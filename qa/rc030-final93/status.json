@@ -48,7 +48,7 @@
     }
   },
   "schemaVersion": 1,
-  "capturedAt": "2026-10-30T17:49:42.796068+00:00",
+  "capturedAt": "2026-10-30T17:51:54.754081+00:00",
   "snapshotOnly": true,
   "publication": false,
   "operators": {
@@ -58,9 +58,11 @@
     },
     "mac": {
       "taskID": "0qs6mqpm",
-      "stage": "QA_RUNNING",
+      "stage": "CLOSED_QA_INCOMPLETE",
       "buildCount": 1,
-      "buildExitCode": 0
+      "buildExitCode": 0,
+      "result": "NOT_APPROVED_FOR_DISTRIBUTION",
+      "finishedAt": "2026-10-30T17:51:28.630016+00:00"
     },
     "windows": {
       "taskID": "31ze36h8",
@@ -109,7 +111,7 @@
     "notary": false,
     "updater": false,
     "canonicalPackaged": "PASS",
-    "rustFormat": "FAIL at apps/desktop/src-tauri/crates/engine-protocol/src/lib.rs:97; no baseline comparison, origin unclassified",
+    "rustFormat": "FAIL at crates/engine-protocol/src/lib.rs:97, baseline NOT compared; no inherited/pre-existing claim",
     "rustResults": [
       {
         "command": "cargo fmt --all -- --check",
@@ -150,26 +152,36 @@
       "bytes": 515342644,
       "files": 5625,
       "symlinks": 154,
-      "bytesMeaning": "aggregate packaged inventory bytes, not JSON report size"
+      "unchangedAtClose": true
     },
     "globalUntouched": true,
     "checks": {
       "coldStart": "PASS, Danil window and fresh onboarding",
       "toolsWithoutGlobalPATH": "PASS canonical runtime smoke, documents and inventory identical",
+      "rootIdentity": "ai.danil.seldon.dev",
       "globalUnchanged": "Installed binaries/processes unchanged; initial same-ID lab discarded, final QA uses exclusive bundle ID",
       "initialLabUncounted": "Unexpected hola turn not issued by operator; initial lab stopped, no result credited",
       "labBundleID": "ai.danil.terminus.rc93-qa",
       "labCopyAdhocOnly": true,
       "freshBundleColdStart": "PASS English/light defaults, Prepare Danil and Danil environment",
       "labRoot": "/Users/aceballosvilla/qa/rc030-final-93/mac-lab-isolated/root",
-      "personalize": "Blank main content observed with Start button available; no personalization capability credited"
+      "personalize": "OBSERVED BLANK / NOT PASS: main content blank, Back, I’ll do it later and Start visible; screenshot isolated-personalize.png. Start reached main. Cause not investigated.",
+      "folderThroughUI": "INCOMPLETE: chooser opened; private folder attachment not confirmed",
+      "twoOwnUITurns": "NOT ACCREDITED: unexpected hola and di 2 tasks not issued by operator; no inference results credited",
+      "fileViewerAndPersistence": "NOT TESTED for this candidate",
+      "environmentVersionUI": "NOT TESTED for this candidate; source versions and engine provenance verified separately",
+      "isolation": "Separate HOME/root and bundle ID used; unexpected task/history observation means complete data isolation not accredited, cause unknown",
+      "unrecognizedTurnCleanup": "Stop turn UI confirmed Interrupted for di 2; then own lab window and engine stopped",
+      "freeModel": "Catalog gratis=true fallback=false and public price all zero verified; no two operator inference completions accredited",
+      "qaCopySignature": "Ad-hoc outer QA bundle only; original Developer ID app and DMG preserved, all inventory hashes match",
+      "complete": false
     },
     "rustDiagnostics": {
       "sourceOID": "93eeb9ef51b71f3cece7fa04942fa76e3b15adc2",
       "baselineCompared": false,
       "origin": "unclassified; no inherited claim",
       "toolchainObservedAt": "2026-10-30T17:49:42.796068+00:00",
-      "toolchainProvenance": "Read-only version commands on operator Mac; log Clippy links independently identify rust-1.96.0; operator confirmation of original command environment pending",
+      "toolchainProvenance": "Cargo target .rustc_info.json and current readback; initial rustc -Vv was not captured separately in build.log; operator confirms no toolchain change.",
       "rustc": "1.96.0 (ac68faa20 2026-05-25)",
       "rustcCommit": "ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96",
       "host": "aarch64-apple-darwin",
@@ -232,10 +244,44 @@
     },
     "personalizeConclusion": {
       "result": "NOT_PASS",
-      "observation": "Blank main content with Start button available",
-      "conclusion": "Personalization capability not demonstrated; cause not established",
-      "operatorEvidencePending": true
-    }
+      "observation": "OBSERVED BLANK / NOT PASS: main content blank, Back, I’ll do it later and Start visible; screenshot isolated-personalize.png. Start reached main. Cause not investigated.",
+      "conclusion": "Blank central content verified in screenshot; cause not established",
+      "operatorEvidencePending": false
+    },
+    "rustToolchain": {
+      "rustc": "1.96.0",
+      "commit": "ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96",
+      "cargo": "1.96.0",
+      "clippy": "0.1.96",
+      "evidence": "Cargo target .rustc_info.json and current readback; initial rustc -Vv was not captured separately in build.log",
+      "changedByOperator": false
+    },
+    "rustTestCount": 35,
+    "cleanup": {
+      "ownLabProcessesStopped": {
+        "99869": true,
+        "99921": true
+      },
+      "globalStopOrReplacement": false,
+      "shutdown": false
+    },
+    "untested": [
+      "two operator UI turns",
+      "private folder successfully attached by UI",
+      "file viewer and persistence after reopen",
+      "Environment version screen",
+      "computer-use MCP on final package",
+      "browser execution beyond version",
+      "notarization",
+      "Gatekeeper acceptance",
+      "signed updater",
+      "DMG mount/extraction install flow"
+    ],
+    "result": "NOT_APPROVED_FOR_DISTRIBUTION",
+    "finishedAt": "2026-10-30T17:51:28.630016+00:00",
+    "sourceCleanAtClose": true,
+    "noAdditionalBuilds": true,
+    "terminalReport": "# Mac QA93: cierre sin aprobación\n\nOID exacto: `93eeb9ef51b71f3cece7fa04942fa76e3b15adc2`. Fuente limpia, versión `0.3.0-rc.1`, pin `4e10efc24a9be6f8dbf15559f767a50fb109a0a7`. Un build normal Tauri; sin rebuild ni cambios de fuente.\n\nBuild, inventario canónico y smoke de runtimes sin PATH global: PASS. Firma Developer ID app y DMG: PASS. Procedencia del motor igual al pin tras quitar firma en copias y normalizar exclusivamente __LINKEDIT vmsize. Inventario de la app original sin cambios al cierre. Gatekeeper exit 3; stapler exit 65; sin notarización ni updater: NO apta para clientes.\n\nQA nativo INCOMPLETO. Arranque y onboarding hasta principal comprobados, título Danil. Personalize muestra contenido central en blanco y botones Back / I’ll do it later / Start; Start permite llegar a principal. No se atribuye PASS a personalización ni se establece causa. Captura: `isolated-personalize.png`.\n\nAparecieron tareas/historial no originados por este operador, incluso después de usar bundle ID, HOME y raíz propios. Se detuvo el turno no reconocido en UI y se comprobó Interrupted. No se acreditan dos turnos propios, archivo/visor/persistencia, carpeta adjunta ni aislamiento completo. No se investigó la causa ni se modificó producción. Procesos de laboratorio 99869 y 99921 detenidos; no quedaron descendientes proveedor en el árbol al cierre. No se alteró instalación o motor global ni se apagó la Mac.\n\nRust: cargo check --locked PASS; cargo test --locked PASS, 35 tests. cargo fmt --all -- --check FAIL exit 1: crates/engine-protocol/src/lib.rs:97 requiere salto de línea. Clippy -D warnings FAIL exit 101: src/extracted/typst_live.rs:369:39 y 385:40 explicit_auto_deref; 559:13 while_let_loop; src/extracted/update.rs:118:10 unnecessary_fold. Baseline no comparado: no se califican como heredados. Rust 1.96.0 ac68faa20; Cargo 1.96.0; Clippy 0.1.96. Cache .rustc_info.json y lectura actual coinciden; versión inicial no capturada por separado en build.log, no hubo cambio de toolchain por este operador.\n\nLogs: rust-checks.log, rust-remaining.log, rust-results.json, build.log, runtime-smoke.log. Metadatos, hashes, bytes, firma, inventario y límites completos en ../mac-status.json. No hay secretos ni contenido de DB en este informe.\n"
   },
   "windows": {
     "signature": "not yet built; no signing credentials used",
@@ -273,12 +319,12 @@
   },
   "limitations": [
     "Snapshot of existing evidence only; no new build or QA executed by exporter.",
-    "Mac QA still running; two successful turns and durable-file restart not credited in this snapshot.",
     "Mac Gatekeeper exit 3 and stapler exit 65; notarization and updater absent.",
     "Rust format exit 1 and clippy exit 101; check and tests exit 0.",
     "Windows compilation in progress; final NSIS hash, size and completed QA unavailable.",
     "Removing Terminal from preparation/selector and simplifying bundled-tool detection assigned separately on Linux; do not rebuild QA93 for that change yet.",
-    "No global installation, Mac shutdown, workflow, release or binary upload authorized by this receipt."
+    "No global installation, Mac shutdown, workflow, release or binary upload authorized by this receipt.",
+    "Mac QA closed incomplete: two operator turns, folder attachment, file viewer/persistence and complete isolation not accredited. Own laboratory stopped."
   ],
   "coordination": {
     "delivery": "steered",
@@ -318,6 +364,18 @@
       "path": "/Users/aceballosvilla/qa/rc030-final-93/mac-evidence/rust-results.json",
       "sha256": "eeaa76521b31b6ad4689cd41f5fc1d6fa2d067ac76c6a6489498be0437ab20f0",
       "bytes": 273
+    },
+    {
+      "path": "/Users/aceballosvilla/qa/rc030-final-93/mac-evidence/terminal-report.md",
+      "exportedPath": "qa/rc030-final93/mac-terminal-report.md",
+      "sha256": "98b911085b6c448baebbd907ca1bb5ae85ca58b77918ba7c5584e46107eba379",
+      "bytes": 2269
+    },
+    {
+      "path": "/Users/aceballosvilla/qa/rc030-final-93/mac-evidence/isolated-personalize.png",
+      "exportedPath": "qa/rc030-final93/mac-isolated-personalize.png",
+      "sha256": "1f812d38b607b9d74a285de17b6075aae9dec09ed01b0fa755a72c3f3234016b",
+      "bytes": 61568
     }
   ]
 }
