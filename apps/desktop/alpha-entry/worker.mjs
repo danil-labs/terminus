@@ -1,10 +1,7 @@
 // Entrada de alfa-app.danil.ai: sirve Terminus web (TERMINUS_WEB) en la raíz, la entrada con
 // WorkOS (session.mjs) y, en /alpha-api, una lista cerrada del BFF de appv2 (APPV2_BFF).
-// Lecturas GET: /auth/profile, /auth/emails, /auth/account/support-access, /api/channels y el
-// inbox, con query acotada. Escrituras POST, solo los correos de la persona: /auth/emails,
-// /auth/emails/verify, /auth/emails/primary y /auth/emails/remove, con Origin exacto, Bearer,
-// JSON de hasta 1 KB y exactamente sus campos; un actor `ai` se rechaza aquí. Al BFF solo van
-// Authorization, Accept, Origin, Referer y un cuerpo reconstruido; nunca cookies.
+// Las escrituras usan Origin exacto, Bearer personal y cuerpos JSON reconstruidos y acotados.
+// La autorización de respuestas se revalida en el BFF sobre la cuenta y canal de la conversación.
 import { handleAuth } from "./session.mjs";
 
 const HOST = "alfa-app.danil.ai";
@@ -18,7 +15,7 @@ const json = (error, status) => Response.json({ error }, {
   headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" },
 });
 
-// Las únicas escrituras: los correos de la persona (Configuración → Cuenta de Danil).
+// Los correos de la persona (Configuración → Cuenta de Danil).
 const EMAIL_WRITES = {
   "/auth/emails": ["email"],
   "/auth/emails/verify": ["email", "code"],
@@ -26,6 +23,28 @@ const EMAIL_WRITES = {
   "/auth/emails/remove": ["email"],
 };
 const MAX_BODY = 1024;
+
+async function replyWrite(request, env, url) {
+  if (request.headers.get("Origin") !== `https://${HOST}`) return json("forbidden_origin", 403);
+  if ((request.headers.get("X-Danil-Actor") ?? "").trim().toLowerCase() === "ai") return json("identity_requires_person", 403);
+  const authorization = request.headers.get("Authorization");
+  if (!authorization || !/^Bearer \S+$/i.test(authorization)) return json("unauthorized", 401);
+  if (url.search) return json("invalid_query", 400);
+  if (!/^application\/json(?:\s*;\s*charset=utf-8)?$/i.test(request.headers.get("Content-Type") ?? "")) return json("invalid_body", 400);
+  const bytes = await boundedBody(request, 20 * 1024);
+  if (!bytes) return json("invalid_body", 400);
+  let body;
+  try { body = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)); } catch { return json("invalid_body", 400); }
+  if (!body || typeof body !== "object" || Array.isArray(body) || Object.keys(body).length !== 3 ||
+      !["conversation_id", "text", "client_message_id"].every(key => Object.hasOwn(body, key)) ||
+      !Number.isSafeInteger(body.conversation_id) || body.conversation_id <= 0 ||
+      typeof body.text !== "string" || !body.text.trim() || body.text.trim().length > 4096 ||
+      typeof body.client_message_id !== "string" || !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(body.client_message_id)) return json("invalid_body", 400);
+  if (!env.APPV2_BFF) return json("bff_unavailable", 503);
+  url.pathname = "/api/messaging/reply";
+  const headers = { Authorization: authorization, Accept: "application/json", "Content-Type": "application/json", Origin: `https://${HOST}` };
+  return forward(env, new Request(url, { method: "POST", headers, body: JSON.stringify({ conversation_id: body.conversation_id, text: body.text.trim(), client_message_id: body.client_message_id }), redirect: "manual" }));
+}
 
 /** Lee el cuerpo por partes y corta al pasar de `max` bytes: sin Content-Length no se carga entero. */
 async function boundedBody(request, max) {
@@ -143,6 +162,7 @@ export default {
     }
     if (url.pathname === PREFIX || url.pathname.startsWith(`${PREFIX}/`)) {
       const path = url.pathname.slice(PREFIX.length);
+      if (request.method === "POST" && path === "/api/messaging/reply") return replyWrite(request, env, url);
       if (request.method === "POST" && Object.hasOwn(EMAIL_WRITES, path)) return emailWrite(request, env, url, path);
       if (request.method !== "GET") return json("method_not_allowed", 405);
       const kind = path === "/auth/profile" ? "profile" :
@@ -150,6 +170,7 @@ export default {
         path === "/api/inbox/conversations" ? "list" :
         path === "/api/channels" ? "channels" :
         path === "/auth/account/support-access" ? "support" :
+        path === "/auth/account/my-permissions" ? "support" :
         /^\/api\/inbox\/conversations\/[1-9]\d*\/messages$/.test(path) ? "messages" : null;
       if (!kind) return json("not_found", 404);
       if (kind === "messages" && !Number.isSafeInteger(Number(path.split("/")[4]))) return json("invalid_query", 400);

@@ -267,3 +267,42 @@ test("WorkOS sign-in routes stay in the Worker; the sign-in page is an asset", a
   assert.equal(await (await h.fetch("/auth?next=%2Finbox")).text(), "assets");
   assert.equal(h.calls.length, 1);
 });
+
+const replyBody = { conversation_id: 12, text: ' hola ', client_message_id: 'ea6db9df-1c8c-4b53-9b36-0d60575ef400' };
+const replyHeaders = { ...auth, Origin: origin, 'Content-Type': 'application/json' };
+test('reply is an exact JSON write preserving user identity and target, stripping ambient authority', async () => {
+  const h = harness();
+  const response = await h.fetch(prefix + '/api/messaging/reply', { method: 'POST', headers: { ...replyHeaders, Cookie: 'admin=true', 'X-Account-Id': '9' }, body: JSON.stringify(replyBody) });
+  assert.equal(response.status, 200);
+  assert.equal(h.calls.length, 1);
+  const upstream = h.calls[0];
+  assert.equal(upstream.url, origin + '/api/messaging/reply');
+  assert.equal(upstream.headers.get('Authorization'), auth.Authorization);
+  assert.equal(upstream.headers.get('Cookie'), null);
+  assert.equal(upstream.headers.get('X-Account-Id'), null);
+  assert.deepEqual(await upstream.json(), { ...replyBody, text: 'hola' });
+});
+test('reply rejects CSRF, AI identity, extra fields, malformed targets and non JSON before BFF', async () => {
+  const h = harness();
+  const options = { method: 'POST', headers: replyHeaders, body: JSON.stringify(replyBody) };
+  for (const headers of [{ ...replyHeaders, Origin: 'https://evil.example' }, { ...replyHeaders, Origin: '' }, { ...replyHeaders, 'X-Danil-Actor': ' AI ' }]) {
+    assert.equal((await h.fetch(prefix + '/api/messaging/reply', { ...options, headers })).status, 403);
+  }
+  for (const body of [{ ...replyBody, account_id: 9 }, { ...replyBody, conversation_id: 0 }, { ...replyBody, conversation_id: 9007199254740992 }, { ...replyBody, text: '  ' }, { ...replyBody, text: 'x'.repeat(4097) }, { ...replyBody, client_message_id: 'anything' }, []]) {
+    assert.equal((await h.fetch(prefix + '/api/messaging/reply', { ...options, body: JSON.stringify(body) })).status, 400);
+  }
+  assert.equal((await h.fetch(prefix + '/api/messaging/reply?account_id=7', options)).status, 400);
+  assert.equal((await h.fetch(prefix + '/api/messaging/reply', { ...options, headers: { ...replyHeaders, 'Content-Type': 'application/json-evil' } })).status, 400);
+  const stream = new ReadableStream({ start(controller) { controller.enqueue(new TextEncoder().encode(' '.repeat(20 * 1024 + 1))); controller.close(); } });
+  assert.equal((await h.fetch(prefix + '/api/messaging/reply', { ...options, body: stream, duplex: 'half' })).status, 400);
+  assert.equal(h.calls.length, 0);
+});
+test('effective permissions are account scoped and server write denials remain denials', async () => {
+  const h = harness();
+  assert.equal((await h.fetch(prefix + '/auth/account/my-permissions?account_id=7', { headers: auth })).status, 200);
+  for (const query of ['', 'account_id=0', 'account_id=7&limit=30', 'account_id=7&account_id=8']) assert.equal((await h.fetch(prefix + '/auth/account/my-permissions?' + query, { headers: auth })).status, 400);
+  for (const status of [401, 402, 403, 404, 503]) {
+    h.env.APPV2_BFF.fetch = async () => Response.json({ error: 'forbidden_read_only' }, { status });
+    assert.equal((await h.fetch(prefix + '/api/messaging/reply', { method: 'POST', headers: replyHeaders, body: JSON.stringify(replyBody) })).status, status);
+  }
+});
