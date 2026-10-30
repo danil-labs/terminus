@@ -212,6 +212,20 @@ lleva su comentario allí:
 | Registros de actividad por máquina | `list_activity`, `read_activity`, `read_activity_log` | — |
 | PR en la tarjeta | `list_session_git` (por carpeta, con las visibles en `priority`) | — |
 | Llevar trabajo | `work_status`, `work_key` | `work_export`, `work_read_part`, `work_write_part`, `work_import`, `work_cancel` |
+| Espacios (UI nueva) | `list_spaces` | `create_space`, `rename_space`, `space_delete_preview` (lo que eliminar detiene o descarta), `delete_space` (con ese `seen`) |
+| Mantener despierta (UI nueva) | `keep_awake_status` | `set_keep_awake` (`on`, `agent`, `off`) |
+| Puertos (UI nueva) | `list_ports` | — |
+| Archivadas (UI nueva) | `archived_tasks` (todas las carpetas; el relay la guarda en su espejo) | — |
+
+**Máquinas con un motor anterior.** Las funciones de la UI nueva se agrupan en
+`APP_FEATURES` (`packages/protocol`). Un motor que no conoce un comando contesta
+`command` (o el relay `unsupported` / `command_not_allowed`, o la frase
+`shell.service.command`); `Host.call` lo anota y falla con
+`command_unsupported` y el comando en `detail` (`isUnknownCommand`,
+`CommandSupport`). La UI pregunta `host.available(feature)`: `unknown` hasta la
+primera respuesta, `yes` si contestó la lectura de la función y `no` si
+rechazó cualquiera de sus comandos; el cambio avisa por `onChange`. La máquina
+nunca sale desactualizada por eso, y al volver a encenderse se vuelve a saber.
 
 En Consumos, «Almacenamiento» consulta el resumen de disco al desplegarlo y el
 workspace seleccionado al abrir una máquina o medir manualmente. No hay
@@ -222,7 +236,8 @@ la fecha de los datos anteriores, marcados como desactualizados.
 
 **Qué enciende la VM.** El relay solo enciende con su lista de intención
 (`INTENT_COMMANDS`: escribir, crear, aprobar, `!`, iniciar sesión…). Fijar,
-renombrar, archivar, subir una imagen y agregar o quitar una cuenta no están en ella: para
+renombrar, archivar, subir una imagen, agregar o quitar una cuenta, crear,
+renombrar o eliminar un espacio (también su previa) y cambiar Mantener despierta no están en ella: para
 esas (`WAKES_FIRST` en `apps/mobile/src/lib/hosts.ts`) el teléfono pide encenderla al plano de
 control (`POST /v1/computers/:id/start`) y espera a que conteste antes de
 mandarlas. Marcar vista, detener o cancelar nunca encienden; abrir la app, una

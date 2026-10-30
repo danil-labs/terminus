@@ -19,7 +19,7 @@ import {
   wakes,
 } from "@terminus/computers";
 import { Fleet, type FleetEvent, type Link, type Slice, type StorageLike, isFleetError, isRead } from "@terminus/fleet";
-import { type AppCommand, type EngineError, type EngineEvent, isAppCommand } from "@terminus/protocol";
+import { type AppCommand, type AppFeature, COMMAND_UNSUPPORTED, CommandSupport, type EngineError, type EngineEvent, type Support, isAppCommand, isUnknownCommand } from "@terminus/protocol";
 
 export class HostError extends Error {
   code: string;
@@ -45,6 +45,14 @@ export type Host = {
   readonly linked: ReadonlySet<string> | null;
   /** Lo que su motor anuncia (`status.service_features`); sin el dato, nada. */
   features?(): readonly string[];
+  /**
+   * Si su motor conoce el comando, según lo que contestó al llamarlo: `unknown`
+   * hasta la primera respuesta. Un motor anterior contesta `command_unsupported`
+   * y la UI oculta solo esa función; cambiar avisa por `onChange`.
+   */
+  supports?(command: AppCommand): Support;
+  /** Lo mismo por función de la UI nueva (`APP_FEATURES`). */
+  available?(feature: AppFeature): Support;
   power(): Power;
   /** Si una acción se puede mandar ya, enciende la máquina, no tiene cómo o su motor está desactualizado. */
   canAct(): "now" | "wakes" | "asleep" | "outdated";
@@ -65,6 +73,12 @@ function allowed(command: string) {
   if (!isAppCommand(command)) throw new HostError("command_not_allowed", command);
 }
 
+/** Anota en `support` lo que contestó `command` y nombra el fallo: el comando que la máquina no conoce sale `command_unsupported`. */
+function noted(support: CommandSupport, machine: string, command: string, error: unknown): HostError {
+  if (support.note(machine, command, error)) return new HostError(COMMAND_UNSUPPORTED, command);
+  return error instanceof HostError ? error : new HostError("io", error instanceof Error ? error.message : String(error));
+}
+
 /**
  * Acciones de la persona que el relay no toma por intención (no encienden la
  * VM por sí solas): la flota enciende antes la VM administrada por el plano de
@@ -80,6 +94,13 @@ export const WAKES_FIRST: ReadonlySet<string> = new Set([
   "prepare_attachments",
   "add_account",
   "remove_account",
+  // Los espacios y Mantener despierta (UI nueva). La previa de eliminar también:
+  // es el primer paso de borrar y sin ella no hay `seen` que mandar.
+  "create_space",
+  "rename_space",
+  "space_delete_preview",
+  "delete_space",
+  "set_keep_awake",
 ]);
 
 /** Pide al plano de control que encienda la computadora (`POST /v1/computers/:id/start`). */
@@ -179,9 +200,16 @@ export function accountFleet(config: AccountFleetConfig, factory?: SocketFactory
     },
   });
   fleet.subscribeEvents();
+  const lastPower = new Map<string, Power>();
   const changed = (machine: string) => {
+    // Al volver a encenderse puede traer otro motor: lo que se supo de sus comandos se vuelve a saber al llamar.
+    const now = fleet.power(machine);
+    const before = lastPower.get(machine);
+    lastPower.set(machine, now);
+    if (now === "on" && before !== undefined && before !== "on") support.forget(machine);
     for (const listener of changes.get(machine) ?? []) listener();
   };
+  const support = new CommandSupport(changed);
   const listen = <T,>(book: Map<string, Set<T>>, machine: string, listener: T) => {
     const set = book.get(machine) ?? new Set<T>();
     set.add(listener);
@@ -212,6 +240,8 @@ export function accountFleet(config: AccountFleetConfig, factory?: SocketFactory
         return fleet.info(id)?.linked ?? null;
       },
       features: () => fleet.info(id)?.features ?? [],
+      supports: (command) => support.supports(id, command),
+      available: (feature) => support.feature(id, feature),
       power,
       canAct,
       onChange: (listener) => listen(changes, id, listener),
@@ -222,9 +252,11 @@ export function accountFleet(config: AccountFleetConfig, factory?: SocketFactory
         if (isRead(command)) {
           // Una lectura es una rebanada: apagada con copia no se pregunta, y sin respuesta se queda la anterior.
           const slice = await fleet.read(envelope).catch((error: unknown) => {
-            throw hostError(error, label());
+            throw noted(support, id, command, hostError(error, label()));
           });
-          if (!slice.has) throw sliceError(slice, label());
+          if (!slice.has) throw noted(support, id, command, sliceError(slice, label()));
+          // Una copia no dice qué conoce el motor de ahora; una respuesta viva sí.
+          if (slice.status === "ok") support.note(id, command);
           return { value: slice.value as T, cachedAt: slice.status === "ok" ? null : slice.at };
         }
         // Fijar, archivar, renombrar o mover con la máquina apagada (VM o propia): el relay lo guarda sin encenderla.
@@ -235,9 +267,11 @@ export function accountFleet(config: AccountFleetConfig, factory?: SocketFactory
         }
         try {
           const { value, at } = await fleet.raw(envelope);
+          // Aplazada por el relay (`at`): aún no la vio el motor.
+          if (at === null) support.note(id, command);
           return { value: value as T, cachedAt: at };
         } catch (error) {
-          throw hostError(error, label());
+          throw noted(support, id, command, hostError(error, label()));
         }
       },
       async wake() {
@@ -311,6 +345,9 @@ export function bridgeHost(pairing: Pairing, label: string): Host {
   const eventListeners = new Set<(events: EngineEvent[], gap: boolean) => void>();
   let online = false;
   let stopped = false;
+  const support = new CommandSupport(() => {
+    for (const listener of changeListeners) listener();
+  });
   const setOnline = (next: boolean) => {
     if (online === next) return;
     online = next;
@@ -339,6 +376,8 @@ export function bridgeHost(pairing: Pairing, label: string): Host {
     kind: "bridge",
     managed: false,
     linked: null,
+    supports: (command) => support.supports("bridge", command),
+    available: (feature) => support.feature("bridge", feature),
     power: () => (online ? "on" : "off"),
     canAct: () => (online ? "now" : "asleep"),
     onChange(listener) {
@@ -354,8 +393,13 @@ export function bridgeHost(pairing: Pairing, label: string): Host {
       const body = await bridgeRequest<{ result: unknown; error: EngineError | null }>(pairing, "/v1/call", {
         method: "POST",
         body: JSON.stringify({ command, args, workspace }),
+      }).catch((error: unknown) => {
+        // Un bridge anterior contesta 403 `command_not_allowed` a lo que no tiene en su lista.
+        throw noted(support, "bridge", command, error);
       });
-      if (body.error) throw new HostError(body.error.code, body.error.detail);
+      // El fallo del motor tal como llega, con su frase (`message_key`), antes de perderla en `HostError`.
+      if (body.error) throw support.note("bridge", command, body.error) ? new HostError(COMMAND_UNSUPPORTED, command) : new HostError(body.error.code, body.error.detail);
+      support.note("bridge", command);
       const result = body.result as { value?: unknown } | null;
       // `service invoke` envuelve la respuesta del comando en `value`.
       const value = (result && typeof result === "object" && "value" in result ? result.value : result) as T;

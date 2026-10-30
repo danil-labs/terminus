@@ -181,3 +181,54 @@ test("una lista de turnos guardada no deja en cola los mensajes a una VM apagada
   on = true;
   assert.equal((await loadTask(host, "w", "p", "task")).running, true);
 });
+
+test("un motor anterior que no conoce un comando de la UI nueva: error claro, se oculta esa función y la máquina sigue", async () => {
+  FakeSocket.replies.set("cmp_vm", ({ command }) => {
+    if (command === "list_ports") return { error: { code: "command", detail: "list_ports" } };
+    if (command === "set_keep_awake") return { error: { code: "command_failed", detail: { what: { clave: "shell.service.command" }, detail: "set_keep_awake" } } };
+    if (command === "keep_awake_status") return { value: { mode: "agent", active: false, supported: true } };
+    if (command === "list_projects") return { value: [] };
+    return undefined;
+  });
+  const { machines, byId } = await start([{ ...VM, state: "online" }]);
+  socketOf("cmp_vm").open("online");
+  const vm = byId("cmp_vm");
+  let changes = 0;
+  vm.onChange(() => changes++);
+  assert.equal(vm.available?.("ports"), "unknown");
+  await assert.rejects(vm.call("list_ports", "w1", {}), (e: HostError) => e.code === "command_unsupported" && e.detail === "list_ports");
+  assert.equal(vm.available?.("ports"), "no");
+  assert.ok(changes > 0, "la UI se entera y la oculta");
+  assert.deepEqual((await vm.call("keep_awake_status", "w1", {})).value, { mode: "agent", active: false, supported: true });
+  assert.equal(vm.available?.("keep_awake"), "yes");
+  await assert.rejects(vm.call("set_keep_awake", "w1", { mode: "on" }), (e: HostError) => e.code === "command_unsupported");
+  assert.equal(vm.available?.("keep_awake"), "no", "si rechaza cambiarlo, tampoco se enseña");
+  assert.deepEqual((await vm.call("list_projects", "w1", {})).value, [], "la máquina sigue en servicio");
+  assert.notEqual(vm.canAct(), "outdated");
+  machines.close();
+});
+
+test("crear, renombrar y eliminar espacios y cambiar Mantener despierta encienden antes la VM; leer puertos o archivadas no", async () => {
+  const woken: string[] = [];
+  FakeSocket.replies.set("cmp_vm", ({ command, args }) => {
+    if (command === "create_space") return { value: { id: "s9", name: args.name, folders: [] } };
+    return { error: { code: "machine_off" } };
+  });
+  const { machines, byId } = await start([VM], {
+    wake: async (id) => {
+      woken.push(id);
+      setTimeout(() => socketOf("cmp_vm").push({ type: "state", state: "online" }), 5);
+      return true;
+    },
+  });
+  socketOf("cmp_vm").open("offline");
+  const vm = byId("cmp_vm");
+  await assert.rejects(vm.call("list_ports", "w1", {}), (e: HostError) => e.code === "machine_off");
+  await assert.rejects(vm.call("archived_tasks", "w1", {}), (e: HostError) => e.code === "machine_off");
+  assert.deepEqual(woken, [], "leer no enciende");
+  assert.equal(vm.available?.("ports"), "unknown", "apagada no dice si lo conoce");
+  const made = await vm.call<{ id: string }>("create_space", "w1", { name: "Pagos" });
+  assert.equal(made.value.id, "s9");
+  assert.deepEqual(woken, ["cmp_vm"]);
+  machines.close();
+});
