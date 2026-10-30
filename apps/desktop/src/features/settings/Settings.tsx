@@ -51,7 +51,7 @@ const ManageProjects = lazy(() => import("./ManageProjects"));
 const Agents = lazy(() => import("./Agents"));
 
 /** `/admin` de la web de alfa; el escritorio la abre en el navegador. */
-const ADMIN_URL = "https://alfa-app.danil.ai/terminus/admin";
+const ADMIN_URL = "https://alfa-app.danil.ai/admin";
 
 /**
  * Configuración: siete entradas, y lo que eran secciones sueltas va en

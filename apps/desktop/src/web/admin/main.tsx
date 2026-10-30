@@ -19,7 +19,7 @@ export async function startAdmin(settings: { login: string; supabaseUrl: string;
   const session = supabaseSession(settings.supabaseUrl, settings.supabaseKey, { onGone: leave });
   const { data } = await session.client.auth.getSession();
   if (!data.session) return leave();
-  const api = createSupportAccess(session);
+  const api = createSupportAccess(session, fetch, `${import.meta.env.BASE_URL}alpha-api`);
   const source: AdminSource = {
     memberships: api.memberships,
     active: async () => activeAccountOf(await session.getToken()),
