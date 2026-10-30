@@ -248,7 +248,7 @@
   "danil.emails.retry": "Retry",
   "danil.emails.empty": "There are no emails in your account yet.",
   "danil.emails.manage_label": "Emails",
-  "danil.emails.manage_description": "Add other emails, choose your primary one and remove the ones you no longer use. Opens Danil in your browser.",
+  "danil.emails.manage_description": "Add other emails, choose your primary one and remove the ones you no longer use. Opens Danil in your browser, with the account you signed in with there.",
   "danil.emails.manage": "Manage",
   "danil.emails.error.code_invalid": "That code doesn't match. Check it and try again.",
   "danil.emails.error.code_invalid_left": {

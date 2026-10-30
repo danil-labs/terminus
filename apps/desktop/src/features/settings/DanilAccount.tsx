@@ -6,7 +6,7 @@ import { capabilities } from "../../lib/platform";
 import { Button } from "../../ui/Button";
 import { Input } from "../../ui/Input";
 import { engineAccountProfile, engineAccountProfileOf, profileFromStatus } from "./account-engine";
-import type { AccountProfile, AccountProfileSource } from "./account-profile";
+import { type AccountProfile, type AccountProfileSource, PROFILE_CHANGED } from "./account-profile";
 import { AccountIdentityBlock, type AccountIdentityState, createAccountIdentity } from "./AccountIdentity";
 import type { DanilConnectStatus } from "./danil-account";
 import { createDanilAccounts, type DanilAccounts } from "./danil-accounts";
@@ -47,7 +47,8 @@ function ManageEmailsRow(props: { web?: boolean }) {
 
 /** En la web la persona ya entró con su cuenta: su foto, nombre y correos. */
 function WebAccount(props: { source: AccountProfileSource }) {
-  const identity = createAccountIdentity(props.source);
+  const [primaryChanged, setPrimaryChanged] = createSignal(0);
+  const identity = createAccountIdentity(props.source, undefined, { watch: primaryChanged });
   const workspaces = createWorkspaces();
   return (
     <SettingsPanel data-danil-account="web">
@@ -57,7 +58,17 @@ function WebAccount(props: { source: AccountProfileSource }) {
           <ManageEmailsRow web />
         </Show>
       </SettingsSection>
-      <Show when={capabilities().accountEmails}>{(emails) => <EmailsSection source={emails()} />}</Show>
+      <Show when={capabilities().accountEmails}>
+        {(emails) => (
+          <EmailsSection
+            source={emails()}
+            onPrimaryChanged={() => {
+              setPrimaryChanged((n) => n + 1);
+              window.dispatchEvent(new CustomEvent(PROFILE_CHANGED));
+            }}
+          />
+        )}
+      </Show>
       <Show when={workspaces.actual()} keyed>
         {(workspace) => <AccountComputersSection workspace={workspace.id} />}
       </Show>

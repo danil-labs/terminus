@@ -35,7 +35,7 @@ function countdown(until: () => number | null) {
  * marcado, agregar con un código de 6 dígitos, hacer principal y quitar. Los
  * errores se dicen dentro de la sección.
  */
-export function EmailsSection(props: { source: AccountEmailsSource }) {
+export function EmailsSection(props: { source: AccountEmailsSource; onPrimaryChanged?: () => void }) {
   const [list, { refetch }] = createResource(() => props.source.list());
   const [feedback, setFeedback] = createSignal<Feedback>(null);
   const [adding, setAdding] = createSignal(false);
@@ -81,6 +81,8 @@ export function EmailsSection(props: { source: AccountEmailsSource }) {
 
   async function changed(kind: "verified" | "primary" | "removed" | "gone") {
     await refetch();
+    // El principal es el correo de la persona: la identidad y el pie lo vuelven a leer.
+    if (kind === "primary") props.onPrimaryChanged?.();
     if (kind === "removed") focusAdd();
     if (kind === "verified" || kind === "gone") setCodeFor(null);
   }

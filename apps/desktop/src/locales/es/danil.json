@@ -248,7 +248,7 @@
   "danil.emails.retry": "Reintentar",
   "danil.emails.empty": "Todavía no hay correos en tu cuenta.",
   "danil.emails.manage_label": "Correos",
-  "danil.emails.manage_description": "Agrega otros correos, elige el principal y quita los que ya no uses. Se abre Danil en el navegador.",
+  "danil.emails.manage_description": "Agrega otros correos, elige el principal y quita los que ya no uses. Se abre Danil en el navegador, con la cuenta con la que hayas entrado ahí.",
   "danil.emails.manage": "Administrar",
   "danil.emails.error.code_invalid": "Ese código no coincide. Revísalo e inténtalo de nuevo.",
   "danil.emails.error.code_invalid_left": {
