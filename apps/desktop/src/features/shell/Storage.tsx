@@ -16,7 +16,7 @@ import { peso } from "../../lib/format";
 import { conservar } from "../../lib/sessionRefresh";
 import { haceCuanto } from "../../lib/limits";
 import { cn } from "../../lib/utils";
-import Gauge from "lucide-solid/icons/gauge";
+import Server from "lucide-solid/icons/server";
 import Trash2 from "lucide-solid/icons/trash-2";
 import ChevronRight from "lucide-solid/icons/chevron-right";
 import ChevronDown from "lucide-solid/icons/chevron-down";
@@ -1102,7 +1102,7 @@ export default function Almacenamiento(props: {
             title={triggerTitle()}
             data-machine-pressure={pressure()?.level}
           >
-            <Gauge
+            <Server
               size={props.vertical ? 16 : 12}
               class={midiendo() || clearing() ? "animate-pulse" : undefined}
               aria-hidden
@@ -1127,7 +1127,7 @@ export default function Almacenamiento(props: {
       >
         <div class="flex shrink-0 items-center justify-between gap-2 border-b border-border px-3 py-2">
           <h2 class="m-0 flex items-center gap-1.5 text-xs font-semibold text-neutral-950">
-            <Gauge size={12} class="text-neutral-500" aria-hidden />
+            <Server size={12} class="text-neutral-500" aria-hidden />
             {t("shell.machine_panel.title")}
           </h2>
           <span class="flex items-center gap-1">
