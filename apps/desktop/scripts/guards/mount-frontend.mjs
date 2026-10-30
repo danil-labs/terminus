@@ -2823,7 +2823,9 @@ if (!roto) {
   const selectedKeys = (scope) => (selections.get(scope) ?? []).map(({ key }) => key);
   providers.w.document.querySelector('button[aria-label="Configuración"]')?.click();
   await sleep(100);
-  providerButton("Control de Fuentes")?.click();
+  providers.w.document.querySelector("#cfg-tab-projects")?.click();
+  await sleep(50);
+  providers.w.document.querySelector("#cfg-sub-fuentes")?.click();
   await sleep(100);
   assert.equal(providerButton("Quitar del workspace"), undefined, "la conexión previa muestra solo el resumen");
   assert.ok(providers.w.document.body.textContent.includes("acme"));
@@ -2928,7 +2930,9 @@ if (!roto) {
   });
   plugins.w.document.querySelector('button[aria-label="Configuración"]')?.click();
   await sleep(100);
-  plugins.w.document.querySelector('#cfg-tab-plugins')?.click();
+  plugins.w.document.querySelector('#cfg-tab-agents-skills')?.click();
+  await sleep(50);
+  plugins.w.document.querySelector('#cfg-sub-plugins')?.click();
   await sleep(100);
   const officeCard = () => [...plugins.w.document.querySelectorAll("div")].find(d => d.textContent === "LibreOffice")?.parentElement?.parentElement?.parentElement;
   const officeButton = (text) => [...officeCard().querySelectorAll("button")].find(b => b.textContent?.trim() === text);
@@ -3100,7 +3104,9 @@ if (!roto) {
   };
   rDoc.querySelector('button[aria-label="Configuración"]')?.click();
   await sleep(100);
-  rDoc.querySelector("#cfg-tab-radiant")?.click();
+  rDoc.querySelector("#cfg-tab-connections")?.click();
+  await sleep(50);
+  rDoc.querySelector("#cfg-sub-radiant")?.click();
   await sleep(100);
   assert.ok(rPanel().textContent.includes(CLOUD), "Radiant Cloud enseña su origen");
   assert.equal(rBoton("Iniciar sesión"), undefined, "sin servidor elegido no hay sesión que iniciar");
@@ -3335,6 +3341,8 @@ if (!roto) {
   const languageDoc = languageApp.w.document;
   languageDoc.querySelector('button[aria-label="Configuración"]')?.click();
   await sleep(100);
+  languageDoc.querySelector("#cfg-tab-preferences")?.click();
+  await sleep(50);
   const languageSelect = () =>
     [...languageDoc.querySelectorAll("select")].find((s) => s.querySelector('option[value="en"]') && s.querySelector('option[value=""]'));
   const pickLanguage = async (code) => {
@@ -3471,16 +3479,16 @@ if (!roto) {
   agDoc.querySelector('button[aria-label="Configuración"]')?.click();
   await sleep(100);
   const pestanas = [...agDoc.querySelectorAll('[role="tab"][id^="cfg-tab-"]')].map((b) => b.id);
-  const skills = pestanas.indexOf("cfg-tab-skills");
-  assert.deepEqual(pestanas.slice(skills, skills + 4), ["cfg-tab-skills", "cfg-tab-agentes", "cfg-tab-proyectos", "cfg-tab-plugins"]);
-  agDoc.querySelector("#cfg-tab-proyectos").click();
+  const proyectos = pestanas.indexOf("cfg-tab-projects");
+  assert.deepEqual(pestanas.slice(proyectos, proyectos + 2), ["cfg-tab-projects", "cfg-tab-agents-skills"]);
+  agDoc.querySelector("#cfg-tab-projects").click();
   // La página llega en su propio trozo: se espera a que pinte sus filas.
   for (let i = 0; i < 120 && !agDoc.querySelector("#cfg-panel [data-settings-project]"); i++) await sleep(25);
   const filasDeProyectos = [...agDoc.querySelectorAll("#cfg-panel [data-settings-project]")];
   assert.deepEqual(filasDeProyectos.map((f) => f.getAttribute("data-settings-project")), idsDelCatalogo, "Ajustes › Proyectos lista las carpetas del espacio");
   assert.ok(filasDeProyectos.every((f) => f.textContent.includes("Archivos") && f.textContent.includes("sin tareas")), "cada fila dice su tipo en palabras y que no tiene tareas");
   assert.doesNotMatch(panelDeAjustes().textContent, /\bgit\b/i, "la página no le habla de git a la persona");
-  agDoc.querySelector("#cfg-tab-agentes").click();
+  agDoc.querySelector("#cfg-tab-agents-skills").click();
   // Agentes llega en su propio trozo: se espera a que pinte sus filas.
   for (let i = 0; i < 120 && !propia("giskard-po"); i++) await sleep(25);
 
@@ -3858,6 +3866,8 @@ if (!roto) {
   assert.ok(minimizar()[0].closest("[data-title-bar]"));
   d3.querySelector('button[aria-label="Configuración"]')?.click();
   await sleep(150);
+  d3.querySelector("#cfg-tab-machines").click();
+  await sleep(50);
   [...d3.querySelectorAll("button")].find((b) => b.textContent.trim() === "Estado del entorno").click();
   await sleep(200);
   assert.equal(d3.body.textContent.split("Motor 0.2.73 b1fed68").length, 2, "el build del motor aparece una sola vez en Estado del entorno");
@@ -4876,6 +4886,8 @@ if (!roto) {
   assert.equal(defaultModeLabel(), "Permisos: Automático", "and the next new task starts with the default again");
   defaultDoc.querySelector('button[aria-label="Configuración"]')?.click();
   await sleep(150);
+  defaultDoc.querySelector("#cfg-tab-preferences")?.click();
+  await sleep(50);
   const defaultSelect = defaultDoc.querySelector('select[aria-label="Permisos por defecto"]');
   assert.ok(defaultSelect, "General shows the default permissions select");
   assert.equal(defaultSelect.value, "auto");
@@ -5160,7 +5172,9 @@ if (!roto) {
         [...doc.querySelectorAll("button")].find(b => b.textContent.trim() === "Ahora no").click();
         doc.querySelector('button[aria-label="Configuraci\u00f3n"]').click();
         await sleep(100);
-        doc.querySelector("#cfg-tab-entorno").click();
+        doc.querySelector("#cfg-tab-machines").click();
+        await sleep(50);
+        doc.querySelector("#cfg-sub-entorno").click();
         await sleep(100);
       }
       latest = available ? { ...latest, rid: 278, version: "0.2.78" } : null;
