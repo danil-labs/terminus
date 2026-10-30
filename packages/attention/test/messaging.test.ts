@@ -38,3 +38,16 @@ test('ambiguous writes and rejected tokens are never automatically retried', asy
   await assert.rejects(createMessaging(session, async () => { throw new Error('timeout'); }).reply(12, 'hola', clientId), /uncertain/);
   await assert.rejects(createMessaging(session, async () => Response.json({ ok: true })).reply(12, 'hola', clientId), /uncertain/);
 });
+
+test('session cancellation during token renewal prevents the write from starting', async () => {
+  let resolveToken!: (token: string) => void;
+  const token = new Promise<string>(resolve => { resolveToken = resolve; });
+  const controller = new AbortController();
+  let calls = 0;
+  const api = createMessaging({ ...session, getToken: () => token }, async () => { calls++; return Response.json({ status: 'pending' }); });
+  const pending = api.reply(12, 'hola', clientId, controller.signal);
+  controller.abort();
+  resolveToken('old-token');
+  await assert.rejects(pending, error => error instanceof DOMException && error.name === 'AbortError');
+  assert.equal(calls, 0);
+});

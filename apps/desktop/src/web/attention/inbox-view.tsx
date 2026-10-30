@@ -10,7 +10,8 @@ import Phone from 'lucide-solid/icons/phone';
 import Radio from 'lucide-solid/icons/radio';
 import Search from 'lucide-solid/icons/search';
 import SendHorizontal from 'lucide-solid/icons/send-horizontal';
-import { createEffect, createSignal, For, type JSX, onCleanup, Show } from 'solid-js';
+import { For, type JSX, Show } from 'solid-js';
+import type { InboxDraft } from './inbox-drafts';
 import { ReplyError } from '../../../../../packages/attention/src/messaging.ts';
 import { contactDisplayName, contactIdentifier, contactSubIdentifier, type Conversation, type ConversationLabel, conversationLabels, type InboxFilter, type Message, normalizeProvider } from '../../../../../packages/attention/src/inbox.ts';
 import { df } from '../../lib/format';
@@ -191,47 +192,39 @@ export function MessageBubble(props: { message: Message; position: 'first' | 'mi
   </div>;
 }
 
-export function InboxComposer(props: { conversation: number; allowed: boolean; onSend: (conversation: number, text: string, clientId: string) => Promise<{ requiresTemplate: boolean; duplicate: boolean }>; onRefresh: () => Promise<void> }) {
-  const [draft, setDraft] = createSignal('');
-  const [pending, setPending] = createSignal(false);
-  const [notice, setNotice] = createSignal('');
-  const [error, setError] = createSignal(false);
-  const [uncertain, setUncertain] = createSignal(false);
-  let generation = 0;
-  onCleanup(() => { generation++; });
-  createEffect(() => { void props.conversation; void props.allowed; generation++; setDraft(''); setNotice(''); setError(false); setUncertain(false); setPending(false); });
+export function InboxComposer(props: { draft: InboxDraft; conversation: number; allowed: boolean; onSend: (conversation: number, text: string, clientId: string, signal: AbortSignal) => Promise<{ requiresTemplate: boolean; duplicate: boolean }>; onRefresh: () => Promise<void> }) {
+  const state = () => props.draft.value();
   async function refresh() {
-    const current = generation;
-    setPending(true);
-    try { await props.onRefresh(); if (current === generation) { setUncertain(false); setNotice(t("inbox-writes.reviewed")); setError(false); } }
-    catch { if (current === generation) { setNotice(t("inbox-writes.refresh_failed")); setError(true); } }
-    finally { if (current === generation) setPending(false); }
+    const draft = props.draft;
+    draft.set(value => ({ ...value, pending: true }));
+    try { await props.onRefresh(); if (!draft.signal.aborted) draft.set(value => ({ ...value, uncertain: false, notice: t("inbox-writes.reviewed"), error: false })); }
+    catch { if (!draft.signal.aborted) draft.set(value => ({ ...value, notice: t("inbox-writes.refresh_failed"), error: true })); }
+    finally { if (!draft.signal.aborted) draft.set(value => ({ ...value, pending: false })); }
   }
   async function send() {
-    if (pending() || uncertain() || !props.allowed || !draft().trim()) return;
-    const current = generation;
-    setPending(true); setNotice(''); setError(false);
+    const draft = props.draft;
+    if (state().pending || state().uncertain || !props.allowed || !state().text.trim()) return;
+    draft.set(value => ({ ...value, pending: true, notice: '', error: false }));
     try {
-      const result = await props.onSend(props.conversation, draft(), crypto.randomUUID());
-      if (current !== generation) return;
-      setDraft('');
-      setNotice(result.requiresTemplate ? t("inbox-writes.template") : result.duplicate ? t("inbox-writes.duplicate") : t("inbox-writes.queued"));
-      setError(result.requiresTemplate);
-      try { await props.onRefresh(); } catch { /* La aceptación se conserva aunque falle la lectura posterior. */ }
+      const result = await props.onSend(props.conversation, state().text, crypto.randomUUID(), draft.signal);
+      if (draft.signal.aborted) return;
+      draft.set(value => ({ ...value, text: result.requiresTemplate ? value.text : '', uncertain: result.requiresTemplate,
+        notice: result.requiresTemplate ? t("inbox-writes.template") : result.duplicate ? t("inbox-writes.duplicate") : t("inbox-writes.queued"), error: result.requiresTemplate }));
+      if (draft === props.draft) try { await props.onRefresh(); } catch { /* La aceptación se conserva aunque falle la lectura posterior. */ }
     } catch (cause) {
-      if (current !== generation) return;
+      if (draft.signal.aborted) return;
       const unknown = !(cause instanceof ReplyError) || cause.code === 'uncertain';
-      setUncertain(unknown); setError(true);
-      setNotice(unknown ? t("inbox-writes.uncertain") : cause.status === 403 ? t("inbox-writes.denied") : cause.status === 402 ? t("inbox-writes.wallet") : t("inbox-writes.failed"));
-    } finally { if (current === generation) setPending(false); }
+      draft.set(value => ({ ...value, uncertain: unknown, error: true,
+        notice: unknown ? t("inbox-writes.uncertain") : cause.status === 403 ? t("inbox-writes.denied") : cause.status === 402 ? t("inbox-writes.wallet") : t("inbox-writes.failed") }));
+    } finally { if (!draft.signal.aborted) draft.set(value => ({ ...value, pending: false })); }
   }
   return <form class="absolute right-0 bottom-0 left-0 z-10 bg-transparent p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]" onSubmit={event => { event.preventDefault(); void send(); }}>
-    <p id="alpha-inbox-send-status" role={error() ? 'alert' : 'status'} class={`m-0 mb-1.5 text-center text-[0.72rem] ${error() ? 'text-error-strong' : 'text-neutral-500'}`}>{!props.allowed ? t("inbox-writes.denied") : pending() ? t("inbox-writes.pending") : notice()}</p>
-    <Show when={uncertain()}><Button size="sm" variant="secondary" disabled={pending()} onClick={() => void refresh()}>{t("inbox-writes.review")}</Button></Show>
+    <p id="alpha-inbox-send-status" role={state().error ? 'alert' : 'status'} class={`m-0 mb-1.5 text-center text-[0.72rem] ${state().error ? 'text-error-strong' : 'text-neutral-500'}`}>{!props.allowed ? t("inbox-writes.denied") : state().pending ? t("inbox-writes.pending") : state().notice}</p>
+    <Show when={state().uncertain}><Button size="sm" variant="secondary" disabled={state().pending} onClick={() => void refresh()}>{t("inbox-writes.review")}</Button></Show>
     <div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-end gap-2 rounded-2xl border border-border/60 bg-surface/30 p-1.5 shadow-sm backdrop-blur-[4px]">
       <Button size="icon" variant="ghost" disabled aria-label={t("web.alpha.attach")} class="rounded-full border border-border-strong bg-neutral-100 text-neutral-700 dark:bg-surface-raised"><Paperclip size={17}/></Button>
-      <Textarea variant="ghost" rows={1} maxLength={4096} value={draft()} onInput={event => setDraft(event.currentTarget.value)} disabled={!props.allowed || pending()} aria-label={t("web.alpha.reply_label")} aria-describedby="alpha-inbox-send-status" placeholder={t("web.alpha.reply_placeholder")} class="max-h-32 overflow-y-auto px-1 py-2 text-base leading-6"/>
-      <Button size="icon" type="submit" disabled={!props.allowed || pending() || uncertain() || !draft().trim()} aria-label={t("web.alpha.send_reply")} aria-describedby="alpha-inbox-send-status" class="rounded-full"><SendHorizontal size={17}/></Button>
+      <Textarea variant="ghost" rows={1} maxLength={4096} value={state().text} onInput={event => { const text = event.currentTarget.value; props.draft.set(value => ({ ...value, text })); }} disabled={!props.allowed || state().pending} aria-label={t("web.alpha.reply_label")} aria-describedby="alpha-inbox-send-status" placeholder={t("web.alpha.reply_placeholder")} class="max-h-32 overflow-y-auto px-1 py-2 text-base leading-6"/>
+      <Button size="icon" type="submit" disabled={!props.allowed || state().pending || state().uncertain || !state().text.trim()} aria-label={t("web.alpha.send_reply")} aria-describedby="alpha-inbox-send-status" class="rounded-full"><SendHorizontal size={17}/></Button>
     </div>
   </form>;
 }

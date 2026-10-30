@@ -1,6 +1,7 @@
 import { createEffect, createSignal, For, onCleanup, onMount, Show } from 'solid-js';
 import { createInbox, matchesFilter, type Account, type Conversation, type ConversationCounts, type InboxFilter, type InboxSession, type Message } from '../../../../../packages/attention/src/inbox.ts';
 import { t } from '../../lib/i18n';
+import { inboxDraft } from './inbox-drafts';
 import { createMessaging } from '../../../../../packages/attention/src/messaging.ts';
 import { publishConversations, requestedConversation, requestConversation } from './loaded';
 import { Button } from '../../ui/Button';
@@ -26,6 +27,7 @@ export function Attention(props: { demo: boolean; session?: InboxSession & { sub
   const [filter, setFilter] = createSignal<InboxFilter>('all');
   const [counts, setCounts] = createSignal<ConversationCounts>({ assistance: null, aiDisabled: null });
   const api = props.session ? createInbox(props.session, fetch, `${import.meta.env.BASE_URL}alpha-api`) : null;
+  const draftSession = props.session ?? { getToken: async () => '', unauthorized: async () => false };
   const messaging = props.session ? createMessaging(props.session, fetch, `${import.meta.env.BASE_URL}alpha-api`) : null;
   let epoch = 0;
   let thread = 0;
@@ -120,9 +122,9 @@ export function Attention(props: { demo: boolean; session?: InboxSession & { sub
                   <Show when={!loadingThread() && !error() && messages().length === 0}><p class="m-0 p-3 text-center text-[0.85rem] text-neutral-500">{t("web.alpha.no_messages")}</p></Show>
                 </div>
               </div>
-              <InboxComposer conversation={row().id} allowed={canReply() && !props.demo && !row().contact_blocked} onSend={async (id, text, clientId) => {
+              <InboxComposer draft={inboxDraft(draftSession, account() ?? 0, row().id)} conversation={row().id} allowed={canReply() && !props.demo && !row().contact_blocked} onSend={async (id, text, clientId, signal) => {
                 if (!messaging || !canReply()) throw new Error(t("inbox-writes.denied"));
-                return messaging.reply(id, text, clientId);
+                return messaging.reply(id, text, clientId, signal);
               }} onRefresh={async () => {
                 if (!api || !account()) throw new Error(t("web.alpha.session_required"));
                 const currentEpoch = epoch, currentThread = thread;
