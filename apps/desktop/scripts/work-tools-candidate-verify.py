@@ -39,14 +39,17 @@ metadata_path = args.candidate.resolve()
 metadata = json.loads(metadata_path.read_text())
 base = metadata_path.parent
 target = metadata['target']
-if target != 'x86_64-unknown-linux-gnu' or metadata['published_engine_lock']:
-    raise ValueError('Expected the unpublished native Linux overlay')
+if target != 'x86_64-unknown-linux-gnu':
+    raise ValueError('Expected the native Linux overlay')
 source = base / 'binaries' / f'seldon-runtime-{target}'
 if digest(source) != metadata['engine_sha256']:
     raise ValueError('Candidate source engine SHA-256 mismatch')
 lock = json.loads((Path(__file__).resolve().parent.parent / 'seldon-runtime.lock').read_text())
-if any(pin['sha256'] == digest(source) for pin in lock['platforms'].values()):
-    raise ValueError('Candidate engine is the old published pin')
+published_engine = lock['platforms'].get(target, {}).get('sha256') == metadata['engine_sha256']
+if metadata['published_engine_lock'] != published_engine:
+    raise ValueError('Candidate metadata disagrees with the published engine lock')
+if not published_engine and any(pin['sha256'] == digest(source) for pin in lock['platforms'].values()):
+    raise ValueError('Published candidate engine does not match the native target')
 appimage = args.appimage.resolve()
 patchelf = args.patchelf.resolve()
 with tempfile.TemporaryDirectory(prefix='candidate-appimage-') as temporary:

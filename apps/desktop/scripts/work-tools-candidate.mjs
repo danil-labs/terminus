@@ -37,7 +37,8 @@ if (hash(join(resources, "inventory.json")) !== manifest.inventory_sha256) throw
 const resourcesInventory = join(dirname(resources), "resources-inventory.json");
 if (process.platform === "linux" && !existsSync(resourcesInventory)) throw new Error("Prepare with --tauri-config first: the AppImage needs resources-inventory.json.");
 const lock = JSON.parse(readFileSync(join(root, "seldon-runtime.lock"), "utf8"));
-if (Object.values(lock.platforms ?? {}).some((pin) => pin.sha256 === expectedEngine)) throw new Error("Candidate engine is the published pin; a new local engine is required.");
+const publishedEngine = lock.platforms?.[target]?.sha256 === expectedEngine;
+if (!publishedEngine && Object.values(lock.platforms ?? {}).some((pin) => pin.sha256 === expectedEngine)) throw new Error("Published candidate engine does not match the native target.");
 const contract = hash(join(root, "src-tauri/crates/engine-protocol/commands.json"));
 const bundleEnvironment = process.platform === "linux" ? {
   NO_STRIP: "1",
@@ -103,5 +104,5 @@ const config = {
 };
 const configPath = join(output, "tauri.candidate.json");
 writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`);
-writeFileSync(join(output, "candidate.json"), `${JSON.stringify({ schema: 1, version, target, engine_sha256: expectedEngine, resource_manifest_sha256: expectedManifest, contract, published_engine_lock: false, updater_signature: false, production_identity_changed: false, native_platforms_tested: [], source_engine: "local engine build; see SHA-256", resources: `resources/work-tools/${target}`, browser_catalog_sha256: hash(join(stagedResources, "browser-navigation.json")), bundle_environment: bundleEnvironment }, null, 2)}\n`);
+writeFileSync(join(output, "candidate.json"), `${JSON.stringify({ schema: 1, version, target, engine_sha256: expectedEngine, resource_manifest_sha256: expectedManifest, contract, published_engine_lock: publishedEngine, updater_signature: false, production_identity_changed: false, native_platforms_tested: [], source_engine: publishedEngine ? lock.release : "local engine build; see SHA-256", resources: `resources/work-tools/${target}`, browser_catalog_sha256: hash(join(stagedResources, "browser-navigation.json")), bundle_environment: bundleEnvironment }, null, 2)}\n`);
 console.log(JSON.stringify({ config: configPath, metadata: join(output, "candidate.json"), target, version, bundle_environment: bundleEnvironment, next: `Apply bundle_environment to pnpm tauri build --config ${configPath}; then run work-tools-candidate-verify.py on the final AppImage.` }, null, 2));
