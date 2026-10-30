@@ -215,7 +215,7 @@ export default function Actualizacion(props: { build?: string }) {
         {(s) => (
           <SettingsBlock>
             <div class="grid gap-2 rounded-md border border-warning/30 bg-warning/5 px-3 py-2.5">
-              <p class="m-0 flex items-start gap-1.5 text-[0.8125rem] font-semibold text-warning-strong">
+              <p class="m-0 flex items-start gap-1.5 text-ui font-semibold text-warning-strong">
                 <TriangleAlert size={14} class="mt-0.5 shrink-0" />
                 <span>{t("settings.update.unreachable")}</span>
               </p>
@@ -229,7 +229,7 @@ export default function Actualizacion(props: { build?: string }) {
                 <summary class="cursor-pointer text-xs text-neutral-500">
                   {t("settings.update.detail")}
                 </summary>
-                <p class="m-0 mt-1 font-mono text-[0.6875rem] break-all whitespace-pre-wrap text-neutral-500">
+                <p class="m-0 mt-1 font-mono text-caption break-all whitespace-pre-wrap text-neutral-500">
                   {s().crudo}
                 </p>
               </details>

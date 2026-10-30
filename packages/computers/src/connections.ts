@@ -73,7 +73,8 @@ export const PERMISSION_MODES = ["lectura", "manual", "ediciones", "auto"] as co
 
 /** La URL que se pega en el orquestador. */
 export function mcpUrl(endpoint: string): string {
-  return apiUrl(endpoint, "/mcp");
+  const url = apiUrl(endpoint, "/mcp");
+  return url === "https://computers.danil.ai/mcp" ? "https://mcp.danil.ai/mcp" : url;
 }
 
 const rows = (body: unknown): Connection[] =>

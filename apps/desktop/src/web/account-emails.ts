@@ -2,6 +2,7 @@
  * Los correos de la cuenta en el navegador: las rutas `/auth/emails` del BFF de
  * Danil por el proxy de alfa (`<base>alpha-api`), con la sesión de la persona.
  */
+import { sessionFetch } from "../../../../packages/attention/src/request.ts";
 import { AccountEmailsError, type AccountEmails, type AccountEmailsSource } from "../features/settings/account-emails.ts";
 
 type Fetch = (input: string, init?: RequestInit) => Promise<Response>;
@@ -11,16 +12,13 @@ const num = (v: unknown, fallback: number) => (typeof v === "number" && Number.i
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 
 export function webAccountEmails(session: Session, prefix: string, f: Fetch = (input, init) => fetch(input, init)): AccountEmailsSource {
+  const authorized = sessionFetch(session, (input, init) => f(String(input), init));
   async function send(path: string, body?: Record<string, string>): Promise<Record<string, unknown>> {
-    const once = async () =>
-      f(`${prefix}${path}`, {
-        method: body ? "POST" : "GET",
-        cache: "no-store",
-        headers: { Authorization: `Bearer ${await session.getToken()}`, ...(body ? { "Content-Type": "application/json" } : {}) },
-        ...(body ? { body: JSON.stringify(body) } : {}),
-      });
-    let response = await once();
-    if (response.status === 401 && (await session.unauthorized())) response = await once();
+    const response = await authorized(`${prefix}${path}`, {
+      method: body ? "POST" : "GET",
+      headers: body ? { "Content-Type": "application/json" } : {},
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    });
     const data = (await response.json().catch(() => null)) as Record<string, unknown> | null;
     if (!response.ok) {
       throw new AccountEmailsError(

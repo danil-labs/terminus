@@ -204,7 +204,7 @@ export function FilePreview(props: { path: string; alt?: string }) {
           <span class="block truncate text-xs font-semibold text-neutral-950">
             {props.alt?.trim() || nombreDe(props.path)}
           </span>
-          <span class="block truncate font-mono text-[0.6875rem] text-neutral-500">
+          <span class="block truncate font-mono text-caption text-neutral-500">
             {ext.toUpperCase() || t("chat.file.kind")}
             <Show when={bytes()}>{(n) => ` · ${tamano(n())}`}</Show>
           </span>

@@ -1,3 +1,4 @@
+import { TEXT } from "@terminus/design";
 import { type ReactNode, useEffect, useState } from "react";
 import { KeyboardAvoidingView, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -91,7 +92,7 @@ export function SheetOption({
           {label}
         </Text>
         {detail ? (
-          <Text numberOfLines={2} style={{ color: theme.textMuted, fontSize: 13 }}>
+          <Text numberOfLines={2} style={{ color: theme.textMuted, fontSize: TEXT.ui }}>
             {detail}
           </Text>
         ) : null}
@@ -107,6 +108,6 @@ const styles = StyleSheet.create({
   sheet: { maxHeight: "80%", borderTopLeftRadius: 18, borderTopRightRadius: 18, borderWidth: StyleSheet.hairlineWidth, paddingTop: 8 },
   grabber: { alignSelf: "center", width: 36, height: 5, borderRadius: 3, marginBottom: 6 },
   title: { fontSize: 18, fontWeight: "700", paddingHorizontal: 18, paddingVertical: 8 },
-  section: { fontSize: 13, fontWeight: "600", paddingHorizontal: 18, paddingTop: 12, paddingBottom: 4 },
+  section: { fontSize: TEXT.ui, fontWeight: "600", paddingHorizontal: 18, paddingTop: 12, paddingBottom: 4 },
   option: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 18, paddingVertical: 11, minHeight: 48 },
 });

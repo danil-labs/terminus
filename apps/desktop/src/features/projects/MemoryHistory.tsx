@@ -73,22 +73,22 @@ export default function HistorialDeEntrada(props: {
   return (
     <Dialog open={props.file !== null} onOpenChange={(a) => !a && props.onCerrar()}>
       <DialogContent>
-        <DialogTitle class="m-0 text-[0.9375rem] font-semibold">
+        <DialogTitle class="m-0 text-lead font-semibold">
           {t("projects.memory.history_title", { file: props.file ?? "" })}
         </DialogTitle>
         <div class="grid gap-2 pt-3" data-memory-history="">
           <Show when={fallo()}>{(f) => <FailureNote f={f()} />}</Show>
-          <Show when={versiones()} fallback={<p class="m-0 text-[0.8125rem] text-neutral-500">{t("projects.memory.history_loading")}</p>}>
+          <Show when={versiones()} fallback={<p class="m-0 text-ui text-neutral-500">{t("projects.memory.history_loading")}</p>}>
             {(lista) => (
               <Show
                 when={lista().length > 0}
-                fallback={<p class="m-0 text-[0.8125rem] text-neutral-500">{t("projects.memory.history_empty")}</p>}
+                fallback={<p class="m-0 text-ui text-neutral-500">{t("projects.memory.history_empty")}</p>}
               >
                 <ol class="m-0 grid list-none gap-1.5 p-0">
                   <For each={lista()}>
                     {(v, i) => (
                       <li class="grid gap-1 rounded-md border border-border px-3 py-2" data-memory-version={v.commit}>
-                        <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.6875rem] text-neutral-500">
+                        <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-caption text-neutral-500">
                           <span class="text-neutral-950">{v.author.name || v.author.email}</span>
                           <span>{fecha(v.at)}</span>
                           <Show when={i() === 0}>
@@ -96,10 +96,10 @@ export default function HistorialDeEntrada(props: {
                           </Show>
                           <span class="font-mono">{v.commit.slice(0, 7)}</span>
                         </div>
-                        <p class="m-0 text-[0.75rem] text-neutral-700">{v.message}</p>
+                        <p class="m-0 text-label text-neutral-700">{v.message}</p>
                         <Show
                           when={v.oid}
-                          fallback={<span class="text-[0.75rem] text-neutral-500">{t("projects.memory.history_deleted")}</span>}
+                          fallback={<span class="text-label text-neutral-500">{t("projects.memory.history_deleted")}</span>}
                         >
                           <div>
                             <Button variant="ghost" size="compact" onClick={() => void ver(v)}>
@@ -108,7 +108,7 @@ export default function HistorialDeEntrada(props: {
                           </div>
                         </Show>
                         <Show when={vista()?.commit === v.commit}>
-                          <pre class="m-0 max-h-64 overflow-auto rounded bg-neutral-50 p-2 text-[0.75rem] whitespace-pre-wrap" data-memory-version-text="">
+                          <pre class="m-0 max-h-64 overflow-auto rounded bg-neutral-50 p-2 text-label whitespace-pre-wrap" data-memory-version-text="">
                             {vista()?.texto}
                           </pre>
                         </Show>

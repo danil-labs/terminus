@@ -18,7 +18,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
-const { ASTRO_BODIES, astroColors, CSS_SOURCE, CSS_THEME_BLOCKS, STATUS_ICONS, STATUS_LABELS, THEMES, WORDS } = await import(
+const { ASTRO_BODIES, astroColors, CHANNEL_COLORS, CSS_SOURCE, CSS_THEME_BLOCKS, RADIUS, STATUS_ICONS, STATUS_LABELS, TEXT, THEMES, WORDS } = await import(
   pathToFileURL(join(ROOT, "..", "..", "packages/design/src/index.ts")).href
 );
 
@@ -89,6 +89,22 @@ for (const [mode, selectors] of Object.entries(CSS_THEME_BLOCKS)) {
       failures.push(`${mode}.${key} es ${actual}; ${variable} en global.css es ${expected === undefined ? "(no está)" : resolve(expected)}`);
     }
   }
+}
+
+const hoja = readFileSync(join(ROOT, "src/styles/global.css"), "utf8");
+const medida = (variable) => hoja.match(new RegExp(`${variable}:\\s*([\\d.]+)(rem|px);`));
+const enPx = (variable) => {
+  const m = medida(variable);
+  return m ? Number(m[1]) * (m[2] === "rem" ? 16 : 1) : null;
+};
+for (const [step, px] of Object.entries(TEXT)) {
+  if (enPx(`--text-${step}`) !== px) failures.push(`TEXT.${step} es ${px}; --text-${step} en global.css es ${enPx(`--text-${step}`)}`);
+}
+for (const [step, px] of Object.entries(RADIUS)) {
+  if (enPx(`--radius-${step}`) !== px) failures.push(`RADIUS.${step} es ${px}; --radius-${step} en global.css es ${enPx(`--radius-${step}`)}`);
+}
+for (const [channel, color] of Object.entries(CHANNEL_COLORS)) {
+  if (!hoja.includes(`--color-inbox-channel-${channel}: ${color};`)) failures.push(`CHANNEL_COLORS.${channel} es ${color} y global.css dice otra cosa`);
 }
 
 for (const lang of Object.keys(STATUS_LABELS)) {

@@ -33,8 +33,8 @@ export function PanelAlMargen(props: {
     >
       <div class="flex min-w-0 items-center gap-2">
         <MessageCircleQuestion size={14} class="shrink-0 text-side" aria-hidden="true" />
-        <span class="text-[0.8125rem] font-semibold text-side">{t("chat.side.title")}</span>
-        <span class="rounded-[5px] bg-surface px-1.5 py-0.5 text-[0.6875rem] text-neutral-700">
+        <span class="text-ui font-semibold text-side">{t("chat.side.title")}</span>
+        <span class="rounded-[5px] bg-surface px-1.5 py-0.5 text-caption text-neutral-700">
           {t("chat.side.off_thread")}
         </span>
         <span class="flex-1" />
@@ -52,7 +52,7 @@ export function PanelAlMargen(props: {
           <X size={15} />
         </Button>
       </div>
-      <p class="m-0 font-mono text-[0.8125rem] break-words whitespace-pre-wrap text-neutral-950">
+      <p class="m-0 font-mono text-ui break-words whitespace-pre-wrap text-neutral-950">
         {props.estado.question}
       </p>
       <Show
@@ -61,7 +61,7 @@ export function PanelAlMargen(props: {
           <Show
             when={props.estado.failure}
             fallback={
-              <span class="flex items-center gap-1.5 text-[0.8125rem] text-neutral-500">
+              <span class="flex items-center gap-1.5 text-ui text-neutral-500">
                 <Spinner size={13} class="text-side" />
                 {t("chat.side.waiting")}
               </span>
@@ -73,7 +73,7 @@ export function PanelAlMargen(props: {
       >
         {(answer) => (
           <>
-            <div class="max-h-[40vh] min-w-0 overflow-y-auto overscroll-contain text-[0.8125rem] text-neutral-700">
+            <div class="max-h-[40vh] min-w-0 overflow-y-auto overscroll-contain text-ui text-neutral-700">
               <Markdown>{answer()}</Markdown>
             </div>
             <div class="flex min-w-0 justify-end gap-1">

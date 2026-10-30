@@ -1,13 +1,12 @@
 import { Show, createEffect, createSignal, onCleanup } from "solid-js";
 import { Dynamic } from "solid-js/web";
-import { ASTRO_BODIES, ASTRO_SHAPES, astroBody, isAstroBody, type AstroBody, type AstroNode } from "@terminus/design";
+import { ASTRO_BODIES, ASTRO_SHAPES, astroBody, type AstroBody, type AstroNode } from "@terminus/design";
 import type { HandlerStatus } from "../../lib/model";
 import { cn } from "../../lib/utils";
 import { generacionDeAvatar, urlDeAvatar } from "./avatar-src";
 
 export const CUERPOS = ASTRO_BODIES;
 export type Cuerpo = AstroBody;
-export const isBody = isAstroBody;
 
 /** La clase que lleva los dos tonos del cuerpo. Literal para que se encuentre
  * desde `global.css` con `grep`: compuesta con plantilla, no la ve nadie. */

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { segmentosAnsi } from "../../src/lib/ansi.ts";
-import { comando } from "../../src/lib/steps.ts";
+import { clasificar, comando } from "../../src/lib/steps.ts";
 
 /**
  * **La fila enseña lo que el agente decidió hacer, no cómo se lanzó.**
@@ -57,4 +57,9 @@ test("un color extendido se lee como un grupo y no como instrucciones sueltas", 
   assert.deepEqual(segmentosAnsi("\x1b[38;2;1;2;3;1mnegrita\x1b[0m"), [
     { text: "negrita", color: "default", bold: true, dim: false },
   ]);
+});
+
+test("MultiEdit es una edición en todos los clientes", () => {
+  assert.equal(clasificar("MultiEdit"), "editar");
+  assert.equal(clasificar("algo_nuevo"), "otro");
 });

@@ -37,8 +37,20 @@ test("revocar es DELETE; una sesión vencida es unauthorized", async () => {
   assert.deepEqual(await listConnections("computers.test", "tok", expired.f), { kind: "unauthorized" });
 });
 
-test("la URL del MCP sale del mismo origen", () => {
-  assert.equal(mcpUrl("computers.danil.ai"), "https://computers.danil.ai/mcp");
+test("producción copia directamente el recurso OAuth canónico del MCP", () => {
+  for (const endpoint of ["computers.danil.ai", "https://computers.danil.ai/", "wss://computers.danil.ai"]) {
+    assert.equal(mcpUrl(endpoint), "https://mcp.danil.ai/mcp");
+  }
+});
+
+test("staging y servidores propios conservan su recurso MCP", () => {
+  for (const [endpoint, expected] of [
+    ["https://computers-dev.danil.ai", "https://computers-dev.danil.ai/mcp"],
+    ["http://localhost:8787", "http://localhost:8787/mcp"],
+    ["https://computers.example/base/", "https://computers.example/base/mcp"],
+    ["https://computers.danil.ai:8443", "https://computers.danil.ai:8443/mcp"],
+    ["https://computers.danil.ai/custom", "https://computers.danil.ai/custom/mcp"],
+  ]) assert.equal(mcpUrl(endpoint), expected);
 });
 
 test("el secreto del webhook llega en la respuesta del cambio", async () => {

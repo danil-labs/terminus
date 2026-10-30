@@ -33,7 +33,7 @@
  */
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { relative } from "node:path";
-// Ver la nota de `paths.mjs`: `.pathname` en Windows da `/C:/…` y revienta.
+// `.pathname` en Windows da `/C:/…` y revienta.
 import { fileURLToPath } from "node:url";
 import { walkFiles } from "../git.mjs";
 import { EVENTOS_PENDIENTES } from "../engine-pending.mjs";

@@ -1,4 +1,5 @@
 import type { InboxSession } from './inbox.ts';
+import { sessionFetch } from './request.ts';
 
 export type SupportLevel = 'read' | 'write';
 export type SupportStatus = 'active' | 'expired' | 'revoked';
@@ -42,10 +43,9 @@ export function grantOf(value: unknown, account: number): SupportGrant {
 
 /** Los workspaces de Danil que la persona administra, sus accesos de soporte y su revocación. */
 export function createSupportAccess(session: InboxSession, request: typeof fetch = fetch, prefix = '/terminus/alpha-api') {
+  const send = sessionFetch(session, request);
   async function get(path: string) {
-    const headers = async () => ({ Authorization: `Bearer ${await session.getToken()}` });
-    let response = await request(`${prefix}${path}`, { headers: await headers(), cache: 'no-store' });
-    if (response.status === 401 && await session.unauthorized()) response = await request(`${prefix}${path}`, { headers: await headers(), cache: 'no-store' });
+    const response = await send(`${prefix}${path}`);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return object(await response.json());
   }
@@ -69,9 +69,7 @@ export function createSupportAccess(session: InboxSession, request: typeof fetch
     /** La única escritura: revocar una concesión. La entrada alfa todavía no la deja pasar. */
     async revoke(account: number, grant: number): Promise<string> {
       const path = `${prefix}/auth/account/support-access/${id(grant)}/revoke?account_id=${id(account)}`;
-      const headers = async () => ({ Authorization: `Bearer ${await session.getToken()}` });
-      let response = await request(path, { method: 'POST', headers: await headers(), cache: 'no-store' });
-      if (response.status === 401 && await session.unauthorized()) response = await request(path, { method: 'POST', headers: await headers(), cache: 'no-store' });
+      const response = await send(path, { method: 'POST' });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const status = object(await response.json()).status;
       if (!['revoked', 'already_revoked', 'expired', 'not_found'].includes(String(status))) throw new Error('invalid_response');

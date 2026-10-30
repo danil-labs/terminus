@@ -3,39 +3,16 @@ import { Channel } from "@tauri-apps/api/core";
 import { invoke } from "../../lib/invoke.ts";
 import { type Accessor, createSignal } from "solid-js";
 
-import { type TaskGitStatus, readTaskGit, UNKNOWN_TASK_GIT } from "@terminus/tasks";
+import { type TaskGitStatus, mergeRemoteGit, readTaskGit, retainGitObservation, sameGit as mismoGit, UNKNOWN_TASK_GIT } from "@terminus/tasks";
 export type { CheckState, KnState, ReviewState } from "@terminus/tasks";
-export { canFinishTask } from "@terminus/tasks";
+export { canFinishTask, mergeRemoteGit, retainGitObservation } from "@terminus/tasks";
 export type GitStatus = TaskGitStatus;
 export const UNKNOWN_GIT: GitStatus = UNKNOWN_TASK_GIT;
-
-export function retainGitObservation(previous: Record<string, GitStatus>, incoming: Record<string, GitStatus>) {
-  return Object.fromEntries(Object.entries(incoming).map(([id, row]) => {
-    const next = row.kind === "unknown" && previous[id] ? { ...previous[id], stale: true }
-      : (previous[id]?.checked_at ?? 0) > (row.checked_at ?? 0) ? mergeRemoteGit({ [id]: row }, previous)[id] : row;
-    // Lo que no cambió conserva su objeto: cada barrido trae filas nuevas iguales
-    // a las de antes, y un objeto nuevo repinta la fila aunque diga lo mismo.
-    return [id, previous[id] && mismoGit(previous[id], next) ? previous[id] : next];
-  }));
-}
-
-function mismoGit(a: GitStatus, b: GitStatus) {
-  return a === b || JSON.stringify(a) === JSON.stringify(b);
-}
 
 /** El registro nuevo, o el mismo si ninguna fila cambió: así no avisa a nadie. */
 function conservarFilas(previous: Record<string, GitStatus>, next: Record<string, GitStatus>) {
   const ids = Object.keys(next);
   return ids.length === Object.keys(previous).length && ids.every(id => previous[id] === next[id]) ? previous : next;
-}
-
-export function mergeRemoteGit(previous: Record<string, GitStatus>, incoming: Record<string, GitStatus>) {
-  return Object.fromEntries(Object.entries(previous).map(([id, row]) => {
-    const remote = incoming[id];
-    if (!remote || remote.repository !== row.repository || remote.kind !== row.kind || remote.branch !== row.branch || remote.head !== row.head
-      || (remote.checked_at ?? 0) < (row.checked_at ?? 0)) return [id, row];
-    return [id, { ...row, pull: remote.pull, pull_known: remote.pull_known, checked_at: remote.checked_at, stale: remote.stale }];
-  }));
 }
 
 function staleGit(rows: Record<string, GitStatus>) {

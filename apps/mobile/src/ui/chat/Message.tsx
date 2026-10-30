@@ -1,3 +1,4 @@
+import { TEXT } from "@terminus/design";
 import { imagenInerte } from "@terminus/chat/links";
 import { splitNextSteps } from "@terminus/chat/nextSteps";
 import type { TurnTool } from "@terminus/protocol";
@@ -59,7 +60,7 @@ function QuickReply({ prompt, theme, onSend }: { prompt: string; theme: Theme; o
       }}
       style={[styles.reply, { borderColor: theme.border, backgroundColor: theme.bg, opacity: disabled && state !== "sending" ? 0.55 : 1 }]}
     >
-      <Text style={{ color: theme.text, fontSize: 14 }}>{prompt}</Text>
+      <Text style={{ color: theme.text, fontSize: TEXT.body }}>{prompt}</Text>
     </Pressable>
   );
 }

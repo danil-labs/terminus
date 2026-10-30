@@ -1,3 +1,4 @@
+import { TEXT } from "@terminus/design";
 import * as Crypto from "expo-crypto";
 import { useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
@@ -191,7 +192,7 @@ export default function NewTask() {
       <View style={{ flex: 1 }} />
       {pending && waking ? (
         <View style={[styles.pending, { backgroundColor: theme.userBubble, borderColor: theme.border }]}>
-          <Text style={{ color: theme.text, fontSize: 15, lineHeight: 21 }}>{pending}</Text>
+          <Text style={{ color: theme.text, fontSize: TEXT.lead, lineHeight: 21 }}>{pending}</Text>
         </View>
       ) : null}
       {notice || note ? (

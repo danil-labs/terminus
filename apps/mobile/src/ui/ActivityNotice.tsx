@@ -1,3 +1,4 @@
+import { TEXT } from "@terminus/design";
 import type { ActivityEvent } from "@terminus/protocol";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
@@ -29,7 +30,7 @@ export function ActivityNotice() {
   if (!notice) return null;
   return <View accessibilityLiveRegion="polite" style={{ position: "absolute", top: insets.top + 56, left: 16, right: 16, backgroundColor: theme.surface, borderColor: theme.border, borderWidth: 1, borderRadius: 10, padding: 14, gap: 8 }}>
     <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}><Text style={{ flex: 1, color: theme.text, fontWeight: "600" }}>{notice.title}</Text><Pressable accessibilityRole="button" accessibilityLabel={t("activity.dismiss")} onPress={() => setNotice(null)} hitSlop={10}><Text style={{ color: theme.textMuted, fontSize: 20 }}>×</Text></Pressable></View>
-    <Text style={{ color: theme.textMuted, fontSize: 12 }}>{t(`activity.state.${notice.state}`)} · {hostOf(notice.machine)?.label ?? notice.machine}</Text>
+    <Text style={{ color: theme.textMuted, fontSize: TEXT.label }}>{t(`activity.state.${notice.state}`)} · {hostOf(notice.machine)?.label ?? notice.machine}</Text>
     <Pressable accessibilityRole="button" onPress={() => { router.push({ pathname: "/activity", params: { machine: notice.machine } }); setNotice(null); }} style={{ paddingVertical: 8 }}><Text style={{ color: theme.primary, fontWeight: "600" }}>{t("activity.view")}</Text></Pressable>
   </View>;
 }

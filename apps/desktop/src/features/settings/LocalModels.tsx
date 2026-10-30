@@ -44,10 +44,10 @@ function Fila(props: {
         {props.icono}
       </span>
       <span class="grid min-w-0 flex-1 gap-1">
-        <strong class="flex min-w-0 items-center gap-1 text-[13px] leading-[1.2] font-semibold text-neutral-950">
+        <strong class="flex min-w-0 items-center gap-1 text-ui leading-[1.2] font-semibold text-neutral-950">
           {props.nombre}
         </strong>
-        <span class={cn("truncate text-[11px]", props.aviso ? "text-warning-strong" : "text-neutral-500")}>
+        <span class={cn("truncate text-caption", props.aviso ? "text-warning-strong" : "text-neutral-500")}>
           {props.linea}
         </span>
       </span>
@@ -59,7 +59,7 @@ function Fila(props: {
 
 function Etiqueta(props: { children: JSX.Element }) {
   return (
-    <span class="shrink-0 rounded-full bg-primary/10 px-1.5 py-px text-[10px] font-medium text-primary">
+    <span class="shrink-0 rounded-full bg-primary/10 px-1.5 py-px text-2xs font-medium text-primary">
       {props.children}
     </span>
   );
@@ -182,7 +182,7 @@ export default function ListaDeModelosLocales(props: { m: ModelosLocales; memori
               <Switch
                 fallback={
                   <>
-                    <span class="text-[11px] whitespace-nowrap text-neutral-500 tabular-nums">{peso(x.bytes)}</span>
+                    <span class="text-caption whitespace-nowrap text-neutral-500 tabular-nums">{peso(x.bytes)}</span>
                     <Button
                       size="compact"
                       variant={x.recommended && ninguno() ? "primary" : "secondary"}

@@ -168,7 +168,7 @@ export function EsperaDeTareas() {
     <Show when={waitingThen()}>
       {(then) => (
         <Toast data-wait-notice="">
-          <p class="m-0 text-[0.8125rem] font-semibold">
+          <p class="m-0 text-ui font-semibold">
             {then() === "restart" ? t("shell.wait.restart_title") : t("shell.wait.quit_title")}
           </p>
           <Show when={waitRows().length > 0}>

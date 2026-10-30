@@ -161,7 +161,7 @@ export default function AvisoDeMaterial() {
   return (
     <Show when={visibles().length > 0}>
       <Toast>
-        <p class="m-0 text-[0.8125rem] font-semibold">
+        <p class="m-0 text-ui font-semibold">
           {t("shell.material.title", { count: visibles().length })}
         </p>
         {/* Cuáles, por su nombre: «una fuente» no dice si es la que la tarea de

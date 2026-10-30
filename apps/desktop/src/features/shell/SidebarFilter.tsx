@@ -32,7 +32,7 @@ export type SidebarFilterProps = {
 const GROUPINGS: SidebarGrouping[] = ["none", "folder", "status", "agent", "machine"];
 
 const renglon = cn(ITEM_DE_MENU, "grid grid-cols-[14px_minmax(0,1fr)_auto] items-center gap-2 py-1");
-const titulo = "flex items-center px-2 pt-1.5 pb-0.5 text-[0.6875rem] font-medium text-neutral-500";
+const titulo = "flex items-center px-2 pt-1.5 pb-0.5 text-caption font-medium text-neutral-500";
 const seccion = "px-2 pt-1.5 pb-1 text-xs font-semibold text-neutral-950";
 
 function Casilla(props: { on: boolean }) {
@@ -70,7 +70,7 @@ function Opcion(props: {
         <Casilla on={props.on} />
       </Show>
       <span class="flex min-w-0 items-center gap-1.5 truncate">{props.children}</span>
-      <span class="text-[0.6875rem] text-neutral-500 tabular-nums">{props.aside}</span>
+      <span class="text-caption text-neutral-500 tabular-nums">{props.aside}</span>
     </button>
   );
 }

@@ -37,7 +37,7 @@ export const PopoverAnchor = Kobalte.Anchor;
  * fila distintas.
  */
 export const ITEM_DE_MENU =
-  "block w-full rounded-sm px-2 py-1.5 text-left text-[0.8125rem] text-neutral-950 outline-none hover:bg-surface-muted focus-visible:bg-surface-muted focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
+  "block w-full rounded-sm px-2 py-1.5 text-left text-ui text-neutral-950 outline-none hover:bg-surface-muted focus-visible:bg-surface-muted focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
 
 export function PopoverContent(props: ComponentProps<typeof Kobalte.Content>) {
   const [propios, resto] = splitProps(props, ["class"]);
