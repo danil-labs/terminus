@@ -8487,7 +8487,7 @@ export default function App() {
               modelos={modelosParaAgentes()}
               sessions={sesionesDelRiel()}
               viewKey={sidebarViewKey(workspaceActivo(), escritorio())}
-              filterRef={setSidebarFilter}
+              filterRef={(filter, released) => setSidebarFilter((actual) => filter ?? (actual === released ? null : actual))}
               onHablarCon={hablarConEncargado}
               onAgentProfile={openAgentProfile}
               escritorio={activeSpace() ? spaceName(activeSpace()) : null}
