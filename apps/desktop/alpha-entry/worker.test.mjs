@@ -284,3 +284,88 @@ test("WorkOS sign-in routes stay in the Worker; the sign-in page is an asset", a
   assert.equal(await (await h.fetch("/auth?next=%2Finbox")).text(), "assets");
   assert.equal(h.calls.length, 1);
 });
+
+test("broadcast reads are an exact list with rebuilt queries", async () => {
+  const h = harness();
+  for (const path of ["/auth/account/features?account_id=7", "/auth/account/my-permissions?account_id=7", "/api/marketing/campaigns", "/api/marketing/campaigns/4/stats", "/api/marketing/campaigns/4/messages?limit=200&offset=0", "/api/marketing/templates", "/api/marketing/templates?status=APPROVED", "/api/marketing/templates/9", "/api/marketing/templates/9/channels", "/api/contacts", "/api/contacts/metadata-keys", "/api/funnels", "/api/funnels/3/board"]) {
+    const response = await h.fetch(prefix + path, { headers: auth });
+    assert.equal(response.status, 200, path);
+    assert.equal(new URL(h.calls.at(-1).url).pathname + new URL(h.calls.at(-1).url).search, path);
+    assert.equal(h.calls.at(-1).headers.get("Cookie"), null);
+  }
+  const before = h.calls.length;
+  for (const path of ["/api/marketing/campaigns?x=1", "/api/marketing/campaigns/4/messages?limit=201&offset=0", "/api/marketing/campaigns/4/messages?limit=5", "/api/marketing/templates?status=DRAFT", "/auth/account/features", "/auth/account/features?account_id=7&x=1", "/api/contacts?q=ana"]) {
+    assert.equal((await h.fetch(prefix + path, { headers: auth })).status, 400, path);
+  }
+  for (const path of ["/api/marketing/campaigns/0/stats", "/api/marketing/campaigns/4", "/api/marketing/other", "/api/contacts/5", "/api/contacts/imports/1", "/api/funnels/3", "/api/media"]) {
+    assert.equal((await h.fetch(prefix + path, { headers: auth })).status, 404, path);
+  }
+  assert.equal((await h.fetch(prefix + "/api/marketing/campaigns")).status, 401);
+  assert.equal(h.calls.length, before);
+});
+
+const writes = [
+  ["POST", "/api/marketing/campaigns", { template_id: 1, channel_id: 2, name: "Promo", variable_mapping: { nombre: "contact.name" } }],
+  ["POST", "/api/marketing/campaigns/4/contacts", { contact_account_ids: [1, 2] }],
+  ["POST", "/api/marketing/campaigns/4/start"], ["POST", "/api/marketing/campaigns/4/pause"], ["POST", "/api/marketing/campaigns/4/resume"], ["POST", "/api/marketing/campaigns/4/cancel"],
+  ["POST", "/api/marketing/campaigns/4/schedule", { scheduled_at: "2026-11-01T12:00:00.000Z" }],
+  ["POST", "/api/marketing/templates", { channel_id: 2, name: "promo", category: "MARKETING", language: "es_MX", header: null, body: { text: "Hola" }, footer: null, submit: false }],
+  ["POST", "/api/marketing/templates/sync", {}],
+  ["PATCH", "/api/marketing/templates/9", { name: "promo_2", body: { text: "Hola" } }],
+  ["POST", "/api/marketing/templates/9/submit"], ["DELETE", "/api/marketing/templates/9"],
+  ["POST", "/auth/account/request-access", { account_id: 7, feature: "campaigns", phone: "+525512345678" }],
+];
+const send = (h, method, path, body, extra = {}) => h.fetch(prefix + path, { method, headers: { ...auth, Origin: origin, ...(body === undefined ? {} : { "Content-Type": "application/json" }), ...extra }, body: body === undefined ? undefined : JSON.stringify(body) });
+
+test("broadcast writes answer 403 unless the switch is on, and never reach the BFF", async () => {
+  const h = harness();
+  for (const [method, path, body] of writes) {
+    const response = await send(h, method, path, body);
+    assert.equal(response.status, 403, path);
+    assert.deepEqual(await response.json(), { error: "broadcast_writes_disabled" });
+  }
+  assert.equal((await h.fetch(prefix + "/api/media", { method: "POST", headers: { ...auth, Origin: origin, "Content-Type": "multipart/form-data; boundary=x" }, body: "--x--" })).status, 403);
+  assert.equal(h.calls.length, 0);
+});
+
+test("with the switch on each write keeps its barriers and sends a rebuilt body", async () => {
+  const h = harness();
+  h.env.BROADCAST_WRITES = "on";
+  for (const [method, path, body] of writes) {
+    assert.equal((await send(h, method, path, body)).status, 200, path);
+    const call = h.calls.at(-1);
+    assert.equal(call.method, method);
+    assert.equal(new URL(call.url).pathname, path);
+    assert.equal(call.headers.get("Cookie"), null);
+    if (body) assert.deepEqual(await call.json(), body);
+  }
+  const before = h.calls.length;
+  const [method, path, body] = writes[0];
+  assert.equal((await h.fetch(prefix + path, { method, headers: { ...auth, Origin: "https://evil.example", "Content-Type": "application/json" }, body: JSON.stringify(body) })).status, 403);
+  assert.equal((await h.fetch(prefix + path, { method, headers: { Origin: origin, "Content-Type": "application/json" }, body: JSON.stringify(body) })).status, 401);
+  assert.equal((await send(h, method, path, body, { "X-Danil-Actor": "ai" })).status, 403);
+  assert.equal((await send(h, method, path + "?x=1", body)).status, 400);
+  for (const [badPath, bad] of [
+    ["/api/marketing/campaigns", { ...body, extra: 1 }], ["/api/marketing/campaigns", { ...body, name: "" }], ["/api/marketing/campaigns", { ...body, variable_mapping: { a: 1 } }],
+    ["/api/marketing/campaigns/4/contacts", { contact_account_ids: [] }], ["/api/marketing/campaigns/4/contacts", { contact_account_ids: [1.5] }],
+    ["/api/marketing/campaigns/4/schedule", { scheduled_at: "mañana" }],
+    ["/api/marketing/templates", { ...writes[7][2], name: "Con Espacios" }], ["/api/marketing/templates", { ...writes[7][2], submit: "yes" }], ["/api/marketing/templates", { ...writes[7][2], body: { text: "x".repeat(1025) } }],
+    ["/auth/account/request-access", { account_id: 7, feature: "funnels", phone: "+525512345678" }],
+  ]) assert.equal((await send(h, "POST", badPath, bad)).status, 400, JSON.stringify(bad));
+  assert.equal((await h.fetch(prefix + path, { method, headers: { ...auth, Origin: origin, "Content-Type": "text/plain" }, body: JSON.stringify(body) })).status, 400);
+  for (const [m, p] of [["PUT", "/api/marketing/templates/9"], ["DELETE", "/api/marketing/campaigns/4"], ["POST", "/api/marketing/campaigns/4/delete"], ["POST", "/api/contacts"], ["POST", "/api/contacts/import"]]) {
+    assert.equal((await h.fetch(prefix + p, { method: m, headers: { ...auth, Origin: origin } })).status, 405, p);
+  }
+  assert.equal(h.calls.length, before);
+  const upload = await h.fetch(prefix + "/api/media", { method: "POST", headers: { ...auth, Origin: origin, "Content-Type": "multipart/form-data; boundary=x" }, body: "--x--" });
+  assert.equal(upload.status, 200);
+  assert.match(h.calls.at(-1).headers.get("Content-Type"), /^multipart\/form-data; boundary=x/);
+  assert.equal((await h.fetch(prefix + "/api/media", { method: "POST", headers: { ...auth, Origin: origin, "Content-Type": "application/json" }, body: "{}" })).status, 400);
+});
+
+test("a 204 from the BFF passes without a body", async () => {
+  const h = harness();
+  h.env.BROADCAST_WRITES = "on";
+  h.env.APPV2_BFF = { fetch: async () => new Response(null, { status: 204 }) };
+  assert.equal((await send(h, "DELETE", "/api/marketing/templates/9")).status, 204);
+});

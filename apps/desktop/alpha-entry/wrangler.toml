@@ -21,6 +21,7 @@ service = "appv2"
 # Entrada con WorkOS (session.mjs), ambiente Production. Secretos: WORKOS_API_KEY,
 # SUPABASE_SERVICE_ROLE_KEY y SESSION_COOKIE_KEY (32 bytes base64url, versión v1 del sello).
 # Sin uno de ellos, /auth/session responde 503 y nadie entra.
+# BROADCAST_WRITES = "on" abre las escrituras de Difusiones; sin ella responden 403.
 [vars]
 SUPABASE_URL = "https://sqonjbpvairwfksotadj.supabase.co"
 WORKOS_CLIENT_ID = "client_01M2HETZ89A209TH6NNPF6P8YC"

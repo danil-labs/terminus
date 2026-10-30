@@ -1,0 +1,120 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { actionsFor, campaignProgress, cleanReason, contactTagLabels, contactsInWindow, createBroadcasts, failureReason, maskPhone, nothingReachedMeta, parseTemplateText, sendsDone, summarizeFailures, summarizeRejections, templateContent, templateHasUnmappableParams, templateVariables, type Recipient } from '../src/broadcasts.ts';
+
+const session = (refresh = true) => ({ getToken: async () => 'jwt', unauthorized: async () => refresh });
+const reply = (body: unknown, status = 200) => (async () => Response.json(body, { status })) as unknown as typeof fetch;
+const stats = (over = {}) => ({ by_process_status: {}, by_delivery_status: {}, responded: 0, total: 0, ...over });
+
+test('with writes off every mutation stops before the network', async () => {
+  let calls = 0;
+  const api = createBroadcasts(session(), (async () => { calls++; return Response.json({}); }) as typeof fetch);
+  const attempts = [
+    () => api.createCampaign({ template_id: 1, channel_id: 1, name: 'x' }), () => api.addContacts(1, [1]), () => api.start(1), () => api.pause(1), () => api.resume(1), () => api.cancel(1), () => api.schedule(1, 'x'),
+    () => api.syncTemplates(), () => api.submitTemplate(1), () => api.deleteTemplate(1), () => api.uploadMedia(new File(['x'], 'x.png')), () => api.requestAccess(1, '5551234567'),
+  ];
+  for (const attempt of attempts) await assert.rejects(attempt(), /writes_disabled/);
+  assert.equal(calls, 0);
+});
+
+test('reads retry one 401 and phones never leave the parser whole', async () => {
+  const calls: string[] = [];
+  let first = true;
+  const request = (async (url: string) => {
+    calls.push(url);
+    if (first) { first = false; return new Response('', { status: 401 }); }
+    return Response.json({ items: [{ id: 1, name: 'Ana', phone: '+52 55 1234 5678', tags: { items: [{ label: 'VIP' }] }, last_active_at: null }, { id: 2, phone: '12', tags: [] }, { id: 3, phone: null }] });
+  }) as typeof fetch;
+  const rows = await createBroadcasts(session(), request, '/alpha-api').contacts();
+  assert.deepEqual(calls, ['/alpha-api/api/contacts', '/alpha-api/api/contacts']);
+  assert.deepEqual(rows.map(row => [row.phone, row.sendable, row.tags]), [['••••5678', true, ['VIP']], [null, true, []], [null, false, []]]);
+  assert.equal(JSON.stringify(rows).includes('1234 5678'), false);
+});
+
+test('server errors keep their detail and malformed answers fail', async () => {
+  const api = (body: unknown, status = 200) => createBroadcasts(session(), reply(body, status));
+  await assert.rejects(api({ detail: 'Plantilla inválida' }, 422).campaigns(), /Plantilla inválida/);
+  await assert.rejects(api({ detail: { error: 'code_x' } }, 403).campaigns(), (error: { code: string; status: number }) => error.code === 'code_x' && error.status === 403);
+  await assert.rejects(api({ error: 'not_found' }, 404).campaigns(), /not_found/);
+  await assert.rejects(api({}).campaigns(), /invalid_response/);
+  await assert.rejects(api({ items: [{ id: 1, name: 'x', status: 'future' }] }).campaigns(), /invalid_response/);
+});
+
+test('writes with the switch on send JSON or multipart and a delete takes the 204', async () => {
+  const seen: { url: string; init: RequestInit }[] = [];
+  const api = createBroadcasts(session(), (async (url: string, init: RequestInit) => {
+    seen.push({ url, init });
+    if (init.method === 'DELETE') return new Response(null, { status: 204 });
+    return Response.json({ id: 1, status: 'running', public_url: 'https://x/y.png', added: 1, requested: 2, rejected: [{ reason: 'no_phone' }] });
+  }) as typeof fetch, '', { writes: true });
+  assert.deepEqual(await api.start(1), { id: 1, status: 'running' });
+  assert.equal(seen[0]!.init.body, undefined);
+  assert.deepEqual((await api.addContacts(1, [4, 5])).rejected, [{ contact_account_id: null, reason: 'no_phone' }]);
+  assert.equal(seen[1]!.init.body, '{"contact_account_ids":[4,5]}');
+  assert.equal(await api.uploadMedia(new File(['x'], 'x.png')), 'https://x/y.png');
+  assert.equal((seen[2]!.init.body as FormData).get('kind'), 'template');
+  assert.equal(new Headers(seen[2]!.init.headers).has('Content-Type'), false);
+  await api.deleteTemplate(9);
+  assert.equal(seen[3]!.url, '/api/marketing/templates/9');
+});
+
+test('channels follow the operable rule of Appv2', async () => {
+  const api = createBroadcasts(session(), reply({ channels: [{ id: 1, name: 'Ventas' }, { id: 2, name: 'prueba_x' }, { id: 3, name: 'Web', provider: 'web_preview' }, { id: 4, name: 'Old', archived: true }] }));
+  assert.deepEqual(await api.channels(), [{ id: 1, name: 'Ventas' }]);
+});
+
+test('only the legal transitions of each state are offered', () => {
+  assert.deepEqual(actionsFor('draft'), ['start', 'schedule', 'cancel']);
+  assert.deepEqual(actionsFor('scheduled'), ['start', 'cancel']);
+  assert.deepEqual(actionsFor('running'), ['pause', 'cancel']);
+  assert.deepEqual(actionsFor('paused'), ['resume', 'cancel']);
+  for (const status of ['cancelled', 'completed', 'failed'] as const) assert.deepEqual(actionsFor(status), []);
+});
+
+test('progress reads open maps; an all-dead send counts as failed', () => {
+  const value = stats({ by_process_status: { pending: 2, queued: 1, dispatched: 5, dead: 2 }, by_delivery_status: { delivered: 3, failed: 1 }, responded: 1, total: 10 });
+  assert.deepEqual(campaignProgress(value), { pending: 3, sent: 5, delivered: 3, read: 0, failed: 3, responded: 1, processed: 7, total: 10 });
+  assert.equal(sendsDone(stats({ by_process_status: { dispatched: 1 }, total: 1 }), 'running'), true);
+  assert.equal(sendsDone(stats(), 'draft'), false);
+  assert.equal(nothingReachedMeta(stats({ by_process_status: { dead: 2 }, total: 2 })), true);
+});
+
+test('failure reasons prefer the Meta code and never stay blank', () => {
+  assert.deepEqual(failureReason({ detail: 'Status 400: (#132000) mismatch' }), { code: '132000', text: '' });
+  assert.deepEqual(failureReason({ code: 131042 }), { code: '131042', text: '' });
+  assert.deepEqual(failureReason({ detail: 'Boom {"error":{"code":1}}' }), { code: null, text: 'Boom' });
+  assert.equal(cleanReason('x'.repeat(200)).length, 138);
+  const row = (id: number, over: Partial<Recipient>): Recipient => ({ id, contact_account_id: id, name: null, phone: null, status: 'dispatched', status_detail: null, delivery_status: null, delivery_error_code: null, delivery_error_message: null, ...over });
+  const groups = summarizeFailures([row(1, { status: 'dead', status_detail: '(#131026) a' }), row(2, { delivery_status: 'failed', delivery_error_code: 131026 }), row(3, { status: 'failed', status_detail: 'Otro' }), row(4, {})]);
+  assert.deepEqual(groups.map(group => [group.code, group.text, group.count]), [['131026', '', 2], [null, 'Otro', 1]]);
+  assert.deepEqual(summarizeRejections([{ contact_account_id: 1, reason: 'invalid_format' }, { contact_account_id: 2, reason: 'invalid_phone' }, { contact_account_id: 3, reason: 'nuevo' }]), [{ reason: 'invalid_phone', count: 2 }, { reason: 'other', count: 1 }]);
+});
+
+test('templates: variables, the refusal outside the body and both component shapes', () => {
+  const draft = { header: { format: 'TEXT', text: 'Hola' }, body: { text: 'Hola {{nombre}} y {{ nombre }}, {{codigo}}' }, footer: null };
+  assert.deepEqual(templateVariables(draft), ['nombre', 'codigo']);
+  assert.equal(templateHasUnmappableParams(draft), false);
+  const meta = [{ type: 'HEADER', format: 'image' }, { type: 'BODY', text: 'Hola {{nombre}}' }, { type: 'FOOTER', text: 'Pie' }, { type: 'BUTTONS', buttons: [{ url: 'https://x/{{codigo}}' }] }];
+  assert.deepEqual(templateContent(meta), { header: { format: 'IMAGE', text: null, media_url: null }, body: { text: 'Hola {{nombre}}' }, footer: { text: 'Pie' } });
+  assert.equal(templateHasUnmappableParams(meta), true);
+  assert.deepEqual(templateVariables(null), []);
+});
+
+test('contact helpers: masks, tag shapes and the activity window', () => {
+  assert.equal(maskPhone('+52 55 1234 5678'), '••••5678');
+  assert.equal(maskPhone('123'), null);
+  assert.deepEqual(contactTagLabels(['a', { label: 'b' }, ' a ']), ['a', 'b']);
+  assert.deepEqual(contactTagLabels({ items: [{ label: 'x' }] }), ['x']);
+  const now = Date.parse('2026-10-30T00:00:00Z');
+  const rows = [{ last_active_at: '2026-10-28T00:00:00Z' }, { last_active_at: '2026-10-01T00:00:00Z' }, { last_active_at: null }];
+  assert.equal(contactsInWindow(rows, 'all', now).length, 3);
+  assert.equal(contactsInWindow(rows, '7d', now).length, 1);
+  assert.equal(contactsInWindow(rows, '30d', now).length, 2);
+});
+
+test('template text paints what WhatsApp paints, nothing more', () => {
+  assert.deepEqual(parseTemplateText('Hola *{{nombre}}*'), [{ type: 'text', value: 'Hola ' }, { type: 'bold', children: [{ type: 'variable', name: 'nombre' }] }]);
+  assert.deepEqual(parseTemplateText('2 * 3 * 4'), [{ type: 'text', value: '2 * 3 * 4' }]);
+  assert.deepEqual(parseTemplateText('*a\nb*'), [{ type: 'text', value: '*a\nb*' }]);
+  assert.deepEqual(parseTemplateText('```a*b*```'), [{ type: 'mono', value: 'a*b*' }]);
+});

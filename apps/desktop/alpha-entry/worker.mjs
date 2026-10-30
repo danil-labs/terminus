@@ -5,6 +5,9 @@
 // /auth/emails/verify, /auth/emails/primary y /auth/emails/remove, con Origin exacto, Bearer,
 // JSON de hasta 1 KB y exactamente sus campos; un actor `ai` se rechaza aquí. Al BFF solo van
 // Authorization, Accept, Origin, Referer y un cuerpo reconstruido; nunca cookies.
+// Difusiones: sus lecturas y sus escrituras son listas cerradas en broadcasts.mjs. Las
+// escrituras llegan a clientes reales: responden 403 salvo con la variable BROADCAST_WRITES="on".
+import { broadcastRead, broadcastWrite } from "./broadcasts.mjs";
 import { handleAuth, sessionConfig } from "./session.mjs";
 
 const HOST = "alfa-app.danil.ai";
@@ -101,6 +104,7 @@ async function forward(env, upstream) {
     return json("bff_unavailable", 502);
   }
   if (response.status >= 300 && response.status < 400) return json("unexpected_redirect", 502);
+  if (response.status === 204) return new Response(null, { status: 204, headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
   const contentType = response.headers.get("Content-Type") ?? "";
   if (!contentType.toLowerCase().startsWith("application/json")) return json("unexpected_response", 502);
   return new Response(response.body, {
@@ -133,6 +137,30 @@ async function emailWrite(request, env, url, path) {
   return forward(env, new Request(url, { method: "POST", headers, body: JSON.stringify(body), redirect: "manual" }));
 }
 
+/** Una escritura de Difusiones: las mismas barreras que los correos, más el interruptor. */
+async function writeBroadcast(request, env, url, path, route) {
+  if (request.headers.get("Origin") !== `https://${HOST}`) return json("forbidden_origin", 403);
+  if ((request.headers.get("X-Danil-Actor") ?? "").trim().toLowerCase() === "ai") return json("identity_requires_person", 403);
+  const authorization = request.headers.get("Authorization");
+  if (!authorization || !/^Bearer \S+$/i.test(authorization)) return json("unauthorized", 401);
+  if (env.BROADCAST_WRITES !== "on") return json("broadcast_writes_disabled", 403);
+  if (url.search) return json("invalid_query", 400);
+  const contentType = request.headers.get("Content-Type") ?? "";
+  const declared = Number(request.headers.get("Content-Length") ?? "0");
+  if (declared > route.max) return json("invalid_body", 400);
+  const bytes = route.parse === null ? new Uint8Array() : await boundedBody(request, route.max);
+  if (!bytes) return json("invalid_body", 400);
+  const body = route.parse?.(bytes, contentType) ?? (route.parse === null ? "" : null);
+  if (body === null) return json("invalid_body", 400);
+  if (!env.APPV2_BFF) return json("bff_unavailable", 503);
+  const headers = new Headers({ Authorization: authorization, Accept: "application/json", Origin: `https://${HOST}` });
+  if (route.parse !== null) headers.set("Content-Type", route.multipart ? contentType : "application/json");
+  const referer = request.headers.get("Referer");
+  if (referer !== null) headers.set("Referer", referer);
+  url.pathname = path;
+  return forward(env, new Request(url, { method: request.method, headers, body: route.parse === null ? undefined : body, redirect: "manual" }));
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -145,8 +173,11 @@ export default {
     if (url.pathname === PREFIX || url.pathname.startsWith(`${PREFIX}/`)) {
       const path = url.pathname.slice(PREFIX.length);
       if (request.method === "POST" && Object.hasOwn(EMAIL_WRITES, path)) return emailWrite(request, env, url, path);
+      const write = broadcastWrite(request.method, path);
+      if (write) return writeBroadcast(request, env, url, path, write);
       if (request.method !== "GET") return json("method_not_allowed", 405);
-      const kind = path === "/auth/profile" ? "profile" :
+      const read = broadcastRead(path);
+      const kind = read ? "broadcast" : path === "/auth/profile" ? "profile" :
         path === "/auth/emails" ? "emails" :
         path === "/api/inbox/conversations" ? "list" :
         path === "/api/channels" ? "channels" :
@@ -154,7 +185,7 @@ export default {
         /^\/api\/inbox\/conversations\/[1-9]\d*\/messages$/.test(path) ? "messages" : null;
       if (!kind) return json("not_found", 404);
       if (kind === "messages" && !Number.isSafeInteger(Number(path.split("/")[4]))) return json("invalid_query", 400);
-      const query = queryFor(url, kind);
+      const query = read ? read(url.searchParams) : queryFor(url, kind);
       if (!query) return json("invalid_query", 400);
       const authorization = request.headers.get("Authorization");
       if (!authorization || !/^Bearer \S+$/i.test(authorization)) return json("unauthorized", 401);
