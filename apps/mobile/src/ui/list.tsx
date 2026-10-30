@@ -113,7 +113,7 @@ export function GroupHeader({ children, count, strong, right }: { children: stri
   const theme = useTheme();
   return (
     <View style={[styles.groupHeader, strong ? styles.groupHeaderStrong : null]}>
-      <Text accessibilityRole="header" numberOfLines={1} style={strong ? [styles.strongText, { color: theme.text }] : [styles.capsText, { color: theme.textMuted }]}>
+      <Text accessibilityRole="header" numberOfLines={2} style={strong ? [styles.strongText, { color: theme.text }] : [styles.capsText, { color: theme.textMuted }]}>
         {strong ? children : children.toLocaleUpperCase()}
         {count !== undefined ? <Text style={{ color: theme.textMuted, fontWeight: "500", fontSize: strong ? 14 : 12 }}>{`  ${count}`}</Text> : null}
       </Text>
@@ -246,7 +246,7 @@ export function Segmented<T extends string>({ options, value, onChange, testID, 
             style={[styles.segment, on ? { backgroundColor: theme.surface, borderColor: theme.border, borderWidth: StyleSheet.hairlineWidth } : null]}
           >
             {option.icon ? <Icon name={option.icon} size={14} color={on ? theme.text : theme.textMuted} /> : null}
-            <Text numberOfLines={1} style={{ color: on ? theme.text : theme.textMuted, fontWeight: on ? "600" : "500", fontSize: 13.5, flexShrink: 1 }}>{option.label}</Text>
+            <Text numberOfLines={1} style={{ color: on ? theme.text : theme.textMuted, fontWeight: on ? "600" : "500", fontSize: 13, flexShrink: 1 }}>{option.label}</Text>
           </Tap>
         );
       })}
@@ -296,7 +296,7 @@ const styles = StyleSheet.create({
   largeText: { fontSize: 34, fontWeight: "800", letterSpacing: -0.5 },
   groupHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 32, paddingTop: 18, paddingBottom: 6 },
   groupHeaderStrong: { paddingHorizontal: 20, paddingTop: 22, paddingBottom: 8 },
-  capsText: { fontSize: 12.5, fontWeight: "600", letterSpacing: 0.4 },
+  capsText: { fontSize: 12.5, fontWeight: "600", letterSpacing: 0.4, flexShrink: 1 },
   strongText: { fontSize: 19, fontWeight: "700", flexShrink: 1 },
   footer: { paddingHorizontal: 32, paddingTop: 8, fontSize: 13, lineHeight: 18 },
   group: { marginHorizontal: 16, borderRadius: 14, overflow: "hidden" },

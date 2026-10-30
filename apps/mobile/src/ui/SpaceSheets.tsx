@@ -97,7 +97,7 @@ export function DeleteSpaceSheet({ target, space, onClose, onDeleted }: { target
       <View style={styles.body}>
         {preview?.last ? <Text style={{ color: theme.textMuted }}>{t("space.delete_last")}</Text> : preview ? (
           <>
-            <Text style={{ color: theme.text, fontSize: 15, lineHeight: 21 }}>{t("space.delete_body", { count: preview.tasks.length })}</Text>
+            <Text style={{ color: theme.text, fontSize: 15, lineHeight: 21 }}>{preview.tasks.length ? t("space.delete_body", { count: preview.tasks.length }) : t("space.delete_empty")}</Text>
             {dirty ? <Text style={{ color: theme.error }}>{t("space.delete_dirty", { count: dirty })}</Text> : null}
           </>
         ) : null}

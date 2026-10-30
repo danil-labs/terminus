@@ -93,7 +93,12 @@ export default function Profile() {
 
         {ready("keepAwake") && awake?.supported ? (
           <>
-            <GroupHeader right={<Text style={{ color: theme.textMuted, fontSize: 12.5 }}><Text style={{ color: awake.active ? theme.approving : theme.textMuted }}>● </Text>{w(awake.active ? "shell.keep_awake.active" : "shell.keep_awake.inactive")}</Text>}>
+            <GroupHeader right={
+              <View style={styles.state}>
+                <View style={[styles.dot, { backgroundColor: awake.active ? theme.approving : theme.border }]} />
+                <Text style={{ color: theme.textMuted, fontSize: 12.5 }}>{w(awake.active ? "shell.keep_awake.active" : "shell.keep_awake.inactive")}</Text>
+              </View>
+            }>
               {w("shell.keep_awake.title")}
             </GroupHeader>
             <View style={[styles.segmentCard, { backgroundColor: theme.surface }]}>
@@ -141,5 +146,7 @@ const styles = StyleSheet.create({
   avatar: { width: 76, height: 76, borderRadius: 38, alignItems: "center", justifyContent: "center", marginBottom: 8 },
   avatarText: { color: "#ffffff", fontSize: 28, fontWeight: "700" },
   name: { fontSize: 22, fontWeight: "800" },
+  state: { flexDirection: "row", alignItems: "center", gap: 5, marginLeft: 8 },
+  dot: { width: 8, height: 8, borderRadius: 4 },
   segmentCard: { marginHorizontal: 16, borderRadius: 14, paddingVertical: 6 },
 });

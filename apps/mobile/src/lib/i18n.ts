@@ -452,6 +452,7 @@ const es = {
   "task.tools.subtasks_note": "Las subtareas no aparecen en Inicio. Para encontrarlas, usa Buscar.",
   "task.tools.empty": "Esta tarea no tiene subtareas.",
   "task.tools.chat": "Chat",
+  "space.delete_empty": "No tiene tareas abiertas.",
 } as const;
 
 type Key = keyof typeof es;
@@ -907,6 +908,7 @@ const en: Record<Key, string> = {
   "task.tools.subtasks_note": "Subtasks don’t show on Home. Use Search to find them.",
   "task.tools.empty": "This task has no subtasks.",
   "task.tools.chat": "Chat",
+  "space.delete_empty": "It has no open tasks.",
 };
 
 /** The language the app speaks, also for the words that come from `@terminus/design`. */

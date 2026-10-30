@@ -117,7 +117,7 @@ export default function Home() {
       key: `space-${s.id}`,
       label: spaceName(s, t("space.general")),
       checked: s.id === space?.id,
-      count: (snapshot?.tasks ?? []).filter((task) => task.space && taskInSpace(task, s)).length,
+      count: (snapshot?.tasks ?? []).filter((task) => taskInSpace(task, s)).length,
       onPress: () => selectSpace(s.id),
     })) : []),
     ...(manage ? [
