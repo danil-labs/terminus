@@ -10,6 +10,7 @@ export type Plural = { one: string; other: string };
 export type Word = string | Plural;
 
 const es = {
+  "common.brand_name": "Danil",
   "shell.sidebar.view.trigger": "Filtrar y agrupar",
   "shell.sidebar.view.folders": "Carpetas",
   "shell.sidebar.view.all_folders": "Todas las carpetas",
@@ -68,7 +69,7 @@ const es = {
   "danil.license.start": "Empezar prueba gratis",
   "danil.license.retry": "Ya lo activé · Reintentar",
   "web.machines.create_on": "Se crea en",
-  "web.machines.off_action": "{name} está sin conexión. Verifica que Terminus esté abierto y tenga acceso a internet.",
+  "web.machines.off_action": "{name} está sin conexión. Verifica que Danil esté abierto y tenga acceso a internet.",
   "web.machines.outdated_action": "{name} necesita actualizarse antes de usarla desde aquí.",
   // La tarjeta de vista previa (hover card del escritorio), el cuadro de escribir y las cuentas.
   "projects.hover_card.open": "Abrir",
@@ -229,7 +230,7 @@ const es = {
   "shell.keep_awake.active": "Activo",
   "shell.keep_awake.inactive": "Inactivo",
   "shell.keep_awake.agent.description": "Despierta mientras un agente esté trabajando",
-  "shell.keep_awake.on.description": "No dejar que la computadora entre en reposo, y Terminus sigue atendiendo aunque cierres su ventana",
+  "shell.keep_awake.on.description": "No dejar que la computadora entre en reposo, y Danil sigue atendiendo aunque cierres su ventana",
   "shell.keep_awake.off.description": "La computadora entra en reposo como siempre",
   "usage.manage_accounts": "Gestionar cuentas",
   "settings.nav.connections": "Conexiones",
@@ -278,6 +279,7 @@ const es = {
 export type WordKey = keyof typeof es;
 
 const en: Record<WordKey, Word> = {
+  "common.brand_name": "Danil",
   "shell.sidebar.view.trigger": "Filter and group",
   "shell.sidebar.view.folders": "Folders",
   "shell.sidebar.view.all_folders": "All folders",
@@ -336,7 +338,7 @@ const en: Record<WordKey, Word> = {
   "danil.license.start": "Start free trial",
   "danil.license.retry": "I already activated it · Retry",
   "web.machines.create_on": "Created on",
-  "web.machines.off_action": "{name} is disconnected. Check that Terminus is open and has internet access.",
+  "web.machines.off_action": "{name} is disconnected. Check that Danil is open and has internet access.",
   "web.machines.outdated_action": "{name} needs an update before you can use it from here.",
   "projects.hover_card.open": "Open",
   "projects.hover_card.archive": "Archive",
@@ -496,7 +498,7 @@ const en: Record<WordKey, Word> = {
   "shell.keep_awake.active": "Active",
   "shell.keep_awake.inactive": "Inactive",
   "shell.keep_awake.agent.description": "Stay awake while an agent is working",
-  "shell.keep_awake.on.description": "Keep this computer awake continuously, and keep Terminus serving with its window closed",
+  "shell.keep_awake.on.description": "Keep this computer awake continuously, and keep Danil serving with its window closed",
   "shell.keep_awake.off.description": "Allow normal system sleep behavior",
   "usage.manage_accounts": "Manage accounts",
   "settings.nav.connections": "Connections",

@@ -12,7 +12,7 @@
   "cli.error.handler_dirty_not_approvable": "La carpeta del encargado tiene cambios sin commit: una definición sin huella fija no se puede aprobar.",
   "cli.error.handler_request_unknown": "El encargado no pide ese slot o esa herramienta.",
   "cli.error.handler_mcp_server_unknown": "Ese servidor no está en el catálogo MCP de este workspace.",
-  "cli.error.handler_mcp_server_unreachable": "Terminus no pudo listar las herramientas de ese servidor y no sabe qué concedería. No se aprobó nada.",
+  "cli.error.handler_mcp_server_unreachable": "Danil no pudo listar las herramientas de ese servidor y no sabe qué concedería. No se aprobó nada.",
   "cli.error.handler_mcp_access_not_distinguished": "El servidor no marca qué herramientas solo leen: no se puede aprobar como read. Apruébalo como slot=servidor:write si aceptas que escriba, o no lo apruebes.",
   "cli.error.handler_not_approved": "Ese encargado no tiene aprobación que retirar.",
   "cli.error.handler_mcp_hints_not_accepted": "Un slot read concede las herramientas que el servidor marca readOnlyHint. Revisa detail.read_tools y repite con --accept-hints y exactamente esa lista.",

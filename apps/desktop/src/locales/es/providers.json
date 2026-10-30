@@ -62,7 +62,7 @@
   "providers.http.token_expired": "La conexión con {name} dejó de valer: el token se venció o alguien lo revocó. Crea uno nuevo y vuelve a conectar.",
   "providers.http.token_unknown": "{name} no reconoce ese token. Revisa que lo hayas copiado completo y que no esté vencido, y pégalo otra vez.",
   "providers.http.unreadable": "{name} contestó algo que no supe leer. Vuelve a intentar en un momento.",
-  "providers.github.error.confirm_repositories": "Esta conexión de GitHub es de una versión anterior del motor. Actualiza Terminus o vuelve a elegir la cuenta en Configuración → GitHub.",
+  "providers.github.error.confirm_repositories": "Esta conexión de GitHub es de una versión anterior del motor. Actualiza Danil o vuelve a elegir la cuenta en Configuración → GitHub.",
   "providers.github.cli.title": "GitHub CLI (gh)",
   "providers.github.cli.absent": "No instalado",
   "providers.github.cli.install": "Descargar gh compatible",
@@ -131,8 +131,8 @@
   "providers.github.account.error.github_reauthorize": "GitHub dejó de aceptar esta conexión. Vuelve a conectar.",
   "providers.github.account.error.github_unavailable": "GitHub no contestó. Inténtalo en un momento.",
   "providers.github.account.error.github_disabled": "Tu cuenta de Danil todavía no puede guardar GitHub.",
-  "providers.github.account.error.license_required": "GitHub en la cuenta necesita Terminus activo en tu cuenta de Danil.",
-  "providers.github.account.error.invalid_return_to": "Danil no aceptó la página de regreso. Abre Terminus desde app.danil.ai e inténtalo otra vez.",
+  "providers.github.account.error.license_required": "GitHub en la cuenta necesita Danil activo en tu cuenta de Danil.",
+  "providers.github.account.error.invalid_return_to": "Danil no aceptó la página de regreso. Abre Danil desde app.danil.ai e inténtalo otra vez.",
   "providers.github.account.error.offline": "No se pudo hablar con tu cuenta de Danil. Revisa tu conexión a internet.",
   "providers.github.account.error.generic": "No se pudo completar con GitHub de tu cuenta. Inténtalo otra vez."
 }

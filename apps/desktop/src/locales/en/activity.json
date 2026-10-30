@@ -8,7 +8,7 @@
   "activity.empty": "No activity has been recorded on this machine yet.",
   "activity.loading": "Loading logs…",
   "activity.offline": "This machine is offline. Logs will refresh when it reconnects.",
-  "activity.unavailable": "Could not read the logs. Check the connection and that Terminus is up to date on this machine.",
+  "activity.unavailable": "Could not read the logs. Check the connection and that Danil is up to date on this machine.",
   "activity.technical": "Technical details · commands and output for each step",
   "activity.output": "Command output",
   "activity.no_output": "This step produced no output.",

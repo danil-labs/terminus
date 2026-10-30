@@ -79,7 +79,7 @@ export function ConnectPage(props: { session: Session; endpoint: string; code: s
 
   return (
     <main class="flex h-full flex-col overflow-y-auto bg-bg px-10 py-10" data-web-connect={view().t}>
-      <h1 class="m-0 mb-5 text-3xl leading-tight font-display font-bold tracking-[-0.03em] text-neutral-950">Terminus</h1>
+      <h1 class="m-0 mb-5 text-3xl leading-tight font-display font-bold tracking-[-0.03em] text-neutral-950">{t("common.brand_name")}</h1>
       <BrowserAccount session={props.session} disabled={view().t === "approving"} />
       <Switch>
         <Match when={view().t === "loading"}>

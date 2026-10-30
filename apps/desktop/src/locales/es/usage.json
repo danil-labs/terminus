@@ -4,7 +4,7 @@
   "usage.tool.title": "{agent}: te queda {left}% de la ventana más justa",
   "usage.refresh_all": "Actualizar",
   "usage.manage_accounts": "Gestionar cuentas",
-  "usage.bug_report": "Reportar un bug de Terminus",
+  "usage.bug_report": "Reportar un bug de Danil",
   "usage.bug_report.ask_agent": "Pídeselo al agente",
   "usage.bug_report.open_web": "Abrir un issue en blanco",
   "usage.query.failed": "No se pudo preguntar a {agent} cuánto te queda.",
