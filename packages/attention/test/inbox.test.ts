@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createInbox } from '../src/inbox.ts';
+import { contactDisplayName, contactSubIdentifier, conversationLabels, createInbox, matchesFilter, needsHuman } from '../src/inbox.ts';
 const session = { getToken: async () => 'user-token', unauthorized: async () => true };
 const response = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status });
 test('reads explicit account pages and rejects a response from another account', async () => {
@@ -33,4 +33,31 @@ test('validates canonical account IDs and rejects conversation substitution', as
   assert.deepEqual(await api.accounts(), [{ id: 3, name: 'Account' }]);
   await assert.rejects(api.messages(3,7), /invalid_scope/);
   await assert.rejects(api.conversations(Number.NaN), /invalid_response/);
+});
+test('keeps the list fields Appv2 already sends and the account totals for the filters', async () => {
+  const api = createInbox(session, async () => response({
+    hasMore: true, total_assistance: 4, total_ai_disabled: 2,
+    conversations: [{ id: 5, account_id: 2, ai_assistance: false, contact_name: '', active_provider: 'whatsapp_cloud', contact_phone: '5219991234567', last_message_at: '2026-10-29T15:42:00Z', assistance_requested_at: '2026-10-29T15:00:00Z', assistance_state: 'active', assist_status: { reason_code: 'loop' }, contact_ai_blocked: true, last_message_direction: 'inbound', last_message_sender_type: 'contact' }],
+  }));
+  const page = await api.conversations(2);
+  assert.deepEqual(page.counts, { assistance: 4, aiDisabled: 2 });
+  const row = page.rows[0];
+  assert.equal(row.last_message_at, '2026-10-29T15:42:00Z');
+  assert.equal(row.assist_reason, 'loop');
+  assert.equal(row.contact_ai_blocked, true);
+  assert.equal(contactDisplayName(row, 'Contacto'), '+521 999 123 4567');
+  assert.deepEqual(conversationLabels(row), ['ai_paused_loop', 'human_required']);
+});
+test('labels and filters follow Appv2', () => {
+  const base = { id: 1, account_id: 1, contact_name: 'Ana', channel_name: 'WhatsApp', last_message: '', ai_assistance: true, unread_count: 0 };
+  assert.deepEqual(conversationLabels(base), []);
+  assert.deepEqual(conversationLabels({ ...base, ai_assistance: false }), ['ai_off']);
+  const answered = { ...base, assistance_state: 'abandoned', assistance_requested_at: 'x', last_message_direction: 'outbound', last_message_sender_type: 'human-agent' };
+  assert.equal(needsHuman(answered), false);
+  assert.equal(matchesFilter(answered, 'assistance'), true);
+  assert.equal(matchesFilter({ ...base, ai_assistance: false, contact_ai_blocked: true }, 'ai_disabled'), false);
+  assert.equal(matchesFilter({ ...base, ai_assistance: false, contact_ai_blocked: true }, 'ai_blocked'), true);
+  assert.equal(contactSubIdentifier({ ...base, active_provider: 'web', contact_handle: '1329' }), null);
+  assert.equal(contactSubIdentifier({ ...base, active_provider: 'messenger', contact_handle: '42' }), 'PSID 42');
+  assert.equal(contactSubIdentifier({ ...base, active_provider: 'instagram', contact_handle: 'ana.mx' }), '@ana.mx');
 });
