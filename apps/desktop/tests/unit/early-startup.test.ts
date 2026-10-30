@@ -4,6 +4,8 @@ import test from "node:test";
 import { listaBasta, reconciliar } from "../../src/features/settings/early-startup.ts";
 import { mountAfterLanguagePacks } from "../../src/locales/startup.ts";
 import { untilConnected } from "../../src/lib/invoke.ts";
+import "../helpers/catalog.ts";
+import { aplicarLenguaDeWorkspace, elegirLengua, lengua, refreshLanguage } from "../../src/lib/i18n.ts";
 
 /**
  * La ventana no espera a `workspaces_startup`. El arranque migra dentro y
@@ -33,6 +35,30 @@ test("catálogo disponible o rechazado monta sin esperar el plazo", async () => 
   await mountAfterLanguagePacks(Promise.resolve([]), () => { mounts++; });
   await mountAfterLanguagePacks(Promise.reject(new Error("unreadable")), () => { mounts++; });
   assert.equal(mounts, 2);
+});
+
+test("el catálogo tardío conserva la lengua del workspace elegida tras montar", async () => {
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  const values = new Map<string, string>();
+  Object.defineProperty(globalThis, "localStorage", { configurable: true, value: {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => { values.set(key, value); },
+    removeItem: (key: string) => { values.delete(key); },
+  } });
+  try {
+    elegirLengua("en");
+    let finish!: () => void;
+    const packs = new Promise<void>((done) => { finish = done; }).then(refreshLanguage);
+    await mountAfterLanguagePacks(packs, () => aplicarLenguaDeWorkspace("es"), 20);
+    finish();
+    await packs;
+    assert.equal(lengua(), "es");
+    assert.equal(values.get("harness:lengua:ultima"), "es");
+    assert.equal(values.get("harness:lengua"), "en");
+  } finally {
+    if (descriptor) Object.defineProperty(globalThis, "localStorage", descriptor);
+    else Reflect.deleteProperty(globalThis, "localStorage");
+  }
 });
 
 test("una lista con activo abre la ventana", () => {

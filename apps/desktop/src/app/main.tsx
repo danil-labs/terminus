@@ -12,7 +12,7 @@ import { trimNativeMenu } from "../lib/contextMenu";
 import { acotarSeleccionarTodo } from "../lib/selectAll";
 import { activarBarrasAlDesplazar } from "../lib/scrollbars";
 import { aplicarVeloDePestanas } from "../lib/chat-background-store";
-import { aplicarLengua, elegirLengua, lenguasDisponibles, semillaDelAlta } from "../lib/i18n";
+import { aplicarLengua, refreshLanguage, lenguasDisponibles, semillaDelAlta } from "../lib/i18n";
 import { cargarPaquetes } from "../locales/packs";
 import { mountAfterLanguagePacks } from "../locales/startup";
 import { capabilities } from "../lib/platform";
@@ -56,7 +56,7 @@ aplicarLengua();
  * se lee el disco antes del primer pintado — montar antes enseñaría la ventana
  * un instante en español antes de que cambiara sola.
  *
- * `elegirLengua` después de cargar **vuelve a resolver**: la lengua se fijó al
+ * `refreshLanguage` después de cargar **vuelve a resolver**: la lengua se fijó al
  * evaluarse el motor, cuando el paquete todavía no estaba, y sin esto quedaría
  * en el respaldo aunque el catálogo ya esté dentro. Con la preferencia tal
  * cual, es idempotente.
@@ -82,7 +82,7 @@ const montar = () =>
     document.getElementById("root")!,
   );
 
-const lenguasDeDisco = cargarPaquetes().then(() => elegirLengua(semillaDelAlta()));
+const lenguasDeDisco = cargarPaquetes().then(refreshLanguage);
 // No un `await` de nivel superior: el objetivo del build es `es2020`, donde no
 // existe, y subirlo por esta línea cambiaría el objetivo de la app entera.
 if (laQueTocaYaEstaDentro()) montar();
