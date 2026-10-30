@@ -143,7 +143,7 @@ export default function Tasks() {
             testID="filter"
             hitSlop={10}
             onPress={() => router.push("/filter")}
-            accessibilityLabel={changed ? w("shell.sidebar.view.trigger_count", { count: changed }) : w("shell.sidebar.view.trigger")}
+            accessibilityLabel={w("shell.sidebar.view.trigger")}
             style={styles.filter}
           >
             <Icon name="sliders-horizontal" size={18} color={theme.textMuted} />

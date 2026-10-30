@@ -11,7 +11,6 @@ export type Word = string | Plural;
 
 const es = {
   "shell.sidebar.view.trigger": "Filtrar y agrupar",
-  "shell.sidebar.view.trigger_count": "Filtrar y agrupar ({count} cambiados)",
   "shell.sidebar.view.folders": "Carpetas",
   "shell.sidebar.view.all_folders": "Todas las carpetas",
   "shell.sidebar.view.all": "Todas",
@@ -179,7 +178,6 @@ export type WordKey = keyof typeof es;
 
 const en: Record<WordKey, Word> = {
   "shell.sidebar.view.trigger": "Filter and group",
-  "shell.sidebar.view.trigger_count": "Filter and group ({count} changed)",
   "shell.sidebar.view.folders": "Folders",
   "shell.sidebar.view.all_folders": "All folders",
   "shell.sidebar.view.all": "All",

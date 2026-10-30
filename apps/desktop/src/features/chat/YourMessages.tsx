@@ -1,7 +1,8 @@
-import { createSignal, onCleanup, Show } from "solid-js";
+import { createEffect, createSignal, For, on, onCleanup, Show } from "solid-js";
 import { t } from "../../lib/i18n";
 import { Popover, PopoverContent } from "../../ui/Popover";
 import { RETARDO_TOOLTIP } from "../../ui/Tooltip";
+import { cn } from "../../lib/utils";
 import { MarcaAgente } from "../../ui/icons";
 import { AstroAvatar } from "../projects/AstroAvatar";
 
@@ -14,6 +15,8 @@ export type InputMessage = {
 
 const TICK_PITCH = 11;
 const RAIL_PADDING = 8;
+/** Cuántas marcas caben a la vez: el riel es un carrusel, no una columna con todo el hilo. */
+const VISIBLE = 15;
 const CLOSE_DELAY = 200;
 const WHEEL_QUIET = 300;
 const PREVIEW_LENGTH = 100;
@@ -28,6 +31,18 @@ export default function YourMessages(props: {
 }) {
   const [open, setOpen] = createSignal(false);
   const [preview, setPreview] = createSignal(props.active);
+  // La marca bajo el puntero, para agrandarla a ella y a sus vecinas.
+  const [sobre, setSobre] = createSignal<number | null>(null);
+  const cuenta = () => Math.min(VISIBLE, props.messages.length);
+  const tope = () => Math.max(0, props.messages.length - cuenta());
+  const centrada = (i: number) => Math.max(0, Math.min(tope(), i - Math.floor(cuenta() / 2)));
+  const [inicio, setInicio] = createSignal(centrada(props.active));
+  // La ventana sigue al mensaje en pantalla cuando este sale de ella.
+  createEffect(on(() => [props.active, props.messages.length] as const, ([activo]) => {
+    if (activo < inicio() || activo >= inicio() + cuenta()) setInicio(centrada(activo));
+    else if (inicio() > tope()) setInicio(tope());
+  }));
+  const visibles = () => Array.from({ length: cuenta() }, (_, k) => inicio() + k);
   let openTimer: ReturnType<typeof setTimeout> | undefined;
   let closeTimer: ReturnType<typeof setTimeout> | undefined;
   let lastWheel: number | null = null;
@@ -38,15 +53,14 @@ export default function YourMessages(props: {
     clearTimeout(closeTimer);
   });
 
-  const height = () => Math.min(Math.max(24, props.visibleHeight - 16), props.messages.length * TICK_PITCH + RAIL_PADDING * 2);
-  const pitch = () => (height() - RAIL_PADDING * 2) / props.messages.length;
+  const height = () => cuenta() * TICK_PITCH + RAIL_PADDING * 2;
   const top = () => Math.max(0, Math.round((props.visibleHeight - height()) / 2));
-  const tickTop = (index: number) => RAIL_PADDING + Math.max(0, Math.min(props.messages.length - 1, index)) * pitch();
+  const tickTop = (index: number) => RAIL_PADDING + Math.max(0, Math.min(cuenta() - 1, index - inicio())) * TICK_PITCH;
   const current = () => props.messages[Math.min(preview(), props.messages.length - 1)];
   const excerpt = () => current()?.text.slice(0, PREVIEW_LENGTH) ?? "";
   const indexAt = (e: { clientY: number }) => {
     const y = e.clientY - (rail?.getBoundingClientRect().top ?? 0) - RAIL_PADDING;
-    return Math.max(0, Math.min(props.messages.length - 1, Math.floor(y / pitch())));
+    return Math.max(0, Math.min(props.messages.length - 1, inicio() + Math.floor(y / TICK_PITCH)));
   };
   const cancelOpen = () => {
     clearTimeout(openTimer);
@@ -62,18 +76,25 @@ export default function YourMessages(props: {
     }, RETARDO_TOOLTIP);
   };
   const leave = () => {
+    setSobre(null);
     lastWheel = null;
     cancelOpen();
     clearTimeout(closeTimer);
     closeTimer = setTimeout(() => setOpen(false), CLOSE_DELAY);
   };
-  const wheel = () => {
+  // La rueda recorre el carrusel; la vista previa sigue a la marca que queda bajo el puntero.
+  const wheel = (e: WheelEvent) => {
+    if (props.messages.length <= cuenta() || !e.deltaY) return;
+    e.preventDefault();
     lastWheel = performance.now();
-    cancelOpen();
-    setOpen(false);
+    setInicio((i) => Math.max(0, Math.min(tope(), i + Math.sign(e.deltaY))));
+    const i = indexAt(e);
+    setSobre(i);
+    setPreview(i);
   };
   const movePointer = (e: PointerEvent) => {
     setPreview(indexAt(e));
+    setSobre(indexAt(e));
     if (lastWheel !== null) {
       if ((!e.movementX && !e.movementY) || performance.now() - lastWheel < WHEEL_QUIET) return;
       lastWheel = null;
@@ -97,6 +118,7 @@ export default function YourMessages(props: {
     if (next === null) return;
     e.preventDefault();
     setPreview(next);
+    if (next < inicio() || next >= inicio() + cuenta()) setInicio(centrada(next));
     setOpen(true);
   };
 
@@ -107,13 +129,7 @@ export default function YourMessages(props: {
           ref={rail}
           type="button"
           class="riel-de-mensajes pointer-events-auto absolute left-0 w-8 rounded-sm outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-          style={{
-            top: `${top()}px`,
-            height: `${height()}px`,
-            "--riel-paso": `${pitch()}px`,
-            "--riel-grosor": `${Math.min(3, pitch() * 0.6)}px`,
-            "--riel-activo": `${tickTop(props.active)}px`,
-          }}
+          style={{ top: `${top()}px`, height: `${height()}px` }}
           aria-label={`${t("chat.rail.label")}: ${excerpt()}`}
           aria-haspopup="dialog"
           aria-expanded={open()}
@@ -124,7 +140,32 @@ export default function YourMessages(props: {
           onFocus={() => { setPreview(props.active); setOpen(true); }}
           onKeyDown={key}
           onClick={(e) => { if (e.detail !== 0) setPreview(indexAt(e)); jump(); }}
-        />
+        >
+          <For each={visibles()}>
+            {(i) => {
+              // Con el puntero encima, la marca crece y sus vecinas un poco menos.
+              const distancia = () => { const h = sobre(); return h === null ? null : Math.abs(i - h); };
+              const ancho = () => {
+                const d = distancia();
+                const base = d === 0 ? 22 : d === 1 ? 17 : d === 2 ? 14 : 12;
+                return i === props.active ? Math.max(base, 18) : base;
+              };
+              // Las del borde se desvanecen cuando el carrusel tiene más mensajes de ese lado.
+              const borde = () => (i === inicio() && inicio() > 0) || (i === inicio() + cuenta() - 1 && inicio() < tope());
+              return (
+                <span
+                  aria-hidden="true"
+                  class={cn(
+                    "riel-marca pointer-events-none absolute left-1 h-[3px] rounded-full",
+                    distancia() === 0 ? "bg-neutral-950" : i === props.active ? "bg-neutral-700" : open() || sobre() !== null ? "bg-neutral-500" : "bg-neutral-300",
+                    borde() && distancia() !== 0 && "opacity-40",
+                  )}
+                  style={{ top: `${RAIL_PADDING + (i - inicio()) * TICK_PITCH}px`, width: `${ancho()}px` }}
+                />
+              );
+            }}
+          </For>
+        </button>
         <span ref={anchor} class="pointer-events-none absolute left-4 size-px" style={{ top: `${top() + tickTop(preview())}px` }} aria-hidden="true" />
         <PopoverContent
           class="pointer-events-none w-64 p-2"
