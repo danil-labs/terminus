@@ -21,7 +21,7 @@ export {
   statusKeyOf,
 } from "./view.ts";
 export { REMOTE_CHILD_FEATURE, type RemoteParent, type RemoteRow, type RemoteScope, remoteLauncherOf, remoteParentOf, withRemoteLaunchers } from "./remote.ts";
-export { type FlatRow, type FlatTask, type LauncherRow, delegatedOf, flattenTasks, folderCounts, launcherOf, shownUnderLauncher } from "./flat.ts";
+export { type FlatRow, type FlatTask, type LauncherRow, delegatedOf, flattenTasks, folderCounts, isSubtask, launcherOf } from "./flat.ts";
 export {
   type AgentPresence,
   type DockAgent,
