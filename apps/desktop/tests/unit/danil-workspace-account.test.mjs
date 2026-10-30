@@ -402,6 +402,22 @@ test("a failed account lookup does not show the default account or its computers
   assert.deepEqual(app.fallos, []);
 });
 
+test("switching workspace inside the same account resets «Administrar» in Perfil", async () => {
+  const e = engine({ map: { w: "u_alberto", w2: "u_alberto" } });
+  const app = await openDanilAccounts("danil-settings-manage-reset", e);
+  const { w } = app;
+  const panel = () => w.document.querySelector("[data-danil-account]");
+  panel().querySelector("[data-danil-manage]").click();
+  await sleep(100);
+  assert.ok(panel().querySelector("[data-workspace-account-select]"), "«Administrar» opens the account choices");
+  e.state.active = "w2";
+  w.dispatchEvent(new w.CustomEvent("harness:workspace"));
+  await sleep(700);
+  assert.ok(panel().querySelector("[data-danil-manage]"), "W2 shows its own account row");
+  assert.equal(panel().querySelector("[data-workspace-account-select]"), null, "manage state is new for W2");
+  assert.deepEqual(app.fallos, []);
+});
+
 test("same-account workspace switches discard old machine reads, controls and connection polling", async () => {
   const e = engine({ map: { w: "u_alberto", w2: "u_alberto" } });
   e.table.account_relay_token = ({ account }) => {
