@@ -169,6 +169,7 @@ if (command === 'validate') {
   const nativeIdentity = JSON.parse(await readFile(path.join(process.env.RUNNER_TEMP, 'native-identity.json'), 'utf8'));
   const receipt = {source_oid: manifest.source_oid, version: manifest.version, platform: manifest.platform,
     signing_workflow_oid: process.env.GITHUB_SHA ?? null, input_release: process.env.INPUT_RELEASE ?? null,
+    workflow_definition_oid: process.env.DEFINITION_OID ?? null,
     input_sha256: process.env.INPUT_SHA256 ?? null,
     updater_pubkey_sha256: UPDATER_PUBKEY_SHA256, native_identity: nativeIdentity,
     reviewed_build_receipt_sha256: process.env.RECEIPT_SHA256,

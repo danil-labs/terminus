@@ -4,6 +4,9 @@ name: Sign existing candidate (manual review only)
 on:
   workflow_dispatch:
     inputs:
+      workflow_oid:
+        description: OID completo aprobado del dispatcher y scripts (distinto de source_oid)
+        required: true
       source_oid:
         description: OID completo del código de los binarios revisados
         required: true
@@ -36,6 +39,9 @@ on:
 
 permissions:
   contents: read
+env:
+  EXPECTED_WORKFLOW_OID: ${{ inputs.workflow_oid }}
+  DEFINITION_OID: ${{ github.workflow_sha }}
 concurrency:
   group: sign-existing-candidate
   cancel-in-progress: false
@@ -50,8 +56,16 @@ jobs:
       INPUT_RELEASE: ${{ inputs.input_release }}
       INPUT_SHA256: ${{ inputs.linux_sha256 }}
     steps:
+      - name: Check approved dispatcher revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_WORKFLOW_OID" =~ ^[a-f0-9]{40}$ ]]
+          test "$GITHUB_SHA" = "$EXPECTED_WORKFLOW_OID"
+          test "$DEFINITION_OID" = "$EXPECTED_WORKFLOW_OID"
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
+          ref: ${{ github.sha }}
           persist-credentials: false
       - name: Fetch and validate reviewed AppImage
         env:
@@ -105,8 +119,16 @@ jobs:
       run:
         shell: pwsh
     steps:
+      - name: Check approved dispatcher revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_WORKFLOW_OID" =~ ^[a-f0-9]{40}$ ]]
+          test "$GITHUB_SHA" = "$EXPECTED_WORKFLOW_OID"
+          test "$DEFINITION_OID" = "$EXPECTED_WORKFLOW_OID"
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
+          ref: ${{ github.sha }}
           persist-credentials: false
       - name: Fetch reviewed input
         env:
@@ -186,8 +208,16 @@ jobs:
       INPUT_RELEASE: ${{ inputs.input_release }}
       INPUT_SHA256: ${{ inputs.macos_sha256 }}
     steps:
+      - name: Check approved dispatcher revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_WORKFLOW_OID" =~ ^[a-f0-9]{40}$ ]]
+          test "$GITHUB_SHA" = "$EXPECTED_WORKFLOW_OID"
+          test "$DEFINITION_OID" = "$EXPECTED_WORKFLOW_OID"
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
+          ref: ${{ github.sha }}
           persist-credentials: false
       - name: Fetch reviewed input
         env:

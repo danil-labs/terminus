@@ -211,3 +211,32 @@ El recibo final fija `updater_pubkey_sha256` a
 `dd20ff2f22272128f403eb4ab852c00890bdc8aae0e70f3fb4c62ec2d031022a`,
 hash del valor base64 instalado; si cambia, falla. Incluye hashes de outputs,
 OID del workflow, OID del build, hash del ZIP y hash del recibo externo.
+
+## Despacho sin promover código a main
+
+GitHub exige que el workflow manual esté registrado en la rama predeterminada;
+permite seleccionar otra rama con `--ref`. El nuevo archivo
+`sign-existing-candidate.yml` no acredita ese registro. Véanse
+[GitHub: ejecución manual](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow)
+y [CLI: workflow run](https://cli.github.com/manual/gh_workflow_run).
+
+La consulta de sólo lectura confirmó que `publish.yml` ya está registrado con
+ID `369790415`, estado `active`. La alternativa preparada es una rama aislada,
+`build/sign-existing-dispatch`, donde ese archivo se reemplaza enteramente por
+el dispatcher de firma aquí descrito y se elimina el workflow nuevo duplicado.
+Esa rama no se integra a `dev` ni a `main`. El workflow original de publicación
+permanece intacto en ambas ramas compartidas. No despachar `publish.yml` desde
+`dev`, `main` o un ref distinto: allí todavía puede compilar/publicar.
+
+Antes de un despacho autorizado, fijar el OID completo aprobado de la rama de
+firma y comprobar por lectura que la rama remota aún apunta a él. El input
+`workflow_oid` debe ser ese OID; `source_oid` es el OID del código de los binarios
+existentes y puede ser distinto. Cada job comprueba `GITHUB_SHA` y el SHA de la
+definición contra `workflow_oid` antes de checkout/secrets; checkout usa ese SHA
+del evento explícitamente. Si la rama se mueve antes de despachar, falla antes
+de usar secrets. El recibo conserva ambos OIDs.
+
+El mecanismo propuesto usa el ID existente y `--ref build/sign-existing-dispatch`,
+con inputs JSON revisados. No se ejecutó ese comando ni se subió la rama. Su
+aceptación por GitHub queda por comprobar después de la autorización específica;
+el registro existente y la documentación no sustituyen esa comprobación real.
