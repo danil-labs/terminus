@@ -109,7 +109,7 @@ test("the web lists secrets by scope, marks an old engine as not compatible, and
     assert.match(oldRow.textContent, /no compatible/);
     assert.equal(oldRow.querySelectorAll("button").length, 0, "no remove or restore on a machine that would not apply it");
     assert.equal(ws.querySelector("[data-credential-usage]").textContent, "En uso en: Mac · no compatible en vm-vieja");
-    assert.match(ws.querySelector('[data-secret-unsupported-help="cmp_old"]').textContent, /vm-vieja tiene una versión de Terminus sin secretos/);
+    assert.match(ws.querySelector('[data-secret-unsupported-help="cmp_old"]').textContent, /vm-vieja tiene una versión de Danil sin secretos/);
 
     const button = (root, text) => [...root.querySelectorAll("button")].find((b) => b.textContent.trim() === text);
     button(panel(), "Añadir secreto").click();

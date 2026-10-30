@@ -45,7 +45,7 @@ test("the app opens at once, never the installer nor a preparation screen", asyn
     assert.equal(fake.sockets.length, 1, "the only computer opens");
     assert.ok(text().includes("Tarea t1"), "the app is already there");
     assert.ok(!/Preparando tu computadora|Conectando con tu computadora|Connecting to your computer/.test(text()), "no waiting screen");
-    assert.ok(!text().includes("Preparando Terminus"), "never the installer");
+    assert.ok(!text().includes("Preparando Danil"), "never the installer");
     assert.ok(!fake.calls.some((c) => ["check_environment", "prepare_runtime", "setup_required"].includes(c.command)), "nor its checks");
     assert.deepEqual(app.fallos, []);
   } finally {
