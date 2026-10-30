@@ -106,6 +106,8 @@ function webBuild(serve: boolean): UserConfig {
       "import.meta.env.TERMINUS_ALPHA": JSON.stringify(env.TERMINUS_WEB_ALPHA === "1"),
     },
     plugins: [page],
+    // Los iconos de la pestaña solo los usa la web; la ventana de escritorio no los copia.
+    publicDir: fileURLToPath(new URL("./web-public/", import.meta.url)),
     build: {
       outDir,
       emptyOutDir: true,
