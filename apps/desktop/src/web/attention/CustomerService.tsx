@@ -96,33 +96,40 @@ function AgentDetail(props: { source: ServiceSource; agent: ServiceAgent; onBack
   </SettingsPanel>;
 }
 
-function Watched(props: { session?: Session; children: () => JSX.Element }) {
+/** Cambiar de sesión o de workspace desmonta todo: ni selección ni lecturas del ámbito anterior. */
+function Scoped(props: { session?: Session; workspace: () => string | null; children: () => JSX.Element }) {
   const [epoch, setEpoch] = createSignal(0);
   onMount(() => {
     const stop = props.session?.subscribe?.(() => setEpoch(value => value + 1));
     if (stop) onCleanup(stop);
   });
-  return <Show when={epoch() + 1} keyed>{(_) => props.children()}</Show>;
+  return <Show when={`${epoch()}:${props.workspace() ?? ''}`} keyed>{(_) => props.children()}</Show>;
+}
+
+function AgentsBody(props: { source: ServiceSource; workspace: () => string | null }) {
+  const [open, setOpen] = createSignal<ServiceAgent | null>(null);
+  return <section class="grid min-w-0 gap-6" data-service-agents="">
+    <Resolved source={props.source} workspace={props.workspace}>
+      <Show when={open()} fallback={
+        <Listed title={t("web.service.agents_title")} description={t("web.service.agents_hint")} aside={<OpenAgents />} empty={t("web.service.agents_empty")} load={() => props.source.agents()}>
+          {row => <SettingsRow label={row.name} description={typeLabel(row.type)}><Button variant="ghost" size="sm" onClick={() => setOpen(row)}>{t("web.service.see")}</Button></SettingsRow>}
+        </Listed>}>
+        {agent => <AgentDetail source={props.source} agent={agent()} onBack={() => setOpen(null)} />}
+      </Show>
+    </Resolved>
+  </section>;
 }
 
 /** Agentes y skills › Agentes, sección de atención a clientes. */
 export function CustomerAgents(props: CustomerProps) {
-  const [open, setOpen] = createSignal<ServiceAgent | null>(null);
   const [source] = createResource(props.load);
-  return <Watched session={props.session}>{() => <Show when={source()}>{s => <section class="grid min-w-0 gap-6" data-service-agents="">
-    <Show when={open()} fallback={<Resolved source={s()} workspace={props.workspace}>
-      <Listed title={t("web.service.agents_title")} description={t("web.service.agents_hint")} aside={<OpenAgents />} empty={t("web.service.agents_empty")} load={() => s().agents()}>
-        {row => <SettingsRow label={row.name} description={typeLabel(row.type)}><Button variant="ghost" size="sm" onClick={() => setOpen(row)}>{t("web.service.see")}</Button></SettingsRow>}
-      </Listed></Resolved>}>
-      {agent => <AgentDetail source={s()} agent={agent()} onBack={() => setOpen(null)} />}
-    </Show>
-  </section>}</Show>}</Watched>;
+  return <Show when={source()}>{s => <Scoped session={props.session} workspace={props.workspace}>{() => <AgentsBody source={s()} workspace={props.workspace} />}</Scoped>}</Show>;
 }
 
 /** Conexiones › Atención a clientes. Canales ya tenía su vista; lo demás sale de aquí. */
 export function CustomerConnections(props: CustomerProps) {
   const [source] = createResource(props.load);
-  return <Watched session={props.session}>{() => <Show when={source()}>{s => <SettingsPanel data-service-connections="">
+  return <Show when={source()}>{s => <Scoped session={props.session} workspace={props.workspace}>{() => <SettingsPanel data-service-connections="">
     <Resolved source={s()} workspace={props.workspace}>
       <SettingsSection><SettingsRow label={t("web.service.edit_hint")}><OpenAgents /></SettingsRow></SettingsSection>
       <Suspense fallback={null}><Channels demo={props.demo} session={props.session} /></Suspense>
@@ -136,5 +143,5 @@ export function CustomerConnections(props: CustomerProps) {
         {row => <SettingsRow label={<span class="font-mono text-ui">{row.key}</span>} description={row.secret ? t("web.service.secret") : undefined} />}
       </Listed>
     </Resolved>
-  </SettingsPanel>}</Show>}</Watched>;
+  </SettingsPanel>}</Scoped>}</Show>;
 }
