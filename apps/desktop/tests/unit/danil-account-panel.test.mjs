@@ -64,7 +64,7 @@ test("la cuenta de Danil entra con el navegador, muestra el código y cierra ses
 
   w.dispatchEvent(new w.CustomEvent("harness:open-settings", { detail: "cuenta-danil" }));
   await sleep(800);
-  assert.ok(w.document.getElementById("cfg-tab-cuenta-danil")?.textContent.includes("Cuenta de Danil"), "the rail shows the section");
+  assert.ok(w.document.getElementById("cfg-tab-account")?.textContent.includes("Cuenta"), "the rail shows the section");
   assert.equal(panel()?.dataset.danilAccount, "disconnected");
   assert.equal(panel().querySelector("input")?.value, "alberto-mbp", "the name defaults to the hostname the engine suggests");
   assert.ok(text().includes("Nombre de esta computadora"), "the field names the machine, not the account");

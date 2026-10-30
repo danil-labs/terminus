@@ -23,6 +23,16 @@ import WorkspaceAccount from "./WorkspaceAccount";
  */
 export type DanilAccountPart = "profile" | "machines";
 
+/** El nombre nuevo de esta computadora: Perfil lo enseña aunque se haya cambiado en Máquinas. */
+const [selfRename, setSelfRename] = createSignal<{ id: string; name: string } | null>(null);
+const renamedFor = (id: string | null | undefined) => {
+  const r = selfRename();
+  return r && id && r.id === id ? r.name : null;
+};
+const renameFor = (id: string | null | undefined) => (name: string) => {
+  if (id) setSelfRename({ id, name });
+};
+
 /** Configuración → Cuenta de Danil. Chunk aparte: solo lo carga quien abre esta sección. */
 export default function DanilAccount(props: { part?: DanilAccountPart }) {
   const web = capabilities().accountProfile;
@@ -77,7 +87,6 @@ function MachineAccount(props: { part?: DanilAccountPart }) {
 function WorkspacePanel(props: { workspace: { id: string; name: string }; accounts: DanilAccounts; part?: DanilAccountPart }) {
   const a = props.accounts;
   const [manage, setManage] = createSignal(false);
-  const [renamed, setRenamed] = createSignal<string | null>(null);
   const session = () => a.of()?.signed_in ? sessionForWorkspace(a.sessions(), a.of()) : null;
   let shownAccount: string | null | undefined;
   createEffect(() => {
@@ -85,7 +94,6 @@ function WorkspacePanel(props: { workspace: { id: string; name: string }; accoun
     const key = s ? sessionKey(s) : null;
     if (key === shownAccount) return;
     shownAccount = key;
-    setRenamed(null);
     setManage(false);
   });
   const onlyMachines = () => props.part === "machines" && Boolean(session() && a.of()?.linked);
@@ -124,12 +132,12 @@ function WorkspacePanel(props: { workspace: { id: string; name: string }; accoun
           <>
             <Show when={!onlyMachines()}>
               <SettingsSection title={t("danil.account.title")}>
-                <SessionCard session={session()!} accounts={a} computerName={renamed() ?? undefined} />
+                <SessionCard session={session()!} accounts={a} computerName={renamedFor(session()?.computer_id) ?? undefined} />
                 <Show when={a.problem()}>{(code) => <p class="m-0 text-sm text-error-strong" role="alert">{said(code())}</p>}</Show>
               </SettingsSection>
             </Show>
             <Show when={a.of()?.linked && props.part !== "profile"}>
-              <AccountComputersSection account={key} workspace={props.workspace.id} self={session()?.computer_id} onSelfName={setRenamed} />
+              <AccountComputersSection account={key} workspace={props.workspace.id} self={session()?.computer_id} onSelfName={renameFor(session()?.computer_id)} />
               <ConnectMachineSection account={key} />
             </Show>
           </>
@@ -200,7 +208,6 @@ function SessionCard(props: { session: DanilSessionInfo; accounts: DanilAccounts
 function SingleAccount(props: { part?: DanilAccountPart }) {
   const session = createDanilSession();
   const { view, status, name, setName, busy } = session;
-  const [renamed, setRenamed] = createSignal<string | null>(null);
   const onlyMachines = () => props.part === "machines" && status()?.state === "connected";
 
   return (
@@ -221,7 +228,7 @@ function SingleAccount(props: { part?: DanilAccountPart }) {
           <Match when={status()?.state === "connected"}>
             <ConnectedIdentity status={status} />
             <SettingsRow
-              label={t("danil.account.this_computer", { name: renamed() || status()?.name || status()?.computer_id || "" })}
+              label={t("danil.account.this_computer", { name: renamedFor(status()?.computer_id) || status()?.name || status()?.computer_id || "" })}
               description={status()?.online ? t("danil.account.online") : t("danil.account.offline")}
             >
               <Button size="sm" variant="secondary" disabled={busy()} onClick={() => void session.signOut()}>
@@ -272,7 +279,7 @@ function SingleAccount(props: { part?: DanilAccountPart }) {
       </SettingsSection>
       </Show>
       <Show when={status()?.state === "connected" && props.part !== "profile"}>
-        <AccountComputersSection self={status()?.computer_id ?? null} onSelfName={setRenamed} />
+        <AccountComputersSection self={status()?.computer_id ?? null} onSelfName={renameFor(status()?.computer_id)} />
         <ConnectMachineSection />
       </Show>
     </SettingsPanel>
