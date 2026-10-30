@@ -64,6 +64,7 @@ function danil(initial) {
 const heading = (w) => w.document.querySelector("h1")?.textContent ?? "";
 const buttons = (w, root = w.document) => [...root.querySelectorAll("button")];
 const button = (w, label, root) => buttons(w, root).find((b) => b.textContent.trim() === label);
+const PROFILE = "Tu cuenta y preferencias";
 
 /** Primer arranque con Codex ya conectado: «Conecta tu IA» deja seguir a «Personaliza». */
 const TO_PERSONALIZE = {
@@ -115,12 +116,14 @@ test("el pie de la barra lateral solo aparece con sesión de Danil y abre su sec
   assert.equal(foot(), null, "without a session there is nothing: signing in is in Settings");
   assert.ok(!w.document.body.textContent.includes("Iniciar sesión"), "no sign-in button in the sidebar");
   assert.ok(w.document.querySelector('[aria-label="Configuración"]'), "the footer's other items stay");
+  assert.ok(w.document.querySelector(`[data-profile-menu] button[aria-label="${PROFILE}"]`), "the generic avatar still opens the profile menu");
 
   engine.become(app, { state: "connected", computer_id: "cmp_1", name: "Mac", email: "alberto@danil.ai", online: true });
   await sleep(300);
   assert.equal(foot()?.dataset.danilFoot, "connected");
-  assert.ok(foot().textContent.includes("alberto@danil.ai"), foot().textContent);
+  assert.equal(w.document.querySelector(`[data-profile-menu] button[aria-label="${PROFILE}"]`), null, "the person takes the generic avatar's place");
   assert.equal(foot().getAttribute("title"), "alberto@danil.ai · en línea con Danil");
+  assert.equal(foot().getAttribute("aria-label"), "alberto@danil.ai · en línea con Danil", "the collapsed entry is named by its label");
   assert.ok(foot().querySelector(".bg-success"), "the online dot");
 
   engine.become(app, { state: "connected", computer_id: "cmp_1", name: "Mac", email: "alberto@danil.ai", online: false });
@@ -128,12 +131,17 @@ test("el pie de la barra lateral solo aparece con sesión de Danil y abre su sec
   assert.ok(!foot().querySelector(".bg-success"), "offline drops the dot's color");
 
   foot().click();
+  await sleep(300);
+  const item = button(w, "Cuenta de Danil");
+  assert.ok(item, "the click opens the profile menu with the account");
+  item.click();
   await sleep(800);
-  assert.equal(w.document.querySelector("[data-danil-account]")?.dataset.danilAccount, "connected", "the click opens Settings at the section");
+  assert.equal(w.document.querySelector("[data-danil-account]")?.dataset.danilAccount, "connected", "the account item opens Settings at the section");
 
   engine.become(app, { state: "disconnected", name: "alberto-mbp" });
   await sleep(300);
   assert.equal(foot(), null, "signing out takes it away");
+  assert.ok(w.document.querySelector(`[data-profile-menu] button[aria-label="${PROFILE}"]`), "and gives the generic avatar back");
 });
 
 test("sin el flujo en el motor el pie no muestra la entrada", async () => {
@@ -157,7 +165,6 @@ test("el pie muestra el nombre y la foto de la cuenta de Danil", async () => {
 
   engine.become(app, { ...person, avatar: "/data/danil-computers/avatar-v1.png", avatar_source: "provider" });
   await sleep(300);
-  assert.ok(foot().textContent.includes("Alberto Ceballos"), foot().textContent);
   assert.equal(foot().getAttribute("title"), "Alberto Ceballos · en línea con Danil");
   assert.equal(foot().querySelector("img")?.getAttribute("src"), "data:image/png;base64,UFJPVg==");
   assert.ok(foot().querySelector(".bg-success"), "the online dot stays over the photo");
