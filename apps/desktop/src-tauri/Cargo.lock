@@ -4252,7 +4252,7 @@ dependencies = [
 
 [[package]]
 name = "terminus"
-version = "0.2.89"
+version = "0.3.0-rc.1"
 dependencies = [
  "core-foundation",
  "dirs",

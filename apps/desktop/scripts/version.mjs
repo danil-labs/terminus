@@ -27,9 +27,12 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { isReleaseVersion } from "./release-version.mjs";
 
 const raiz = join(dirname(fileURLToPath(import.meta.url)), "..");
-const nueva = process.argv[2];
+const [nueva, ...options] = process.argv.slice(2);
+const prepareOnly = options.includes("--prepare-only");
+
 
 const salir = (...lineas) => {
   console.error("");
@@ -38,8 +41,8 @@ const salir = (...lineas) => {
   process.exit(1);
 };
 
-if (!nueva || !/^\d+\.\d+\.\d+$/.test(nueva)) {
-  salir("Uso: pnpm version:bump 0.1.9", "Tres números y nada más — es lo que compara el updater.");
+if (!isReleaseVersion(nueva) || options.some((option) => option !== "--prepare-only")) {
+  salir("Uso: pnpm version:bump 0.3.0-rc.1 [--prepare-only]", "Versión SemVer estable o de prueba, sin metadatos de compilación.");
 }
 
 const rutaPaquete = join(raiz, "package.json");
@@ -62,7 +65,7 @@ function sustituir(ruta, patron, hecho) {
   // sus grupos de captura dentro, así que contar su longitud cuenta paréntesis,
   // no apariciones. Un patrón con dos grupos «encontraba tres».
   const encontradas = texto.match(new RegExp(patron.source, "gm"));
-  if (!encontradas || encontradas.length !== 1) {
+  if (encontradas?.length !== 1) {
     salir(
       `En ${ruta} esperaba una línea de versión y encontré ${encontradas?.length ?? 0}.`,
       "El formato del archivo cambió: revísalo antes de seguir.",
@@ -71,21 +74,32 @@ function sustituir(ruta, patron, hecho) {
   writeFileSync(ruta, texto.replace(patron, hecho), "utf8");
 }
 
-sustituir(rutaPaquete, /^(\s*"version":\s*")\d+\.\d+\.\d+(")/m, `$1${nueva}$2`);
-sustituir(rutaTauri, /^(\s*"version":\s*")\d+\.\d+\.\d+(")/m, `$1${nueva}$2`);
+sustituir(rutaPaquete, /^(\s*"version":\s*")\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(")/m, `$1${nueva}$2`);
+sustituir(rutaTauri, /^(\s*"version":\s*")\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(")/m, `$1${nueva}$2`);
 // Solo la del `[package]`, que es la primera del archivo. Las de las
 // dependencias vienen después y no se tocan.
-sustituir(rutaCargo, /^(version = ")\d+\.\d+\.\d+(")/m, `$1${nueva}$2`);
+sustituir(rutaCargo, /^(version = ")\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(")/m, `$1${nueva}$2`);
 
 console.log(`\n  ${actual} → ${nueva}\n`);
 console.log("  Dejando el Cargo.lock a cargo…");
-execFileSync("cargo", ["check", "--quiet"], {
+const host = prepareOnly
+  ? execFileSync("rustc", ["-vV"], { encoding: "utf8" }).match(/^host: (\S+)$/m)?.[1]
+  : null;
+if (prepareOnly && !host) salir("No se pudo leer el target de rustc; Cargo.lock queda pendiente.");
+execFileSync("cargo", prepareOnly
+  ? ["metadata", "--offline", "--filter-platform", host, "--format-version", "1"]
+  : ["check", "--quiet"], {
   cwd: join(raiz, "src-tauri"),
-  stdio: ["ignore", "inherit", "inherit"],
+  stdio: ["ignore", prepareOnly ? "ignore" : "inherit", "inherit"],
 });
 
 console.log("\n  Ahora la nota, que es lo que se lee en la release:");
 console.log("      release-notes/es.md y release-notes/en.md");
+
+if (prepareOnly) {
+  console.log("\n  Preparación terminada; cargo check y pnpm verify quedan pendientes. No se compiló ni publicó.\n");
+  process.exit(0);
+}
 
 // **Y aquí se corre, que es lo que la cabecera prometía.** Imprimía un
 // recordatorio —«y después `pnpm verify`»— justo debajo del párrafo que dice
@@ -96,7 +110,7 @@ console.log("      release-notes/es.md y release-notes/en.md");
 // mirar una pantalla en blanco durante un minuto.
 console.log("\n  Y verificando, que el lock cambió y la corrida de antes no vale…\n");
 try {
-  execFileSync("pnpm", ["verificar"], {
+  execFileSync("pnpm", ["verify"], {
     cwd: raiz,
     stdio: "inherit",
     // En Windows `pnpm` es un `.cmd`, y a esos no los lanza `CreateProcess`
@@ -115,4 +129,4 @@ try {
     "correrlo, o revierte el bump si no era el momento.",
   );
 }
-console.log(`\n  Verificado en ${nueva}. Escribe la nota y abre el PR a main.\n`);
+console.log(`\n  Verificado en ${nueva}. Escribe la nota y abre el PR a dev.\n`);
