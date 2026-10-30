@@ -256,6 +256,23 @@ test("email writes: a chunked body over 1 KB is cut while reading, and an AI act
   assert.equal(h.calls.length, 0);
 });
 
+test("with WorkOS configured the entry goes straight to it, except to show a message", async () => {
+  const h = harness();
+  Object.assign(h.env, { WORKOS_CLIENT_ID: "client_01ABC", WORKOS_API_KEY: "sk_test", SUPABASE_URL: "https://db.example", SUPABASE_SERVICE_ROLE_KEY: "service", SESSION_COOKIE_KEY: "key" });
+  for (const [path, to] of [["/auth", "/auth/workos/start"], ["/sign-in", "/auth/workos/start"], ["/auth?next=%2Finbox", "/auth/workos/start?next=%2Finbox"], ["/sign-in?next=%2Fm%2Finbox", "/auth/workos/start?next=%2Fm%2Finbox"]]) {
+    const response = await h.fetch(path);
+    assert.equal(response.status, 302, path);
+    assert.equal(response.headers.get("Location"), to);
+    assert.equal(response.headers.get("Cache-Control"), "no-store");
+  }
+  assert.equal(h.calls.length, 0);
+  for (const path of ["/auth?error=session_failed", "/auth?signed_out=1", "/auth?error=x&next=%2Finbox", "/sign-in?code=abc"]) {
+    assert.equal(await (await h.fetch(path)).text(), "assets", path);
+  }
+  assert.equal((await h.fetch("/auth", { method: "HEAD" })).status, 200);
+  assert.equal((await h.fetch("/auth", { method: "POST" })).status, 405);
+});
+
 test("WorkOS sign-in routes stay in the Worker; the sign-in page is an asset", async () => {
   const h = harness();
   const session = await h.fetch("/auth/session", { method: "POST", headers: { Origin: origin } });
