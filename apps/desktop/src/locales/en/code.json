@@ -1,7 +1,4 @@
 {
-  "code.changes.observed_during_turn": "Changes observed during the turn",
-  "code.changes.retired": "This change was made in a copy from before the migration; it can no longer be opened.",
-  "code.changes.truncated": "The change is too large to show in full: what is below is the beginning.",
   "code.column.close.label": "Close the work tree",
   "code.column.close.title": "Close the work tree (Esc)",
   "code.column.export_chat": "Export chat",
@@ -13,14 +10,11 @@
   "code.diff.layout.split": "Side by side",
   "code.empty": "This project has no working folder.",
   "code.file.binary": "This is a binary file: it has no lines to compare.",
-  "code.file.deleted_open": "This change deleted the file: there is nothing left to open.",
   "code.file.discard": "Discard",
   "code.file.discard.keep_agent": "Keep what the agent wrote",
   "code.file.discard.leave": "Leave the file as it was",
   "code.file.gone_from_diff": "This file no longer appears in the change.",
   "code.file.image_too_big": "This image is {size} and does not fit here.",
-  "code.file.open": "Open the file",
-  "code.file.open_aria": "Open “{ruta}”",
   "code.file.open_with_app": "Open in its app",
   "code.file.open_external": "Open or locate",
   "code.file.open_external.title": "Documents open with their app; other files are shown in their folder",
@@ -52,18 +46,11 @@
   "code.file.unreadable": "Could not read this file.",
   "code.file.view.changes": "Changes",
   "code.file.view.preview": "Preview",
-  "code.files.count": {
-    "one": "{count} file",
-    "other": "{count} files"
-  },
   "code.gap.lines": {
     "one": "{count} unchanged line",
     "other": "{count} unchanged lines"
   },
   "code.gap.title": "Bring these lines in",
-  "code.status.deleted": "deleted",
-  "code.status.new": "new",
-  "code.status.renamed": "renamed",
   "code.tree.dirty_before": {
     "one": "It already had {count} changed file when this task started; it does not count as the agent's.",
     "other": "It already had {count} changed files when this task started; they do not count as the agent's."

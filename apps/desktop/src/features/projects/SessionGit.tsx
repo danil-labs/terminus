@@ -19,7 +19,6 @@ import { t } from "../../lib/i18n";
 import { cn } from "../../lib/utils";
 import { changeNumber, changeShort, checksName } from "../../lib/gitHosts";
 import { workLabel } from "./branchLabel";
-import { RailSpinner } from "./TaskStatus";
 import { type CheckState, compactGitKind, type GitStatus, gitReviewSignals, type KnState, type ReviewState } from "./taskGit";
 
 function knLabel(state: KnState) {
@@ -197,7 +196,7 @@ export function RailPull(props: { status: GitStatus }) {
             {(s) => (
               <span data-git-signal={s()} data-git-stale={stale() || undefined} class="inline-flex shrink-0" aria-label={signalLabel()}>
                 <Switch>
-                  <Match when={s() === "pending"}><RailSpinner size={11} /></Match>
+                  <Match when={s() === "pending"}><CircleDashed size={12} class="text-warning-strong" aria-hidden="true" /></Match>
                   <Match when={s() === "stale"}><Clock size={12} class="text-neutral-500" aria-hidden="true" /></Match>
                   <Match when={s() === "failure"}><CircleX size={12} class="text-error-strong" aria-hidden="true" /></Match>
                   <Match when={s() === "changes_requested"}><MessageSquareWarning size={12} class="text-warning-strong" aria-hidden="true" /></Match>

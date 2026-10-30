@@ -3,6 +3,7 @@ import { aplicarLengua, aplicarLenguaDeWorkspace, t } from '../../lib/i18n';
 import { Button } from '../../ui/Button';
 import '../phrases';
 import '../../styles/global.css';
+import '../../lib/sharedClock';
 
 export async function startAttention(settings: { login: string }) {
   const query = new URLSearchParams(location.search);

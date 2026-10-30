@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { createChannels, type Channel } from '../../../../packages/attention/src/channels.ts';
 import { useAccount } from '../lib/account';
-import { ALPHA_DEMO } from '../lib/alpha-mode';
+import { ALPHA_API, ALPHA_DEMO } from '../lib/alpha-mode';
 import { useCustomization } from '../lib/customization';
 import { t } from '../lib/i18n';
 import { Row } from '../ui/components';
@@ -14,7 +14,7 @@ const PROVIDERS: Record<string, string> = { whatsapp: 'WhatsApp', whatsapp_cloud
 export default function Channels(){
   const model=useCustomization();const pathname=usePathname();const theme=useTheme();const session=useAccount();
   const enabled=model.ready&&model.enabled('channels');
-  const api=useMemo(()=>ALPHA_DEMO||!enabled||!session.session?null:createChannels(session),[session.getToken,session.unauthorized,session.session?.user.id,enabled]);
+  const api=useMemo(()=>ALPHA_DEMO||!enabled||!session.session?null:createChannels(session,fetch,ALPHA_API),[session.getToken,session.unauthorized,session.session?.user.id,enabled]);
   const [rows,setRows]=useState<Channel[]>([]);const [busy,setBusy]=useState(false);const [error,setError]=useState('');
   const generation=useRef(0);
   async function load(){

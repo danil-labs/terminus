@@ -11,7 +11,6 @@ import ChevronRight from "lucide-solid/icons/chevron-right";
 import Copy from "lucide-solid/icons/copy";
 import CornerDownLeft from "lucide-solid/icons/corner-down-left";
 import FileText from "lucide-solid/icons/file-text";
-import Loader2 from "lucide-solid/icons/loader-circle";
 import Maximize2 from "lucide-solid/icons/maximize-2";
 import MessageCircleQuestion from "lucide-solid/icons/message-circle-question-mark";
 import Paperclip from "lucide-solid/icons/paperclip";
@@ -93,6 +92,7 @@ import {
 import {
   type Clase,
   cuentaDelTramo,
+  partesDelTramo,
   formatearDuracion,
   nombreDe,
   type Paso,
@@ -167,6 +167,7 @@ import Suggestions, { type Suggestion } from "./Suggestions";
 import LineaDeTiempo, { SUPERFICIE_DE_EJECUCION } from "./Timeline";
 import EstadoDelTurno from "./TurnStatus";
 import { WithMentions } from "./WithMentions";
+import { Spinner } from "../../ui/Spinner";
 
 /**
  * Quién dijo un turno: lo arma Rust a partir de la cuenta del agente o del
@@ -413,7 +414,7 @@ export type ChatProps = {
    * Cuál de las conversaciones es esta: la clave de la tarea abierta, `""`
    * mientras todavía no tiene id. No es el id de la tarea para usarlo como
    * tal: la transcripción no conoce proyectos ni tareas —trabaja con
-   * mensajes—, esa frontera es la que deja `cambiosDelTurno` fuera.
+   * mensajes—, esa frontera es la que deja `onVerCambios` fuera.
    */
 
   /**
@@ -488,12 +489,11 @@ export type ChatProps = {
    */
   proyecto: JSX.Element;
   /**
-   * El bloque de código de un turno, compuesto por `App.tsx`: función y no
-   * nodo, hay uno por turno (SYSTEM.md § Las reglas de Solid, regla 9). El
-   * chat no conoce ids de proyecto y sesión —trabaja con mensajes—;
-   * dárselos solo para esto ampliaría su contrato (precedente: `proyecto`).
+   * Abre el panel de archivos de esta tarea en «Cambios». Lo compone
+   * `App.tsx`: el chat no conoce ids de proyecto y sesión —trabaja con
+   * mensajes—. Sin él, «Editó N archivos» es solo texto.
    */
-  cambiosDelTurno: (code: CodeRange[]) => JSX.Element;
+  onVerCambios?: () => void;
   agent: string;
   modelOptions?: { headers: Record<string, string> };
   /**
@@ -2937,7 +2937,7 @@ export default function Chat(props: ChatProps) {
                           [k]: !preguntasPlegadas()[k],
                         });
                       }}
-                      cambios={props.cambiosDelTurno}
+                      onVerCambios={props.onVerCambios}
                       agenteDelTurno={fromWork(b(), (t) => t.msg.agent ?? props.agent, props.agent)}
                       catalogo={props.catalogos[fromWork(b(), (t) => t.msg.agent ?? props.agent, props.agent)] ?? null}
                       agentLabel={
@@ -3411,10 +3411,15 @@ export default function Chat(props: ChatProps) {
   );
 }
 
+/** La cabecera de un tramo, entera o partida (ver `RegistroDeTrabajo`). */
+const FILA_DEL_TRAMO =
+  "flex w-full min-w-0 items-center gap-2 rounded-sm py-1.5 text-left text-sm hover:bg-surface-muted";
+
 /**
  * Un tramo de trabajo: las herramientas seguidas entre dos textos del agente,
  * con su cuenta por clase como cabecera. Se pliega; lo que el turno preguntó
- * (`RegistroPreguntas`) y lo que cambió quedan fuera: son el resultado.
+ * (`RegistroPreguntas`) queda fuera. Lo que cambió no se pinta en el hilo:
+ * «Editó N archivos» abre el panel de la tarea en «Cambios».
  */
 function RegistroDeTrabajo(props: {
   pasos: Paso[];
@@ -3424,6 +3429,8 @@ function RegistroDeTrabajo(props: {
   duracion?: string | null;
   abierto?: boolean;
   onAlternar: (abierto: boolean) => void;
+  /** Con él, «Editó N archivos» abre los cambios en el panel de la tarea. */
+  onVerCambios?: () => void;
 }) {
   // Sin contar los pasos con error: fallar y reintentar es normal en un turno
   // correcto, y «1 con error» alarmaba. El fallo del turno va aparte.
@@ -3432,10 +3439,28 @@ function RegistroDeTrabajo(props: {
   const rotulo = () =>
     cuentaDelTramo(todos(), props.corriendo) ??
     (props.corriendo ? t("chat.work.running") : t("chat.work.title"));
+  const partes = createMemo(() => (props.onVerCambios ? partesDelTramo(todos(), props.corriendo) : []));
   const duracion = () =>
     !props.corriendo && props.duracion ? t("chat.work.duration", { duration: props.duracion }) : null;
   // El chevron y el cuerpo leen esto; si divergen, el primer clic abre lo que ya se veía abierto.
   const desplegado = () => Boolean(props.abierto);
+  const chevron = () => (
+    <ChevronRight
+      size={14}
+      class={cn("shrink-0 text-neutral-500 transition-transform", desplegado() && "rotate-90")}
+      aria-hidden="true"
+    />
+  );
+  const girando = () => (
+    <Show when={props.corriendo}>
+      <Spinner size={14} class="pointer-events-none text-primary" />
+    </Show>
+  );
+  const tiempo = () => (
+    <Show when={duracion()}>
+      <span class="pointer-events-none ml-auto shrink-0 text-xs whitespace-nowrap text-neutral-500">{duracion()}</span>
+    </Show>
+  );
 
   // Sin envoltorio y con los datos de la derecha en un solo texto: cada
   // elemento de más se multiplica por los tramos del hilo (`open-task-cost`).
@@ -3445,33 +3470,60 @@ function RegistroDeTrabajo(props: {
         when={todos().length > 0 || avance().length > 0}
         fallback={<p class="m-0 mb-2 px-1 py-1.5 text-xs text-neutral-500">{duracion()}</p>}
       >
-        <button
-          type="button"
-          aria-expanded={desplegado()}
-          onClick={() => props.onAlternar(!desplegado())}
-          class={cn(
-            "flex w-full min-w-0 items-center gap-2 rounded-sm px-1 py-1.5 text-left text-sm hover:bg-surface-muted",
-            !desplegado() && "mb-2",
-          )}
+        {/* Con cambios que abrir, la fila se parte: el plegado la cubre por
+            debajo del texto y encima solo «Editó N archivos» recibe el clic
+            (dos botones hermanos: uno dentro de otro no es HTML válido). Sin
+            ellos queda el botón de siempre: cada nodo de más se multiplica por
+            los tramos del hilo (`open-task-cost`). */}
+        <Show
+          when={props.onVerCambios && partes().some((p) => p.clase === "editar")}
+          fallback={
+            <button
+              type="button"
+              aria-expanded={desplegado()}
+              onClick={() => props.onAlternar(!desplegado())}
+              class={cn(FILA_DEL_TRAMO, "px-1", !desplegado() && "mb-2")}
+            >
+              {chevron()}
+              {girando()}
+              <span class="min-w-0 truncate font-medium text-neutral-700">{rotulo()}</span>
+              {tiempo()}
+            </button>
+          }
         >
-          <ChevronRight
-            size={14}
-            class={cn(
-              "shrink-0 text-neutral-500 transition-transform",
-              desplegado() && "rotate-90",
-            )}
-            aria-hidden="true"
-          />
-          <Show when={props.corriendo}>
-            <Loader2 size={14} class="shrink-0 animate-spin-steps text-primary" aria-hidden="true" />
-          </Show>
-          <span class="min-w-0 truncate font-medium text-neutral-700">{rotulo()}</span>
-          <Show when={duracion()}>
-            <span class="ml-auto shrink-0 text-xs whitespace-nowrap text-neutral-500">
-              {duracion()}
+          <div class={cn(FILA_DEL_TRAMO, "relative pr-1 pl-[1.625rem]", !desplegado() && "mb-2")}>
+            <button
+              type="button"
+              aria-expanded={desplegado()}
+              aria-label={[rotulo(), duracion()].filter(Boolean).join(" · ")}
+              onClick={() => props.onAlternar(!desplegado())}
+              class="absolute inset-0 flex items-center rounded-sm px-1 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
+            >
+              {chevron()}
+            </button>
+            {girando()}
+            <span class="pointer-events-none min-w-0 truncate font-medium text-neutral-700">
+              <Index each={partes()}>
+                {(parte, i) => (
+                  <>
+                    {i > 0 ? t("common.steps.summary.separator") : ""}
+                    <Show when={parte().clase === "editar"} fallback={parte().texto}>
+                      <button
+                        type="button"
+                        title={t("chat.work.open_changes")}
+                        onClick={() => props.onVerCambios?.()}
+                        class="pointer-events-auto relative rounded-sm underline decoration-neutral-400 underline-offset-2 hover:text-neutral-950 hover:decoration-current focus-visible:outline-2 focus-visible:outline-primary"
+                      >
+                        {parte().texto}
+                      </button>
+                    </Show>
+                  </>
+                )}
+              </Index>
             </span>
-          </Show>
-        </button>
+            {tiempo()}
+          </div>
+        </Show>
 
         <Show when={desplegado()}>
           <div class={cn(SUPERFICIE_DE_EJECUCION, "mb-2")}>
@@ -3525,7 +3577,8 @@ function TrabajoDeAgente(props: {
   /** Si las preguntas de ESTE turno están desplegadas. Nacen abiertas. */
   preguntasAbiertas: boolean;
   onAlternarPreguntas: () => void;
-  cambios: (code: CodeRange[]) => JSX.Element;
+  /** Solo se ofrece si el turno trae rango de código (`msg.code`). */
+  onVerCambios?: () => void;
   /** El agente dueño del turno, cuando el mensaje no lo trae. */
   agenteDelTurno: string;
   /** El nombre legible del agente, para el tooltip cuando no hay proveedor. */
@@ -3566,6 +3619,7 @@ function TrabajoDeAgente(props: {
           duracion={duracion()}
           abierto={props.abiertoElTrabajo}
           onAlternar={props.onAlternarTrabajo}
+          onVerCambios={props.msg.code?.length ? props.onVerCambios : undefined}
         />
       </Show>
 
@@ -3653,15 +3707,6 @@ function TrabajoDeAgente(props: {
         />
       </div>
 
-      {/* Fuera del plegado, y fuera también del registro de trabajo: lo
-          que el agente hizo para contestar se dobla dentro de «Trabajó
-          durante…», que es el rastro; qué código cambió es el resultado,
-          visible sin desplegar nada. Depende de que el turno tenga par de
-          árboles: uno que solo conversa no pinta nada, el rango existe
-          pero los dos árboles son el mismo y `Cambios` no enseña archivos. */}
-      <Show when={props.msg.code?.length ? props.msg.code : null}>
-        {(c) => props.cambios(c())}
-      </Show>
     </article>
   );
 }

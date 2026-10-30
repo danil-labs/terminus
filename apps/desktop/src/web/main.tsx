@@ -37,6 +37,7 @@ import { type OtherAccount, setCapabilities, type WebAccountsSource } from "../l
 import { deliver } from "../lib/serviceEvents";
 // In the page, not in the lazy app chunk: the stylesheet loads with the HTML.
 import "../styles/global.css";
+import "../lib/sharedClock";
 import { HomeLink } from "./HomeLink";
 import { installIpc } from "./ipc";
 import { webAccountProfile } from "./account";
