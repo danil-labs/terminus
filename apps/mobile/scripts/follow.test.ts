@@ -7,7 +7,7 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { type Follow, MARGIN, OPENED, SLOP, jumped, scrolled, shouldStick, showJump, unseen } from "../src/lib/follow.ts";
+import { type Follow, MARGIN, OPENED, SLOP, fromTop, jumped, scrolled, shouldStick, showJump, unseen } from "../src/lib/follow.ts";
 
 const VIEWPORT = 600;
 /** Un scroll a `offset` con `content` de alto. */
@@ -88,10 +88,24 @@ test("una conversación más corta que la pantalla no ofrece el botón", () => {
 
 test("el redondeo al crecer no suelta; un arrastre lento sí", () => {
   // Abajo con 9629; crece a 10294 y el navegador mueve el scroll un píxel hacia arriba.
-  let s = at(OPENED, 8936, 9629);
-  s = at(s, 8935, 10294);
+  let s = at(OPENED, 9029, 9629);
+  s = at(s, 9028, 10294);
   assert.equal(shouldStick(s), true, "un píxel no es un gesto");
   // Antes de que baje, la persona arrastra despacio hacia arriba: un píxel por evento.
-  for (let k = 2; k <= SLOP + 2; k++) s = at(s, 8936 - k, 10294);
+  for (let k = 2; k <= SLOP + 2; k++) s = at(s, 9029 - k, 10294);
   assert.equal(shouldStick(s), false, "los píxeles sueltos se suman");
+});
+
+test("en la lista invertida el final es el desplazamiento 0", () => {
+  const metrics = { content: 2000, viewport: VIEWPORT };
+  assert.equal(fromTop(0, metrics), 1400);
+  assert.equal(scrolled(OPENED, { ...metrics, offset: fromTop(0, metrics) }, 0).near, true);
+  assert.equal(scrolled(OPENED, { ...metrics, offset: fromTop(900, metrics) }, 0).near, false);
+});
+
+test("el primer gesto, si ya aleja del final, suelta el hilo", () => {
+  const metrics = { content: 9000, viewport: VIEWPORT };
+  const next = scrolled(OPENED, { ...metrics, offset: fromTop(2000, metrics) }, 3);
+  assert.equal(next.following, false);
+  assert.equal(next.seen, 3);
 });

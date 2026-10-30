@@ -44,8 +44,14 @@ export type Follow = {
 /** Lo que se lee de un `onScroll`, en píxeles. */
 export type Metrics = { offset: number; content: number; viewport: number };
 
-/** Al abrir una tarea: abajo y siguiendo. */
-export const OPENED: Follow = { following: true, near: true, offset: 0, seen: null };
+/**
+ * Al abrir una tarea: abajo y siguiendo. La lista invertida abre sin ningún evento de scroll: sin un `offset` que
+ * ganarle, el primer gesto que aleja del final no soltaría el hilo.
+ */
+export const OPENED: Follow = { following: true, near: true, offset: Infinity, seen: null };
+
+/** El desplazamiento desde arriba de una lista invertida, cuyo 0 es el final. */
+export const fromTop = (offset: number, { content, viewport }: Omit<Metrics, "offset">) => content - viewport - offset;
 
 export const distanceToEnd = ({ offset, content, viewport }: Metrics) => Math.max(0, content - viewport - offset);
 
