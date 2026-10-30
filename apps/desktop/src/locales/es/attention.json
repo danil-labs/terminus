@@ -2,7 +2,7 @@
   "attention.inbox": "Inbox",
   "attention.inbox_description": "Conversaciones externas de sólo lectura; la cuenta operativa se elige por separado.",
   "attention.broadcasts": "Difusiones",
-  "attention.broadcasts_description": "Prototipo sintético, sin envíos ni campañas reales.",
+  "attention.broadcasts_description": "Crea, lanza y sigue difusiones de WhatsApp.",
   "attention.agents": "Agentes de atención",
   "attention.agents_description": "Abre los agentes y sus perfiles en Ajustes.",
   "attention.channels": "Canales",

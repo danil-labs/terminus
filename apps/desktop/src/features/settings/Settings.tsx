@@ -287,7 +287,7 @@ export default function Settings(props: {
   }, props.proyectos, () => props.workspace ?? null, () => props.activityMachine ?? null, () => props.workspaceName ?? null);
   const ENTRADAS = entradasDe(pestanas);
 
-  // Sin soporte del motor activo, Secretos no se ofrece.
+  // Sin soporte del motor activo, Secretos no se ofrece; su enlace directo sí abre el aviso.
   const pestanaVisible = (p: Pestana) => p.id !== "secrets" || secretsRoute(capabilities().accountCredentials ? "worker" : "engine", machines()) !== "unsupported";
   const pedido = settingsTarget(props.panel);
   const inicial = ENTRADAS.find((e) => e.id === pedido?.entry) ?? ENTRADAS[0];
@@ -368,8 +368,7 @@ export default function Settings(props: {
   const entrada = () => ENTRADAS.find((d) => d.id === activo()) ?? ENTRADAS[0];
   const pestana = () => {
     const e = entrada();
-    const tabs = e.tabs.filter(pestanaVisible);
-    return tabs.find((p) => p.id === subs()[e.id] && p.panel) ?? tabs.find((p) => p.panel)!;
+    return e.tabs.find((p) => p.id === subs()[e.id] && p.panel) ?? e.tabs.find((p) => p.panel && pestanaVisible(p))!;
   };
   const elegir = (p: Pestana) => {
     if (p.panel) setSubs((antes) => ({ ...antes, [entrada().id]: p.id }));

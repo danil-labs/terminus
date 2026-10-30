@@ -4,6 +4,10 @@
 // inbox y los agentes y conexiones de atención de Configuración, con query acotada.
 // Las escrituras usan Origin exacto, Bearer personal y cuerpos JSON reconstruidos y acotados.
 // La autorización de respuestas se revalida en el BFF sobre la cuenta y canal de la conversación.
+// Difusiones: lo que falta sobre marketingProxy son listas cerradas en broadcasts.mjs. Lo que llega
+// a Meta responde 403 salvo con BROADCAST_WRITES="on"; lo que llega a clientes, 409 salvo con
+// BROADCAST_DELIVERY="on". Ambas pasan por el preflight de campaigns.manage.
+import { broadcastRead, broadcastWrite } from "./broadcasts.mjs";
 import { handleAuth, hasSignedOutMarker, sessionConfig } from "./session.mjs";
 
 const HOST = "alfa-app.danil.ai";
@@ -52,6 +56,17 @@ function bearerAccount(authorization) {
   } catch { return null; }
 }
 
+/** Toda escritura de marketing lo pasa: las reglas de la base no cubren cada ruta ni cada fallo. */
+async function requireCampaignsManage(env, headers, account) {
+  const permissionsUrl = new URL(`https://${HOST}/auth/account/my-permissions?account_id=${account}`);
+  const response = await forward(env, new Request(permissionsUrl, { headers, redirect: "manual" }));
+  if (!response.ok) return json("permissions_unavailable", response.status === 401 ? 401 : 403);
+  let permissions;
+  try { permissions = await response.json(); } catch { return json("permissions_unavailable", 403); }
+  if (typeof permissions?.role !== "string" || !Array.isArray(permissions.permissions) || !permissions.permissions.every(value => typeof value === "string") || !Array.isArray(permissions.scoped) || !permissions.scoped.every(grant => grant && typeof grant.permission === "string" && typeof grant.scope_type === "string" && positive(grant.scope_id)) || !permissions.permissions.includes("campaigns.manage")) return json("forbidden_read_only", 403);
+  return null;
+}
+
 async function marketingProxy(request, env, url, path, route) {
   const write = request.method === "POST";
   if (!write && request.method !== "GET") return json("method_not_allowed", 405);
@@ -61,7 +76,7 @@ async function marketingProxy(request, env, url, path, route) {
   const authorization = request.headers.get("Authorization");
   if (!authorization || !/^Bearer \S+$/i.test(authorization)) return json("unauthorized", 401);
   const keys = [...url.searchParams.keys()];
-  const templateList = !write && route === "templates";
+  const templateList = !write && route === "templates" && keys.includes("status");
   if (keys.length !== (templateList ? 2 : 1) || new Set(keys).size !== keys.length || !keys.includes("account_id") || (templateList && url.searchParams.get("status") !== "APPROVED")) return json("invalid_query", 400);
   const rawAccount = url.searchParams.get("account_id");
   const account = Number(rawAccount);
@@ -88,12 +103,8 @@ async function marketingProxy(request, env, url, path, route) {
       const bytes = await boundedBody(request, 0);
       if (!bytes) return json("invalid_body", 400);
     }
-    const permissionsUrl = new URL(`https://${HOST}/auth/account/my-permissions?account_id=${account}`);
-    const response = await forward(env, new Request(permissionsUrl, { headers, redirect: "manual" }));
-    if (!response.ok) return json("permissions_unavailable", response.status === 401 ? 401 : 403);
-    let permissions;
-    try { permissions = await response.json(); } catch { return json("permissions_unavailable", 403); }
-    if (typeof permissions?.role !== "string" || !Array.isArray(permissions.permissions) || !permissions.permissions.every(value => typeof value === "string") || !Array.isArray(permissions.scoped) || !permissions.scoped.every(grant => grant && typeof grant.permission === "string" && typeof grant.scope_type === "string" && positive(grant.scope_id)) || !permissions.permissions.includes("campaigns.manage")) return json("forbidden_read_only", 403);
+    const denied = await requireCampaignsManage(env, headers, account);
+    if (denied) return denied;
   }
   url.pathname = path;
   url.search = new URLSearchParams({ account_id: String(account), ...(templateList ? { status: "APPROVED" } : {}) }).toString();
@@ -195,6 +206,7 @@ async function forward(env, upstream) {
     return json("bff_unavailable", 502);
   }
   if (response.status >= 300 && response.status < 400) return json("unexpected_redirect", 502);
+  if (response.status === 204) return new Response(null, { status: 204, headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
   const contentType = response.headers.get("Content-Type") ?? "";
   if (!contentType.toLowerCase().startsWith("application/json")) return json("unexpected_response", 502);
   return new Response(response.body, {
@@ -227,6 +239,41 @@ async function emailWrite(request, env, url, path) {
   return forward(env, new Request(url, { method: "POST", headers, body: JSON.stringify(body), redirect: "manual" }));
 }
 
+/** Una escritura de Difusiones: las mismas barreras que los correos, más el interruptor. */
+async function writeBroadcast(request, env, url, path, route) {
+  if (request.headers.get("Origin") !== `https://${HOST}`) return json("forbidden_origin", 403);
+  if ((request.headers.get("X-Danil-Actor") ?? "").trim().toLowerCase() === "ai") return json("identity_requires_person", 403);
+  const authorization = request.headers.get("Authorization");
+  if (!authorization || !/^Bearer \S+$/i.test(authorization)) return json("unauthorized", 401);
+  if (!route.delivery && env.BROADCAST_WRITES !== "on") return json("broadcast_writes_disabled", 403);
+  const account = bearerAccount(authorization);
+  if (account === null) return json("missing_active_account", 403);
+  if (route.delivery) {
+    const claimed = url.searchParams.get("account_id");
+    if ([...url.searchParams.keys()].length !== 1 || !/^\d+$/.test(claimed ?? "") || Number(claimed) !== account) return json("account_mismatch", 403);
+    url.search = "";
+  }
+  if (url.search) return json("invalid_query", 400);
+  const contentType = request.headers.get("Content-Type") ?? "";
+  const declared = Number(request.headers.get("Content-Length") ?? "0");
+  if (declared > route.max) return json("invalid_body", 400);
+  const bytes = route.parse === null ? new Uint8Array() : await boundedBody(request, route.max);
+  if (!bytes) return json("invalid_body", 400);
+  const body = route.parse === null ? undefined : await route.parse(bytes, contentType, { env, account });
+  if (body === null) return json("invalid_body", 400);
+  if (!env.APPV2_BFF) return json("bff_unavailable", 503);
+  const headers = new Headers({ Authorization: authorization, Accept: "application/json", Origin: `https://${HOST}` });
+  if (!route.anyMember) {
+    const denied = await requireCampaignsManage(env, headers, account);
+    if (denied) return denied;
+  }
+  if (route.parse !== null && !route.multipart) headers.set("Content-Type", "application/json");
+  const referer = request.headers.get("Referer");
+  if (referer !== null) headers.set("Referer", referer);
+  url.pathname = path;
+  return forward(env, new Request(url, { method: request.method, headers, body, redirect: "manual" }));
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -238,12 +285,15 @@ export default {
     }
     if (url.pathname === PREFIX || url.pathname.startsWith(`${PREFIX}/`)) {
       const path = url.pathname.slice(PREFIX.length);
+      const write = broadcastWrite(request.method, path);
+      if (write && (!write.delivery || env.BROADCAST_DELIVERY === "on")) return writeBroadcast(request, env, url, path, write);
       const marketing = marketingRoute(path);
       if (marketing) return marketingProxy(request, env, url, path, marketing);
       if (request.method === "POST" && path === "/api/messaging/reply") return replyWrite(request, env, url);
       if (request.method === "POST" && Object.hasOwn(EMAIL_WRITES, path)) return emailWrite(request, env, url, path);
       if (request.method !== "GET") return json("method_not_allowed", 405);
-      const kind = path === "/auth/profile" ? "profile" :
+      const read = broadcastRead(path);
+      const kind = read ? "broadcast" : path === "/auth/profile" ? "profile" :
         path === "/auth/emails" ? "emails" :
         path === "/api/inbox/conversations" ? "list" :
         path === "/api/channels" ? "channels" :
@@ -254,7 +304,7 @@ export default {
       if (!kind) return json("not_found", 404);
       if (kind === "messages" && !Number.isSafeInteger(Number(path.split("/")[4]))) return json("invalid_query", 400);
       if (kind === "service" && path.startsWith("/api/agents/") && !Number.isSafeInteger(Number(path.split("/")[3]))) return json("invalid_query", 400);
-      const query = queryFor(url, kind);
+      const query = read ? read(url.searchParams) : queryFor(url, kind);
       if (!query) return json("invalid_query", 400);
       const authorization = request.headers.get("Authorization");
       if (!authorization || !/^Bearer \S+$/i.test(authorization)) return json("unauthorized", 401);
