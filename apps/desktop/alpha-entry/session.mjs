@@ -10,6 +10,8 @@ const WORKOS_API = "https://api.workos.com";
 const HOST_ORIGIN = "https://alfa-app.danil.ai";
 const FLOW_COOKIE = "__Host-danil_alfa_flow";
 const SESSION_COOKIE = "__Host-danil_alfa";
+const SIGNED_OUT_COOKIE = "__Host-danil_alfa_signed_out";
+const SIGNED_OUT_SECONDS = 600;
 const FLOW_SECONDS = 600;
 const SESSION_SECONDS = 30 * 86_400;
 /** The page asks again within this time, so an ended WorkOS session stops it soon. */
@@ -85,8 +87,11 @@ function readCookie(request, name) {
   }
   return null;
 }
-// `__Host-` needs Path=/. The flow cookie must survive the return from WorkOS (Lax); the session one never leaves the site (Strict).
+// `__Host-` needs Path=/. Flow and signed-out cookies survive the WorkOS return (Lax); the session stays Strict.
 const setCookie = (name, value, maxAge) => `${name}=${value}; Path=/; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=${name === SESSION_COOKIE ? "Strict" : "Lax"}`;
+
+// This marker only keeps the sign-in page visible; it never opens a session.
+export const hasSignedOutMarker = request => readCookie(request, SIGNED_OUT_COOKIE) === "1";
 
 /** A return path on this site, outside the sign-in itself and the data proxy; anything else goes to the root. */
 export function safeNext(value) {
@@ -239,7 +244,9 @@ async function start(config, url) {
     client_id: config.clientId, redirect_uri: `${url.origin}/auth/workos/callback`, response_type: "code",
     provider, state, code_challenge: challenge, code_challenge_method: "S256",
   })) authorize.searchParams.set(key, value);
-  return new Response(null, { status: 303, headers: { ...NO_STORE, Location: authorize.href, "Set-Cookie": setCookie(FLOW_COOKIE, flow, FLOW_SECONDS) } });
+  const response = new Response(null, { status: 303, headers: { ...NO_STORE, Location: authorize.href, "Set-Cookie": setCookie(FLOW_COOKIE, flow, FLOW_SECONDS) } });
+  response.headers.append("Set-Cookie", setCookie(SIGNED_OUT_COOKIE, "", 0));
+  return response;
 }
 
 function equal(a, b) {
@@ -311,8 +318,7 @@ async function issue(config, request) {
 }
 
 async function logout(config, request) {
-  // Sin sesión de WorkOS que cerrar, entrar de nuevo la reabriría sola: `/auth` se queda en su pantalla.
-  let location = new URL("/auth?signed_out=1", HOST_ORIGIN).href;
+  let location = new URL("/auth", HOST_ORIGIN).href;
   try {
     const session = await open(config.env, SESSION_COOKIE, readCookie(request, SESSION_COOKIE));
     if (ID_RE.test(session.sid ?? "")) {
@@ -324,7 +330,9 @@ async function logout(config, request) {
   } catch {
     // No session to end at WorkOS: the cookie is cleared all the same.
   }
-  return json({ location }, 200, { "Set-Cookie": setCookie(SESSION_COOKIE, "", 0) });
+  const response = json({ location }, 200, { "Set-Cookie": setCookie(SESSION_COOKIE, "", 0) });
+  response.headers.append("Set-Cookie", setCookie(SIGNED_OUT_COOKIE, "1", SIGNED_OUT_SECONDS));
+  return response;
 }
 
 /** `/auth/workos/*`, `/auth/session` and `/auth/logout`; null for any other path. */

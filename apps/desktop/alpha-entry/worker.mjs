@@ -2,7 +2,7 @@
 // WorkOS (session.mjs) y, en /alpha-api, una lista cerrada del BFF de appv2 (APPV2_BFF).
 // Las escrituras usan Origin exacto, Bearer personal y cuerpos JSON reconstruidos y acotados.
 // La autorización de respuestas se revalida en el BFF sobre la cuenta y canal de la conversación.
-import { handleAuth, sessionConfig } from "./session.mjs";
+import { handleAuth, hasSignedOutMarker, sessionConfig } from "./session.mjs";
 
 const HOST = "alfa-app.danil.ai";
 // La web vive en la raíz del dominio (build con `TERMINUS_WEB_BASE=/`).
@@ -266,7 +266,7 @@ export default {
     if (request.method !== "GET" && request.method !== "HEAD") return json("method_not_allowed", 405);
     // Sin pantalla previa: la entrada es la de WorkOS. Con cualquier otro parámetro
     // (`error`, `signed_out`) se pinta `/auth`; si no, un fallo volvería a entrar en bucle.
-    if (request.method === "GET" && sessionConfig(env) && ENTRY_PATHS.includes(url.pathname) && [...url.searchParams.keys()].every((key) => key === "next")) {
+    if (request.method === "GET" && sessionConfig(env) && !hasSignedOutMarker(request) && ENTRY_PATHS.includes(url.pathname) && [...url.searchParams.keys()].every((key) => key === "next")) {
       return new Response(null, { status: 302, headers: { Location: `/auth/workos/start${url.search}`, "Cache-Control": "no-store" } });
     }
     if (!env.TERMINUS_WEB) return json("assets_unavailable", 503);
