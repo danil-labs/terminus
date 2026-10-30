@@ -1,7 +1,7 @@
 /**
  * WorkOS sign-in for alfa. The browser never holds a WorkOS or refresh token:
- * at the callback the Worker resolves the person (`resolve_login`) and opens a
- * real Supabase session for `users.uuid`; the cookie keeps the WorkOS session
+ * at the callback a service-role RPC resolves an approved existing person. A
+ * real Supabase session opens for `users.uuid`; the cookie keeps the WorkOS session
  * id and that refresh token, sealed. Each POST to `/auth/session`
  * checks the WorkOS session and refreshes in GoTrue, so bans, the hook and RLS
  * stay those of app.danil.ai. Any failure denies; there is no fallback.
@@ -175,8 +175,8 @@ async function checkSession(config, userId, sessionId) {
 }
 
 /**
- * WorkOS user → Danil person with a Supabase login. Only the callback calls
- * it: `resolve_login` writes (links logins, may create a person).
+ * Only this service-role RPC may link a login: it resolves an approved existing
+ * person atomically and never creates one. Missing RPC fails closed.
  */
 async function resolvePerson(config, workosUserId) {
   const user = await workos(config, `/user_management/users/${encodeURIComponent(workosUserId)}`);
@@ -184,8 +184,8 @@ async function resolvePerson(config, workosUserId) {
   if (user.id !== workosUserId || !email) throw unavailable();
   if (user.email_verified !== true) throw new Denied("email_not_verified", 403);
   const name = [user.first_name, user.last_name].filter(v => typeof v === "string" && v.trim()).join(" ").trim() || null;
-  const personId = await rpc(config, "resolve_login", { p_provider: "workos", p_subject: workosUserId, p_email: email, p_email_verified: user.email_verified === true, p_name: name });
-  if (!Number.isSafeInteger(personId) || personId < 1) throw new Denied("unknown_person", 403);
+  const personId = await rpc(config, "resolve_existing_terminus_login", { p_provider: "workos", p_subject: workosUserId, p_email: email, p_email_verified: user.email_verified === true, p_name: name });
+  if (!Number.isSafeInteger(personId) || personId < 1) throw new Denied("access_required", 403);
   const rows = await supabase(config, `/rest/v1/users?id=eq.${personId}&select=id,uuid,merged_into_user_id&limit=1`);
   const row = Array.isArray(rows) ? rows[0] : null;
   if (!row || row.id !== personId || row.merged_into_user_id != null) throw new Denied("unknown_person", 403);
@@ -235,7 +235,7 @@ async function start(config, url) {
   const authorize = new URL(`${WORKOS_API}/user_management/authorize`);
   for (const [key, value] of Object.entries({
     client_id: config.clientId, redirect_uri: `${url.origin}/auth/workos/callback`, response_type: "code",
-    provider, state, code_challenge: challenge, code_challenge_method: "S256",
+    provider, screen_hint: "sign-in", state, code_challenge: challenge, code_challenge_method: "S256",
   })) authorize.searchParams.set(key, value);
   return new Response(null, { status: 303, headers: { ...NO_STORE, Location: authorize.href, "Set-Cookie": setCookie(FLOW_COOKIE, flow, FLOW_SECONDS) } });
 }
@@ -248,12 +248,13 @@ function equal(a, b) {
 }
 
 async function callback(config, request, url) {
+  let flow;
   const back = (error) => {
     const page = new URL("/auth", url.origin);
     page.searchParams.set("error", error);
+    if (flow) page.searchParams.set("next", safeNext(flow.next));
     return new Response(null, { status: 303, headers: { ...NO_STORE, Location: page.href, "Set-Cookie": setCookie(FLOW_COOKIE, "", 0) } });
   };
-  let flow;
   try {
     flow = await open(config.env, FLOW_COOKIE, readCookie(request, FLOW_COOKIE));
   } catch {
