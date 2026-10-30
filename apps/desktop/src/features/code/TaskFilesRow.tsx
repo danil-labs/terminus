@@ -22,6 +22,8 @@ export default function TaskFilesRow(props: {
   treeWidth: number;
   onWidth: (fraction: number) => void;
   onTreeWidth: (px: number) => void;
+  /** Machine, folder and branch of the task. The chat shows them; while the card covers it, the row does. */
+  location?: () => JSX.Element;
   chat: JSX.Element;
 }) {
   let row: HTMLDivElement | undefined;
@@ -37,6 +39,9 @@ export default function TaskFilesRow(props: {
   return (
     <div ref={row} class="flex h-full min-h-0 min-w-0">
       <div class="flex min-h-0 min-w-[320px] flex-1 flex-col" classList={{ hidden: props.open && props.covers }}>{props.chat}</div>
+      <Show when={props.open && props.covers && props.location}>
+        {(location) => <div class="flex min-w-0 flex-1 flex-col">{location()()}</div>}
+      </Show>
       <Show when={props.open && !props.covers}>
           <div role="separator" tabindex={0} aria-orientation="vertical" aria-label={t("code.panel.resize")}
             data-dragging={dragging() ? "" : undefined}

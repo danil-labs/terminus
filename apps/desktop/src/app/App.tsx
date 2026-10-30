@@ -7150,6 +7150,21 @@ export default function App() {
       const proyecto = proyectoDeLaCelda()?.id;
       if (name && proyecto) hablarConEncargado(proyecto, name);
     };
+    // Máquina, carpeta y rama de la tarea. Una función y no un elemento: el chat la pinta
+    // y, cuando los archivos lo tapan, la fila de la tarea pinta la suya.
+    const ubicacion = () => <Show when={pp.sesion}>{(id) => {
+      return <Suspense fallback={null}><TaskLocation
+        machine={filaDe(id())?.machine}
+        on={!apagadas()[id()] && filaDe(id())?.machine_on !== false}
+        onScreen={abrirPantalla}
+        onFiles={() => {
+          const folder = proyectoDeLaCelda()?.id;
+          if (folder) void abrirSesion(folder, id()).then(() => archivosDeTarea.setOpen(id(), true));
+        }}
+        project={proyectoDeLaCelda()?.name}
+        path={estadoDelTrabajo()?.path || undefined}
+        branch={workLabel(estadoDelTrabajo()?.branch, estadoDelTrabajo()?.alias) || undefined} /></Suspense>;
+    }}</Show>;
     return (
     <Show
       when={viewingProfile() && declared()}
@@ -7162,6 +7177,7 @@ export default function App() {
       treeWidth={anchoDelArbol()}
       onWidth={setAnchoDeArchivos}
       onTreeWidth={setAnchoDelArbol}
+      location={ubicacion}
       chat={
     <Chat
         besideFiles={!!pp.sesion && archivosDeTarea.panel(pp.sesion).open}
@@ -7226,19 +7242,7 @@ export default function App() {
             </div>
           </Show>
         </>}
-        location={<Show when={pp.sesion}>{(id) => {
-          return <Suspense fallback={null}><TaskLocation
-            machine={filaDe(id())?.machine}
-            on={!apagadas()[id()] && filaDe(id())?.machine_on !== false}
-            onScreen={abrirPantalla}
-            onFiles={() => {
-              const folder = proyectoDeLaCelda()?.id;
-              if (folder) void abrirSesion(folder, id()).then(() => archivosDeTarea.setOpen(id(), true));
-            }}
-            project={proyectoDeLaCelda()?.name}
-            path={estadoDelTrabajo()?.path || undefined}
-            branch={workLabel(estadoDelTrabajo()?.branch, estadoDelTrabajo()?.alias) || undefined} /></Suspense>;
-        }}</Show>}
+        location={ubicacion()}
         machine={pp.sesion ? filaDe(pp.sesion)?.machine : undefined}
         msgs={mensajes()}
         /* Identidad de lo que tiene delante, no ids de proyecto/tarea: es lo
@@ -7897,7 +7901,8 @@ export default function App() {
           const ancho = () => (cubre() ? undefined : taskFilesWidth(panel().tabs.length > 0, anchoDeArchivos(), anchoDelArbol()));
           return (
             <Show when={usado()}>
-              <div class="z-10 flex min-h-0 min-w-0 justify-self-end pt-9 pr-2 pb-2"
+              {/* The top padding sits over the task's location row: only the card takes the pointer. */}
+              <div class="pointer-events-none z-10 flex min-h-0 min-w-0 justify-self-end pt-9 pr-2 pb-2 *:pointer-events-auto"
                 classList={{ hidden: !visible(), "w-full pl-2": cubre(), "mt-8": llevaTiraInterior(sitio()), "transition-[width] duration-200 ease-out": !moviendoHueco() }}
                 style={{ ...placement(), width: ancho() }}
                 onPointerDown={() => { const d = sitio(); if (d) mandarVentana(d); }}>
