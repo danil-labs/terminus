@@ -1,23 +1,15 @@
-import { For, Show, createSignal, createMemo, onMount, type JSX } from "solid-js";
-import { invoke } from "../../lib/invoke.ts";
-import { machineOf } from "../machines/store";
-import ChevronDown from "lucide-solid/icons/chevron-down";
-import ChevronRight from "lucide-solid/icons/chevron-right";
+import { For, Show, createMemo, type JSX } from "solid-js";
 import Columns2 from "lucide-solid/icons/columns-2";
 import Rows2 from "lucide-solid/icons/rows-2";
 import UnfoldVertical from "lucide-solid/icons/unfold-vertical";
-import SquareArrowOutUpRight from "lucide-solid/icons/square-arrow-out-up-right";
-import { FailureNote, asFailure, type Failure } from "../../ui/Failure";
 import { cn } from "../../lib/utils";
 import { t } from "../../lib/i18n";
 import { createPref } from "../../lib/prefs";
 import { ajuste } from "../../lib/wrap";
-import { Badge } from "../../ui/Badge";
 import { Button } from "../../ui/Button";
 import {
   filasDosPaneles,
   marcarLineas,
-  parsearDiff,
   saltoEntre,
   type ArchivoDiff,
   type Fila,
@@ -27,16 +19,9 @@ import {
 } from "./diff";
 
 /**
- * Los cambios observados en un árbol de trabajo, archivo por archivo.
- *
- * **Aquí es una revisión, no un editor.** Se lee lo que cambió y el contexto que
- * lo rodea; en este bloque no se escribe. Un diff no es un sitio donde escribir
- * —la mitad de sus líneas son del archivo de antes y no existen ya—, así que
- * cada fila lleva **el salto a la pestaña del archivo** (`FileViewer.tsx`), que
- * es donde sí se escribe: sin él, quien ve algo que corregir tiene que abrir la
- * pestaña Código, encontrar el repositorio, desplegar su árbol y bajar hasta la
- * misma ruta que tenía delante. Qué acota lo que se escribe, en
- * `development::tree_write`.
+ * Las piezas del diff que comparten el visor de archivos (`FileViewer.tsx`) y
+ * el lado «Cambios» del panel de la tarea (`TaskFiles.tsx`): el cuerpo de un
+ * archivo y el selector unificado / dos paneles.
  *
  * **El contexto se despliega, y por eso hace falta un segundo comando.** `git
  * diff` da tres líneas alrededor de cada trozo, y un cambio leído sin lo que lo
@@ -65,223 +50,6 @@ export type Cambios = {
   truncated: boolean;
   warnings: string[];
 };
-
-type DiffDeArbol = {
-  patch: string;
-  /** Un motor anterior no lo manda y no recorta. */
-  truncated?: boolean;
-  retired: boolean;
-};
-
-/**
- * Contra qué se mide lo que se pinta, **dentro de un árbol de la tarea**.
- *
- * **`arbol` es un marcador y `turno` es un registro**, y la diferencia no es de
- * implementación: el acumulado dice cómo está el árbol AHORA contra su base, y
- * cambia con cada turno; el rango dice qué pasó entre dos fotos concretas y
- * sigue diciendo lo mismo dentro de un mes. Un turno pintado con el acumulado le
- * atribuiría lo que hicieron los de después.
- *
- * Los dos llevan `arbol` porque una tarea escribe en más de un sitio y cada uno
- * guarda sus fotos aparte: sin él, un sha no se puede resolver.
- */
-export type Origen =
-  | { tipo: "arbol"; arbol: string }
-  | { tipo: "turno"; arbol: string; before: string; after: string };
-
-/**
- * El resumen de un patch, contado de sus propias líneas.
- *
- * `tree_changes` trae el recuento del `--numstat` de git; un rango de árboles
- * llega como texto y punto. Contar aquí evita un segundo viaje al backend para
- * pedir lo que ya está en la mano.
- */
-function previaDePatch({ patch, truncated }: DiffDeArbol): Cambios {
-  const archivos = parsearDiff(patch);
-  return {
-    base: "",
-    files: archivos.map((a) => ({
-      path: a.ruta,
-      added: a.added,
-      removed: a.removed,
-      status: a.estado[0].toUpperCase(),
-    })),
-    added: archivos.reduce((n, a) => n + a.added, 0),
-    removed: archivos.reduce((n, a) => n + a.removed, 0),
-    patch,
-    truncated: Boolean(truncated),
-    warnings: [],
-  };
-}
-
-export default function Cambios(props: {
-  project: string;
-  session: string;
-  origen: Origen;
-  /**
-   * El tope de alto del bloque, para que scrollee dentro y no empuje el hilo.
-   *
-   * Solo lo usa el bloque del chat. En la pestaña no hay tope: **el que scrollea
-   * es el cuerpo de la columna**, uno solo. Con un scroll dentro de otro, la
-   * rueda actúa sobre el de dentro hasta que se acaba, y llegar al final de la
-   * lista de archivos exigía adivinar dónde poner el cursor.
-   */
-  alto?: string;
-  /**
-   * Las clases del marco —el borde, el redondeo—, si quien llama quiere uno.
-   *
-   * **Lo pinta este bloque y no quien lo monta, porque solo aquí se sabe si hay
-   * algo que enmarcar.** Envuelto desde fuera, un turno sin archivos que enseñar
-   * dejaba una caja con borde y nada dentro: ver el `Show` del `return`.
-   */
-  marco?: string;
-  /**
-   * Abrir esa ruta como pestaña del centro. El árbol lo pone quien llama
-   * (`TurnChanges.tsx`): desde aquí la ruta sola no identifica un archivo.
-   */
-  onAbrir: (ruta: string) => void;
-}) {
-  const [previa, setPrevia] = createSignal<Cambios | null>(null);
-  const [cargando, setCargando] = createSignal(true);
-  const [fallo, setFallo] = createSignal<Failure | null>(null);
-  const [retirado, setRetirado] = createSignal(false);
-  /** El diff con el archivo entero, por ruta, cuando alguien lo desplegó. */
-  const [enteros, setEnteros] = createSignal<Record<string, ArchivoDiff>>({});
-
-  const archivos = createMemo(() => {
-    const base = parsearDiff(previa()?.patch ?? "");
-    const completos = enteros();
-    return base.map((a) => completos[a.ruta] ?? a);
-  });
-
-  async function diffDelTurno(
-    o: Extract<Origen, { tipo: "turno" }>,
-    path: string | null,
-  ): Promise<DiffDeArbol> {
-    const diff = await invoke<DiffDeArbol>("tree_diff", {
-      project: props.project,
-      session: props.session,
-      tree: o.arbol,
-      before: o.before,
-      after: o.after,
-      path,
-    }, machineOf(props.session));
-    setRetirado(diff.retired);
-    return diff;
-  }
-
-  onMount(() => {
-    const o = props.origen;
-    const pedido =
-      o.tipo === "arbol"
-        ? invoke<Cambios>("tree_changes", {
-            project: props.project,
-            session: props.session,
-            tree: o.arbol,
-          }, machineOf(props.session))
-        : diffDelTurno(o, null).then(previaDePatch);
-    pedido
-      .then(setPrevia)
-      .catch((e) => setFallo(asFailure(e)))
-      .finally(() => setCargando(false));
-  });
-
-  /** Trae ese archivo con todo su contexto y reemplaza lo que se está pintando. */
-  async function desplegar(ruta: string) {
-    if (enteros()[ruta]) return;
-    try {
-      const o = props.origen;
-      const patch =
-        o.tipo === "arbol"
-          ? await invoke<string>("tree_patch", {
-              project: props.project,
-              session: props.session,
-              tree: o.arbol,
-              path: ruta,
-            }, machineOf(props.session))
-          : (await diffDelTurno(o, ruta)).patch;
-      const [entero] = parsearDiff(patch);
-      if (entero) setEnteros({ ...enteros(), [ruta]: entero });
-    } catch (e) {
-      setFallo(asFailure(e));
-    }
-  }
-
-  /**
-   * Si hay algo que enseñar. **Sin esto no se pinta nada, ni siquiera el
-   * marco.**
-   *
-   * Un «El agente todavía no ha cambiado nada aquí» sería relleno: este bloque
-   * solo se monta debajo de un turno que tocó código, así que esa frase solo
-   * aparece con el rango mal calculado —una por cada copia de trabajo abierta— y
-   * lo que comunica es ese defecto. Un diff vacío no ocupa sitio.
-   *
-   * El fallo y el aviso de recorte sí se enseñan: los dos dicen que lo que se
-   * está mirando no es lo que se pidió, y callarlos deja revisar a ciegas.
-   */
-  const hayAlgo = () =>
-    cargando() ||
-    retirado() ||
-    archivos().length > 0 ||
-    Boolean(previa()?.truncated) ||
-    Boolean(fallo());
-
-  return (
-    <Show when={hayAlgo()}>
-      <div
-        class={cn(
-          "grid content-start gap-2 p-3",
-          props.marco,
-          props.alto && `overflow-y-auto ${props.alto}`,
-        )}
-      >
-        <Show
-          when={!cargando()}
-          fallback={<p class="m-0 text-xs text-neutral-500">{t("code.comparing")}</p>}
-        >
-          <Show when={archivos().length > 0}>
-            <div class="flex items-center gap-2">
-              <h4 class="m-0 flex min-w-0 flex-1 items-baseline gap-2 text-[0.8125rem] font-semibold">
-                {props.origen.tipo === "turno"
-                  ? t("code.changes.observed_during_turn")
-                  : t("code.files.count", { count: archivos().length })}
-                <span class="font-mono text-[0.75rem] font-normal">
-                  <span class="text-success-strong">+{previa()?.added ?? 0}</span>{" "}
-                  <span class="text-error-strong">−{previa()?.removed ?? 0}</span>
-                </span>
-              </h4>
-              <SelectorDeDisposicion />
-            </div>
-
-            <For each={archivos()}>
-              {(a) => (
-                <Archivo
-                  archivo={a}
-                  onDesplegar={() => void desplegar(a.ruta)}
-                  onAbrir={() => props.onAbrir(a.ruta)}
-                />
-              )}
-            </For>
-          </Show>
-
-          <Show when={retirado()}>
-            <p class="m-0 text-xs text-neutral-500">{t("code.changes.retired")}</p>
-          </Show>
-
-          {/* Un diff recortado que parece entero es una revisión que no vale: se
-              dice, y se dice arriba de lo que sí se ve. */}
-          <Show when={previa()?.truncated}>
-            <p class="m-0 rounded-md border border-border bg-surface-raised px-2.5 py-2 text-[0.75rem]">
-              {t("code.changes.truncated")}
-            </p>
-          </Show>
-        </Show>
-
-        <Show when={fallo()}>{(f) => <FailureNote f={f()} />}</Show>
-      </div>
-    </Show>
-  );
-}
 
 export function SelectorDeDisposicion() {
   return (
@@ -326,120 +94,12 @@ function BotonDeDisposicion(props: {
 }
 
 /**
- * Cómo se nombra lo que le pasó al archivo. **`cambiado` no lleva etiqueta**: es
- * el caso normal y ponerle una sería repetir lo que ya dice estar en la lista.
- *
- * Función y no un mapa de módulo por dos cosas: `t()` lee la lengua al llamarse
- * —en una constante se congelaría en la del arranque—, y `scripts/guards/locales.mjs`
- * solo ve las claves escritas enteras, así que una armada al vuelo se
- * reportaría como huérfana.
- */
-function estadoDe(estado: ArchivoDiff["estado"]): string {
-  if (estado === "nuevo") return t("code.status.new");
-  if (estado === "borrado") return t("code.status.deleted");
-  if (estado === "renombrado") return t("code.status.renamed");
-  return "";
-}
-
-/** Un archivo: su cabecera con el recuento, y sus trozos debajo. */
-function Archivo(props: {
-  archivo: ArchivoDiff;
-  onDesplegar: () => void;
-  onAbrir: () => void;
-}) {
-  /**
-   * **Cerrado al nacer, en los dos sitios.** Abierto, un cambio de quince
-   * archivos es una pared de diff que hay que recorrer entera para saber qué
-   * tocó; cerrado, la lista es el índice —ruta, `+N −M`— y el diff se pide de
-   * uno en uno. Es lo que ya hacía el bloque del chat, y no había motivo para
-   * que la pestaña se comportara distinta.
-   */
-  const [abierto, setAbierto] = createSignal(false);
-
-  /**
-   * **La carpeta se apaga y el nombre queda fuerte.** En una lista de quince
-   * rutas que empiezan igual —`src-tauri/src/…`— lo que distingue una fila es lo
-   * último, y con todo al mismo peso hay que leerlas enteras para encontrarla.
-   */
-  const partes = () => {
-    const i = props.archivo.ruta.lastIndexOf("/");
-    return i < 0
-      ? { carpeta: "", nombre: props.archivo.ruta }
-      : { carpeta: props.archivo.ruta.slice(0, i + 1), nombre: props.archivo.ruta.slice(i + 1) };
-  };
-
-  return (
-    <section class="overflow-hidden rounded-md border border-border">
-      <header
-        class="group flex items-center gap-2 border-b border-border bg-surface-raised px-2.5 py-1.5"
-        classList={{ "border-b-0": !abierto() }}
-      >
-        <button
-          class="flex min-w-0 flex-1 items-center gap-1.5 text-left outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-          aria-expanded={abierto()}
-          onClick={() => setAbierto(!abierto())}
-        >
-          {abierto() ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-          <span class="min-w-0 truncate font-mono text-[0.75rem]">
-            <span class="text-neutral-500">{partes().carpeta}</span>
-            <span class="font-semibold">{partes().nombre}</span>
-          </span>
-        </button>
-        <Show when={estadoDe(props.archivo.estado)}>
-          {(e) => <Badge forma="dato" class="shrink-0 text-[0.625rem]">{e()}</Badge>}
-        </Show>
-        <span class="shrink-0 font-mono text-[0.6875rem]">
-          <span class="text-success-strong">+{props.archivo.added}</span>{" "}
-          <span class="text-error-strong">−{props.archivo.removed}</span>
-        </span>
-        {/* **Fuera del botón que pliega**, como «Publicar» en `Code.tsx`: un
-            botón dentro de otro no es HTML válido y el clic acabaría plegando en
-            vez de abrir.
-
-            **Al posar el ratón, y no siempre a la vista.** Es el reparto de la
-            × de la tira de pestañas: con quince archivos, quince iconos
-            encendidos compiten con las rutas, que es lo que se recorre para
-            encontrar la fila. Ocupa su hueco igual estando invisible, así que la
-            columna del `+N −M` no baila entre una fila y la de al lado, y
-            `group-focus-within` lo enciende para quien llega tabulando.
-
-            `-my-1` para que el objetivo sea de 24 px sin estirar la fila: la
-            caja se come el `py-1.5` de la cabecera en vez de sumarse a él.
-
-            **Un borrado no se abre**: su ruta es la que tenía y ya no hay
-            archivo que leer. Se deshabilita en vez de esconderse, para que el
-            hueco siga diciendo que aquí hay un control. */}
-        <button
-          type="button"
-          class="-my-1 grid size-6 shrink-0 place-items-center rounded-sm text-neutral-500 opacity-0 outline-none focus-visible:opacity-100 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary enabled:hover:bg-surface-muted enabled:hover:text-neutral-950 disabled:cursor-default group-hover:opacity-100 group-focus-within:opacity-100"
-          disabled={props.archivo.estado === "borrado"}
-          aria-label={t("code.file.open_aria", { ruta: props.archivo.ruta })}
-          title={
-            props.archivo.estado === "borrado"
-              ? t("code.file.deleted_open")
-              : t("code.file.open")
-          }
-          onClick={() => props.onAbrir()}
-        >
-          <SquareArrowOutUpRight size={13} />
-        </button>
-      </header>
-
-      <Show when={abierto()}>
-        <CuerpoDeArchivo archivo={props.archivo} onDesplegar={props.onDesplegar} />
-      </Show>
-    </section>
-  );
-}
-
-/**
  * Las líneas de un archivo: sus trozos y los tramos que faltan entre ellos.
  *
- * **Aparte de [`Archivo`] para que el árbol lo use sin su cabecera.** Desde el
- * árbol ya se sabe qué archivo se abrió —lo dice la fila de volver—, así que
- * repetir la ruta con su recuento sería el mismo dato dos veces en el mismo
- * renglón. Lo que no puede haber es un segundo dibujante de líneas: dos divergen
- * y quien revisa deja de saber si mira lo mismo.
+ * **Sin cabecera.** Quien lo monta ya dice qué archivo es; repetir la ruta con
+ * su recuento sería el mismo dato dos veces. Lo que no puede haber es un
+ * segundo dibujante de líneas: dos divergen y quien revisa deja de saber si
+ * mira lo mismo.
  */
 export function CuerpoDeArchivo(props: {
   archivo: ArchivoDiff;
