@@ -201,7 +201,7 @@ export function AccountComputers(props: AccountComputersProps) {
                       });
                       queueMicrotask(() => (el.focus(), el.select()));
                     }}
-                    class="h-7 min-h-7 px-1.5 text-[0.8125rem]"
+                    class="h-7 min-h-7 px-1.5 text-ui"
                     maxlength={COMPUTER_NAME_MAX}
                     value={draft()}
                     disabled={saving()}

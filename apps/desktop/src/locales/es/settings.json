@@ -371,8 +371,6 @@
   "settings.providers.state.on": "conectado",
   "settings.providers.state.unverified": "sin comprobar",
   "settings.providers.waiting": "Esperando tu permiso en {name}",
-  "settings.requirement.optional": "opcional",
-  "settings.requirement.required": "obligatorio",
   "settings.skills.add": "Agregar",
   "settings.skills.adding": "Trayendo…",
   "settings.skills.all_agents": "todos los agentes",
@@ -472,8 +470,6 @@
     "other": "Borrar con sus {count} tareas"
   },
   "settings.workspaces.manage": "Administrar workspaces",
-  "settings.workspaces.menu_label": "Workspace: {name}",
-  "settings.workspaces.none": "ninguno",
   "settings.providers.finish_selection": "Listo",
   "settings.providers.no_selected_areas": "Sin acceso seleccionado",
   "settings.providers.remove_area": "Quitar del workspace",
@@ -514,13 +510,6 @@
   },
   "settings.update.busy_operations": "Hay órdenes sin terminar. Espera a que acaben y vuelve a intentarlo:",
   "settings.update.busy_download": "Se está descargando un modelo.",
-  "settings.terminal_theme.error": "No se pudo guardar el tema de la terminal.",
-  "settings.terminal_theme.sample_error": "no se encontró el binario de git",
-  "settings.terminal_theme.sample_muted": "12 archivos sin cambios",
-  "settings.terminal_theme.sample_ok": "entorno listo",
-  "settings.terminal_theme.sample_out": "compilando el backend…",
-  "settings.terminal_theme.sample_warn": "sin identidad de firma local",
-  "settings.terminal_theme.title": "Tema de la terminal",
   "settings.general.close.title": "Al cerrar la ventana",
   "settings.general.close.hint": "Danil sigue en segundo plano. Puedes volver a abrir la ventana o salir desde el icono de Danil.",
   "settings.general.notify.title": "Avisos de las tareas",
@@ -795,5 +784,7 @@
   "settings.customers.title": "Atención a clientes",
   "settings.customers.unavailable": "Esta sección todavía no se ve en la app de escritorio. Ábrela en la web con tu cuenta de Danil.",
   "settings.customers.open_web": "Abrir en la web",
-  "settings.connections.mcp_hint": "Herramientas que tus agentes usan en sus tareas."
+  "settings.connections.mcp_hint": "Herramientas que tus agentes usan en sus tareas.",
+  "settings.environment.release": "Versión de Danil",
+  "settings.environment.release_channel": "Canal de prueba: {channel}"
 }

@@ -37,7 +37,7 @@ export function TableHeaderCell(props: TableHeaderCellProps) {
   return (
     <th
       class={cn(
-        "px-3 py-2 text-[0.6875rem] font-semibold tracking-wider uppercase text-neutral-500",
+        "px-3 py-2 text-caption font-semibold tracking-wider uppercase text-neutral-500",
         propios.class,
       )}
       {...resto}
@@ -52,7 +52,7 @@ export function TableCell(props: TableCellProps) {
   return (
     <td
       class={cn(
-        "border-t border-border px-3 py-2 text-[0.8125rem] text-neutral-950",
+        "border-t border-border px-3 py-2 text-ui text-neutral-950",
         propios.class,
       )}
       {...resto}

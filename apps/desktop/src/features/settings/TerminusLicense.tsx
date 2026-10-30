@@ -23,7 +23,7 @@ export const startTrialInBrowser = () => void invoke("open_external", { target: 
 export function TerminusLicense(props: { onStart: () => void; onRetry: () => void; busy?: boolean; compact?: boolean }) {
   return (
     <div class="grid max-w-[60ch] gap-2" data-terminus-license="">
-      <strong class={props.compact ? "text-[13px] font-semibold text-neutral-950" : "text-base font-semibold text-neutral-950"}>
+      <strong class={props.compact ? "text-ui font-semibold text-neutral-950" : "text-base font-semibold text-neutral-950"}>
         {t("danil.license.title")}
       </strong>
       <p class={props.compact ? "m-0 text-xs text-neutral-500" : "m-0 text-sm text-neutral-500"}>{t("danil.license.body")}</p>

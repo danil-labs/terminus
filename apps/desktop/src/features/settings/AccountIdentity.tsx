@@ -103,7 +103,7 @@ export function AccountIdentityBlock(props: { identity: AccountIdentityState }) 
             {who()}
           </div>
           <Show when={id.profile()?.name && id.profile()?.email}>
-            <div class="min-w-0 truncate text-[0.8125rem] text-neutral-500">{id.profile()?.email}</div>
+            <div class="min-w-0 truncate text-ui text-neutral-500">{id.profile()?.email}</div>
           </Show>
         </div>
         <div class="flex shrink-0 items-center gap-2">
@@ -129,9 +129,9 @@ export function AccountIdentityBlock(props: { identity: AccountIdentityState }) 
           </Show>
         </div>
       </div>
-      <p class="m-0 text-[0.8125rem] text-neutral-500">{t("danil.account.photo_hint")}</p>
+      <p class="m-0 text-ui text-neutral-500">{t("danil.account.photo_hint")}</p>
       <Show when={id.problem()}>
-        {(text) => <p class="m-0 text-[0.8125rem] text-error-strong" role="alert">{text()}</p>}
+        {(text) => <p class="m-0 text-ui text-error-strong" role="alert">{text()}</p>}
       </Show>
     </div>
   );

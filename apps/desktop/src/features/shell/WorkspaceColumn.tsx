@@ -155,7 +155,7 @@ export default function WorkspaceColumn(props: {
             <span
               aria-hidden="true"
               class={cn(
-                "relative grid size-8 place-items-center rounded-md border text-[0.75rem] font-semibold group-focus-visible:outline-solid group-focus-visible:outline-2 group-focus-visible:outline-offset-2 group-focus-visible:outline-primary",
+                "relative grid size-8 place-items-center rounded-md border text-label font-semibold group-focus-visible:outline-solid group-focus-visible:outline-2 group-focus-visible:outline-offset-2 group-focus-visible:outline-primary",
                 active()
                   ? "border-border-strong bg-surface-raised text-neutral-950"
                   : "border-border bg-surface text-neutral-700 group-hover:bg-neutral-200 group-hover:text-neutral-950",
@@ -185,7 +185,7 @@ export default function WorkspaceColumn(props: {
             anchor?.focus();
           }}
         >
-          <p class="m-0 truncate px-2 pt-1 pb-1 text-[0.6875rem] font-medium text-neutral-500">{p.w.name}</p>
+          <p class="m-0 truncate px-2 pt-1 pb-1 text-caption font-medium text-neutral-500">{p.w.name}</p>
           <button
             role="menuitem"
             class={ITEM_DE_MENU}
@@ -231,9 +231,9 @@ export default function WorkspaceColumn(props: {
           </TooltipRoot>
         </PopoverAnchor>
         <PopoverContent role="menu" class="w-64 p-1">
-          <p class="m-0 truncate px-2 pt-1 pb-1 text-[0.6875rem] font-medium text-neutral-500">{p.email}</p>
+          <p class="m-0 truncate px-2 pt-1 pb-1 text-caption font-medium text-neutral-500">{p.email}</p>
           <Show when={p.stale && p.signedIn}>
-            <p class="m-0 px-2 pb-1 text-[0.6875rem] text-neutral-500">{t("shell.workspaces.stale")}</p>
+            <p class="m-0 px-2 pb-1 text-caption text-neutral-500">{t("shell.workspaces.stale")}</p>
           </Show>
           <Show when={!p.signedIn}>
             <button role="menuitem" class={ITEM_DE_MENU} onClick={() => (setAccountMenu(null), accounts?.add(p.email))}>
@@ -275,7 +275,7 @@ export default function WorkspaceColumn(props: {
         >
           <span
             aria-hidden="true"
-            class="relative grid size-8 place-items-center rounded-md border border-border bg-surface text-[0.75rem] font-semibold text-neutral-700 group-hover:bg-neutral-200 group-hover:text-neutral-950 group-focus-visible:outline-solid group-focus-visible:outline-2 group-focus-visible:outline-offset-2 group-focus-visible:outline-primary"
+            class="relative grid size-8 place-items-center rounded-md border border-border bg-surface text-label font-semibold text-neutral-700 group-hover:bg-neutral-200 group-hover:text-neutral-950 group-focus-visible:outline-solid group-focus-visible:outline-2 group-focus-visible:outline-offset-2 group-focus-visible:outline-primary"
           >
             <span class="absolute inset-0 overflow-hidden rounded-[inherit]">
               <span class="relative grid size-full place-items-center">

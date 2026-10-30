@@ -152,7 +152,7 @@ export default function TaskFilesCard(props: {
                 const dirty = () => panel().dirty.includes(tab.id);
                 return (
                   <div role="tab" aria-selected={active()} title={tab.pinned ? tab.path : t("code.panel.tab.preview")}
-                    class={cn("group flex h-7 max-w-[200px] shrink-0 cursor-default items-center gap-1.5 rounded-[var(--radius-sm)] pr-1 pl-2 font-mono text-[0.75rem] select-none",
+                    class={cn("group flex h-7 max-w-[200px] shrink-0 cursor-default items-center gap-1.5 rounded-sm pr-1 pl-2 font-mono text-label select-none",
                       active() ? "bg-surface-muted font-semibold text-neutral-950" : "font-medium text-neutral-500 hover:bg-neutral-950/5 hover:text-neutral-950")}
                     onClick={() => props.files.activate(props.session, tab.id)}
                     onDblClick={() => props.files.pin(props.session, tab.id)}
@@ -161,7 +161,7 @@ export default function TaskFilesCard(props: {
                       <GitCompare size={13} class="shrink-0 text-neutral-500" />
                     </Show>
                     <span class="min-w-0 truncate" classList={{ italic: !tab.pinned }}>{nameOf(tab.path)}</span>
-                    <Show when={tab.changes}><span class="shrink-0 font-sans text-[0.6875rem] font-normal text-neutral-500">{t("code.panel.side.changes")}</span></Show>
+                    <Show when={tab.changes}><span class="shrink-0 font-sans text-caption font-normal text-neutral-500">{t("code.panel.side.changes")}</span></Show>
                     <button type="button" aria-label={t("code.panel.tab.close")}
                       class={cn("grid size-5 shrink-0 place-items-center rounded-sm text-neutral-500 hover:bg-neutral-200",
                         !active() && !dirty() && "opacity-0 group-hover:opacity-100")}
@@ -204,7 +204,7 @@ export default function TaskFilesCard(props: {
           <div class="flex h-9 shrink-0 items-center gap-0.5 border-b border-border pl-1.5">
             <For each={["files", "changes"] as const}>{(side) => (
               <button type="button" onClick={() => props.files.setSide(props.session, side)}
-                class={cn("flex h-7 items-center gap-1.5 rounded-[var(--radius-sm)] px-2 text-xs",
+                class={cn("flex h-7 items-center gap-1.5 rounded-sm px-2 text-xs",
                   panel().side === side ? "bg-surface-muted font-semibold text-neutral-950" : "font-medium text-neutral-500 hover:bg-neutral-950/5 hover:text-neutral-950")}>
                 {side === "files" ? t("code.panel.side.files") : t("code.panel.side.changes")}
               </button>
@@ -250,24 +250,24 @@ function ChangesList(props: {
   alMoverseElArbol(() => props.session, () => props.visible, () => void refetch(), true);
   return (
     <div class="min-h-0 flex-1 overflow-y-auto py-1">
-      <div class="px-3 pt-1 pb-2 text-[0.6875rem] text-neutral-500">{t("code.panel.changes.pending")}</div>
+      <div class="px-3 pt-1 pb-2 text-caption text-neutral-500">{t("code.panel.changes.pending")}</div>
       <Show when={(rows.latest ?? []).length > 0} fallback={<div class="px-3 text-xs text-neutral-500">{rows.loading ? "" : t("code.panel.changes.none")}</div>}>
         <For each={rows.latest}>{(file) => {
           const on = () => props.active?.changes && props.active.tree === file.tree && props.active.path === file.path;
           const mark = () => file.status.charAt(0).toUpperCase();
           return (
             <button type="button" onClick={() => props.onOpen(file.tree, file.path)}
-              class={cn("flex w-full items-center gap-1.5 py-1 pr-3 pl-3 text-left text-[0.75rem] hover:bg-surface-muted", on() && "bg-surface-muted")}>
+              class={cn("flex w-full items-center gap-1.5 py-1 pr-3 pl-3 text-left text-label hover:bg-surface-muted", on() && "bg-surface-muted")}>
               <IconoDeArchivo ruta={file.path} class="shrink-0 text-neutral-500" />
               <span class="min-w-0 flex-1 truncate font-mono">
                 <span class="font-semibold">{nameOf(file.path)}</span>
                 <Show when={folderOf(file.path)}><span class="pl-1.5 text-neutral-500">{folderOf(file.path)}</span></Show>
               </span>
-              <span class="shrink-0 font-mono text-[0.6875rem]">
+              <span class="shrink-0 font-mono text-caption">
                 <span class="text-success-strong">+{file.added}</span>
                 <Show when={file.removed > 0}><span class="text-error-strong"> −{file.removed}</span></Show>
               </span>
-              <span class={cn("w-2.5 shrink-0 text-right font-mono text-[0.625rem] font-semibold", MARK[mark()] ?? "text-neutral-500")}>{mark()}</span>
+              <span class={cn("w-2.5 shrink-0 text-right font-mono text-2xs font-semibold", MARK[mark()] ?? "text-neutral-500")}>{mark()}</span>
             </button>
           );
         }}</For>

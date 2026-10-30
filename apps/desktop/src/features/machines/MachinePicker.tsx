@@ -62,7 +62,7 @@ export function MachinePicker(props: { workspace: string | null; project?: Proje
           </Show>
           <ChevronDown size={11} aria-hidden="true" />
         </PopoverTrigger>
-        <PopoverContent class="w-[300px] overflow-hidden p-0 text-[0.6875rem] text-neutral-500 shadow-lg">
+        <PopoverContent class="w-[300px] overflow-hidden p-0 text-caption text-neutral-500 shadow-lg">
           <p class="m-0 border-b border-border px-2 py-1.5">{t("shell.machines.label")}</p>
           <div class="py-1">
             <For each={machines()}>
@@ -77,7 +77,7 @@ export function MachinePicker(props: { workspace: string | null; project?: Proje
                   <MachineIcon wakes={wakesOf(m)} size={12} />
                   <span class={punto(m)} aria-hidden="true" />
                   <span class="flex-1 truncate">{nombre(m)}</span>
-                  <span class="text-[0.625rem]" data-machine-reason={razon(m) ? "" : undefined}>
+                  <span class="text-2xs" data-machine-reason={razon(m) ? "" : undefined}>
                     {razon(m)?.label ?? (m.on ? t("shell.machines.on") : t("shell.machines.off"))}
                   </span>
                   <span class="flex w-3 shrink-0">

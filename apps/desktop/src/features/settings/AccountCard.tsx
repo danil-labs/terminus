@@ -178,7 +178,7 @@ export default function AccountCard(props: {
                 class={cn(
                   "m-0 truncate text-neutral-500",
                   fila()
-                    ? "text-[0.8125rem] leading-[19px]"
+                    ? "text-ui leading-[19px]"
                     : "mt-0.5 font-mono text-[0.68rem]",
                 )}
               >

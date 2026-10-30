@@ -75,13 +75,13 @@ export default function KnCloud(props: { project: string; session: string }) {
         {(d) => (
           <Switch>
             <Match when={d().state === "running"}>
-              <p class="m-0 px-3 pt-2 text-[0.6875rem] text-neutral-500" role="status">
+              <p class="m-0 px-3 pt-2 text-caption text-neutral-500" role="status">
                 {t("kn.cloud.progress", { done: d().fetched, total: total(d()) })}
               </p>
             </Match>
             <Match when={d().state === "confirm"}>
               <div class="flex items-center gap-2 px-3 pt-2">
-                <p class="m-0 min-w-0 flex-1 text-[0.6875rem] text-neutral-500">
+                <p class="m-0 min-w-0 flex-1 text-caption text-neutral-500">
                   {t("kn.cloud.confirm", { count: d().remaining, size: peso(d().bytes_remaining) })}
                 </p>
                 <Button variant="secondary" size="compact" class="shrink-0" disabled={pidiendo()} onClick={() => void empezar(false)}>
@@ -91,7 +91,7 @@ export default function KnCloud(props: { project: string; session: string }) {
             </Match>
             <Match when={d().state === "done" && d().failed > 0}>
               <div class="flex items-center gap-2 px-3 pt-2">
-                <p class="m-0 min-w-0 flex-1 text-[0.6875rem] text-neutral-500">
+                <p class="m-0 min-w-0 flex-1 text-caption text-neutral-500">
                   {t("kn.cloud.failed", { count: d().failed })}
                 </p>
                 <Button variant="ghost" size="compact" class="shrink-0" disabled={pidiendo()} onClick={() => void empezar(true)}>

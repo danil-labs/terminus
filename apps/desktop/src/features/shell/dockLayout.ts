@@ -2,8 +2,6 @@
 export {
   type DockAgent,
   DOCK_DEFAULT_CAPACITY,
-  DOCK_GAP,
-  DOCK_SLOT,
   agentFolder,
   dockCapacity,
   orderDockAgents,

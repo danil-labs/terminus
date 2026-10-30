@@ -37,7 +37,7 @@
  * Node pelado, sin dependencias: lo corre `pnpm verificar`, en esta máquina.
  */
 import { readFileSync } from "node:fs";
-// Ver la nota de `paths.mjs`: `.pathname` en Windows da `/C:/…` y revienta.
+// `.pathname` en Windows da `/C:/…` y revienta.
 import { fileURLToPath } from "node:url";
 
 const RUTA = fileURLToPath(new URL("../../../../packages/chat/src/sandbox.ts", import.meta.url));

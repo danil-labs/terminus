@@ -371,8 +371,6 @@
   "settings.providers.state.on": "connected",
   "settings.providers.state.unverified": "unverified",
   "settings.providers.waiting": "Waiting for your permission in {name}",
-  "settings.requirement.optional": "optional",
-  "settings.requirement.required": "required",
   "settings.skills.add": "Add",
   "settings.skills.adding": "Fetching…",
   "settings.skills.all_agents": "all agents",
@@ -472,8 +470,6 @@
     "other": "Delete with its {count} tasks"
   },
   "settings.workspaces.manage": "Manage workspaces",
-  "settings.workspaces.menu_label": "Workspace: {name}",
-  "settings.workspaces.none": "none",
   "settings.providers.finish_selection": "Done",
   "settings.providers.no_selected_areas": "No access selected",
   "settings.providers.remove_area": "Remove from workspace",
@@ -514,13 +510,6 @@
   },
   "settings.update.busy_operations": "Some requests have not finished. Wait for them and try again:",
   "settings.update.busy_download": "A model is downloading.",
-  "settings.terminal_theme.error": "Could not save the terminal theme.",
-  "settings.terminal_theme.sample_error": "git binary not found",
-  "settings.terminal_theme.sample_muted": "12 files unchanged",
-  "settings.terminal_theme.sample_ok": "environment ready",
-  "settings.terminal_theme.sample_out": "compiling the backend…",
-  "settings.terminal_theme.sample_warn": "no local signing identity",
-  "settings.terminal_theme.title": "Terminal theme",
   "settings.general.close.title": "When closing the window",
   "settings.general.close.hint": "Danil keeps running in the background. Use the Danil icon to reopen the window or quit.",
   "settings.general.notify.title": "Task notifications",
@@ -795,5 +784,7 @@
   "settings.customers.title": "Customer service",
   "settings.customers.unavailable": "This section is not available in the desktop app yet. Open it on the web with your Danil account.",
   "settings.customers.open_web": "Open on the web",
-  "settings.connections.mcp_hint": "Tools your agents use in their tasks."
+  "settings.connections.mcp_hint": "Tools your agents use in their tasks.",
+  "settings.environment.release": "Danil release",
+  "settings.environment.release_channel": "Preview channel: {channel}"
 }

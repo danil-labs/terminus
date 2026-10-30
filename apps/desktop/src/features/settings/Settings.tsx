@@ -22,7 +22,6 @@ import { Close } from "../../ui/icons";
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -166,7 +165,7 @@ function AdminLink(props: { workspace: string | null }) {
   };
   return (
     <Show when={allowed()}>
-      <SidebarFooter class="mt-auto border-0 border-t border-solid border-border px-0 pb-3 pl-2 pt-2">
+      <div class="mt-auto border-0 border-t border-solid border-border px-0 pb-3 pl-2 pt-2">
         <SidebarMenu role="presentation">
           <SidebarMenuItem role="presentation">
             <SidebarMenuButton
@@ -181,7 +180,7 @@ function AdminLink(props: { workspace: string | null }) {
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
-      </SidebarFooter>
+      </div>
     </Show>
   );
 }
@@ -430,7 +429,7 @@ export default function Settings(props: {
               class="border-0 bg-rail"
             >
               <SidebarHeader class="pb-6 pl-5 pr-3 pt-4">
-                <DialogTitle class="m-0 text-[0.9375rem] font-semibold">
+                <DialogTitle class="m-0 text-lead font-semibold">
                   {t("settings.title")}
                 </DialogTitle>
               </SidebarHeader>

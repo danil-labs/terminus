@@ -62,8 +62,8 @@ const buttonVariants = cva(
       },
       size: {
         compact: "min-h-6 px-2 text-xs font-medium",
-        sm: "min-h-8 px-[11px] text-[13px]",
-        md: "min-h-9 px-[14px] py-[7px] text-[13px]",
+        sm: "min-h-8 px-[11px] text-ui",
+        md: "min-h-9 px-[14px] py-[7px] text-ui",
         iconCompact: "size-8 p-0",
         icon: "size-9 p-0",
       },

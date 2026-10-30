@@ -4,7 +4,7 @@ import Copy from "lucide-solid/icons/copy";
 import ExternalLink from "lucide-solid/icons/external-link";
 import { Spinner } from "../../ui/Spinner";
 import { Show, createSignal, type JSX } from "solid-js";
-import { copyText } from "../../lib/clipboard";
+import { createCopied } from "../../lib/clipboard";
 import { enfocar } from "../../lib/focus";
 import { t } from "../../lib/i18n";
 import { invoke } from "../../lib/invoke.ts";
@@ -18,7 +18,7 @@ import { Terminal, TerminalBody } from "../../ui/Terminal";
 function Paso(props: { numero: number; titulo: string; children: JSX.Element }) {
   return (
     <section class="flex gap-3">
-      <span class="grid size-5 shrink-0 place-items-center rounded-full bg-surface-muted text-[0.6875rem] font-semibold text-neutral-700">
+      <span class="grid size-5 shrink-0 place-items-center rounded-full bg-surface-muted text-caption font-semibold text-neutral-700">
         {props.numero}
       </span>
       <div class="flex min-w-0 flex-1 flex-col gap-2">
@@ -44,20 +44,14 @@ export function DialogoDeConexion(props: {
   onCodigo: (codigo: string) => void;
 }) {
   const [codigo, setCodigo] = createSignal("");
-  const [copiado, setCopiado] = createSignal(false);
   const [copiaFallida, setCopiaFallida] = createSignal<string | null>(null);
+  const { copied: copiado, copy } = createCopied(1400, (e) => setCopiaFallida(prosaDe(e)));
   const enviar = () => {
     if (codigo().trim()) props.onCodigo(codigo().trim());
   };
   async function copiar(u: string) {
-    try {
-      await copyText(u);
-      setCopiaFallida(null);
-      setCopiado(true);
-      setTimeout(() => setCopiado(false), 1400);
-    } catch (e) {
-      setCopiaFallida(prosaDe(e));
-    }
+    setCopiaFallida(null);
+    await copy(u);
   }
   return (
     <Dialog open onOpenChange={(abierto) => !abierto && props.onCancelar()}>

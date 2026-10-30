@@ -1,3 +1,4 @@
+import { TEXT } from "@terminus/design";
 import * as Haptics from "expo-haptics";
 import { type RefObject, useEffect, useRef, useState } from "react";
 import type { HostInstance } from "react-native";
@@ -97,7 +98,7 @@ export function Popover({ anchor, items, onClose, align = "start", testID }: { a
               {item.checked !== undefined ? <View style={styles.check}>{item.checked ? <Icon name="check" size={16} color={theme.text} /> : null}</View> : null}
               {!ios && item.icon ? <Icon name={item.icon} size={17} color={item.destructive ? theme.error : theme.text} /> : null}
               <Text numberOfLines={1} style={[styles.label, { color: item.destructive ? theme.error : theme.text, fontWeight: item.checked ? "600" : "400" }]}>{item.label}</Text>
-              {item.count !== undefined ? <Text style={{ color: theme.textMuted, fontSize: 14 }}>{item.count}</Text> : null}
+              {item.count !== undefined ? <Text style={{ color: theme.textMuted, fontSize: TEXT.body }}>{item.count}</Text> : null}
               {ios && item.icon ? <Icon name={item.icon} size={17} color={item.destructive ? theme.error : theme.text} /> : null}
             </Tap>
           </View>

@@ -1,3 +1,4 @@
+import { TEXT } from "@terminus/design";
 import { useEffect, useRef, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { finishTask } from "../lib/engine";
@@ -42,7 +43,7 @@ export function TaskFinishConfirmation(props: {
     }
   };
   return <View style={{ gap: 12 }}>
-    <Text style={{ color: theme.textMuted, fontSize: 14, lineHeight: 21 }}>{t(props.shared ? "task.header.finish_shared" : "task.header.finish_description")}</Text>
+    <Text style={{ color: theme.textMuted, fontSize: TEXT.body, lineHeight: 21 }}>{t(props.shared ? "task.header.finish_shared" : "task.header.finish_description")}</Text>
     {!props.ready && !busy ? <Text style={{ color: theme.textMuted }}>{t("task.header.finish_unavailable")}</Text> : null}
     {error ? <Text accessibilityRole="alert" style={{ color: theme.failedMark }}>{error}</Text> : null}
     <Pressable testID="task-finish-confirm" accessibilityRole="button" disabled={!props.ready || busy} onPress={() => void finish()} style={{ minHeight: 48, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: theme.primary, opacity: props.ready || busy ? 1 : 0.4 }}>

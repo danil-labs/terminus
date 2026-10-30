@@ -299,7 +299,7 @@ export default function MaterialPicker(props: {
 
       <Show when={!objetivoRamas() && !soloUrl()}>
         <div class="grid gap-1">
-          <span class="text-[0.6875rem] text-neutral-500">{t("settings.material.or")}</span>
+          <span class="text-caption text-neutral-500">{t("settings.material.or")}</span>
           <Button
             type="button"
             variant="secondary"
@@ -311,7 +311,7 @@ export default function MaterialPicker(props: {
             <FolderOpen size={15} />
             {t("settings.material.pick_folder")}
           </Button>
-          <span class="text-[0.6875rem] text-neutral-500">
+          <span class="text-caption text-neutral-500">
             {t("settings.material.or_account")}
           </span>
         </div>
@@ -384,7 +384,7 @@ export default function MaterialPicker(props: {
                               >
                                 {branch}
                                 <Show when={branch === rs().default}>
-                                  <span class="ml-auto font-sans text-[0.625rem] text-neutral-500">
+                                  <span class="ml-auto font-sans text-2xs text-neutral-500">
                                     {t("settings.material.is_default")}
                                   </span>
                                 </Show>
@@ -485,7 +485,7 @@ export default function MaterialPicker(props: {
                     </button>
                   </Show>
                   <MarcaGitHost id={p().id} size={14} />
-                  <span class="text-[0.8125rem] font-medium text-neutral-950">
+                  <span class="text-ui font-medium text-neutral-950">
                     {p().name}
                   </span>
                 </div>
@@ -543,7 +543,7 @@ export default function MaterialPicker(props: {
                     </button>
                   </Show>
                   <MarcaGitHost id={p().id} size={14} />
-                  <span class="text-[0.8125rem] font-medium text-neutral-950">
+                  <span class="text-ui font-medium text-neutral-950">
                     {p().name}
                   </span>
                 </div>
@@ -617,7 +617,7 @@ export default function MaterialPicker(props: {
                         <Button
                           variant="ghost"
                           size="sm"
-                          class="max-w-36 shrink-0 font-mono text-[0.6875rem]"
+                          class="max-w-36 shrink-0 font-mono text-caption"
                           disabled={ocupado()}
                           title={t("settings.material.pick_branch_of", { name: r.name })}
                           aria-label={t("settings.material.pick_branch_of", {

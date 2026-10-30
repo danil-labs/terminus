@@ -10,7 +10,7 @@
  *
  * En macOS no existe: `no_console_window` no hace nada ahí. O sea que esto es
  * lo único que una máquina de desarrollo puede verificar de esta clase de
- * fallo, igual que `paths.mjs`. Ya reincidió tres veces —el login de MCP, el
+ * fallo. Ya reincidió tres veces —el login de MCP, el
  * servidor de AgentsView, `tasklist`—, que es el criterio del repo para
  * mecanizarlo.
  *

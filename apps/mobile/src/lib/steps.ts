@@ -3,10 +3,10 @@
  * y `features/chat/transcript.ts`): sus avances, las herramientas que usó (qué leyó,
  * qué ejecutó) y la respuesta. Sin React Native: se prueba en Node.
  */
+import { bareCommand, classify, fileName, type StepKind } from "@terminus/chat/steps";
 import type { Turn, TurnTool } from "@terminus/protocol";
 
-/** Qué clase de acto fue: decide el verbo y el ícono de la fila. */
-export type StepKind = "read" | "search" | "edit" | "run" | "web" | "plan" | "other";
+export type { StepKind };
 
 export type Step = { kind: StepKind; name: string; target: string | null; ok: boolean | null; running: boolean };
 
@@ -33,38 +33,6 @@ export type Line =
   /** Un `!` de la persona con su salida. */
   | { key: string; kind: "shell"; command: string; output: string; exitCode: number | null };
 
-/** Los nombres de Claude y los tipos de item de Codex, que nombran lo mismo. */
-export function classify(name: string): StepKind {
-  switch (name) {
-    case "Read":
-    case "NotebookRead":
-      return "read";
-    case "Write":
-    case "Edit":
-    case "MultiEdit":
-    case "NotebookEdit":
-    case "file_change":
-      return "edit";
-    case "Bash":
-    case "BashOutput":
-    case "KillShell":
-    case "command_execution":
-      return "run";
-    case "Glob":
-    case "Grep":
-      return "search";
-    case "WebFetch":
-    case "WebSearch":
-    case "web_search":
-      return "web";
-    case "TodoWrite":
-    case "todo_list":
-      return "plan";
-    default:
-      return "other";
-  }
-}
-
 export const stepOf = (name: string, target: string | null, ok: boolean | null = null, running = false): Step => ({ kind: classify(name), name, target, ok, running });
 
 /** Un comando se junta solo consigo: cada uno es su propio acto. */
@@ -80,15 +48,7 @@ export function groupSteps(steps: readonly Step[]): StepRow[] {
   return rows;
 }
 
-/** El comando sin el envoltorio del shell (Codex manda `zsh -lc "…"`) ni el `cd … &&` que lo precede. */
-export function bareCommand(cmd: string) {
-  const wrapped = /^\S*(?:sh|bash|zsh)\s+-[a-z]*c\s+(["'])([\s\S]*)\1\s*$/.exec(cmd.trim());
-  const bare = (wrapped ? wrapped[2] : cmd).trim();
-  const withCd = /^cd\s+(?:"[^"]*"|'[^']*'|\S+)\s*&&\s*([\s\S]+)$/.exec(bare);
-  return (withCd ? withCd[1] : bare).trim();
-}
-
-export const fileName = (path: string) => path.split(/[\\/]/).filter(Boolean).pop() || path;
+export { bareCommand, classify, fileName };
 
 /** La pregunta que el agente deja escrita no es un paso que enseñar. */
 const visible = (tool: TurnTool | undefined): tool is TurnTool => tool !== undefined && !tool.target?.includes(".preguntas.json");

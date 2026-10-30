@@ -1,3 +1,4 @@
+import { TEXT } from "@terminus/design";
 import type { Project, ProjectCloneEvent } from "@terminus/protocol";
 import * as Crypto from "expo-crypto";
 import { useEffect, useRef, useState } from "react";
@@ -199,8 +200,8 @@ export function AddFolderSheets({
 
 const styles = StyleSheet.create({
   body: { paddingHorizontal: 18, paddingVertical: 6, gap: 10 },
-  input: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15 },
-  hint: { fontSize: 13, lineHeight: 18 },
+  input: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: TEXT.lead },
+  hint: { fontSize: TEXT.ui, lineHeight: 18 },
   button: { borderRadius: 10, paddingVertical: 12, alignItems: "center" },
   buttonText: { fontSize: 16, fontWeight: "600" },
 });

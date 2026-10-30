@@ -1,7 +1,7 @@
 import Check from "lucide-solid/icons/check";
 import Copy from "lucide-solid/icons/copy";
-import { Show, createSignal } from "solid-js";
-import { copyText } from "../../lib/clipboard";
+import { Show } from "solid-js";
+import { createCopied } from "../../lib/clipboard";
 import { mb } from "../../lib/format";
 import { t } from "../../lib/i18n";
 import { CancelButton } from "../../ui/IconAction";
@@ -38,24 +38,18 @@ export function BarraDeCarga(props: { hecho: number; total: number | null }) {
 export function Peso(props: { bytes: number | null | undefined }) {
   return (
     <Show when={(props.bytes ?? 0) > 0}>
-      <span class="text-[11px] whitespace-nowrap text-neutral-500 tabular-nums">{mb(props.bytes!)}</span>
+      <span class="text-caption whitespace-nowrap text-neutral-500 tabular-nums">{mb(props.bytes!)}</span>
     </Show>
   );
 }
 
 /** El código que el navegador pide confirmar: grande, legible y con un botón para copiarlo. */
 export function CodigoParaConfirmar(props: { codigo: string }) {
-  const [copiado, setCopiado] = createSignal(false);
-  const copiar = () =>
-    void copyText(props.codigo)
-      .then(() => {
-        setCopiado(true);
-        setTimeout(() => setCopiado(false), 1400);
-      })
-      .catch(() => {});
+  const { copied: copiado, copy } = createCopied(1400);
+  const copiar = () => void copy(props.codigo);
   return (
     <>
-      <strong class="select-all rounded-sm bg-surface-muted px-1.5 py-0.5 font-mono text-[13px] font-semibold tracking-[0.04em] whitespace-nowrap text-neutral-950">
+      <strong class="select-all rounded-sm bg-surface-muted px-1.5 py-0.5 font-mono text-ui font-semibold tracking-[0.04em] whitespace-nowrap text-neutral-950">
         {props.codigo}
       </strong>
       <button

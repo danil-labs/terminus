@@ -1,3 +1,4 @@
+import { TEXT } from "@terminus/design";
 import { contactDisplayName, contactSubIdentifier } from "../../../../packages/attention/src/inbox.ts";
 import { taskTitle } from "@terminus/tasks";
 import { router } from "expo-router";
@@ -172,8 +173,8 @@ export default function Search() {
                   title={contactDisplayName(row, t("customize.unknown"))}
                   subtitle={
                     <View style={{ gap: 2 }}>
-                      <Text numberOfLines={1} style={{ color: theme.textMuted, fontSize: 13 }}>{[row.channel_name, contactSubIdentifier(row)].filter(Boolean).join(" · ")}</Text>
-                      <Marked text={row.last_message} query={query} style={{ color: theme.textMuted, fontSize: 14 }} />
+                      <Text numberOfLines={1} style={{ color: theme.textMuted, fontSize: TEXT.ui }}>{[row.channel_name, contactSubIdentifier(row)].filter(Boolean).join(" · ")}</Text>
+                      <Marked text={row.last_message} query={query} style={{ color: theme.textMuted, fontSize: TEXT.body }} />
                     </View>
                   }
                   value={shortWhen(row.last_message_at, lang)}
@@ -213,5 +214,5 @@ const styles = StyleSheet.create({
   chipsScroll: { flexGrow: 0 },
   chips: { gap: 8, paddingHorizontal: 16, paddingBottom: 4 },
   plus: { width: 28, height: 28, borderRadius: 7, alignItems: "center", justifyContent: "center" },
-  empty: { paddingHorizontal: 32, paddingVertical: 16, fontSize: 15 },
+  empty: { paddingHorizontal: 32, paddingVertical: 16, fontSize: TEXT.lead },
 });

@@ -246,6 +246,15 @@
   --radius-md: 6px;
   --radius-lg: 8px;
 
+  /* La escala de texto que comparten los clientes (`packages/design/src/scale.ts`).
+     Sin `--line-height` a propósito: cada átomo decide su interlineado. */
+  --text-2xs: 0.625rem;
+  --text-caption: 0.6875rem;
+  --text-label: 0.75rem;
+  --text-ui: 0.8125rem;
+  --text-body: 0.875rem;
+  --text-lead: 0.9375rem;
+
   /* Las medidas del visor son contrato del documento, no decisiones de una
      pantalla. La hoja conserva el ancho de texto A4 que publica el exportador
      más el relleno del contenedor; el alto mínimo evita que una tabla o una
@@ -773,15 +782,15 @@
   backdrop-filter: blur(10px) saturate(1.3);
 }
 /* Vidrio de las columnas y barras (historial, riel, árbol, título, consumo):
-   el fondo de Estilo se pinta detrás de toda la ventana (`App.tsx` ·
-   `FondoDeVentana`) y aquí solo se vela y desenfoca. El compositor y los
+   el fondo de Estilo se pinta detrás del área de trabajo y aquí solo se
+   vela y desenfoca. El compositor y los
    mensajes siguen sólidos: ahí se lee y se escribe. */
 .glass-panel {
   background: color-mix(in srgb, var(--color-bg) calc(var(--panel-veil, 0.4) * 100%), transparent);
   -webkit-backdrop-filter: blur(22px) saturate(1.4);
   backdrop-filter: blur(22px) saturate(1.4);
 }
-/* Repite el fondo de la ventana (`App.tsx` · `FondoDeVentana`) fijo al viewport: sin
+/* Repite el fondo del área de trabajo fijo al viewport: sin
    velo encima, la pestaña activa se funde con su panel. Las esquinas cóncavas de su pie
    son ::before y ::after de la misma pestaña. */
 .tab-active {

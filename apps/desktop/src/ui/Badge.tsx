@@ -13,7 +13,7 @@ const badgeVariants = cva("inline-flex items-center gap-1.5 whitespace-nowrap bo
   variants: {
     forma: {
       etiqueta: "rounded-full px-2.5 py-0.5 text-xs font-[560]",
-      dato: "rounded-sm px-1.5 py-0.5 font-mono text-[0.6875rem]",
+      dato: "rounded-sm px-1.5 py-0.5 font-mono text-caption",
     },
     tone: {
       neutral: "text-neutral-700",

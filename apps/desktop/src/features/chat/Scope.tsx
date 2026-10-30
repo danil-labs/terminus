@@ -96,7 +96,7 @@ function Panel(props: { children: JSX.Element }) {
       tabindex="-1"
       // Portado a `<body>`, así que no hereda el tamaño ni el color de la fila:
       // lo que allí venía del contenedor, aquí hay que decirlo.
-      class="w-[300px] overflow-hidden p-0 text-[0.6875rem] text-neutral-500 shadow-lg"
+      class="w-[300px] overflow-hidden p-0 text-caption text-neutral-500 shadow-lg"
       onOpenAutoFocus={(e: Event) => {
         e.preventDefault();
         queueMicrotask(() => {
@@ -346,7 +346,7 @@ export default function Alcance(props: {
       />
       <input
         ref={enfocar}
-        class="w-full bg-transparent py-1 pr-2 pl-6 text-[0.6875rem] outline-none"
+        class="w-full bg-transparent py-1 pr-2 pl-6 text-caption outline-none"
         placeholder={marcador}
         value={busca()}
         onInput={(e) => setBusca(e.currentTarget.value)}
@@ -387,7 +387,7 @@ export default function Alcance(props: {
     // tener una fuente, la forma de añadir contexto o código no existía en
     // pantalla: vivía dentro del menú del `+` de la caja, donde hay que ir a
     // buscarla sabiendo ya que está.
-    <div class="flex flex-wrap items-center gap-1.5 px-1 pb-1 text-[0.6875rem] text-neutral-500">
+    <div class="flex flex-wrap items-center gap-1.5 px-1 pb-1 text-caption text-neutral-500">
       <span class="shrink-0">{props.rotulo}:</span>
 
       <For each={props.items}>
@@ -703,7 +703,7 @@ export default function Alcance(props: {
                   >
                     <input
                       ref={enfocar}
-                      class="min-w-0 flex-1 rounded-sm border border-border bg-transparent px-2 py-1 font-mono text-[0.6875rem] outline-none focus:border-border-strong"
+                      class="min-w-0 flex-1 rounded-sm border border-border bg-transparent px-2 py-1 font-mono text-caption outline-none focus:border-border-strong"
                       placeholder={t("chat.scope.address_or_path_placeholder")}
                       value={url()}
                       onInput={(e) => setUrl(e.currentTarget.value)}

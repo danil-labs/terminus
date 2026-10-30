@@ -25,7 +25,7 @@ const POWER_DOT: Record<Power, string> = {
   no_answer: "bg-error-strong",
 };
 
-const NOTE = "mt-2 rounded-md px-2 py-1.5 text-[0.6875rem]";
+const NOTE = "mt-2 rounded-md px-2 py-1.5 text-caption";
 const NOTE_INFO = cn(NOTE, "bg-surface-muted text-neutral-500");
 const SEG_TASKS = "bg-neutral-500";
 const SEG_ENGINE = "bg-info-strong";
@@ -50,9 +50,9 @@ function disk(r: MachineResources | undefined) {
 function Metric(props: { label: string; why?: string; value?: string; children: unknown }) {
   return (
     <span class="mt-2 grid grid-cols-[4.5rem_minmax(0,1fr)_auto] items-center gap-2">
-      <span class="text-[0.6875rem] text-neutral-500" title={props.why}>{props.label}</span>
+      <span class="text-caption text-neutral-500" title={props.why}>{props.label}</span>
       <span class="flex min-w-0 items-center gap-2.5">{props.children as never}</span>
-      <span class="whitespace-nowrap font-mono text-[0.6875rem] tabular-nums text-neutral-950">{props.value}</span>
+      <span class="whitespace-nowrap font-mono text-caption tabular-nums text-neutral-950">{props.value}</span>
     </span>
   );
 }
@@ -142,7 +142,7 @@ export function MachineCard(props: {
     await props.onRefresh?.();
     setRefreshing(false);
   };
-  const small = "shrink-0 rounded-[5px] border border-border px-2 py-0.5 text-[0.6875rem] text-neutral-950 outline-none hover:bg-surface-muted focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary disabled:opacity-60";
+  const small = "shrink-0 rounded-[5px] border border-border px-2 py-0.5 text-caption text-neutral-950 outline-none hover:bg-surface-muted focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary disabled:opacity-60";
 
   return (
     <div
@@ -161,13 +161,13 @@ export function MachineCard(props: {
     >
       <span class="flex min-w-0 items-center gap-2">
         <span class="truncate text-xs font-semibold text-neutral-950">{machineName(props.machine.id, props.machine.local)}</span>
-        <span class="min-w-0 flex-1 truncate text-[0.6875rem] text-neutral-500">{kind(props.machine, r())}</span>
-        <span class="flex shrink-0 items-center gap-1 text-[0.6875rem] text-neutral-500" data-machine-power={props.power}>
+        <span class="min-w-0 flex-1 truncate text-caption text-neutral-500">{kind(props.machine, r())}</span>
+        <span class="flex shrink-0 items-center gap-1 text-caption text-neutral-500" data-machine-power={props.power}>
           <span class={cn("size-1.5 rounded-full", POWER_DOT[props.power])} aria-hidden />
           {t(`shell.machine_panel.power.${props.power}`)}
         </span>
         <Show when={state()}>
-          {(s) => <Badge tone={s().tone} class="shrink-0 px-1.5 py-0 text-[0.625rem]">{s().label}</Badge>}
+          {(s) => <Badge tone={s().tone} class="shrink-0 px-1.5 py-0 text-2xs">{s().label}</Badge>}
         </Show>
       </span>
 
@@ -188,7 +188,7 @@ export function MachineCard(props: {
                 <Metric label={t("shell.machine_panel.metric.pressure")} why={t("shell.machine_panel.pressure.why")}
                   value={r()?.memory?.swap_used_bytes ? t("shell.machine_panel.compressed", { size: peso(r()!.memory!.swap_used_bytes) }) : ""}>
                   <PressureBars values={bars()} tone={barTone()} />
-                  <span class="truncate text-[0.6875rem] text-neutral-500">
+                  <span class="truncate text-caption text-neutral-500">
                     {t("shell.machine_panel.pressure.text", { memory: Math.round(pr().memory), io: Math.round(pr().io) })}
                   </span>
                 </Metric>
@@ -215,7 +215,7 @@ export function MachineCard(props: {
 
       <Show when={parts()}>
         {(p) => (
-          <span class="mt-1.5 flex flex-wrap gap-x-2.5 gap-y-0.5 text-[0.625rem] text-neutral-500">
+          <span class="mt-1.5 flex flex-wrap gap-x-2.5 gap-y-0.5 text-2xs text-neutral-500">
             <span class="flex items-center gap-1"><span class={cn("size-2 rounded-[2px]", SEG_TASKS)} aria-hidden />{t("shell.machine_panel.legend.tasks", { size: peso(p().tasks) })}</span>
             <span class="flex items-center gap-1"><span class={cn("size-2 rounded-[2px]", SEG_ENGINE)} aria-hidden />{t("shell.machine_panel.legend.engine", { size: peso(p().engine) })}</span>
             <span class="flex items-center gap-1"><span class={cn("size-2 rounded-[2px]", SEG_OTHER)} aria-hidden />{t("shell.machine_panel.legend.other")}</span>
@@ -254,7 +254,7 @@ export function MachineCard(props: {
       </Show>
     </button>
       <Show when={version() || updatable()}>
-        <div class={cn("flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 px-3 pb-2.5 text-[0.6875rem] text-neutral-500", !on() && "opacity-60")} data-machine-engine="">
+        <div class={cn("flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 px-3 pb-2.5 text-caption text-neutral-500", !on() && "opacity-60")} data-machine-engine="">
           <Show when={version()}>
             {(v) => (
               <span class="font-mono tabular-nums">
@@ -263,7 +263,7 @@ export function MachineCard(props: {
             )}
           </Show>
           <Show when={version()?.updateAvailable}>
-            <Badge tone="info" class="px-1.5 py-0 text-[0.625rem]">{t("shell.machine_panel.update_available")}</Badge>
+            <Badge tone="info" class="px-1.5 py-0 text-2xs">{t("shell.machine_panel.update_available")}</Badge>
           </Show>
           <Show when={updatable()}>
             <span class="ml-auto flex items-center gap-1.5">
@@ -327,11 +327,11 @@ function TaskRow(props: {
         <button type="button" aria-expanded={open()} onClick={() => setOpen((v) => !v)}
           class="min-w-0 flex-1 py-1.5 pl-1.5 text-left outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary">
           <span class="block truncate text-xs font-medium text-neutral-950">{title()}</span>
-          <span class="flex min-w-0 flex-wrap items-center gap-x-1.5 text-[0.6875rem] text-neutral-500">
+          <span class="flex min-w-0 flex-wrap items-center gap-x-1.5 text-caption text-neutral-500">
             <Show when={project()}>{(p) => <span class="truncate">{p()}</span>}</Show>
             <Show when={props.left} fallback={
-              <Show when={props.task.state === "running"} fallback={<Badge class="px-1.5 py-0 text-[0.625rem]">{t("shell.machine_panel.task.idle")}</Badge>}>
-                <Badge tone="success" class="px-1.5 py-0 text-[0.625rem]">{t("shell.machine_panel.task.working")}</Badge>
+              <Show when={props.task.state === "running"} fallback={<Badge class="px-1.5 py-0 text-2xs">{t("shell.machine_panel.task.idle")}</Badge>}>
+                <Badge tone="success" class="px-1.5 py-0 text-2xs">{t("shell.machine_panel.task.working")}</Badge>
               </Show>
             }>
               <span>{ended()}</span>
@@ -339,11 +339,11 @@ function TaskRow(props: {
             <span>{t("shell.machine_panel.task.processes", { count: props.task.processes })}</span>
           </span>
         </button>
-        <span class="shrink-0 font-mono text-[0.6875rem] tabular-nums text-neutral-950">{peso(props.task.memory_bytes)}</span>
+        <span class="shrink-0 font-mono text-caption tabular-nums text-neutral-950">{peso(props.task.memory_bytes)}</span>
         <Show when={props.left && props.canStop}>
           <button type="button" disabled={props.stopping} onClick={() => props.onStop?.()}
             aria-label={t("shell.machine_panel.stop_aria", { title: title() })}
-            class="shrink-0 rounded-[5px] border border-border px-2 py-0.5 text-[0.6875rem] text-neutral-950 outline-none hover:border-error-strong hover:text-error-strong focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary disabled:opacity-60">
+            class="shrink-0 rounded-[5px] border border-border px-2 py-0.5 text-caption text-neutral-950 outline-none hover:border-error-strong hover:text-error-strong focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary disabled:opacity-60">
             {props.stopping ? t("shell.machine_panel.stopping") : t("shell.machine_panel.stop")}
           </button>
         </Show>
@@ -358,7 +358,7 @@ function TaskRow(props: {
         <ul class="m-0 list-none px-2 pb-2">
           <For each={topProcesses(props.task)}>
             {(p) => (
-              <li class="flex justify-between gap-2 py-px text-[0.6875rem] text-neutral-500">
+              <li class="flex justify-between gap-2 py-px text-caption text-neutral-500">
                 <span class="truncate">{p.count > 1 ? `${p.command} (${p.count})` : p.command}</span>
                 <span class="shrink-0 font-mono tabular-nums">{peso(p.bytes)}</span>
               </li>
@@ -386,14 +386,14 @@ export function MemoryTab(props: {
   const tasks = () => active(props.resources);
   const left = () => leftovers(props.resources);
   const scale = () => Math.max(0, ...tasks().map((x) => x.memory_bytes), ...left().map((x) => x.memory_bytes));
-  const section = "m-0 mt-2.5 mb-1 flex items-center justify-between gap-2 px-1.5 text-[0.6875rem] font-semibold text-neutral-950";
+  const section = "m-0 mt-2.5 mb-1 flex items-center justify-between gap-2 px-1.5 text-caption font-semibold text-neutral-950";
   return (
     <div data-machine-memory="">
       <p class={section}>
         <span>{t("shell.machine_panel.tasks")}</span>
         <span class="font-normal text-neutral-500">{t("shell.machine_panel.tasks.hint")}</span>
       </p>
-      <Show when={tasks().length} fallback={<p class="m-0 px-1.5 text-[0.6875rem] text-neutral-500">{t("shell.machine_panel.tasks.none")}</p>}>
+      <Show when={tasks().length} fallback={<p class="m-0 px-1.5 text-caption text-neutral-500">{t("shell.machine_panel.tasks.none")}</p>}>
         <ul class="m-0 list-none p-0">
           <For each={tasks()}>{(x) => <TaskRow task={x} scale={scale()} lookup={props.lookup} when={props.when} />}</For>
         </ul>
@@ -403,7 +403,7 @@ export function MemoryTab(props: {
         <span>{t("shell.machine_panel.leftover")}</span>
         <Show when={left().length}><span class="font-normal text-neutral-500">{t("shell.machine_panel.leftover.hint")}</span></Show>
       </p>
-      <Show when={left().length} fallback={<p class="m-0 px-1.5 text-[0.6875rem] text-neutral-500">{t("shell.machine_panel.leftover.none")}</p>}>
+      <Show when={left().length} fallback={<p class="m-0 px-1.5 text-caption text-neutral-500">{t("shell.machine_panel.leftover.none")}</p>}>
         <ul class="m-0 list-none p-0">
           <For each={left()}>
             {(x) => (
@@ -411,7 +411,7 @@ export function MemoryTab(props: {
                 <TaskRow task={x} scale={scale()} lookup={props.lookup} when={props.when} left
                   canStop={props.canStop} stopping={!!props.stopping[x.session]} onStop={() => props.onStop(x)} />
                 <Show when={props.failure[x.session]}>
-                  {(f) => <li role="alert" class="px-1.5 py-0.5 text-[0.6875rem] text-error-strong">{f()}</li>}
+                  {(f) => <li role="alert" class="px-1.5 py-0.5 text-caption text-error-strong">{f()}</li>}
                 </Show>
               </>
             )}
@@ -426,7 +426,7 @@ export function MemoryTab(props: {
               <span>{t("shell.machine_panel.engine")}</span>
               <span class="font-mono font-normal tabular-nums">{peso(e().rss_bytes ?? 0)}</span>
             </p>
-            <p class="m-0 px-1.5 text-[0.6875rem] text-neutral-500">{t("shell.machine_panel.engine.detail", { threads: e().threads ?? 0 })}</p>
+            <p class="m-0 px-1.5 text-caption text-neutral-500">{t("shell.machine_panel.engine.detail", { threads: e().threads ?? 0 })}</p>
           </>
         )}
       </Show>
