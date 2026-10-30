@@ -588,7 +588,7 @@ this update does not register a new client principal.
 The desktop CLI forwards `task create --as peer|worker` arguments unchanged to
 the bundled engine executable. Rank semantics and negotiation of `peer_rank_v1`
 belong to that CLI and engine; the window does not derive rank from parent ids.
-The contract snapshot comes from seldon-host `437a280`. Its compatible engine
+The contract snapshot comes from seldon-host `b8e7fcd`. Its compatible engine
 release is not pinned yet: `MOTOR_PENDIENTE` preserves the publication block.
 
 `handler list` describes memory configuration, not effective turn availability.

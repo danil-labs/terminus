@@ -9,6 +9,8 @@ export type SupportGrant = {
   created_at: string; expires_at: string; revoked_at: string | null; revoked_by_kind: string | null; status: SupportStatus;
 };
 export type SupportWorkspace = { id: number; name: string };
+/** Un workspace de Danil al que la persona entra como miembro, con su rol; organización y plan solo si el BFF los manda. */
+export type Membership = SupportWorkspace & { role: string; organization: string | null; plan: string | null };
 
 const object = (value: unknown): Record<string, unknown> => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('invalid_response');
@@ -26,6 +28,7 @@ const nullable = (value: unknown): string | null => value === null || value === 
 const STATUSES: readonly string[] = ['active', 'expired', 'revoked'];
 /** Quién puede ver y revocar lo decide el BFF (`members.manage`); aquí solo se listan los workspaces donde la persona es owner o admin. */
 const MANAGERS: readonly string[] = ['owner', 'admin'];
+export const isManager = (role: string) => MANAGERS.includes(role);
 
 export function grantOf(value: unknown, account: number): SupportGrant {
   const row = object(value);
@@ -49,16 +52,25 @@ export function createSupportAccess(session: InboxSession, request: typeof fetch
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return object(await response.json());
   }
+  async function memberships(): Promise<Membership[]> {
+    const rows = object((await get('/auth/profile')).user).accounts ?? [];
+    if (!Array.isArray(rows)) throw new Error('invalid_response');
+    return rows.flatMap(value => {
+      const row = object(value);
+      // Una cuenta a la que se entra por soporte no se administra desde aquí.
+      if (row.access === 'support') return [];
+      const organization = row.organization && typeof row.organization === 'object' ? (row.organization as Record<string, unknown>).name : row.organization_name;
+      return [{
+        id: id(row.id), name: typeof row.name === 'string' ? row.name : '', role: String(row.role ?? ''),
+        organization: typeof organization === 'string' && organization ? organization : null,
+        plan: typeof row.plan === 'string' && row.plan ? row.plan : null,
+      }];
+    });
+  }
   return {
+    memberships,
     async workspaces(): Promise<SupportWorkspace[]> {
-      const rows = object((await get('/auth/profile')).user).accounts ?? [];
-      if (!Array.isArray(rows)) throw new Error('invalid_response');
-      return rows.flatMap(value => {
-        const row = object(value);
-        // Una cuenta a la que se entra por soporte no se administra desde aquí.
-        if (row.access === 'support' || !MANAGERS.includes(String(row.role))) return [];
-        return [{ id: id(row.id), name: typeof row.name === 'string' ? row.name : '' }];
-      });
+      return (await memberships()).filter(m => isManager(m.role)).map(m => ({ id: m.id, name: m.name }));
     },
     async list(account: number): Promise<{ grants: SupportGrant[]; canRevokeAll: boolean }> {
       const workspace = id(account);

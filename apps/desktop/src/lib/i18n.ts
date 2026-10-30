@@ -231,6 +231,7 @@ function resolver(pref: string): string {
   return BASE;
 }
 
+let requestedLanguage = semillaDelAlta();
 const [lengua, setLengua] = createSignal(
   // Lo último pintado, que es de un workspace o del alta: la ventana tiene que
   // poder pintarse antes de leer el disco. Sin nada, el sistema. Si ese código
@@ -254,6 +255,7 @@ export function manifiesto(): Manifiesto {
  * escribiendo en español bajo una interfaz en maya. Ver `lib/format.ts`.
  */
 export function elegirLengua(pref: string) {
+  requestedLanguage = pref;
   // Se recuerda para dársela al workspace que se está creando, no como
   // preferencia que gobierne después. Ver `semillaDelAlta`.
   if (pref === "sistema") almacen()?.removeItem(CLAVE);
@@ -270,10 +272,19 @@ export function elegirLengua(pref: string) {
  * (`workspaces::Workspace::lengua`).
  */
 export function aplicarLenguaDeWorkspace(codigo: string | null | undefined) {
+  requestedLanguage = codigo ?? "sistema";
   // Sin lengua declarada se sigue al sistema, no a la semilla del alta.
   const resuelto = resolver(codigo ?? "sistema");
   setLengua(resuelto);
   almacen()?.setItem(ULTIMA, resuelto);
+  aplicarLengua();
+}
+
+/** Un catálogo tardío vuelve a resolver la preferencia vigente, sin imponer la semilla del alta. */
+export function refreshLanguage() {
+  const resolved = resolver(requestedLanguage);
+  setLengua(resolved);
+  almacen()?.setItem(ULTIMA, resolved);
   aplicarLengua();
 }
 

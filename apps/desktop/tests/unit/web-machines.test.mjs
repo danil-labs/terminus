@@ -469,8 +469,8 @@ test("one subscription shows both machine chips while Team keeps its own card an
   });
   const button = (label) => [...doc.querySelectorAll("button")].find((b) => b.textContent?.trim() === label || b.getAttribute("aria-label") === label);
   button("Configuración").click();
-  assert.ok(await until(() => button("Proveedores de IA")));
-  button("Proveedores de IA").click();
+  assert.ok(await until(() => button("Cuentas de IA")));
+  button("Cuentas de IA").click();
   assert.ok(await until(() => doc.querySelectorAll('[data-account-machines="cmp_vm~personal"] [data-account-machine]').length === 2));
   assert.equal(doc.querySelectorAll("[data-account-machines]").length, 2, "one Pro card and one Team card");
   const personal = doc.querySelector('[data-account-machines="cmp_vm~personal"]');
@@ -511,8 +511,8 @@ test("provider login from settings receives its link and code", async () => {
   });
   const button = (label) => [...doc.querySelectorAll("button")].find((b) => b.textContent?.trim() === label || b.getAttribute("aria-label") === label);
   button("Configuración").click();
-  assert.ok(await until(() => button("Proveedores de IA")));
-  button("Proveedores de IA").click();
+  assert.ok(await until(() => button("Cuentas de IA")));
+  button("Cuentas de IA").click();
   assert.ok(await until(() => button("+ Agregar cuenta")));
   button("+ Agregar cuenta").click();
   assert.ok(await until(() => calls("cmp_vm", "login_account").length));

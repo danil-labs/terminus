@@ -3,14 +3,15 @@ import { engine, relay } from './fake-relay.mjs';
 import { boot, sleep } from './jsdom-app.mjs';
 
 // El App real y su pestaña Inbox, con relay y BFF de prueba independientes.
-const fake = relay({table:{...engine,list_spaces:[{id:'space',name:'Space',folders:['p1'],created_at:0,updated_at:0}]}});
+const workspace={id:'w',name:'Dos',context_root:null};
+const fake = relay({table:{...engine,list_workspaces:{workspaces:[workspace],active:'w'},workspaces_startup:{workspaces:[workspace],active:'w'},list_spaces:[{id:'space',name:'Space',folders:['p1'],created_at:0,updated_at:0}]}});
 const pending=[];
 let rejectOnce=true, refreshes=0;const invalidate=new Set();
 const fixtureFetch=async input=>{
  const url=String(input?.url??input);
  if(url.endsWith('/auth/profile')){
   if(rejectOnce){rejectOnce=false;return new Response('',{status:401});}
-  return Response.json({user:{accounts:[{id:1,name:'One'},{id:2,name:'Danil Workspace'}]}});
+  return Response.json({user:{accounts:[{id:1,name:'One'},{id:2,name:'Dos'}]}});
  }
  if(url.includes('/messages?'))return new Promise(resolve=>pending.push(resolve));
  if(url.includes('/api/inbox/conversations?')){
@@ -25,7 +26,7 @@ const app=await boot('listo','alpha-real-shell',{},undefined,{}, {web:true,antes
  w.history.replaceState({},'','/terminus/inbox?live=1');
  globalThis.WebSocket=fake.Socket;
  globalThis.fetch=fixtureFetch;
- w.terminusWeb={userId:'fixture-user',endpoint:'https://relay.test',computerId:'cmp_test',getToken:async()=>'fixture',refresh:async()=>{refreshes++;await sleep(30);return true;},subscribe:clear=>{invalidate.add(clear);return()=>invalidate.delete(clear);}};
+ w.terminusWeb={userId:'fixture-user',endpoint:'https://relay.test',computerId:'cmp_test',getToken:async()=>`x.${btoa(JSON.stringify({active_account_id:2}))}.y`,refresh:async()=>{refreshes++;await sleep(30);return true;},subscribe:clear=>{invalidate.add(clear);return()=>invalidate.delete(clear);}};
 }});
 const {w}=app;
 const text=()=>w.document.body.textContent;
@@ -44,9 +45,9 @@ try{
  assert.ok(w.document.querySelector('[data-sesion]'),'real Sidebar still mounts');
  await sleep(150);
  assert.equal(refreshes,1,'401 awaits refresh and retries the GET once');
- // Sin selector de cuenta: abre sola «Danil Workspace» aunque no sea la primera.
+ // Sin selector de cuenta: abre la cuenta del workspace activo aunque no sea la primera.
  assert.equal(w.document.querySelector('[data-alpha-inbox] select'),null,'Inbox has no account picker');
- assert.match(text(),/Contact 2/,'Danil Workspace opens by itself');
+ assert.match(text(),/Contact 2/,'the active workspace account opens by itself');
  assert.doesNotMatch(text(),/Contact 1/,'and the first account is not read');
  const contact=[...w.document.querySelectorAll('[data-alpha-inbox] button')].find(node=>node.textContent.includes('Contact 2'));
  contact.click();await sleep(50);
@@ -56,6 +57,6 @@ try{
  await sleep(150);
  assert.equal(w.document.querySelector('[data-alpha-inbox]'),null,'hidden Inbox unmounts on session change and discards pending messages');
  assert.doesNotMatch(text(),/Contact 2|SECRET STALE/);
- console.log('alpha real shell: 401 refresh/retry, Danil Workspace account and hidden-tab session invalidation passed');
+ console.log('alpha real shell: 401 refresh/retry, workspace account and hidden-tab session invalidation passed');
 }finally{w.close();}
 process.exit(0);

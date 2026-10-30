@@ -2829,7 +2829,9 @@ if (!roto) {
   const selectedKeys = (scope) => (selections.get(scope) ?? []).map(({ key }) => key);
   providers.w.document.querySelector('button[aria-label="Configuración"]')?.click();
   await sleep(100);
-  providerButton("Control de Fuentes")?.click();
+  providers.w.document.querySelector("#cfg-tab-projects")?.click();
+  await sleep(50);
+  providers.w.document.querySelector("#cfg-sub-fuentes")?.click();
   await sleep(100);
   assert.equal(providerButton("Quitar del workspace"), undefined, "la conexión previa muestra solo el resumen");
   assert.ok(providers.w.document.body.textContent.includes("acme"));
@@ -2934,12 +2936,14 @@ if (!roto) {
   });
   plugins.w.document.querySelector('button[aria-label="Configuración"]')?.click();
   await sleep(100);
-  plugins.w.document.querySelector('#cfg-tab-plugins')?.click();
+  plugins.w.document.querySelector('#cfg-tab-connections')?.click();
+  await sleep(50);
+  plugins.w.document.querySelector('#cfg-sub-operation')?.click();
   await sleep(100);
   const officeCard = () => [...plugins.w.document.querySelectorAll("div")].find(d => d.textContent === "LibreOffice")?.parentElement?.parentElement?.parentElement;
   const officeButton = (text) => [...officeCard().querySelectorAll("button")].find(b => b.textContent?.trim() === text);
   const officeSwitch = () => officeCard().querySelector('button[role="switch"][aria-label="Activar en este espacio"]');
-  assert.ok(officeCard(), "Plugins offers LibreOffice alongside AgentsView");
+  assert.ok(officeCard(), "Connections offers LibreOffice alongside AgentsView");
   officeButton("Instalar").click();
   await sleep(50);
   assert.deepEqual(pluginCalls, [["install", "libreoffice"]]);
@@ -3106,7 +3110,9 @@ if (!roto) {
   };
   rDoc.querySelector('button[aria-label="Configuración"]')?.click();
   await sleep(100);
-  rDoc.querySelector("#cfg-tab-radiant")?.click();
+  rDoc.querySelector("#cfg-tab-connections")?.click();
+  await sleep(50);
+  rDoc.querySelector("#cfg-sub-operation")?.click();
   await sleep(100);
   assert.ok(rPanel().textContent.includes(CLOUD), "Radiant Cloud enseña su origen");
   assert.equal(rBoton("Iniciar sesión"), undefined, "sin servidor elegido no hay sesión que iniciar");
@@ -3125,7 +3131,7 @@ if (!roto) {
     rPanel().textContent.includes(`Sesión iniciada como ana@example.test · Danil en ${CLOUD}.`),
     "la cuenta y la organización salen del servidor",
   );
-  const rSelect = rPanel().querySelector('select[aria-label="Workspace de Radiant"]');
+  const rSelect = rPanel().querySelector('select[aria-label="Workspace de Danil Teams"]');
   assert.ok(rSelect, "con sesión se elige workspace remoto");
   await rElegir(rSelect, "ops");
   assert.deepEqual(radiantCalls.at(-1), ["workspace", "ops"]);
@@ -3134,7 +3140,7 @@ if (!roto) {
     "elegir workspace cambia de organización y la cuenta se relee",
   );
   const rMostrado = () => {
-    const select = rPanel().querySelector('select[aria-label="Workspace de Radiant"]');
+    const select = rPanel().querySelector('select[aria-label="Workspace de Danil Teams"]');
     return [select.value, select.selectedOptions[0]?.textContent];
   };
   assert.deepEqual(rMostrado(), ["ops", "Operación"], "tras elegir, el selector enseña el workspace elegido");
@@ -3161,7 +3167,7 @@ if (!roto) {
   await completarLogin();
   assert.ok(rPanel().textContent.includes("ana@example.test · Danil"));
   radiantCuenta.revocada = true;
-  await rElegir(rPanel().querySelector('select[aria-label="Workspace de Radiant"]'), "eng");
+  await rElegir(rPanel().querySelector('select[aria-label="Workspace de Danil Teams"]'), "eng");
   assert.ok(rPanel().textContent.includes(`Sin sesión en ${CLOUD}.`), "la revocación se ve como sesión cerrada");
   assert.ok(!rPanel().textContent.includes("ana@example.test"), "sin sesión no se enseña la cuenta anterior");
   Object.assign(radiantCuenta, { email: "bea@example.test", organization: "Otra", workspaces: [{ id: "legal", name: "Legal" }], revocada: false });
@@ -3170,11 +3176,11 @@ if (!roto) {
   await completarLogin();
   assert.ok(rPanel().textContent.includes("bea@example.test · Otra"), "el login nuevo enseña su propia cuenta");
   assert.ok(!rPanel().textContent.includes("ana@example.test"));
-  const opciones = [...rPanel().querySelectorAll('select[aria-label="Workspace de Radiant"] option')].map((o) => o.value).filter(Boolean);
+  const opciones = [...rPanel().querySelectorAll('select[aria-label="Workspace de Danil Teams"] option')].map((o) => o.value).filter(Boolean);
   assert.deepEqual(opciones, ["legal"], "y los workspaces de su cuenta, no los de la anterior");
   // Cloud con la cuenta y la lista en camino, y se pasa a un servidor propio que ya tiene sesión de otra cuenta.
   const PROPIO = "https://radiant.example.com";
-  const rWorkspaces = () => rPanel().querySelector('select[aria-label="Workspace de Radiant"]');
+  const rWorkspaces = () => rPanel().querySelector('select[aria-label="Workspace de Danil Teams"]');
   const rOpciones = () => [...rWorkspaces().querySelectorAll("option")].map((o) => o.value).filter(Boolean);
   const rPedirCuentaYLista = async (id) => {
     const pedidas = {};
@@ -3222,7 +3228,7 @@ if (!roto) {
   assert.ok(rPanel().textContent.includes("eva@example.test · Propia"), "el fallo tardío de la cuenta anterior no borra la nueva");
   assert.deepEqual(rOpciones(), ["taller"]);
   assert.ok(!rPanel().textContent.includes("No hay sesión en este servidor"), "ni enseña su error");
-  rBoton("Radiant Cloud").click();
+  rBoton("Danil Cloud").click();
   await sleep(120);
   assert.deepEqual(radiantCalls.at(-1), ["server", CLOUD]);
   // Una cuenta en varias organizaciones elige una antes de ver workspaces.
@@ -3237,25 +3243,25 @@ if (!roto) {
   await sleep(80);
   await completarLogin();
   assert.ok(rPanel().textContent.includes("Tu cuenta pertenece a varias organizaciones."), "lo que falta sale del catálogo");
-  assert.equal(rPanel().querySelector('select[aria-label="Workspace de Radiant"]'), null, "sin organización no se ofrecen workspaces");
+  assert.equal(rPanel().querySelector('select[aria-label="Workspace de Danil Teams"]'), null, "sin organización no se ofrecen workspaces");
   const rOrganizacion = rPanel().querySelector('select[aria-label="Organización"]');
   assert.deepEqual([...rOrganizacion.querySelectorAll("option")].map((o) => o.value).filter(Boolean), ["org_danil", "org_otra"]);
   await rElegir(rOrganizacion, "org_otra");
   assert.deepEqual(radiantCalls.at(-1), ["organization", "org_otra"]);
   assert.ok(rPanel().textContent.includes("carla@example.test · Otra"), "la organización elegida queda en la cuenta");
   assert.equal(rPanel().querySelector('select[aria-label="Organización"]'), null);
-  assert.ok(rPanel().querySelector('select[aria-label="Workspace de Radiant"]'));
+  assert.ok(rPanel().querySelector('select[aria-label="Workspace de Danil Teams"]'));
   // Gobernar el workspace con el remoto elegido: lo instalado se resume y lo que falta se dice.
-  const rGobierno = () => rPanel().querySelector('button[aria-label="Gobernar este workspace con Radiant"]');
+  const rGobierno = () => rPanel().querySelector('button[aria-label="Administrar este workspace con Danil Teams"]');
   assert.ok(rGobierno()?.disabled, "sin workspace remoto elegido no se gobierna");
   radiant.workspace = { id: "eng", name: "Ingeniería" };
   radiantApp.emit("radiant", null);
   await sleep(120);
-  assert.ok(rPanel().textContent.includes("Gobernar este workspace con Radiant (Ingeniería)."));
+  assert.ok(rPanel().textContent.includes("Administrar este workspace con Danil Teams (Ingeniería)."));
   rGobierno().click();
   await sleep(120);
   assert.deepEqual(radiantCalls.at(-1), ["govern"]);
-  assert.ok(rPanel().textContent.includes("Gobernado por Radiant · workspace Ingeniería."), "el interruptor queda puesto");
+  assert.ok(rPanel().textContent.includes("Lo administra Danil Teams · workspace Ingeniería."), "el interruptor queda puesto");
   assert.ok(rPanel().textContent.includes("gobierno (raíz)"), "la raíz de gobierno sale en el resumen");
   assert.ok(rPanel().textContent.includes("revisar") && rPanel().textContent.includes("revisor"));
   assert.ok(rPanel().textContent.includes("Tailscale no está instalado en este equipo."), "un MCP de tailnet dice por qué no se activa");
@@ -3288,11 +3294,11 @@ if (!roto) {
   rGobierno().click();
   await sleep(120);
   assert.deepEqual(radiantCalls.at(-1), ["ungovern"]);
-  assert.ok(!rPanel().textContent.includes("Gobernado por Radiant"), "desactivar quita el gobierno de la pantalla");
+  assert.ok(!rPanel().textContent.includes("Lo administra Danil Teams"), "desactivar quita el gobierno de la pantalla");
   gobierno = { ...SIN_GOBIERNO, notice: "radiant.governance.notice.denied" };
   radiantApp.emit("radiant", null);
   await sleep(120);
-  assert.ok(rPanel().textContent.includes("Radiant dejó de conceder este workspace"), "un 403 se avisa");
+  assert.ok(rPanel().textContent.includes("Danil Teams dejó de conceder este workspace"), "un 403 se avisa");
   gobierno = SIN_GOBIERNO;
   radiant.workspace = null;
   // Cambiar de workspace de Terminus borra lo mostrado, y la respuesta tardía del anterior no entra.
@@ -3341,6 +3347,8 @@ if (!roto) {
   const languageDoc = languageApp.w.document;
   languageDoc.querySelector('button[aria-label="Configuración"]')?.click();
   await sleep(100);
+  languageDoc.querySelector("#cfg-tab-preferences")?.click();
+  await sleep(50);
   const languageSelect = () =>
     [...languageDoc.querySelectorAll("select")].find((s) => s.querySelector('option[value="en"]') && s.querySelector('option[value=""]'));
   const pickLanguage = async (code) => {
@@ -3477,16 +3485,16 @@ if (!roto) {
   agDoc.querySelector('button[aria-label="Configuración"]')?.click();
   await sleep(100);
   const pestanas = [...agDoc.querySelectorAll('[role="tab"][id^="cfg-tab-"]')].map((b) => b.id);
-  const skills = pestanas.indexOf("cfg-tab-skills");
-  assert.deepEqual(pestanas.slice(skills, skills + 4), ["cfg-tab-skills", "cfg-tab-agentes", "cfg-tab-proyectos", "cfg-tab-plugins"]);
-  agDoc.querySelector("#cfg-tab-proyectos").click();
+  const proyectos = pestanas.indexOf("cfg-tab-projects");
+  assert.deepEqual(pestanas.slice(proyectos, proyectos + 2), ["cfg-tab-projects", "cfg-tab-agents-skills"]);
+  agDoc.querySelector("#cfg-tab-projects").click();
   // La página llega en su propio trozo: se espera a que pinte sus filas.
   for (let i = 0; i < 120 && !agDoc.querySelector("#cfg-panel [data-settings-project]"); i++) await sleep(25);
   const filasDeProyectos = [...agDoc.querySelectorAll("#cfg-panel [data-settings-project]")];
   assert.deepEqual(filasDeProyectos.map((f) => f.getAttribute("data-settings-project")), idsDelCatalogo, "Ajustes › Proyectos lista las carpetas del espacio");
   assert.ok(filasDeProyectos.every((f) => f.textContent.includes("Archivos") && f.textContent.includes("sin tareas")), "cada fila dice su tipo en palabras y que no tiene tareas");
   assert.doesNotMatch(panelDeAjustes().textContent, /\bgit\b/i, "la página no le habla de git a la persona");
-  agDoc.querySelector("#cfg-tab-agentes").click();
+  agDoc.querySelector("#cfg-tab-agents-skills").click();
   // Agentes llega en su propio trozo: se espera a que pinte sus filas.
   for (let i = 0; i < 120 && !propia("giskard-po"); i++) await sleep(25);
 
@@ -3864,6 +3872,8 @@ if (!roto) {
   assert.ok(minimizar()[0].closest("[data-title-bar]"));
   d3.querySelector('button[aria-label="Configuración"]')?.click();
   await sleep(150);
+  d3.querySelector("#cfg-tab-machines").click();
+  await sleep(50);
   [...d3.querySelectorAll("button")].find((b) => b.textContent.trim() === "Estado del entorno").click();
   await sleep(200);
   assert.equal(d3.body.textContent.split("Motor 0.2.73 b1fed68").length, 2, "el build del motor aparece una sola vez en Estado del entorno");
@@ -4882,6 +4892,8 @@ if (!roto) {
   assert.equal(defaultModeLabel(), "Permisos: Automático", "and the next new task starts with the default again");
   defaultDoc.querySelector('button[aria-label="Configuración"]')?.click();
   await sleep(150);
+  defaultDoc.querySelector("#cfg-tab-preferences")?.click();
+  await sleep(50);
   const defaultSelect = defaultDoc.querySelector('select[aria-label="Permisos por defecto"]');
   assert.ok(defaultSelect, "General shows the default permissions select");
   assert.equal(defaultSelect.value, "auto");
@@ -5166,7 +5178,9 @@ if (!roto) {
         [...doc.querySelectorAll("button")].find(b => b.textContent.trim() === "Ahora no").click();
         doc.querySelector('button[aria-label="Configuraci\u00f3n"]').click();
         await sleep(100);
-        doc.querySelector("#cfg-tab-entorno").click();
+        doc.querySelector("#cfg-tab-machines").click();
+        await sleep(50);
+        doc.querySelector("#cfg-sub-entorno").click();
         await sleep(100);
       }
       latest = available ? { ...latest, rid: 278, version: "0.2.78" } : null;

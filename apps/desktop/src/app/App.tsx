@@ -8079,13 +8079,13 @@ export default function App() {
 
       <Show when={pestanas.open().some(p => p.id === INBOX_TAB_ID) && customization.enabled("inbox") ? customization.scope() : undefined} keyed>
         <div class="min-h-0 min-w-0" classList={{ hidden: celdaDe(INBOX_TAB_ID) === undefined || tapadoPorElProyecto(paneles.siteOf(INBOX_TAB_ID)), "pt-8": llevaTiraInterior(paneles.siteOf(INBOX_TAB_ID)) }} style={celdaDe(INBOX_TAB_ID)}>
-          {capabilities().inbox?.render()}
+          {capabilities().inbox?.render(() => workspaceActual()?.name ?? null)}
         </div>
       </Show>
 
       <Show when={pestanas.open().some(p => p.id === BROADCASTS_TAB_ID) && customization.enabled("broadcasts") ? customization.scope() : undefined} keyed>
         <div class="min-h-0 min-w-0" classList={{ hidden: celdaDe(BROADCASTS_TAB_ID) === undefined || tapadoPorElProyecto(paneles.siteOf(BROADCASTS_TAB_ID)), "pt-8": llevaTiraInterior(paneles.siteOf(BROADCASTS_TAB_ID)) }} style={celdaDe(BROADCASTS_TAB_ID)}>
-          {capabilities().inbox?.broadcasts()}
+          {capabilities().inbox?.broadcasts(() => workspaceActual()?.name ?? null)}
         </div>
       </Show>
 
@@ -8403,7 +8403,7 @@ export default function App() {
             onSettings={(panel) => setSettings(panel ?? "")}
             onReportarBug={() => setInput(t("chat.composer.bug_report_starter"))}
             tools={<>
-            <ConexionesMenu triggerClass="size-8 rounded-md" onManage={() => setSettings("skills")} />
+            <ConexionesMenu triggerClass="size-8 rounded-md" onManage={() => setSettings("mcp")} />
             <AppTools
               workspace={workspaceActivo()}
               busy={busy()}
@@ -8669,6 +8669,7 @@ export default function App() {
         <Suspense fallback={null}>
           <Settings
             workspace={workspaceActivo()}
+            workspaceName={workspaceActual()?.name ?? null}
             activityMachine={activityMachine()}
             panel={settings() || undefined}
             modelos={modelosParaAgentes()}

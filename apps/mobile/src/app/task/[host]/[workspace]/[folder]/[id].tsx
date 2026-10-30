@@ -2,8 +2,8 @@ import { RADIUS, TEXT } from "@terminus/design";
 import { AgentAvatar } from "../../../../../ui/AgentAvatar";
 import { SendButton } from "../../../../../ui/SendButton";
 import { Stack, router, useFocusEffect, useLocalSearchParams } from "expo-router";
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AppState, FlatList, Image, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { AppState, FlatList, Image, type NativeScrollEvent, type NativeSyntheticEvent, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { type ChatEvent, type Question, type Turn, DEFAULT_CHAT_VEIL } from "@terminus/protocol";
 import { delegatedOf, taskTitle } from "@terminus/tasks";
 import {
@@ -29,7 +29,8 @@ import {
 import { HostError } from "../../../../../lib/hosts";
 import { type Line, type LivePiece, type StepRow, applyLive, bareCommand, fileName, linesOfLive, linesOfTurn, liveAfterRead } from "../../../../../lib/steps";
 import { lang, t, w } from "../../../../../lib/i18n";
-import { type Follow, OPENED, jumped, scrolled, shouldStick, showJump, unseen } from "../../../../../lib/follow";
+import { type ScrollAnchor, anchorOf, restoreAnchor } from "../../../../../lib/scrollAnchor";
+import { type Follow, MARGIN, OPENED, fromTop, jumped, scrolled, showJump, unseen } from "../../../../../lib/follow";
 import { useAccount } from "../../../../../lib/account";
 import { useMachines } from "../../../../../lib/machines";
 import { COMPUTERS } from "../../../../../lib/supabase";
@@ -52,6 +53,8 @@ import { Avatar } from "../../../../../ui/components";
 const REFRESH = new Set(["permission", "permission_resolved", "started", "done", "presence", "segment_saved"]);
 /** Tras estos, lo que llegó en vivo ya está guardado: la lectura lo reemplaza (`liveAfterRead`). */
 const SAVED = new Set(["done", "segment_saved"]);
+const TAIL_PAGE_SIZE = 20;
+const PREPEND_RECOVERY_MS = 500;
 
 const sameLine = (a: Line, b: Line) => JSON.stringify(a) === JSON.stringify(b);
 
@@ -96,6 +99,8 @@ export default function TaskScreen() {
   // Buscar en el chat: con texto, solo las líneas que lo dicen; `null` cerrado.
   const [finding, setFinding] = useState<string | null>(null);
   const key = `${params.host}/${id}`;
+  const needle = finding?.trim().toLowerCase() ?? "";
+  const webScope = JSON.stringify([params.host, workspace, folder, id, needle]);
   // Las que esta tarea lanzó: la lista las esconde bajo ella, como el riel del escritorio. Las hijas
   // remotas viven en otra máquina y nombran a esta por su `taskKey`.
   const delegated = useMemo(() => [
@@ -106,9 +111,40 @@ export default function TaskScreen() {
   // cambia con cada evento de scroll; solo el botón, que se ve, va en estado.
   const follow = useRef<Follow>(OPENED);
   const [jump, setJump] = useState<{ shown: boolean; unseen: number }>({ shown: false, unseen: 0 });
-  // Al final de verdad: el `scrollToEnd` de la `FlatList` calcula el fondo con el alto estimado de sus filas y sin el
-  // pie (lo que llega en vivo), y con eso se queda corto o sube. El de su `ScrollView` usa el alto medido.
-  const toBottom = (animated: boolean) => list.current?.getNativeScrollRef()?.scrollToEnd({ animated });
+  const anchor = useRef<ScrollAnchor>(null);
+  const prepending = useRef<ScrollAnchor>(null);
+  const prependTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const readingScope = useRef<string | null>(null);
+  const clearPrepending = () => {
+    if (prependTimer.current !== null) clearTimeout(prependTimer.current);
+    prependTimer.current = null;
+    prepending.current = null;
+  };
+  const resetReading = () => {
+    clearPrepending();
+    anchor.current = null;
+  };
+  const webReady = useRef<string | null>(null);
+  const [paintedScope, setPaintedScope] = useState<string | null>(null);
+  const [webWindow, setWebWindow] = useState<{ scope: string; first: string | null }>({ scope: "", first: null });
+  const webSlice = useRef<{ first: number; rows: readonly Line[]; scope: string }>({ first: 0, rows: [], scope: "" });
+  const scroller = () => Platform.OS === "web" ? list.current?.getScrollableNode() as unknown as Element | null : null;
+  const toBottom = (animated: boolean) => {
+    const node = scroller();
+    if (node) {
+      if (animated) node.scrollTo({ top: node.scrollHeight, behavior: "smooth" });
+      else node.scrollTop = node.scrollHeight;
+    } else list.current?.scrollToOffset({ offset: 0, animated });
+  };
+  const restoreReading = (node: Element) => {
+    const held = prepending.current;
+    if (held) {
+      if (restoreAnchor(node, held, false)) {
+        anchor.current = held;
+        clearPrepending();
+      }
+    } else restoreAnchor(node, anchor.current, false);
+  };
 
   const fail = useCallback(
     (error: unknown) => {
@@ -310,18 +346,33 @@ export default function TaskScreen() {
   const replies = useRef(0);
   replies.current = lines.filter((line) => line.kind === "message" && line.role !== "user" && line.role !== "system" && line.role !== "shell").length;
   const onScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (Platform.OS === "web" && prepending.current) return;
     const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
-    const next = scrolled(follow.current, { offset: contentOffset.y, content: contentSize.height, viewport: layoutMeasurement.height }, replies.current);
+    const metrics = { content: contentSize.height, viewport: layoutMeasurement.height };
+    const next = scrolled(follow.current, { ...metrics, offset: Platform.OS === "web" ? contentOffset.y : fromTop(contentOffset.y, metrics) }, replies.current);
     follow.current = next;
+    const node = scroller();
+    if (node) {
+      anchor.current = next.following ? null : anchorOf(node);
+      const page = webSlice.current;
+      if (webReady.current === page.scope && contentOffset.y < MARGIN && page.first > 0 && !prepending.current) {
+        const held = anchorOf(node);
+        prepending.current = held;
+        if (held) prependTimer.current = setTimeout(() => {
+          if (prepending.current === held) resetReading();
+        }, PREPEND_RECOVERY_MS);
+        setWebWindow({ scope: page.scope, first: page.rows[Math.max(0, page.first - TAIL_PAGE_SIZE)].key });
+      }
+    }
     const shown = showJump(next);
     setJump((now) => (now.shown === shown ? now : { shown, unseen: unseen(next, replies.current) }));
   }, []);
-  // Siguiendo, todo lo que cambia de alto —el texto que llega, los pasos, una imagen, el teclado— baja de un corte.
-  // Suelto, no se mueve: crecer por abajo no toca el scroll.
-  const stick = useCallback(() => {
-    if (shouldStick(follow.current)) toBottom(false);
+  const onContentSize = useCallback(() => {
+    const node = scroller();
+    if (!node || webReady.current !== webSlice.current.scope) return;
+    if (prepending.current || !follow.current.following) restoreReading(node);
+    else toBottom(false);
   }, []);
-  const onLayout = useCallback((_: LayoutChangeEvent) => stick(), [stick]);
   const newReplies = jump.shown ? unseen(follow.current, replies.current) : 0;
   const streaming = liveLines.some((line) => line.key === "live");
   const scope = useMemo(() => (host ? { host, hostId: params.host, workspace, folder, session: id } : null), [host, params.host, workspace, folder, id]);
@@ -340,8 +391,62 @@ export default function TaskScreen() {
   const folderRow = snapshot?.folders.find((f) => f.host === params.host && f.id === folder) ?? null;
   const gitBook = useTaskGit(hostOf, [{ host: params.host, workspace, folder, id }]);
   const git = effectiveGit(gitBook, { id, host: params.host, workspace }, snapshot?.tasks ?? []);
-  const needle = finding?.trim().toLowerCase() ?? "";
-  const visible = needle ? lines.filter((line) => ("text" in line ? line.text : line.kind === "shell" ? `${line.command}\n${line.output}` : "").toLowerCase().includes(needle)) : lines;
+  const visible = useMemo(() => needle ? lines.filter((line) => ("text" in line ? line.text : line.kind === "shell" ? `${line.command}\n${line.output}` : "").toLowerCase().includes(needle)) : lines, [lines, needle]);
+  const first = webWindow.scope === webScope ? visible.findIndex((line) => line.key === webWindow.first) : -1;
+  const webStart = first < 0 ? Math.max(0, visible.length - TAIL_PAGE_SIZE) : first;
+  const listed = useMemo(() => Platform.OS === "web" ? visible.slice(webStart) : [...visible].reverse(), [visible, webStart]);
+  webSlice.current = { first: webStart, rows: visible, scope: webScope };
+  useLayoutEffect(() => {
+    if (readingScope.current !== webScope) {
+      resetReading();
+      webReady.current = null;
+      readingScope.current = webScope;
+    }
+    const node = scroller();
+    if (!node || !view) return;
+    if (webReady.current !== webScope) {
+      // Las últimas 20 filas están medidas antes de mostrarse: no hay recorrido ni DOM invertido.
+      follow.current = OPENED;
+      toBottom(false);
+      webReady.current = webScope;
+      setWebWindow({ scope: webScope, first: visible[webStart]?.key ?? null });
+      setPaintedScope(webScope);
+    } else if (prepending.current) restoreReading(node);
+  }, [webScope, Boolean(view), webStart, visible.length]);
+  useLayoutEffect(() => {
+    const node = scroller();
+    if (!node) return;
+    // La virtualización puede remontar filas entre medidas; corregir en la mutación evita pintar ese salto.
+    const observer = new MutationObserver(() => {
+      if (prepending.current || !follow.current.following) restoreReading(node);
+    });
+    observer.observe(node, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["style"] });
+    const intent = ["wheel", "touchstart", "pointerdown"] as const;
+    const interruptPrepend = () => { if (prepending.current) resetReading(); };
+    for (const event of intent) node.addEventListener(event, interruptPrepend, { passive: true });
+    return () => {
+      observer.disconnect();
+      for (const event of intent) node.removeEventListener(event, interruptPrepend);
+      resetReading();
+    };
+  }, [webScope]);
+  const cached = cachedNote ? <Text style={[styles.banner, { color: theme.textMuted, backgroundColor: theme.muted }]}>{cachedNote}</Text> : undefined;
+  const liveFooter = (
+          <View style={styles.footer}>
+            {liveLines.map((line) => (
+              <Row key={line.key} line={line} theme={theme} streaming={line.key === "live"} />
+            ))}
+            {running && !streaming ? <Text style={{ color: theme.textMuted }}>{t("state.working")}…</Text> : null}
+            {pending && waking ? <Bubble line={{ key: "pending", kind: "message", role: "user", text: pending, images: [], attachments: [] }} theme={theme} /> : null}
+            {waking && host ? <Text style={{ color: theme.textMuted }}>{w("shell.machines.waking", { name: host.label })}</Text> : null}
+            {asleep && host ? (
+              <Text style={{ color: theme.textMuted }}>
+                {host.canAct() === "outdated" ? w("web.machines.outdated_action", { name: host.label }) : w("web.machines.off_action", { name: host.label })}
+              </Text>
+            ) : null}
+            {note ? <Text style={{ color: theme.textMuted }}>{note}</Text> : null}
+          </View>
+  );
 
   return (
     <KeyboardScreen>
@@ -378,33 +483,22 @@ export default function TaskScreen() {
       <View style={styles.thread}>
       <FlatList
         ref={list}
-        data={visible}
+        inverted={Platform.OS !== "web"}
+        style={Platform.OS === "web" && paintedScope !== webScope ? { opacity: 0 } : undefined}
+        data={listed}
+        initialNumToRender={TAIL_PAGE_SIZE}
         keyExtractor={(line) => line.key}
         contentContainerStyle={styles.list}
-        onContentSizeChange={stick}
-        onLayout={onLayout}
+        onContentSizeChange={onContentSize}
         onScroll={onScroll}
         scrollEventThrottle={16}
         // Lo que cambia de alto por encima de lo que se lee (una imagen que carga, pasos que se abren) no lo mueve.
-        maintainVisibleContentPosition={Platform.OS === "web" ? undefined : { minIndexForVisible: 0 }}
-        renderItem={({ item }) => <Row line={item} theme={theme} onQuickReply={item.key === lastAgent && !running && !asleep ? quickReply : undefined} />}
-        ListHeaderComponent={cachedNote ? <Text style={[styles.banner, { color: theme.textMuted, backgroundColor: theme.muted }]}>{cachedNote}</Text> : undefined}
-        ListFooterComponent={
-          <View style={styles.footer}>
-            {liveLines.map((line) => (
-              <Row key={line.key} line={line} theme={theme} streaming={line.key === "live"} />
-            ))}
-            {running && !streaming ? <Text style={{ color: theme.textMuted }}>{t("state.working")}…</Text> : null}
-            {pending && waking ? <Bubble line={{ key: "pending", kind: "message", role: "user", text: pending, images: [], attachments: [] }} theme={theme} /> : null}
-            {waking && host ? <Text style={{ color: theme.textMuted }}>{w("shell.machines.waking", { name: host.label })}</Text> : null}
-            {asleep && host ? (
-              <Text style={{ color: theme.textMuted }}>
-                {host.canAct() === "outdated" ? w("web.machines.outdated_action", { name: host.label }) : w("web.machines.off_action", { name: host.label })}
-              </Text>
-            ) : null}
-            {note ? <Text style={{ color: theme.textMuted }}>{note}</Text> : null}
-          </View>
-        }
+        maintainVisibleContentPosition={Platform.OS === "web" ? { minIndexForVisible: 0 } : { minIndexForVisible: 0, autoscrollToTopThreshold: MARGIN }}
+        renderItem={({ item }) => Platform.OS === "web"
+          ? <View nativeID={`chat-row:${encodeURIComponent(webScope)}:${item.key}`}><Row line={item} theme={theme} onQuickReply={item.key === lastAgent && !running && !asleep ? quickReply : undefined} /></View>
+          : <Row line={item} theme={theme} onQuickReply={item.key === lastAgent && !running && !asleep ? quickReply : undefined} />}
+        ListFooterComponent={Platform.OS === "web" ? liveFooter : cached}
+        ListHeaderComponent={Platform.OS === "web" ? cached : liveFooter}
       />
       {jump.shown ? (
         <Pressable
@@ -712,7 +806,8 @@ const styles = StyleSheet.create({
   thread: { flex: 1 },
   delegated: { marginHorizontal: 12, marginTop: 8, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, borderWidth: StyleSheet.hairlineWidth },
   delegatedRow: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 6 },
-  list: { padding: 12, gap: 8 },
+  // `flex-end` en una lista invertida es arriba: un hilo corto sigue empezando arriba.
+  list: { flexGrow: 1, justifyContent: "flex-end", padding: 12, gap: 8 },
   // Como el del escritorio: una píldora centrada por encima del borde de abajo del hilo.
   toBottom: {
     position: "absolute",

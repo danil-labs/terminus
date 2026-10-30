@@ -599,7 +599,7 @@ test("Cuenta de Danil lists the account's computers; a name edited in place reac
     extra: { work_status: { ahead: 0, dirty: false, files: [], large: [], submodules: [] } },
   });
   const w = app.w;
-  w.dispatchEvent(new w.CustomEvent("harness:open-settings", { detail: "cuenta-danil" }));
+  w.dispatchEvent(new w.CustomEvent("harness:open-settings", { detail: "machines" }));
   assert.ok(await until(() => doc.querySelectorAll("[data-account-computer]").length === 3), "the three computers of the account");
   const rowOf = (id) => doc.querySelector(`[data-account-computer="${id}"]`);
   const home = rowOf("cmp_home");
@@ -639,8 +639,10 @@ test("Cuenta de Danil lists the account's computers; a name edited in place reac
   assert.ok(await until(() => rowOf("cmp_vm").querySelector("[data-computer-name]")?.textContent.startsWith("VM de trabajo")), "the row shows the new name");
   assert.equal(rowOf("cmp_vm").querySelector("[data-rename-error]"), null);
 
-  // The window's own name, also in «Esta computadora: …».
+  // The window's own name, also in «Esta computadora: …» of Cuenta › Perfil.
   await edit("cmp_home", "Mac del estudio");
+  assert.ok(await until(() => rowOf("cmp_home").querySelector("[data-computer-name]")?.textContent.startsWith("Mac del estudio")));
+  doc.querySelector("#cfg-tab-account").click();
   assert.ok(await until(() => doc.body.textContent.includes("Esta computadora: Mac del estudio")));
 
   await sleep(1_200);

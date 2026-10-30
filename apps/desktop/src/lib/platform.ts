@@ -52,7 +52,7 @@ export type WebAccountsSource = {
 };
 
 export type Capabilities = {
-  inbox?: { customization: typeof import("./customization").createCustomization; entries: typeof import("./attention-labels").featureEntries; demo: boolean; userId?: string | null; subscribe?: (clear: () => void) => () => void; sidebarMenu: typeof import("../web/attention/SidebarEntries").AttentionMenu; personalizeMenu: typeof import("../web/attention/SidebarEntries").PersonalizeMenu; catalog: (props: import("../web/attention/CustomizationSection").CustomizationSectionProps) => JSX.Element; broadcasts: () => JSX.Element; initial: boolean; render: () => JSX.Element; agentSettings: (name: string) => JSX.Element; integrations: () => JSX.Element; search: { conversations: () => import("../features/shell/GlobalSearch").SearchConversation[]; open: (id: number) => void } };
+  inbox?: { customization: typeof import("./customization").createCustomization; entries: typeof import("./attention-labels").featureEntries; demo: boolean; userId?: string | null; subscribe?: (clear: () => void) => () => void; sidebarMenu: typeof import("../web/attention/SidebarEntries").AttentionMenu; personalizeMenu: typeof import("../web/attention/SidebarEntries").PersonalizeMenu; catalog: (props: import("../web/attention/CustomizationSection").CustomizationSectionProps) => JSX.Element; broadcasts: (workspace: () => string | null) => JSX.Element; initial: boolean; render: (workspace: () => string | null) => JSX.Element; agentSettings: (name: string) => JSX.Element; customerAgents: (workspace: () => string | null) => JSX.Element; customerConnections: (workspace: () => string | null) => JSX.Element; search: { conversations: () => import("../features/shell/GlobalSearch").SearchConversation[]; open: (id: number) => void } };
   spaceOrder?: SpaceOrderSource;
   /** Controles de ventana propios, semáforo de macOS y bandeja. */
   nativeWindow: boolean;
@@ -72,8 +72,10 @@ export type Capabilities = {
   accountEmails?: AccountEmailsSource;
   /** El panel de Configuración que la página pidió abrir al cargar (`?settings=`). */
   initialSettings?: string;
-  /** La bitácora de cambios de la cuenta de Danil activa, con la sesión (la web en alfa); sin esto, Configuración no la ofrece. */
+  /** La bitácora de cambios de la cuenta de Danil activa, con la sesión (la web en alfa); la muestra `/admin`. */
   accountAuditLog?: AuditLogSource;
+  /** `/admin` dentro de esta web (alfa); `allowed` dice si la persona es owner o admin de algún workspace de Danil. Sin esto, el escritorio la abre en el navegador. */
+  adminPage?: { href: (workspace: string | null) => string; allowed: () => Promise<boolean> };
   /** El logo y el fondo de los workspaces leídos y cambiados en la cuenta con la sesión (la web). */
   accountAssets?: WorkspaceAssetsSource;
   /** Botón extra al lado de la búsqueda de la barra lateral (en la web, volver a Danil Agents). */

@@ -2,10 +2,8 @@
   "broadcasts.title": "Difusiones",
   "broadcasts.broadcast": "Difusión",
   "broadcasts.templates": "Plantillas",
-  "broadcasts.account_hint": "Las difusiones son de la cuenta activa de tu sesión en Danil, no de este workspace.",
   "broadcasts.demo_note": "Datos de ejemplo. Nada sale de esta página y los cambios se pierden al recargar.",
   "broadcasts.writes_off": "Solo lectura para lo que llega a clientes o a Meta: en alfa puedes crear borradores, pausar y cancelar; lanzar, agregar contactos y enviar plantillas están apagados.",
-  "broadcasts.no_active_account": "Tu sesión no tiene una cuenta activa de Danil.",
   "broadcasts.view_label": "Ver difusiones o plantillas",
   "broadcasts.new_broadcast": "Nueva difusión",
   "broadcasts.new_broadcast_short": "Nueva",
@@ -221,6 +219,5 @@
   "broadcasts.gate_sending": "Enviando…",
   "broadcasts.gate_hint": "Sin costo. Te contactamos a ese número para activar la función.",
   "broadcasts.gate_sent": "Solicitud enviada. Te contactaremos para activar tu prueba.",
-  "broadcasts.viewing_account": "Cuenta: {name}",
   "broadcasts.account_fallback": "Cuenta {id}"
 }

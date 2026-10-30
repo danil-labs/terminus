@@ -40,6 +40,7 @@ const app = await boot("listo", "browser-navigation", {
   },
 });
 (await waitFor(() => button(app, "Configuración"))).click();
+(await waitFor(() => app.w.document.querySelector("#cfg-tab-machines"))).click();
 (await waitFor(() => button(app, "Estado del entorno"))).click();
 const prepare = await waitFor(() => button(app, "Preparar navegación"));
 assert.ok(!app.comandos.includes("install_tool"), "Abrir ajustes no instala Chrome");
@@ -71,11 +72,13 @@ await waitFor(() => calls.includes("browser-navigation-sandbox"));
 chromeInstalled = true;
 resolveInstall("ready");
 await waitFor(() => button(app, "Listo")?.disabled);
-(await waitFor(() => button(app, "General"))).click();
+(await waitFor(() => app.w.document.querySelector("#cfg-tab-preferences"))).click();
+(await waitFor(() => app.w.document.querySelector("#cfg-tab-machines"))).click();
 (await waitFor(() => button(app, "Estado del entorno"))).click();
 await waitFor(() => button(app, "Listo")?.disabled);
 chromeNeedsUpdate = true;
-(await waitFor(() => button(app, "General"))).click();
+(await waitFor(() => app.w.document.querySelector("#cfg-tab-preferences"))).click();
+(await waitFor(() => app.w.document.querySelector("#cfg-tab-machines"))).click();
 (await waitFor(() => button(app, "Estado del entorno"))).click();
 await waitFor(() => button(app, "Actualizar"));
 assert.equal(app.comandos.filter(c => c === "install_tool").length, 4, "Reabrir el inventario no instala Chrome");

@@ -67,3 +67,15 @@ test('revoke posts to the single revoke route and accepts only known outcomes', 
   await assert.rejects(blocked.revoke(44, 9), /HTTP 405/);
   await assert.rejects(blocked.revoke(44, 0), /invalid_response/);
 });
+
+test('memberships keep the role, and organization and plan only when the profile sends them', async () => {
+  const api = createSupportAccess(session(), async () => Response.json({ user: { accounts: [
+    { id: 44, name: 'Cliente', role: 'owner', organization: { name: 'Danil' }, plan: 'teams' },
+    { id: 45, name: 'Otra', role: 'member' },
+    { id: 47, name: 'Por soporte', role: 'support_write', access: 'support' },
+  ] } }));
+  assert.deepEqual(await api.memberships(), [
+    { id: 44, name: 'Cliente', role: 'owner', organization: 'Danil', plan: 'teams' },
+    { id: 45, name: 'Otra', role: 'member', organization: null, plan: null },
+  ]);
+});

@@ -1,5 +1,7 @@
-import { createEffect, createSignal, For, onCleanup, onMount, Show } from 'solid-js';
-import { createInbox, matchesFilter, type Account, type Conversation, type ConversationCounts, type InboxFilter, type InboxSession, type Message } from '../../../../../packages/attention/src/inbox.ts';
+import { createEffect, createSignal, For, on, onCleanup, onMount, Show } from 'solid-js';
+import { createInbox, matchesFilter, type Conversation, type ConversationCounts, type InboxFilter, type InboxSession, type Message } from '../../../../../packages/attention/src/inbox.ts';
+import { resolveWorkspaceAccount } from '../../../../../packages/attention/src/workspace-account.ts';
+import { activeAccountOf } from '../audit-log';
 import { t } from '../../lib/i18n';
 import { inboxDraft } from './inbox-drafts';
 import { createMessaging } from '../../../../../packages/attention/src/messaging.ts';
@@ -8,8 +10,8 @@ import { Button } from '../../ui/Button';
 import { Skeleton } from '../../ui/Skeleton';
 import { ChannelFilter, ContactDetails, ConversationHeader, ConversationRow, ConversationSearch, FilterChips, InboxComposer, MessageBubble, senderLabel, SelectConversation } from './inbox-view';
 
-export function Attention(props: { demo: boolean; session?: InboxSession & { subscribe?: (clear: () => void) => () => void } }) {
-  const [accounts, setAccounts] = createSignal<Account[]>([]);
+export function Attention(props: { demo: boolean; session?: InboxSession & { subscribe?: (clear: () => void) => () => void }; workspace: () => string | null }) {
+  const [resolved, setResolved] = createSignal(false);
   const [account, setAccount] = createSignal<number>();
   const [rows, setRows] = createSignal<Conversation[]>([]);
   const [selected, setSelected] = createSignal<Conversation>();
@@ -20,7 +22,6 @@ export function Attention(props: { demo: boolean; session?: InboxSession & { sub
   const [loadingThread, setLoadingThread] = createSignal(false);
   const [error, setError] = createSignal('');
   const [canReply, setCanReply] = createSignal(false);
-  const [consent, setConsent] = createSignal(false);
   const [detail, setDetail] = createSignal(false);
   const [query, setQuery] = createSignal('');
   const [channel, setChannel] = createSignal<string | null>(null);
@@ -33,15 +34,17 @@ export function Attention(props: { demo: boolean; session?: InboxSession & { sub
   let thread = 0;
   const clear = () => { epoch++; thread++; setCanReply(false); setRows([]); setSelected(undefined); setMessages([]); setMore(false); setOlder(false); setError(''); setDetail(false); setLoadingThread(false); setQuery(''); setChannel(null); setFilter('all'); setCounts({ assistance: null, aiDisabled: null }); };
   onCleanup(() => { epoch++; thread++; });
+  // Cambiar de workspace es cambiar de cuenta: no queda nada del anterior en pantalla.
+  createEffect(on(props.workspace, () => { if (!props.demo) void connect(); }, { defer: true }));
   onMount(() => {
-    const stop = props.session?.subscribe?.(() => { clear(); setAccounts([]); setAccount(undefined); setConsent(false); setBusy(false); });
+    const stop = props.session?.subscribe?.(() => { clear(); setResolved(false); setAccount(undefined); setBusy(false); });
     if (stop) onCleanup(stop);
     if (!props.demo) void connect();
     if (props.demo) { setRows(demoRows()); setCounts({ assistance: 1, aiDisabled: 2 }); }
   });
   async function connect() {
-    clear(); setAccounts([]); setAccount(undefined); const request = epoch; setConsent(true); setBusy(true);
-    try { if (!api) throw new Error(t("web.alpha.session_required")); const value = await api.accounts(); if (request === epoch) { setAccounts(value); const first = value.find(row => /danil workspace/i.test(row.name)) ?? value[0]; if (first) void load(first.id); } }
+    clear(); setResolved(false); setAccount(undefined); const request = epoch; setBusy(true);
+    try { if (!api) throw new Error(t("web.alpha.session_required")); const value = await resolveWorkspaceAccount(props.workspace(), { accounts: api.accounts, active: async () => activeAccountOf(await props.session!.getToken()) }); if (request === epoch) { setResolved(true); if (value) void load(value.id); } }
     catch (cause) { if (request === epoch) setError(cause instanceof Error ? cause.message : t("web.alpha.error")); }
     finally { if (request === epoch) setBusy(false); }
   }
@@ -98,7 +101,7 @@ export function Attention(props: { demo: boolean; session?: InboxSession & { sub
         </header>
         <div class="grid w-full min-w-0 shrink-0 gap-2 border-b border-border px-3 py-2"><ConversationSearch value={query()} onChange={setQuery}/><FilterChips value={filter()} counts={chipCounts()} onChange={setFilter}/></div>
         <div class="min-h-0 flex-1 overflow-y-auto">
-          <Show when={!props.demo && consent() && !busy() && !error() && accounts().length === 0}><p role="status" class="p-4 text-center text-[0.85rem] text-neutral-500">{t("customize.no_accounts")}</p></Show>
+          <Show when={!props.demo && resolved() && !busy() && !error() && !account()}><div role="status" class="grid gap-1 p-4 text-center text-[0.85rem] text-neutral-500" data-attention-unresolved=""><p class="m-0 font-medium text-neutral-950">{t("web.service.unresolved")}</p><p class="m-0">{t("web.service.unresolved_hint")}</p></div></Show>
           <Show when={listLoading()}><div class="p-3"><Skeleton class="h-14 rounded-md" filas={6}/></div></Show>
           <Show when={!busy() && !error() && (props.demo || account()) && rows().length === 0}><p role="status" class="p-4 text-center text-[0.85rem] text-neutral-500">{t("customize.page_empty")}</p></Show>
           <Show when={rows().length > 0 && visible().length === 0}><p role="status" class="p-4 text-center text-[0.85rem] text-neutral-500">{emptyText()}</p></Show>

@@ -56,7 +56,7 @@ test("the web lists the account's computers and renames one in place", async () 
     const { w } = app;
     const doc = w.document;
     await sleep(2500);
-    w.dispatchEvent(new w.CustomEvent("harness:open-settings", { detail: "cuenta-danil" }));
+    w.dispatchEvent(new w.CustomEvent("harness:open-settings", { detail: "machines" }));
     assert.ok(await until(() => doc.querySelectorAll("[data-account-computer]").length === 2), "both computers linked to this workspace");
     const rowOf = (id) => doc.querySelector(`[data-account-computer="${id}"]`);
     assert.equal(doc.querySelector("[data-self]"), null, "the browser is none of the computers");

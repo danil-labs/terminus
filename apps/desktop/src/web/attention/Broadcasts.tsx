@@ -48,8 +48,7 @@ function Workspace(props: { api: BroadcastPanel; source: BroadcastSource }) {
     <Show when={props.source.demo}><p class="m-0 border-b border-border px-4 py-2 text-xs text-neutral-500">{t("web.alpha.demo_badge")} · {t("broadcasts.demo_note")}</p></Show>
     <Show when={!api.writes || !api.delivery}><p role="note" class="m-0 border-b border-border bg-surface-muted px-4 py-2 text-xs text-neutral-500">{t("broadcasts.writes_off")}</p></Show>
     <Show when={access.data()} fallback={<Show when={access.error()} fallback={<div class="p-4"><Skeleton class="h-14 rounded-md" filas={4}/></div>}><div class="p-4"><Note tone="danger">{access.error()}</Note></div></Show>}>{value =>
-      <Show when={value().account} keyed fallback={<div class="p-4"><Note tone="warning">{t("broadcasts.no_active_account")}</Note></div>}>{account => <>
-        <p class="m-0 shrink-0 truncate border-b border-border px-4 py-1.5 text-xs text-neutral-500" data-broadcast-account="" title={t("broadcasts.account_hint")}>{t("broadcasts.viewing_account", { name: accountName() })}</p>
+      <Show when={value().account} keyed fallback={<div class="p-4"><Note tone="warning">{t("web.service.unresolved")}</Note></div>}>{account => <>
         <Show when={!gated()} fallback={<FeatureGate context={context} account={account}/>}><Panes context={context}/></Show>
       </>}</Show>
     }</Show>
