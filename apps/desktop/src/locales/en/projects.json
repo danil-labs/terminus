@@ -379,6 +379,7 @@
   "projects.tabs.new": "Open a tab",
   "projects.tabs.new_task_in": "New task in",
   "projects.tabs.new_browser": "Browser",
+  "projects.tabs.draft": "New task",
   "projects.picker.add": "Add a project…",
   "projects.picker.manage": "Manage projects",
   "projects.picker.manage_where": "Settings",

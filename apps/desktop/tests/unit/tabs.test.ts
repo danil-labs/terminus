@@ -732,6 +732,47 @@ test("la tarea que nace se queda en el sitio de su pestaña provisional", () => 
   assert.deepEqual(tira("nace").open().map((p) => p.id), ["s1", "s2"]);
 });
 
+// `pintarNaciendo` conserva la provisional antes de activarla: como vista,
+// lanzar la tarea cerraba la que se estaba mirando, y el siguiente clic del
+// riel cerraba la tarea recién lanzada.
+test("lanzar una tarea nueva no sustituye la vista de delante y queda conservada", () => {
+  const t = createTabs({ transient: true });
+  t.load("lanzar-conservada");
+  t.ensure(tarea("s1"));
+  t.activate("s1");
+  const naciendo = idProvisional();
+  t.ensure({ id: naciendo, project: "p", titulo: "arregla el cohete" });
+  t.pin(naciendo);
+  t.activate(naciendo);
+  // Lo que hace el reparto al cambiar de activa: solo sustituye si la nueva es vista.
+  if (!t.isPinned(naciendo)) t.replacePreviews([["s1", naciendo]], [naciendo]);
+  assert.deepEqual(t.open().map((p) => p.id), ["s1", naciendo]);
+  t.commitDraft(naciendo, { id: "s2", project: "p", titulo: "arregla el cohete" });
+  assert.equal(t.isPinned("s2"), true, "la tarea creada hereda la conservación");
+  t.ensure(tarea("s3"));
+  t.activate("s3");
+  t.replacePreviews([["s1", "s2", "s3"]], ["s3"]);
+  assert.deepEqual(t.open().map((p) => p.id), ["s2", "s3"]);
+  assert.deepEqual(tira("lanzar-conservada").open().map((p) => p.id), ["s2", "s3"]);
+  assert.equal(tira("lanzar-conservada").isPinned("s2"), true);
+});
+
+// `enviar` conserva la pestaña de la tarea a la que se escribe, como editar un archivo.
+test("mandar un mensaje conserva la pestaña de su tarea", () => {
+  const t = createTabs({ transient: true });
+  t.load("mandar-conserva");
+  t.ensure(tarea("s1"));
+  t.activate("s1");
+  assert.equal(t.isPinned("s1"), false);
+  t.pin("s1");
+  t.ensure(tarea("s1"));
+  assert.equal(t.isPinned("s1"), true);
+  t.ensure(tarea("s2"));
+  t.activate("s2");
+  t.replacePreviews([["s1", "s2"]], ["s2"]);
+  assert.deepEqual(t.open().map((p) => p.id), ["s1", "s2"]);
+});
+
 // La pestaña provisional existe antes que su tarea, igual que el archivo de
 // vista previa. Sin exención, el primer refresco del historial la cierra y el
 // foco vuelve a la tarea anterior.

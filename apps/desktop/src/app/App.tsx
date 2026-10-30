@@ -666,11 +666,24 @@ export default function App() {
    *  proyecto la tapa, aunque siga siendo la activa de su ventana. */
   const pestanaDelanteEn = (sitio: SitioDePanel) =>
     tapadoPorElProyecto(sitio) ? null : paneles.activeTabAt(sitio);
+  /** Si `sitio` enseña la conversación en blanco: la tarea nueva sin lanzar. */
+  const enBorrador = (sitio: SitioDePanel) =>
+    paneles.activeTabAt(sitio) === null && !tapadoPorElProyecto(sitio);
   /** Sitios sin pestaña delante, restando el que ocupa la vista de proyecto. */
-  const sitiosEnBlanco = () =>
-    paneles
-      .sites()
-      .filter((s) => paneles.activeTabAt(s) === null && !tapadoPorElProyecto(s));
+  const sitiosEnBlanco = () => paneles.sites().filter(enBorrador);
+  // La pestaña que había delante al pasar al blanco: cerrar la tarea nueva vuelve a ella.
+  const [antesDelBorrador, setAntesDelBorrador] = createSignal<string | null>(null);
+  /** A qué pestaña de `sitio` vuelve cerrar la tarea nueva; sin ninguna, no se cierra. */
+  const vueltaDelBorrador = (sitio: SitioDePanel) => {
+    const suyas = paneles.tabsAt(sitio);
+    const antes = antesDelBorrador();
+    return antes !== null && suyas.includes(antes) ? antes : (suyas.at(-1) ?? null);
+  };
+  function cerrarBorrador(sitio: SitioDePanel) {
+    const id = vueltaDelBorrador(sitio);
+    const p = pestanas.open().find((x) => x.id === id);
+    if (p) void activarPestana(p);
+  }
   /** La fila del historial de una tarea, en el grupo que esté. */
   const filaDe = (id: string) => {
     for (const grupo of Object.values(sesiones())) {
@@ -4579,11 +4592,14 @@ export default function App() {
   /**
    * La conversación en blanco: lo que el panel enseña sin tarea abierta.
    * `nuevaSesion` es esto más el aviso de que se va a empezar algo. No es
-   * una pestaña: «Nueva tarea» sería el rótulo de algo que no existe. Su
-   * borrador —separado por proyecto— espera hasta el primer turno.
+   * una pestaña de `lib/tabs.ts`: la tira solo la pinta como «Tarea nueva»
+   * (`enBorrador`). Su borrador —separado por proyecto— espera hasta el
+   * primer turno.
    */
   function irAlBlanco(enProyecto = project()) {
+    const delante = paneles.activeTabAt(paneles.activeSite());
     batch(() => {
+      if (delante !== null) setAntesDelBorrador(delante);
       setProject(enProyecto);
       setProyectoAbierto(null);
       pestanas.activate(null);
@@ -4610,6 +4626,7 @@ export default function App() {
     if (settings() !== null || alta() !== null) return;
     const id = pestanaActiva();
     if (id) cerrarPestana(id);
+    else if (enBorrador(paneles.activeSite())) cerrarBorrador(paneles.activeSite());
   }
 
   /**
@@ -5768,9 +5785,11 @@ export default function App() {
     ]);
     // Y delante, en el mismo gesto: el efecto que reparte las pestañas vuelve
     // a activar la que ya estaba. Nacer sin activarse devuelve la vista a la
-    // tarea anterior hasta que Rust contesta.
+    // tarea anterior hasta que Rust contesta. Y conservada: como vista
+    // sustituiría a la pestaña de delante, y el siguiente clic, a ella.
     batch(() => {
       pestanas.ensure({ id: provisional, project: proyecto, titulo });
+      pestanas.pin(provisional);
       pestanas.activate(provisional);
     });
     return provisional;
@@ -5866,6 +5885,8 @@ export default function App() {
     const excluidas = destination ? borradores()[claveBorrador]?.excludedSourceIds ?? [] : excludedSourceIds();
     if (abierta) marcarViva(abierta);
     else setArrancando(true);
+    // Conversar es editar: la pestaña de la tarea deja de ser vista.
+    if (abierta) pestanas.pin(abierta);
     // La tarea se pinta antes de que Rust la cree. Lo que la retrasaba no era
     // su nombre —`mentions::titulo_desde` lo saca del encargo antes de lanzar
     // nada— sino el evento `started`, que `chat::acp` emite cuando el proceso
@@ -6852,6 +6873,8 @@ export default function App() {
                   pinnedIds={pestanas.pinned()}
                   onPin={pestanas.pin}
                   activeId={pestanaDelanteEn(sitio)}
+                  draftLabel={enBorrador(sitio) ? t("projects.tabs.draft") : undefined}
+                  onCloseDraft={vueltaDelBorrador(sitio) !== null ? () => cerrarBorrador(sitio) : undefined}
                   liveIds={vivas()}
                   approvingIds={permissions().map((p) => p.session)}
                   waitingIds={preguntadas()}
@@ -7594,6 +7617,8 @@ export default function App() {
                   pinnedIds={pestanas.pinned()}
                   onPin={pestanas.pin}
                     activeId={pestanaDelanteEn(sitio)}
+                    draftLabel={enBorrador(sitio) ? t("projects.tabs.draft") : undefined}
+                    onCloseDraft={vueltaDelBorrador(sitio) !== null ? () => cerrarBorrador(sitio) : undefined}
                     liveIds={vivas()}
                     approvingIds={permissions().map((p) => p.session)}
                     waitingIds={preguntadas()}
@@ -7761,6 +7786,8 @@ export default function App() {
                   pinnedIds={pestanas.pinned()}
                   onPin={pestanas.pin}
                 activeId={pestanaDelanteEn(sitio)}
+                draftLabel={enBorrador(sitio) ? t("projects.tabs.draft") : undefined}
+                onCloseDraft={vueltaDelBorrador(sitio) !== null ? () => cerrarBorrador(sitio) : undefined}
                 liveIds={vivas()}
                 approvingIds={permissions().map((p) => p.session)}
                 waitingIds={preguntadas()}

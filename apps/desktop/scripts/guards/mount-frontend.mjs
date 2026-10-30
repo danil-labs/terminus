@@ -1996,6 +1996,12 @@ if (!roto) {
       return capas.some((el) => el.className.includes("justify-center"));
     };
     assert.equal(cajaCentrada(newTaskClick.w.document), true, "la tarea nueva en blanco centra la caja");
+    const tareaNueva = newTaskClick.w.document.querySelector("[data-borrador]");
+    assert.ok(tareaNueva?.textContent.includes("Tarea nueva"), "la tarea nueva sin lanzar se ve en la tira");
+    tareaNueva.querySelector("button").click();
+    await sleep(50);
+    assert.equal(newTaskClick.w.document.querySelector("[data-borrador]"), null, "cerrarla vuelve a la pestaña anterior");
+    assert.ok(newTaskClick.w.document.querySelector('[role="tab"][aria-selected="true"]'));
   }
   assert.deepEqual(newTaskClick.fallos, []);
   assert.equal(newTaskClick.comandos.includes("delete_session"), false);
