@@ -11,7 +11,6 @@ import ChevronRight from "lucide-solid/icons/chevron-right";
 import Copy from "lucide-solid/icons/copy";
 import CornerDownLeft from "lucide-solid/icons/corner-down-left";
 import FileText from "lucide-solid/icons/file-text";
-import Loader2 from "lucide-solid/icons/loader-circle";
 import Maximize2 from "lucide-solid/icons/maximize-2";
 import MessageCircleQuestion from "lucide-solid/icons/message-circle-question-mark";
 import Paperclip from "lucide-solid/icons/paperclip";
@@ -167,6 +166,7 @@ import Suggestions, { type Suggestion } from "./Suggestions";
 import LineaDeTiempo, { SUPERFICIE_DE_EJECUCION } from "./Timeline";
 import EstadoDelTurno from "./TurnStatus";
 import { WithMentions } from "./WithMentions";
+import { Spinner } from "../../ui/Spinner";
 
 /**
  * Quién dijo un turno: lo arma Rust a partir de la cuenta del agente o del
@@ -3463,7 +3463,7 @@ function RegistroDeTrabajo(props: {
             aria-hidden="true"
           />
           <Show when={props.corriendo}>
-            <Loader2 size={14} class="shrink-0 animate-spin-steps text-primary" aria-hidden="true" />
+            <Spinner size={14} class="text-primary" />
           </Show>
           <span class="min-w-0 truncate font-medium text-neutral-700">{rotulo()}</span>
           <Show when={duracion()}>

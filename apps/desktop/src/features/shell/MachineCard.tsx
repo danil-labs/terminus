@@ -270,7 +270,7 @@ export function MachineCard(props: {
               <Show when={props.onRefresh}>
                 <button type="button" class="grid size-6 place-items-center rounded-sm text-neutral-500 outline-none hover:bg-surface-muted hover:text-neutral-950 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-60"
                   aria-label={t("shell.machine_panel.update_check")} title={t("shell.machine_panel.update_check")} disabled={refreshing()} onClick={() => void refresh()}>
-                  <RefreshCw size={12} class={refreshing() ? "animate-spin-steps" : undefined} aria-hidden />
+                  <RefreshCw size={12} class={refreshing() ? "animate-spin" : undefined} aria-hidden />
                 </button>
               </Show>
               <Show when={update() === "idle" || update() === "sending"}>

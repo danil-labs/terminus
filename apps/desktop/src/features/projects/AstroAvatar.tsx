@@ -2,7 +2,6 @@ import { Show, createEffect, createSignal, onCleanup } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import { ASTRO_BODIES, ASTRO_SHAPES, astroBody, isAstroBody, type AstroBody, type AstroNode } from "@terminus/design";
 import type { HandlerStatus } from "../../lib/model";
-import "../../lib/sharedClock";
 import { cn } from "../../lib/utils";
 import { generacionDeAvatar, urlDeAvatar } from "./avatar-src";
 
@@ -88,7 +87,6 @@ export function AstroAvatar(props: {
   return (
     <span
       class="astro-face relative inline-flex shrink-0"
-      data-shared-clock
       data-astro-working={props.status === "working" ? "true" : undefined}
     >
       <Show

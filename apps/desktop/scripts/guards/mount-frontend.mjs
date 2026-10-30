@@ -1797,13 +1797,13 @@ if (!roto) {
   const workingDot = tab("p").querySelector('.rounded-full.bg-current');
   assert.ok(workingDot);
   assert.ok([...workingDot.classList].every((name) => !name.includes("animate")), "the working indicator stays visible without blinking");
-  assert.equal(tab("p").querySelector("svg.lucide-loader-circle"), null);
+  assert.equal(tab("p").querySelector("svg[data-spinner]"), null);
   sidebar.emit("question", { session: "p", workspace: "w", turno: "question-turn", preguntas: [{ id: "choose", question: "¿Qué opción?", options: [], free_text: true }] });
   await sleep(100);
   assert.match(tab("p").getAttribute("aria-label"), /Te preguntó algo/);
   assert.ok(row("p").querySelector('[data-session-status] [aria-label="Te preguntó algo"]'));
   assert.ok(tab("p").querySelector("svg.lucide-git-merge"));
-  assert.equal(tab("p").querySelector("svg.lucide-loader-circle"), null);
+  assert.equal(tab("p").querySelector("svg[data-spinner]"), null);
   assert.equal(tab("p").querySelector("svg.lucide-git-branch"), null);
   // Un delta del chat no refresca git. Se cuenta lo que nace del delta y no lo
   // que cae en una ventana de tiempo: el refresco que deja «started» al

@@ -1165,7 +1165,7 @@ export default function Almacenamiento(props: {
               disabled={midiendo() || clearing() || listing()}
               onClick={() => void openInventory()}
             >
-              <RefreshCw size={12} class={midiendo() ? "animate-spin-steps" : undefined} aria-hidden />
+              <RefreshCw size={12} class={midiendo() ? "animate-spin" : undefined} aria-hidden />
             </Accion>
           </span>
         </div>
