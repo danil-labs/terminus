@@ -35,8 +35,8 @@ import {
   applySidebarView,
   groupKey,
   groupLabel,
-  loadSidebarView,
-  saveSidebarView,
+  setSidebarView,
+  sidebarView,
   type SidebarGroup,
   type SidebarView,
 } from "../../lib/sidebarView";
@@ -142,8 +142,11 @@ export default function Sidebar(props: {
   onAgentProfile: (project: string, name: string) => void;
   /** Dónde se guarda la vista del riel: una por workspace y espacio (`sidebarViewKey`). */
   viewKey: string;
-  /** Entrega el filtro del riel al botón Personalizar de la franja; `null` al desmontar. */
-  filterRef?: (filter: SidebarFilterProps | null) => void;
+  /**
+   * Entrega el filtro del riel al botón Personalizar de la franja; al desmontar,
+   * `null` con el que se suelta, para no borrar el de un riel que ya lo relevó.
+   */
+  filterRef?: (filter: SidebarFilterProps | null, released?: SidebarFilterProps) => void;
   /** El nombre del escritorio activo, para su riel vacío. */
   escritorio?: string | null;
   spaces?: { id: string; name: string }[];
@@ -201,12 +204,8 @@ export default function Sidebar(props: {
         : [...cerrados(), p],
     );
   // Cada espacio guarda su vista: cambiar de espacio relee la suya.
-  const [vista, setVista] = createSignal<SidebarView>(loadSidebarView(props.viewKey));
-  createEffect(on(() => props.viewKey, (key) => setVista(loadSidebarView(key)), { defer: true }));
-  const cambiarVista = (siguiente: SidebarView) => {
-    setVista(siguiente);
-    saveSidebarView(props.viewKey, siguiente);
-  };
+  const vista = () => sidebarView(props.viewKey);
+  const cambiarVista = (siguiente: SidebarView) => setSidebarView(props.viewKey, siguiente);
 
   createEffect(() => recordarCarpetas(props.projects));
 
@@ -331,14 +330,15 @@ export default function Sidebar(props: {
   const agentesDelFiltro = createMemo(() =>
     agentOptions(agentesDelDock().map((a) => a.name), todas().map((x) => x.row))
       .map((a) => ({ ...a, body: perfilDe(a.name)?.body, avatar: perfilDe(a.name)?.avatar })));
-  props.filterRef?.({
+  const filtro: SidebarFilterProps = {
     get view() { return vistaEfectiva(); },
     onChange: cambiarVista,
     get folders() { return carpetasDelFiltro(); },
     get agents() { return agentesDelFiltro(); },
     get machines() { return variasMaquinas(); },
-  });
-  onCleanup(() => props.filterRef?.(null));
+  };
+  props.filterRef?.(filtro);
+  onCleanup(() => props.filterRef?.(null, filtro));
 
   /**
    * A qué proyectos puede irse una tarea que hoy está en `de`.

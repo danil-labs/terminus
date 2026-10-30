@@ -113,6 +113,7 @@ const infoOf = (c: Computer): MachineInfo => {
     wakes: wakes(c),
     linked: linkedWorkspaces(c),
     features: serviceFeatures(c),
+    ...(c.host_version ? { version: c.host_version } : {}),
     ...(os ? { os } : {}),
   };
 };
