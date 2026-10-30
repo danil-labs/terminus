@@ -146,7 +146,7 @@ test("sin licencia, la sección abre la prueba en el navegador y reintenta", asy
 
   button("Iniciar sesión con Danil").click();
   await sleep(300);
-  assert.ok(text().includes("Activa Terminus"), text());
+  assert.ok(text().includes("Activa Danil"), text());
   assert.ok(text().includes("7 días gratis, sin tarjeta; después, 99 MXN al mes con IVA incluido."), text());
   assert.ok(!text().includes("no tiene licencia"), "the bare refusal is gone");
 
@@ -158,7 +158,7 @@ test("sin licencia, la sección abre la prueba en el navegador y reintenta", asy
   button("Ya lo activé · Reintentar").click();
   await sleep(300);
   assert.equal(calls.filter((c) => c.command === "danil_connect_start").length, 2, "retrying signs in again");
-  assert.ok(!text().includes("Activa Terminus"), text());
+  assert.ok(!text().includes("Activa Danil"), text());
   assert.ok(text().includes("Confirma en el navegador · código WDJB-MJHT"), text());
   assert.deepEqual(app.fallos, []);
 });
