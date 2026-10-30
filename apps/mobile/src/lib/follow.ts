@@ -64,6 +64,12 @@ export function scrolled(state: Follow, metrics: Metrics, replies: number): Foll
   return { ...state, near, offset: Math.max(state.offset, metrics.offset) };
 }
 
+/**
+ * `scrolled` con lo medido, sin evento de scroll: lo que cabe también está en su final. Nativo entrega el marco
+ * antes que el contenido, y con una sola medida cualquier lista parecería estar abajo: espera a tener las dos.
+ */
+export const measuredFollow = (state: Follow, metrics: Metrics, replies: number) => (metrics.content && metrics.viewport ? scrolled(state, metrics, replies) : state);
+
 /** Si un cambio de tamaño (contenido o ventana) debe bajar al final. */
 export const shouldStick = (state: Follow) => state.following;
 

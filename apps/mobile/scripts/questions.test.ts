@@ -11,7 +11,7 @@ function fixture(live = false, answered = false) {
     const value = command === 'load_session' ? { id: 's', provider: 'codex', model: 'm', turns: [
       { id: 't', role: 'assistant', text: '', questions: [question] },
       ...(answered ? [{ id: 'a', role: 'user', text: 'uno', answers: [{ turn: 't', question: 'scope', chosen: [], free_text: 'uno' }] }] : []),
-    ] } : command === 'pending_requests' ? { permissions: [], questions: live ? [{ request_id: 'r', turn: 't' }] : [] } : command === 'list_active_turns' ? [] : 's';
+    ] } : command === 'pending_requests' ? { permissions: [], questions: live ? [{ request_id: 'r', turn: 't' }] : [] } : command === 'list_active_turns' || command === 'list_live_turns' ? [] : 's';
     return { value, cachedAt: null };
   } } as unknown as Host;
   return { host, calls };

@@ -7,7 +7,7 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { type Follow, MARGIN, OPENED, SLOP, fromTop, jumped, scrolled, shouldStick, showJump, unseen } from "../src/lib/follow.ts";
+import { type Follow, MARGIN, OPENED, SLOP, fromTop, jumped, measuredFollow, scrolled, shouldStick, showJump, unseen } from "../src/lib/follow.ts";
 
 const VIEWPORT = 600;
 /** Un scroll a `offset` con `content` de alto. */
@@ -108,4 +108,21 @@ test("el primer gesto, si ya aleja del final, suelta el hilo", () => {
   const next = scrolled(OPENED, { ...metrics, offset: fromTop(2000, metrics) }, 3);
   assert.equal(next.following, false);
   assert.equal(next.seen, 3);
+});
+
+test("lo que cabe está en su final aunque nunca haya habido scroll", () => {
+  const closed: Follow = { ...OPENED, following: false, near: false };
+  const fits = scrolled(closed, { offset: 0, content: 300, viewport: 400 }, 0);
+  assert.equal(fits.following, true);
+  const grown = scrolled(fits, { offset: 0, content: 900, viewport: 400 }, 0);
+  assert.equal(grown.following, true, "crecer por abajo no suelta el hilo");
+});
+
+test("nativo mide el marco antes que el contenido: una lista larga no se da por abajo", () => {
+  const closed: Follow = { ...OPENED, following: false, near: false };
+  const framed = measuredFollow(closed, { offset: 0, content: 0, viewport: 400 }, 0);
+  assert.equal(framed, closed, "con una sola medida no se decide nada");
+  const long = measuredFollow(framed, { offset: 0, content: 3000, viewport: 400 }, 0);
+  assert.equal(long.following, false, "crecer después no la lleva al final");
+  assert.equal(measuredFollow(closed, { offset: 0, content: 300, viewport: 400 }, 0).following, true, "lo que cabe sí está en su final");
 });
