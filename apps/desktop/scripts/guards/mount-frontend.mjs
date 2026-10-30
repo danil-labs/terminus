@@ -226,9 +226,9 @@ const roto = normal.fallos.length > 0 || !normal.pintado.trim() || enElEsqueleto
 
 if (!roto) {
   await sleep(1600);
-  const storage = normal.w.document.querySelector('button[aria-label="Almacenamiento"]');
+  const storage = normal.w.document.querySelector('button[aria-label="Máquinas"]');
   if (normal.storageQueries.length || !storage) {
-    console.error("Almacenamiento debe estar disponible sin barrer el disco con el panel cerrado.");
+    console.error("Máquinas debe estar disponible sin barrer el disco con el panel cerrado.");
     process.exit(1);
   }
   normal.emit("harness:turno-cerrado", {});

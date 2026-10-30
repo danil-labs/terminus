@@ -561,3 +561,21 @@ test("handler approvals never fall back from a remote destination to the native 
   assert.equal(native[0].command, "handler_action");
   assert.equal((native[0].args.input as Args).workspace, "w");
 });
+
+test("an off machine's summary comes from its saved copy with its time, without waking it; with no copy it is machine_off", async () => {
+  const copy = { workspaces: [{ id: "w", name: "W" }], active: "w", machine_resources: { measured_at: 1, storage: [] } };
+  const vm = fakeLink({}, "offline");
+  const call = vm.call;
+  vm.call = (id, command, workspace, folder, args, timeout) => command === "list_workspaces"
+    ? (vm.calls.push({ id, command, workspace, args: args as Args }), Promise.resolve({ value: copy, cached: { updated_at: "2026-10-29T10:00:00Z" } }))
+    : call(id, command, workspace, folder, args, timeout);
+  const mac = fakeLink({}, "offline");
+  const { router } = setup({ cmp_vm: vm, cmp_mac: mac });
+  const summary = await router.handle("list_workspaces", {}, on("cmp_vm")) as { cached_at: number; machine_resources: unknown };
+  assert.equal(summary.cached_at, Date.parse("2026-10-29T10:00:00Z"), "the copy keeps its own time");
+  assert.deepEqual(summary.machine_resources, copy.machine_resources);
+  assert.deepEqual(vm.calls.map((c) => c.command), ["list_workspaces"], "a read, never a wake");
+  await assert.rejects(router.handle("list_workspaces", {}, on("cmp_mac")), (e: { detail: string }) => e.detail === "machine_off");
+  const list = await router.handle("machine_list") as { id: string; on: boolean; power?: string }[];
+  assert.deepEqual(list.map((m) => [m.id, m.on, m.power]), [["cmp_home", true, "on"], ["cmp_vm", false, "off"], ["cmp_mac", false, "off"]]);
+});
