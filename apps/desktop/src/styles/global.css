@@ -783,6 +783,8 @@
   position: relative;
   border-radius: var(--tab-foot) var(--tab-foot) 0 0;
 }
+/* El área de trabajo lleva el mismo fondo fijo que la pestaña activa: las dos se leen como una pieza. */
+.work-background,
 .tab-active,
 .tab-active::before,
 .tab-active::after {

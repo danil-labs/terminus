@@ -5,8 +5,8 @@
  */
 export const FONDOS = ["dusk", "neutro", "propia"] as const;
 
-/** El marco nuevo de la ventana no lleva fondo de chat: se pinta la superficie del tema y nada más. */
-export const SIN_FONDO_DE_CHAT = true;
+/** El marco nuevo pinta el fondo solo en el área de trabajo, no detrás de toda la ventana. */
+export const FONDO_SOLO_EN_EL_TRABAJO = true;
 export type FondoDeChat = (typeof FONDOS)[number];
 
 /** El mismo velo que el fondo de un agente, para que el texto siga leyéndose. */

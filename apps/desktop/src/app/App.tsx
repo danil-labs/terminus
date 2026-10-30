@@ -171,7 +171,7 @@ import AvisoDeVersion from "../features/shell/VersionNotice";
 import CloseGuard from "../features/shell/CloseGuard";
 import WorkspaceColumn from "../features/shell/WorkspaceColumn";
 import Sitio from "../features/sites/Site";
-import { claseDeFondo, SIN_FONDO_DE_CHAT, VELO_DE_FONDO } from "../lib/chat-background";
+import { claseDeFondo, FONDO_SOLO_EN_EL_TRABAJO, VELO_DE_FONDO } from "../lib/chat-background";
 import { fondoDeChat, fondoPropio, imagenDelWorkspace, veloDeFondo } from "../lib/chat-background-store";
 import { copyText } from "../lib/clipboard";
 import { capabilities, openMachineScreen } from "../lib/platform";
@@ -7240,7 +7240,7 @@ export default function App() {
         chatAvatar={cellProfile().avatar}
         bodyOf={(name) => profiles()[name]?.body ?? null}
         avatarOf={(name) => profiles()[name]?.avatar ?? null}
-        chatBackground={SIN_FONDO_DE_CHAT || celdaActiva() ? null : chatBackground() ?? null}
+        chatBackground={FONDO_SOLO_EN_EL_TRABAJO || celdaActiva() ? null : chatBackground() ?? null}
         chatVeil={cellProfile().veil}
         onOpenProfile={() => setViewingProfile(true)}
         /* Que el hilo viene, no que no hay: sin esto el chat lee el vacío en
@@ -7506,10 +7506,10 @@ export default function App() {
      vidrio (`.glass-panel`): así se ve también tras el historial, el árbol y
      las barras. Cada chat solo pinta encima el fondo propio de su agente. */
   const imagenDeVentana = () =>
-    SIN_FONDO_DE_CHAT ? null : fondoDelAgente()?.url ?? (fondoDeChat() === "propia" ? (imagenDelWorkspace() ?? fondoPropioUrl()) : null) ?? null;
+    fondoDelAgente()?.url ?? (fondoDeChat() === "propia" ? (imagenDelWorkspace() ?? fondoPropioUrl()) : null) ?? null;
   const veloDeVentana = () => (fondoDelAgente() ? (fondoDelAgente()?.veil ?? VELO_DE_FONDO) : veloDeFondo());
   // Neutro: sin imagen ni velo, solo el `bg-surface` de la raíz.
-  const sinFondo = () => SIN_FONDO_DE_CHAT || (!fondoDelAgente() && fondoDeChat() === "neutro");
+  const sinFondo = () => !fondoDelAgente() && fondoDeChat() === "neutro";
   const FondoDeVentana = () => (
     <Show
       when={imagenDeVentana()}
@@ -8240,7 +8240,7 @@ export default function App() {
     >
       {/* Detrás de todo y sin posicionar nada encima: `-z-10` dentro del
           `isolate` queda sobre el `bg-surface` de la raíz y bajo cada columna. */}
-      <div class="pointer-events-none absolute inset-0 -z-10" aria-hidden="true"><FondoDeVentana /></div>
+      <Show when={!FONDO_SOLO_EN_EL_TRABAJO}><div class="pointer-events-none absolute inset-0 -z-10" aria-hidden="true"><FondoDeVentana /></div></Show>
       <CloseGuard title={(id) => filaDe(id)?.title} />
       <ToastStack>
         {/* Aquí y no en Configuración: ahí no entra nadie a buscar
@@ -8450,7 +8450,8 @@ export default function App() {
           derecha={<>
           </>}
         />
-        <div class="window-frame relative flex min-h-0 flex-1 overflow-visible">
+        {/* El velo del marco cubre la columna y el hueco alrededor de la caja: un solo tono también en la esquina. */}
+        <div class="tab-veil window-frame relative flex min-h-0 flex-1 overflow-visible">
           <WorkspaceColumn
             attention={attention.list()}
             onManage={() => setSettings("workspaces")}
@@ -8580,7 +8581,7 @@ export default function App() {
           {/* 30rem es lo que cabe en la caja sin partir el modelo ni el modo.
               Las columnas laterales encogen mil veces más rápido, hasta su
               mínimo; un factor menor que 1 aquí dejaría desbordar la fila. */}
-          <div ref={medirBordeDeLaBarra} class="min-h-0 min-w-0 flex-[1_1_30rem] overflow-hidden" data-conversacion>
+          <div ref={medirBordeDeLaBarra} class={cn("min-h-0 min-w-0 flex-[1_1_30rem] overflow-hidden", FONDO_SOLO_EN_EL_TRABAJO && "work-background")} data-conversacion>
             <Conversacion />
           </div>
 
