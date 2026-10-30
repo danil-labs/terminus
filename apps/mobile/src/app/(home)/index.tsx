@@ -18,7 +18,7 @@ import { useTaskGit } from "../../lib/useTaskGit";
 import { shortWhen } from "../../lib/when";
 import { spaceName, useWorkspaces } from "../../lib/workspaces";
 import { AgentAvatar } from "../../ui/AgentAvatar";
-import { Avatar, openPreview, openTask } from "../../ui/components";
+import { openPreview, openTask } from "../../ui/components";
 import { Icon, type IconName } from "../../ui/Icon";
 import { CountBadge, Group, GroupHeader, ListRow, pageColor, Tap } from "../../ui/list";
 import { MachineNote } from "../../ui/MachineNote";
@@ -29,6 +29,7 @@ import { spaceTitle } from "../../ui/spaceTitle";
 import { SwipeRow } from "../../ui/SwipeRow";
 import { TaskCard } from "../../ui/TaskCard";
 import { useTheme } from "../../ui/theme";
+import { WorkspaceAvatar } from "../../ui/WorkspaceAvatar";
 
 const NEEDS_YOU = new Set(["approving", "asked", "failed"]);
 
@@ -178,7 +179,7 @@ export default function Home() {
         {renaming !== null ? (
           <>
             <View style={[styles.chip, { opacity: 0.5, backgroundColor: theme.surface }]}>
-              <Avatar name={current?.name ?? "T"} size={24} />
+              <WorkspaceAvatar id={current?.id} name={current?.name ?? "T"} size={24} />
               <Text numberOfLines={1} style={[styles.chipText, { color: theme.text }]}>{current?.name ?? "Terminus"}</Text>
             </View>
             <Tap testID="rename-done" accessibilityRole="button" onPress={() => void saveName()} style={[styles.done, { backgroundColor: theme.text }]}>
@@ -188,7 +189,7 @@ export default function Home() {
         ) : (
           <>
             <Tap testID="workspace-switcher" accessibilityRole="button" accessibilityLabel={t("home.switch")} onPress={() => router.push("/workspaces")} style={[styles.chip, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-              <Avatar name={current?.name ?? "T"} size={24} />
+              <WorkspaceAvatar id={current?.id} name={current?.name ?? "T"} size={24} />
               <Text numberOfLines={1} style={[styles.chipText, { color: theme.text }]}>{current?.name ?? "Terminus"}</Text>
               <Icon name="chevron-down" size={14} color={theme.textMuted} />
             </Tap>

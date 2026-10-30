@@ -7,10 +7,10 @@ import { t, w } from "../lib/i18n";
 import { useMachines } from "../lib/machines";
 import { can } from "../lib/pending";
 import { useWorkspaces } from "../lib/workspaces";
-import { Avatar } from "../ui/components";
 import { Icon } from "../ui/Icon";
 import { Group, GroupFooter, LargeTitle, ListRow, NavBar, pageColor, RoundButton } from "../ui/list";
 import { useTheme } from "../ui/theme";
+import { WorkspaceAvatar } from "../ui/WorkspaceAvatar";
 
 const NEEDS_YOU = new Set<AttentionState>(["approving", "asked", "failed"]);
 
@@ -49,7 +49,7 @@ export default function Workspaces() {
               <ListRow
                 key={workspace.id}
                 testID={`workspace-${workspace.id}`}
-                left={<Avatar name={workspace.name} size={36} />}
+                left={<WorkspaceAvatar id={workspace.id} name={workspace.name} size={36} />}
                 title={workspace.name}
                 subtitle={subtitle || undefined}
                 right={

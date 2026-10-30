@@ -194,7 +194,7 @@ const steps = [
   [
     "El turno reabierto conserva su orden",
     process.execPath,
-    ["--test", "--experimental-strip-types", join(root, "tests/unit/turn-order.test.ts")],
+    ["--test", "--experimental-strip-types", join(root, "tests/unit/turn-order.test.ts"), join(root, "tests/unit/history-refs.test.ts")],
     root,
   ],
   [
