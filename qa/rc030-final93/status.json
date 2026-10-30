@@ -48,7 +48,7 @@
     }
   },
   "schemaVersion": 1,
-  "capturedAt": "2026-10-30T17:47:35.571446+00:00",
+  "capturedAt": "2026-10-30T17:49:42.796068+00:00",
   "snapshotOnly": true,
   "publication": false,
   "operators": {
@@ -109,7 +109,7 @@
     "notary": false,
     "updater": false,
     "canonicalPackaged": "PASS",
-    "rustFormat": "FAIL pre-existing formatting at engine-protocol/src/lib.rs:97; sources not changed",
+    "rustFormat": "FAIL at apps/desktop/src-tauri/crates/engine-protocol/src/lib.rs:97; no baseline comparison, origin unclassified",
     "rustResults": [
       {
         "command": "cargo fmt --all -- --check",
@@ -163,6 +163,78 @@
       "freshBundleColdStart": "PASS English/light defaults, Prepare Danil and Danil environment",
       "labRoot": "/Users/aceballosvilla/qa/rc030-final-93/mac-lab-isolated/root",
       "personalize": "Blank main content observed with Start button available; no personalization capability credited"
+    },
+    "rustDiagnostics": {
+      "sourceOID": "93eeb9ef51b71f3cece7fa04942fa76e3b15adc2",
+      "baselineCompared": false,
+      "origin": "unclassified; no inherited claim",
+      "toolchainObservedAt": "2026-10-30T17:49:42.796068+00:00",
+      "toolchainProvenance": "Read-only version commands on operator Mac; log Clippy links independently identify rust-1.96.0; operator confirmation of original command environment pending",
+      "rustc": "1.96.0 (ac68faa20 2026-05-25)",
+      "rustcCommit": "ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96",
+      "host": "aarch64-apple-darwin",
+      "cargo": "1.96.0 (30a34c682 2026-05-25)",
+      "rustfmt": "1.9.0-stable (ac68faa20c 2026-05-25)",
+      "clippy": {
+        "exit": 101,
+        "errors": [
+          {
+            "file": "apps/desktop/src-tauri/src/extracted/typst_live.rs",
+            "line": 369,
+            "column": 39,
+            "lint": "clippy::explicit_auto_deref",
+            "error": "deref which would be done by auto-deref"
+          },
+          {
+            "file": "apps/desktop/src-tauri/src/extracted/typst_live.rs",
+            "line": 385,
+            "column": 40,
+            "lint": "clippy::explicit_auto_deref",
+            "error": "deref which would be done by auto-deref"
+          },
+          {
+            "file": "apps/desktop/src-tauri/src/extracted/typst_live.rs",
+            "line": 559,
+            "column": 13,
+            "lint": "clippy::while_let_loop",
+            "error": "this loop could be written as a while let loop"
+          },
+          {
+            "file": "apps/desktop/src-tauri/src/extracted/update.rs",
+            "line": 118,
+            "column": 10,
+            "lint": "clippy::unnecessary_fold",
+            "error": "this .fold can be written more succinctly using another method",
+            "caution": "Clippy notes all short circuits and may change semantics with side effects"
+          }
+        ]
+      },
+      "fmt": {
+        "exit": 1,
+        "file": "apps/desktop/src-tauri/crates/engine-protocol/src/lib.rs",
+        "line": 97,
+        "error": "rustfmt requires line wrapping of let mut manifest assignment"
+      },
+      "logs": [
+        {
+          "source": "/Users/aceballosvilla/qa/rc030-final-93/mac-evidence/rust-checks.log",
+          "sha256": "6c4e90b8db60cea0224209d060638efde31a40470f958146cad3095f3dfd5bd3",
+          "bytes": 760,
+          "sanitizedContent": "Diff in apps/desktop/src-tauri/crates/engine-protocol/src/lib.rs:97:\n /// Las órdenes del contrato más las de las extensiones. La huella sigue siendo\n /// solo de [`MANIFEST`].\n pub fn full_manifest() -> serde_json::Value {\n-    let mut manifest: serde_json::Value = serde_json::from_str(MANIFEST).expect(\"frozen command manifest\");\n+    let mut manifest: serde_json::Value =\n+        serde_json::from_str(MANIFEST).expect(\"frozen command manifest\");\n     for raw in EXTENSIONS {\n         let ext: serde_json::Value = serde_json::from_str(raw).expect(\"extension manifest\");\n         let extra = ext[\"commands\"].as_array().cloned().unwrap_or_default();\n[{\"command\": \"cargo fmt --all -- --check\", \"exit\": 1}]\n"
+        },
+        {
+          "source": "/Users/aceballosvilla/qa/rc030-final-93/mac-evidence/rust-remaining.log",
+          "sha256": "10bd1079a80688377c4532c1c5d2b80ca7ef077721915d72520ea71cd26a6fd6",
+          "bytes": 7601,
+          "sanitizedContent": "    Checking terminus-engine-protocol v0.1.0 (apps/desktop/src-tauri/crates/engine-protocol)\n   Compiling terminus v0.3.0-rc.1 (apps/desktop/src-tauri)\n    Checking terminus-engine-client v0.1.0 (apps/desktop/src-tauri/crates/engine-client)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 19.28s\n   Compiling terminus v0.3.0-rc.1 (apps/desktop/src-tauri)\nerror: deref which would be done by auto-deref\n   --> src/extracted/typst_live.rs:369:39\n    |\n369 |         .filter(|i| es_titulo_de_cita(*i))\n    |                                       ^^ help: try: `i`\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.96.0/index.html#explicit_auto_deref\n    = note: `-D clippy::explicit-auto-deref` implied by `-D warnings`\n    = help: to override `-D warnings` add `#[allow(clippy::explicit_auto_deref)]`\n\nerror: deref which would be done by auto-deref\n   --> src/extracted/typst_live.rs:385:40\n    |\n385 |         .filter(|i| !es_titulo_de_cita(*i))\n    |                                        ^^ help: try: `i`\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.96.0/index.html#explicit_auto_deref\n\nerror: this loop could be written as a `while let` loop\n   --> src/extracted/typst_live.rs:559:13\n    |\n559 | /             loop {\n560 | |                 let Some(dentro) = cola.trim_start().strip_prefix('\"') else {\n561 | |                     break;\n562 | |                 };\n...   |\n575 | |             }\n    | |_____________^ help: try: `while let Some(dentro) = cola.trim_start().strip_prefix('\"') { .. }`\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.96.0/index.html#while_let_loop\n    = note: `-D clippy::while-let-loop` implied by `-D warnings`\n    = help: to override `-D warnings` add `#[allow(clippy::while_let_loop)]`\n\nerror: this `.fold` can be written more succinctly using another method\n   --> src/extracted/update.rs:118:10\n    |\n118 |         .fold(true, |clean, path| remove(path) && clean)\n    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `all(|path| remove(path))`\n    |\n    = note: the `all` method is short circuiting and may change the program semantics if the iterator has side effects\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.96.0/index.html#unnecessary_fold\n    = note: `-D clippy::unnecessary-fold` implied by `-D warnings`\n    = help: to override `-D warnings` add `#[allow(clippy::unnecessary_fold)]`\n\nerror: could not compile `terminus` (lib) due to 4 previous errors\n   Compiling terminus-engine-protocol v0.1.0 (apps/desktop/src-tauri/crates/engine-protocol)\n   Compiling terminus v0.3.0-rc.1 (apps/desktop/src-tauri)\n   Compiling terminus-engine-client v0.1.0 (apps/desktop/src-tauri/crates/engine-client)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 24.99s\n     Running unittests src/lib.rs (<QA_ROOT>/mac-cargo-target/debug/deps/app_lib-92ede2111cc1f5e6)\n\nrunning 26 tests\ntest extracted::appearance::tests::only_six_digit_hex_becomes_a_color ... ok\ntest extracted::engine::tests::an_engine_of_another_contract_is_old_only_against_the_bundled_one ... ok\ntest extracted::engine::tests::only_turns_downloads_and_real_operations_keep_the_installer_out ... ok\ntest extracted::handler_policy::tests::resume_only_accepts_handler_receipts_in_the_captured_scope ... ok\ntest extracted::page_preview::tests::la_ruta_no_sale_de_su_carpeta ... ok\ntest extracted::handler_policy::tests::only_declared_actions_and_arguments_cross_the_bridge ... ok\ntest extracted::engine_profile::tests::a_root_that_does_not_exist_yet_hashes_like_the_cli ... ok\ntest extracted::page_preview::tests::los_rangos_se_leen_como_http ... ok\ntest extracted::proxy::tests::conserva_el_diagnostico_de_un_rechazo_del_motor ... ok\ntest extracted::proxy::tests::una_respuesta_demasiado_grande_lo_dice ... ok\ntest extracted::relocate::tests::only_a_disk_or_a_translocation_is_outside_applications ... ok\ntest extracted::engine_profile::tests::the_window_keeps_other_profiles_and_only_production_takes_default ... ok\ntest extracted::relocate::tests::the_bundle_is_the_app_around_the_executable ... ok\ntest extracted::engine_profile::tests::a_managed_alias_protects_the_root_and_the_published_profile ... ok\ntest extracted::service_plan::tests::plist_escapes_paths_and_supervises_only_failures ... ok\ntest extracted::service_plan::tests::preflight_requires_exact_contract_and_all_strict_features ... ok\ntest extracted::tray::tests::notice_link_keeps_its_key_after_windows_normalizes_it ... ok\ntest extracted::typst_live::tests::las_etiquetas_salen_del_texto_aunque_no_compile ... ok\ntest extracted::engine_profile::tests::malformed_profiles_fail_closed_and_false_matches_the_cli ... ok\ntest extracted::update::tests::a_set_aside_name_goes_back_to_the_installed_one ... ok\ntest extracted::update::tests::the_set_aside_window_is_the_one_with_the_engine_prefix ... ok\ntest extracted::update::tests::an_open_window_does_not_stop_the_rest ... ok\ntest extracted::service_plan::tests::readiness_rejects_other_writers_and_unproven_residency ... ok\ntest extracted::service_plan::tests::preparation_preserves_other_profiles_but_rejects_authority_conflicts ... ok\ntest extracted::update::tests::without_set_aside_engines_every_old_file_goes ... ok\ntest extracted::update::tests::a_running_set_aside_engine_keeps_its_window_on_disk ... ok\n\ntest result: ok. 26 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n     Running unittests src/main.rs (<QA_ROOT>/mac-cargo-target/debug/deps/terminus-58b03b2a97200545)\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n     Running tests/engine_extensions.rs (<QA_ROOT>/mac-cargo-target/debug/deps/engine_extensions-c7721ca876e3adb9)\n\nrunning 1 test\ntest extensions_do_not_redefine_commands ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s\n\n     Running tests/engine_push.rs (<QA_ROOT>/mac-cargo-target/debug/deps/engine_push-f1dc17c9ff19ed8c)\n\nrunning 8 tests\ntest old_engine_keeps_one_connection_per_request ... ok\ntest feed_reports_an_engine_that_stopped_answering ... ok\ntest feed_marks_a_gap_and_resumes_from_latest_on_resync_required ... ok\ntest feed_delivers_pushed_events_and_updates_its_filter ... ok\ntest feed_resubscribes_from_its_cursor_after_the_link_drops ... ok\ntest a_changed_selection_is_refused_before_reconnecting ... ok\ntest link_reconnects_and_validates_the_engine_again ... ok\ntest persistent_link_matches_answers_that_arrive_out_of_order ... ok\n\ntest result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.38s\n\n   Doc-tests app_lib\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n[{\"command\": \"cargo fmt --all -- --check\", \"exit\": 1}, {\"command\": \"cargo check --locked\", \"exit\": 0}, {\"command\": \"cargo clippy --locked -- -D warnings\", \"exit\": 101}, {\"command\": \"cargo test --locked\", \"exit\": 0}]\n"
+        }
+      ]
+    },
+    "personalizeConclusion": {
+      "result": "NOT_PASS",
+      "observation": "Blank main content with Start button available",
+      "conclusion": "Personalization capability not demonstrated; cause not established",
+      "operatorEvidencePending": true
     }
   },
   "windows": {
@@ -211,9 +283,9 @@
   "coordination": {
     "delivery": "steered",
     "operations": {
-      "sre19sr7": "2bac4b1c-1de9-4150-b440-215850b3abb2",
-      "0qs6mqpm": "90915fe3-7156-4e83-9eae-35986e2892ef",
-      "31ze36h8": "c674e7cc-1b05-443a-b979-2125ecd40804"
+      "sre19sr7": "945f3ce9-76e0-476e-9055-be3e18d7d9f0",
+      "0qs6mqpm": "7a7303b5-7e17-4c97-9ec3-0cce5fd0a27b",
+      "31ze36h8": "8d870aba-3dd5-4d6d-a00a-09a5623ddb5d"
     }
   },
   "evidenceFiles": [
