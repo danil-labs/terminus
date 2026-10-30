@@ -121,7 +121,7 @@ const pestanasDe = (
     skills: tab("skills", () => t("settings.nav.skills"), () => <Skills />),
     plugins: tab("plugins", () => t("settings.nav.plugins"), () => <Plugins />),
     conexiones: cuenta ? tab("conexiones", () => t("settings.tab.orchestrators"), () => <Suspense fallback={null}><Connections workspace={workspace()} /></Suspense>) : undefined,
-    integrations: capabilities().inbox ? tab("integrations", () => t("alpha.integrations"), () => <>{capabilities().inbox!.integrations()}<Suspense fallback={null}><Integrations /></Suspense></>) : undefined,
+    integrations: capabilities().inbox ? tab("integrations", () => t("alpha.integrations"), () => <Suspense fallback={null}><Integrations /></Suspense>) : undefined,
     radiant: capabilities().radiant ? tab("radiant", () => t("settings.nav.radiant"), () => <Radiant />) : undefined,
   };
 };
