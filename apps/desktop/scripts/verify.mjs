@@ -192,6 +192,12 @@ const steps = [
     root,
   ],
   [
+    "⌘A fuera de un campo selecciona el bloque del clic, no la ventana",
+    process.execPath,
+    ["--test", "--experimental-strip-types", join(root, "tests/unit/select-all.test.ts")],
+    root,
+  ],
+  [
     "El turno reabierto conserva su orden",
     process.execPath,
     ["--test", "--experimental-strip-types", join(root, "tests/unit/turn-order.test.ts")],
@@ -429,6 +435,12 @@ const steps = [
     "Una pestaña no se pierde al cerrar otra",
     process.execPath,
     ["--test", "--experimental-strip-types", join(root, "tests/unit/tabs.test.ts")],
+    root,
+  ],
+  [
+    "El panel de archivos de cada tarea guarda sus pestañas",
+    process.execPath,
+    ["--test", "--experimental-strip-types", join(root, "tests/unit/task-files.test.ts")],
     root,
   ],
   [

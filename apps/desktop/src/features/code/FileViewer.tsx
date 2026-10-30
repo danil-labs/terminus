@@ -158,6 +158,8 @@ export default function VisorDeArchivo(props: {
   suelto?: boolean;
   /** Si el agente lo cambió al abrirlo: es el valor de partida de [`hayCambios`]. */
   cambiado: boolean;
+  /** Opens straight in the changes view. */
+  enCambios?: boolean;
   /** Si esta pestaña es la que se está mirando. Las de detrás siguen montadas: ver `refresh.ts`. */
   visible: boolean;
   /** Guardar lo convierte en un archivo cambiado, y eso lo tiene que saber el panel. */
@@ -236,7 +238,8 @@ export default function VisorDeArchivo(props: {
   const conPrevia = () =>
     vistaTypst() ||
     (esTexto() && !typst() && (esMarkdown(props.ruta) || esHtml(props.ruta) || delimiterFor(props.ruta) !== null));
-  const [elegida, setElegida] = createSignal<Disposicion | null>(null);
+  // The diff covers the code side, so a tab opened for its changes starts there whatever layout is remembered.
+  const [elegida, setElegida] = createSignal<Disposicion | null>(props.enCambios ? "codigo" : null);
   const disposicion = (): Disposicion => {
     if (!conPrevia()) return "codigo";
     // Con Typst, «Vista previa» es el ampliar de la tarea: lo comparten sus archivos y Esc lo deshace.
@@ -308,7 +311,7 @@ export default function VisorDeArchivo(props: {
       : null;
 
   /** Los cambios se piden al mirarlos y tapan el lado del código; la vista previa sigue a su lado. */
-  const [verCambios, setVerCambios] = createSignal(false);
+  const [verCambios, setVerCambios] = createSignal(Boolean(props.enCambios));
   const mostrarCambios = () => verCambios() && hayCambios() && !previa();
   function alternarCambios() {
     const ver = !verCambios();
@@ -376,7 +379,7 @@ export default function VisorDeArchivo(props: {
   });
 
   /** La salida usa lo que hay en disco, no lo escrito sin guardar. */
-  const canOpenExternal = () => !conGuardadoManual() && (props.suelto || props.session !== "");
+  const canOpenExternal = () => !conGuardadoManual() && (props.suelto || props.session !== "") && !machineOf(props.session);
 
   async function openExternal() {
     setFalloAfuera(null);
@@ -404,7 +407,7 @@ export default function VisorDeArchivo(props: {
 
   // El PDF de un documento de Office; sin archivo en disco (una rama base) no hay.
   function pedirOffice(): Promise<Preview> | null {
-    if (props.suelto) return invoke<Preview>("office_preview", { path: props.ruta });
+    if (props.suelto) return invoke<Preview>("office_preview", { path: props.ruta }, machineOf(props.session));
     if (props.session === "") return null;
     return invoke<Preview>("tree_office_preview", {
       project: props.project,
@@ -416,7 +419,7 @@ export default function VisorDeArchivo(props: {
 
   const pedirContenido = async (): Promise<Contenido> => {
     if (props.suelto) {
-      const p = await invoke<Preview>("preview_file", { path: props.ruta, rel: props.ruta });
+      const p = await invoke<Preview>("preview_file", { path: props.ruta, rel: props.ruta }, machineOf(props.session));
       return {
         kind: p.kind === "html" ? "text" : p.kind,
         text: p.text ?? "",
@@ -656,7 +659,7 @@ export default function VisorDeArchivo(props: {
         e.preventDefault();
         alternarAjuste();
       }}
-      class="flex h-full min-h-0 flex-col"
+      class="@container flex h-full min-h-0 flex-col"
     >
       {/* Los controles de escritura van en esta fila: es la única que está siempre. */}
       <div class="flex h-8.5 shrink-0 items-center gap-2 border-b border-border pr-1.5 pl-2.5">
@@ -716,26 +719,26 @@ export default function VisorDeArchivo(props: {
             onClick={alternarCambios}
           >
             <IconoCambios size={13} aria-hidden="true" />
-            {t("code.file.view.changes")}
+            <span class="sr-only">{t("code.file.view.changes")}</span>
           </BotonDeBarra>
         </Show>
         <Show when={mostrarCambios()}>
-          <SelectorDeDisposicion />
+          <div class="flex @max-[560px]:hidden"><SelectorDeDisposicion /></div>
         </Show>
 
         <Show when={conPrevia()}>
           <div role="group" aria-label={t("code.file.layout.label")} class="flex shrink-0 gap-0.5">
             <BotonDeBarra pulsado={disposicion() === "codigo"} onClick={() => elegir("codigo")} titulo={t("code.file.layout.code")}>
               <IconoCodigo size={13} aria-hidden="true" />
-              {t("code.file.layout.code")}
+              <span class="sr-only">{t("code.file.layout.code")}</span>
             </BotonDeBarra>
-            <BotonDeBarra pulsado={disposicion() === "lado"} onClick={() => elegir("lado")} titulo={t("code.file.layout.split.title")}>
+            <BotonDeBarra pulsado={disposicion() === "lado"} onClick={() => elegir("lado")} titulo={t("code.file.layout.split.title")} class="@max-[560px]:hidden">
               <IconoLado size={13} aria-hidden="true" />
-              {t("code.file.layout.split")}
+              <span class="sr-only">{t("code.file.layout.split")}</span>
             </BotonDeBarra>
             <BotonDeBarra pulsado={disposicion() === "previa"} onClick={() => elegir("previa")} titulo={t("code.file.view.preview")}>
               <IconoPrevia size={13} aria-hidden="true" />
-              {t("code.file.view.preview")}
+              <span class="sr-only">{t("code.file.view.preview")}</span>
             </BotonDeBarra>
           </div>
         </Show>
@@ -750,7 +753,7 @@ export default function VisorDeArchivo(props: {
             onClick={() => void openExternal()}
           >
             <Navegador size={13} aria-hidden="true" />
-            {CON_SU_APP.includes(extension(props.ruta)) ? t("code.file.open_with_app") : t("code.file.open_external")}
+            <span class="sr-only">{CON_SU_APP.includes(extension(props.ruta)) ? t("code.file.open_with_app") : t("code.file.open_external")}</span>
           </Button>
         </Show>
       </div>
@@ -818,7 +821,7 @@ export default function VisorDeArchivo(props: {
                     }
                   >
                     {(d) => (
-                      <div class="min-h-0 min-w-0 flex-1 overflow-hidden bg-surface-muted">
+                      <div data-select-scope class="min-h-0 min-w-0 flex-1 overflow-hidden bg-surface-muted">
                         {/* Ya llega con el archivo entero de contexto: no hay tramo que traer. */}
                         <CuerpoDeArchivo archivo={d()} onDesplegar={() => {}} llena />
                       </div>
@@ -827,7 +830,7 @@ export default function VisorDeArchivo(props: {
                 </Show>
 
                 <Show when={!mostrarCambios() && !editable()}>
-                  <div class="min-h-0 min-w-0 flex-1 overflow-y-auto bg-surface-muted">
+                  <div data-select-scope class="min-h-0 min-w-0 flex-1 overflow-y-auto bg-surface-muted">
                     <Cuerpo contenido={c()} ruta={props.ruta} onOpenExternal={() => void openExternal()} pedirOffice={pedirOffice} />
                   </div>
                 </Show>
@@ -865,6 +868,7 @@ export default function VisorDeArchivo(props: {
         {/* Con «Código» la vista de Typst se esconde sin desmontarse: soltarla apagaría Tinymist y sus marcas. */}
         <Show when={ladoPrevia() || vistaTypst()}>
           <div
+            data-select-scope
             class={cn(
               "min-h-0 min-w-0 flex-1 flex-col",
               ladoPrevia() ? "flex" : "hidden",

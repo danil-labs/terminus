@@ -1,14 +1,21 @@
 import { invoke } from "../../lib/invoke.ts";
+import ArrowLeftRight from "lucide-solid/icons/arrow-left-right";
 import ChevronRight from "lucide-solid/icons/chevron-right";
+import CornerDownRight from "lucide-solid/icons/corner-down-right";
+import FilePenLine from "lucide-solid/icons/file-pen-line";
+import ListTree from "lucide-solid/icons/list-tree";
 import MoreVertical from "lucide-solid/icons/more-vertical";
 import Pin from "lucide-solid/icons/pin";
 import PinOff from "lucide-solid/icons/pin-off";
 import { createEffect, createMemo, createSignal, For, type JSX, lazy, mapArray, on, onCleanup, Show, Suspense } from "solid-js";
+import { Dynamic } from "solid-js/web";
 import { arrastrar, fueArrastre, tareaEnVuelo } from "../../lib/drag";
 import { enfocarYSeleccionar } from "../../lib/focus";
+import { df } from "../../lib/format";
 import { t } from "../../lib/i18n";
 import { createPref } from "../../lib/prefs";
 import { SESSION_TITLE_MAX_LENGTH } from "../../lib/projectNames";
+import { esProvisional } from "../../lib/taskDraft";
 import { cn } from "../../lib/utils";
 import { Button } from "../../ui/Button";
 import { asFailure, type Failure, FailureNote } from "../../ui/Failure";
@@ -25,10 +32,9 @@ import {
   PopoverTrigger,
 } from "../../ui/Popover";
 import { WithMentions } from "../chat/WithMentions";
-import FolderChip, { FolderSquare } from "./FolderChip";
-import SessionGit, { gitAppearance, sessionGitDescription } from "./SessionGit";
+import FolderChip from "./FolderChip";
+import SessionGit, { RailPull, sessionGitDescription } from "./SessionGit";
 import { WithTaskHoverCard } from "./TaskHoverCardTrigger";
-import { hoverCardPull } from "./hoverCardPull";
 import { MachineChip } from "../machines/MachineChip";
 import { bringHereLabel, canBringHere } from "../machines/store";
 import { createTaskHistories } from "./taskHistories";
@@ -43,8 +49,8 @@ import { matchesTaskQuery } from "./taskSearch";
 import { canFinishTask, effectiveTaskGit, type GitStatus, sharesTaskGit, watchSessionGit } from "./taskGit";
 import { authorKey, authorKeys, shownUnderLauncher } from "./taskAuthors";
 import { descendientes, type Rama as RamaDeTareas, taskTree } from "./taskTree";
-import { type TaskActivity, taskPriority } from "@terminus/design";
-import { taskCard, buildTaskTree, taskIdentity, withTaskAncestors } from "@terminus/tasks";
+import { rolledOutcome, type TaskActivity, taskPriority } from "@terminus/design";
+import { taskCard, buildTaskTree, launcherOf, sameAgent, taskIdentity, withTaskAncestors } from "@terminus/tasks";
 
 export function readableSessionTitle(title: string): string {
   if (!title.startsWith("/root/")) return title;
@@ -67,6 +73,25 @@ const AGENT_NAME_MAX = 10;
 export function shortAgentName(nombre: string): string {
   const letras = [...nombre];
   return letras.length > AGENT_NAME_MAX ? `${letras.slice(0, AGENT_NAME_MAX - 1).join("")}…` : nombre;
+}
+
+/**
+ * La hora corta de la tarjeta del riel: `ahora`, `4m`, `2h`, `ayer`, `3d` dentro
+ * de la semana y después la fecha (`12 oct`). No es un contador: se escribe al
+ * pintar la fila y se rehace cuando la fila cambia, no cada minuto.
+ */
+export function shortTaskTime(when: number, now = Date.now()): string {
+  if (!Number.isFinite(when)) return "";
+  const minutes = Math.floor((now - when) / 60_000);
+  if (minutes < 1) return t("projects.sessions.time_now");
+  if (minutes < 60) return t("projects.sessions.time_minutes", { count: minutes });
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return t("projects.sessions.time_hours", { count: hours });
+  const midnight = (ms: number) => new Date(ms).setHours(0, 0, 0, 0);
+  const days = Math.round((midnight(now) - midnight(when)) / 86_400_000);
+  if (days <= 1) return t("projects.sessions.time_yesterday");
+  if (days < 7) return t("projects.sessions.time_days", { count: days });
+  return df({ day: "numeric", month: "short" }).format(when);
 }
 
 export function threadTitle(row: Pick<SessionRow, "inbox" | "title"> | undefined): string {
@@ -93,7 +118,8 @@ export type SessionRow = {
   launcher_name?: string | null;
   archived?: boolean | null;
   result_revision?: string | null;
-  outcome?: "delivered" | "failed" | null;
+  /** `interrupted`: la persona detuvo el turno; un motor viejo lo manda como `failed`. */
+  outcome?: "delivered" | "failed" | "interrupted" | null;
   id: string;
   title: string;
   provider: string;
@@ -111,6 +137,12 @@ export type SessionRow = {
   created_at: number;
   /** Cuándo se movió por última vez. No es el orden: ver `created_at`. */
   updated_at: number;
+  /**
+   * Cuándo cerró el último turno, o cuándo empezó el que corre: la hora de la
+   * tarjeta del riel. Mismas unidades que `updated_at`, que es su respaldo con
+   * un motor que no lo manda.
+   */
+  last_turn_at?: number | null;
   turns: number;
   /** Borrar al padre conserva a la hija: el historial la muestra en la raíz. */
   parent: string | null;
@@ -131,6 +163,8 @@ export type SessionRow = {
   stage: Etapa | null;
   /** Con qué criterio corre esta tarea (`workspace/handlers.rs`). */
   agent: string | null;
+  /** Quién la llevaba antes del último traspaso; `null` si nunca pasó de mano. */
+  previous_agent?: string | null;
   /**
    * El encargado del padre, cuando esta tarea es una hija de orquestación.
    * Derivado, solo para pintar quién la lanzó: NO es el criterio de esta
@@ -325,13 +359,11 @@ export default function Sessions(props: {
   projectOf?: (row: SessionRow) => string;
   destinosDe?: (row: SessionRow) => { id: string; name: string }[];
   carpetaDe?: (row: SessionRow) => string | undefined;
-  /** En el riel: dos líneas por tarea, o una sola en «Compacta». */
-  density?: "comfortable" | "compact";
   /** Bajo la cabecera de su carpeta, la fila no repite la carpeta. */
   hideFolder?: boolean;
   /**
-   * La tarjeta del riel fuera del riel (las delegadas): su fila, su tarjeta
-   * flotante y su densidad, sin lo que el riel hace con la lista.
+   * La tarjeta del riel fuera del riel (las delegadas): su fila y su tarjeta
+   * flotante, sin lo que el riel hace con la lista.
    */
   card?: boolean;
   /** Hacia dónde sale la tarjeta flotante; el riel la saca a la derecha. */
@@ -340,7 +372,6 @@ export default function Sessions(props: {
 }) {
   /** Fila de dos líneas con tarjeta flotante: el riel y quien la pide. */
   const tarjetaDelRiel = () => !!props.sidebar || !!props.card;
-  const compacta = () => props.density === "compact";
   const projectOf = (row: SessionRow) => props.projectOf?.(row) ?? props.de;
   const projectOfId = (id: string) => {
     const row = props.sessions.find((s) => s.id === id);
@@ -587,98 +618,186 @@ export default function Sessions(props: {
   const gitDe = (row: SessionRow) => effectiveTaskGit(row, gitRows(), props.relatedSessions ?? props.sessions);
 
   /**
-   * El cuerpo de una fila del riel. Línea 1: estado en su columna fija,
-   * título y chincheta. Línea 2: lo que te piden si espera aprobación o
-   * respuesta; si no (también si falló), proveedor, carpeta, máquina (si no
-   * es esta), cara del agente y PR. Lo demás vive en la tarjeta flotante.
+   * Las subtareas vivas de cada tarea, por id de quien las lanzó: el chip de
+   * subtareas de la tarjeta. No es un dato del motor; sale de las filas que la
+   * lista ya tiene (`launcherOf`, la misma relación que esconde la subtarea
+   * bajo su lanzador en el riel).
    */
-  const FilaDelRiel = (r: { s: SessionRow; actividad: TaskActivity; titulo: JSX.Element }) => {
+  const hijasPorLanzador = createMemo(() => {
+    const porLanzador = new Map<string, SessionRow[]>();
+    for (const row of props.relatedSessions ?? props.sessions) {
+      const lanzador = launcherOf(row);
+      if (!lanzador || row.archived || lanzador === row.id) continue;
+      const hijas = porLanzador.get(lanzador);
+      // Una subtarea que llega por dos listas cuenta una vez.
+      if (hijas) { if (!hijas.some((h) => h.id === row.id)) hijas.push(row); }
+      else porLanzador.set(lanzador, [row]);
+    }
+    return porLanzador;
+  });
+
+  /** Una cara de 13 px con el nombre solo en el tooltip; antes de ella, su flecha si la lleva. */
+  const ChipDeCara = (c: {
+    name: string;
+    tip: string;
+    kind: "agent" | "opener" | "handoff";
+    icon?: typeof CornerDownRight;
+    working?: boolean;
+  }) => (
+    <TooltipRoot openDelay={RETARDO_TOOLTIP} placement="top" gutter={4}>
+      <TooltipTrigger
+        as="span"
+        data-session-agent={c.kind === "agent" ? "" : undefined}
+        data-session-opener={c.kind === "opener" ? "" : undefined}
+        data-session-handoff={c.kind === "handoff" ? "" : undefined}
+        class="inline-flex shrink-0 items-center gap-0.5"
+        aria-label={c.tip}
+      >
+        <Show when={c.icon}>{(icon) => <Dynamic component={icon()} size={12} aria-hidden="true" />}</Show>
+        <AstroAvatar
+          name={c.name}
+          status={c.working ? "working" : "asleep"}
+          body={profiles()[c.name]?.body}
+          avatar={profiles()[c.name]?.avatar}
+          size={13}
+        />
+      </TooltipTrigger>
+      <TooltipContent class="pointer-events-none">{c.tip}</TooltipContent>
+    </TooltipRoot>
+  );
+
+  /**
+   * La tarjeta del riel y de las delegadas: 52 px y siempre dos líneas. Línea 1:
+   * el título y el hueco del estado, que al pasar el puntero es el menú. Línea 2:
+   * agente, proveedor, carpeta (solo raíz y sin agrupar por carpeta), PR, subtareas,
+   * borrador, quién la abrió, de quién la heredó, el cohete y la hora. Nada de lo
+   * que la tarea pide; lo demás vive en la tarjeta flotante.
+   */
+  const FilaDelRiel = (r: {
+    s: SessionRow;
+    actividad: TaskActivity;
+    titulo: JSX.Element;
+    /** Terminada y vista: la fila se apaga y vuelve a su color al pasar el puntero. */
+    apagada: boolean;
+    /** Si el hueco del estado puede pasar a ser el menú: no renombrando ni en solo lectura. */
+    conMenu: boolean;
+    menu: () => JSX.Element;
+    cohete: () => JSX.Element;
+  }) => {
     // Qué lleva la línea 2 lo decide la tarjeta compartida con el teléfono (`@terminus/tasks`).
     const tarjeta = () => taskCard(r.s, { live: props.vivas, approving: props.aprobando, hideFolder: hideFolder(r.s) });
-    const estado = () => taskPriority(r.actividad);
-    const pide = () => tarjeta().request;
-    const pull = () => hoverCardPull(gitDe(r.s));
-    // Rojo si el CI falló; si no, el color del estado del PR, como su icono.
-    const colorDelPr = () => pull()?.checks === "failure" && !gitDe(r.s).stale ? "text-error-strong"
-      : gitDe(r.s).stale ? "text-neutral-500" : gitAppearance(gitDe(r.s)).color;
+    const git = () => gitDe(r.s);
     // La rama de quien comparte el árbol de su padre se dice en la fila del padre.
-    const propioDeOtra = () => !!gitDe(r.s).shared_with || sharesTaskGit(r.s, gitRows(), props.relatedSessions ?? props.sessions);
-    /** El PR, o el estado de una carpeta de conocimiento; la rama sola va a la tarjeta. */
-    // Va después de la carpeta: dice qué le falta a esa tarea, no la encabeza.
-    const WorktreeFaltante = () => (
-      <Show when={worktreeDe(r.s.id)?.owned && !worktreeDe(r.s.id)?.available}>
-        <span class="flex shrink-0 text-error-strong" title={t("projects.sessions.worktree_missing")} aria-label={t("projects.sessions.worktree_missing")}><WorktreeRoto size={13} /></span>
-      </Show>
-    );
-    const ChipDeGit = () => (
-      <Show when={(pull() || gitDe(r.s).kind === "kn") && !propioDeOtra()}>
-        <span data-session-pr class="inline-flex shrink-0 items-center gap-0.5" title={sessionGitDescription(gitDe(r.s))}>
-          <SessionGit status={gitDe(r.s)} compact />
-          <Show when={pull()}>
-            {(pr) => <span class={colorDelPr()}>#{pr().number}</span>}
-          </Show>
-        </span>
-      </Show>
-    );
-    const nombreDelAgente = () => r.s.agent ? displayName(r.s.agent, profiles()[r.s.agent]) : "";
+    const propioDeOtra = () => !!git().shared_with || sharesTaskGit(r.s, gitRows(), props.relatedSessions ?? props.sessions);
+    const nombre = (agente: string) => displayName(agente, profiles()[agente]);
+    // Quién la abrió, si fue otro agente: el lanzador o el encargado de la madre.
+    const abridor = () => {
+      const quien = r.s.launcher_name ?? r.s.parent_agent;
+      return quien && !sameAgent(quien, r.s.agent) ? quien : null;
+    };
+    const anterior = () => r.s.previous_agent && !sameAgent(r.s.previous_agent, r.s.agent) ? r.s.previous_agent : null;
+    const hijas = () => hijasPorLanzador().get(r.s.id) ?? [];
+    const actividadDeHijas = (): TaskActivity => ({
+      aprobando: hijas().some((h) => props.aprobando.includes(h.id)),
+      viva: hijas().some((h) => props.vivas.includes(h.id)),
+      esperando: hijas().some((h) => h.esperando),
+      outcome: hijas().some((h) => h.outcome === "failed") ? "failed"
+        : hijas().some((h) => h.outcome === "interrupted") ? "interrupted" : null,
+      sinVer: hijas().some((h) => h.sin_ver),
+    });
+    // Con un motor que no manda `last_turn_at`, la última vez que se movió.
+    const cuando = () => r.s.last_turn_at ?? r.s.updated_at;
+    // Memo: al hacer clic el menú se reinicia y, sin él, la ranura reescribe su clase.
+    const abierto = createMemo(() => menu() === r.s.id);
     return (
-      <div class="grid min-w-0 grid-cols-[14px_minmax(0,1fr)] items-center gap-x-1.5">
-        <span data-session-status class="grid size-3.5 place-items-center">
-          <Show
-            when={estado() || r.actividad.outcome === "delivered"}
-            fallback={<span aria-hidden="true" class="size-[9px] rounded-full border-[1.5px] border-neutral-300" />}
-          >
-            <EstadoDeTarea {...r.actividad} size={13} />
-          </Show>
-        </span>
-        <div class="min-w-0">{r.titulo}</div>
-        <Show when={!compacta()}>
-          <div data-session-preview class="col-start-2 mt-0.5 flex h-4 min-w-0 items-center gap-1.5 text-[0.6875rem] font-normal leading-tight text-neutral-500">
-            <Show
-              when={pide()}
-              fallback={
-                <>
-                  <Show when={tarjeta().provider}>
-                    {(proveedor) => <span data-session-provider class="flex shrink-0" title={proveedor()} aria-label={proveedor()}><MarcaAgente id={proveedor()} size={13} /></span>}
-                  </Show>
-                  <Show when={!hideFolder(r.s) && props.carpetaDe?.(r.s)}>
-                    {(nombre) => <FolderChip id={projectOf(r.s)} name={nombre()} untitled={props.sidebar} class="max-w-[108px] shrink-0" />}
-                  </Show>
-                  <WorktreeFaltante />
-                  {/* En qué máquina corre, solo si no es esta: con una sola máquina no sale. */}
-                  <Show when={tarjeta().machine}>
-                    {(machine) => <MachineChip machine={machine().id} on={machine().on} class="max-w-[96px]" />}
-                  </Show>
-                  <Show when={tarjeta().agent}>
-                    {(agente) => (
-                      <TooltipRoot openDelay={RETARDO_TOOLTIP} placement="top" gutter={4}>
-                        <TooltipTrigger as="span" data-session-agent class="flex shrink-0" aria-label={nombreDelAgente()}>
-                          <AstroAvatar
-                            name={agente()}
-                            status={props.vivas.includes(r.s.id) ? "working" : "asleep"}
-                            body={profiles()[agente()]?.body}
-                            avatar={profiles()[agente()]?.avatar}
-                            size={13}
-                          />
-                        </TooltipTrigger>
-                        <TooltipContent class="pointer-events-none">{nombreDelAgente()}</TooltipContent>
-                      </TooltipRoot>
-                    )}
-                  </Show>
-                  <ChipDeGit />
-                </>
-              }
+      <>
+        <div class="flex h-[18px] min-w-0 items-center gap-1.5">
+          <div class="min-w-0 flex-1">{r.titulo}</div>
+          <span class="relative flex h-5 min-w-[22px] shrink-0 items-center justify-end">
+            <span
+              data-session-status
+              class={cn(
+                "inline-flex size-4 items-center justify-center",
+                r.conMenu && "group-hover/session:hidden group-focus-visible/session:sr-only group-has-[:focus-visible]/session:sr-only",
+                r.conMenu && abierto() && "hidden",
+              )}
             >
-              <span data-session-request class="min-w-0 flex-1 truncate text-neutral-700">{pide()}</span>
-              <ChipDeGit />
-              <Show when={!hideFolder(r.s)}>
-                <span title={props.carpetaDe?.(r.s)} class="flex shrink-0"><FolderSquare id={projectOf(r.s)} /></span>
-              </Show>
-              <WorktreeFaltante />
+              <EstadoDeTarea
+                riel
+                {...r.actividad}
+                provisional={esProvisional(r.s.id)}
+                archivada={!!r.s.archived}
+                size={14}
+              />
+            </span>
+            <Show when={r.conMenu}>
+              <span
+                data-session-actions
+                data-abierto={abierto() ? "true" : undefined}
+                class={cn(
+                  "hidden group-hover/session:inline-flex group-focus-visible/session:inline-flex group-has-[:focus-visible]/session:inline-flex",
+                  abierto() && "inline-flex",
+                )}
+              >
+                {r.menu()}
+              </span>
             </Show>
-          </div>
-        </Show>
-      </div>
+          </span>
+        </div>
+        <div
+          data-session-preview
+          class={cn(
+            "flex h-4 min-w-0 items-center gap-[7px] overflow-hidden text-xs font-normal leading-4 text-neutral-500",
+            r.apagada && "opacity-80 group-hover/session:opacity-100",
+          )}
+        >
+          <Show when={tarjeta().agent}>
+            {(agente) => <ChipDeCara kind="agent" name={agente()} tip={nombre(agente())} working={props.vivas.includes(r.s.id)} />}
+          </Show>
+          <Show when={tarjeta().provider}>
+            {(proveedor) => <span data-session-provider class="flex shrink-0" title={proveedor()} aria-label={proveedor()}><MarcaAgente id={proveedor()} size={12} /></span>}
+          </Show>
+          {/* La carpeta solo si el riel no agrupa por carpeta, y solo en la raíz:
+              una subtarea vive en la carpeta de su madre. Es lo primero que se recorta. */}
+          <Show when={!hideFolder(r.s) && !launcherOf(r.s) && props.carpetaDe?.(r.s)}>
+            {(carpeta) => <FolderChip id={projectOf(r.s)} name={carpeta()} untitled={tarjetaDelRiel()} class="min-w-0 shrink text-xs text-neutral-500" />}
+          </Show>
+          <Show when={!propioDeOtra()}>
+            <Show
+              when={git().kind === "kn"}
+              fallback={<RailPull status={git()} />}
+            >
+              <Show when={git().kn === "draft"}>
+                <span data-session-pr class="inline-flex shrink-0 text-primary" title={sessionGitDescription(git())} aria-label={sessionGitDescription(git())}>
+                  <FilePenLine size={12} aria-hidden="true" />
+                </span>
+              </Show>
+            </Show>
+          </Show>
+          <Show when={hijas().length > 0}>
+            <span
+              data-session-subtasks={hijas().length}
+              class="inline-flex shrink-0 items-center gap-1 tabular-nums"
+              title={t("projects.sessions.subtasks_count", { count: hijas().length })}
+            >
+              <ListTree size={12} aria-hidden="true" />
+              <span aria-hidden="true">{hijas().length}</span>
+              <EstadoDeTarea riel ambito="plegadas" {...actividadDeHijas()} size={10} />
+            </span>
+          </Show>
+          <Show when={abridor()}>
+            {(quien) => <ChipDeCara kind="opener" icon={CornerDownRight} name={quien()} tip={t("projects.sessions.opened_by", { name: nombre(quien()) })} />}
+          </Show>
+          <Show when={anterior()}>
+            {(quien) => <ChipDeCara kind="handoff" icon={ArrowLeftRight} name={quien()} tip={t("projects.sessions.handed_from", { name: nombre(quien()) })} />}
+          </Show>
+          <span class="min-w-1 flex-1" />
+          <span class="flex shrink-0 items-center gap-[5px]">
+            {r.cohete()}
+            <span data-session-time class="whitespace-nowrap text-[0.71875rem] tabular-nums">{shortTaskTime(cuando())}</span>
+          </span>
+        </div>
+      </>
     );
   };
 
@@ -735,6 +854,14 @@ export default function Sessions(props: {
     };
 
     const marcaDeFijada = () => <span role="img" aria-label={t("projects.sessions.pinned")} title={t("projects.sessions.pinned")} class="shrink-0 text-neutral-500"><Pin size={12} /></span>;
+    /**
+     * Terminada y vista en la tarjeta del riel: sin marca, la fila se apaga
+     * —el título al 62 % y la segunda línea al 80 %— y recupera su color al
+     * pasar el puntero.
+     */
+    const apagada = createMemo(() => tarjetaDelRiel() && !taskPriority(activity()) && !esProvisional(f.s.id));
+    const conMenu = createMemo(() => !props.readOnly && renombrando() !== f.s.id && (props.draggedTask ?? tareaEnVuelo()?.id) !== f.s.id);
+    // Sin memo, el clic (que pasa por «en vuelo») reescribe las clases con el mismo valor: tests/perf/open-task-cost.mjs.
     /** El título, o el campo que lo renombra en su sitio y con su misma medida. */
     const Titulo = () => (
       <>
@@ -744,14 +871,15 @@ export default function Sessions(props: {
         fallback={
           // El cohete es absoluto: sin este hueco el título se mete debajo. Por
           // `:has`, no por clase reactiva: cada fila mutaría al llegar git.
-          <div class="flex min-w-0 items-center gap-1 text-[0.8125rem] leading-[1.35] [:has(>[data-finish-slot])_&]:pr-16">
+          <div class={cn(
+            "flex min-w-0 items-center gap-1 text-[0.8125rem] leading-[1.35] [:has(>[data-finish-slot])_&]:pr-16",
+            // La tarjeta del riel: 13,5 px en su línea de 18, sin chincheta ni «Contexto».
+            tarjetaDelRiel() && "text-[0.84375rem] leading-[18px]",
+            apagada() && "text-neutral-500 group-hover/session:text-neutral-950",
+          )}>
             <Show when={fijada(f.s) && !tarjetaDelRiel()}>{marcaDeFijada()}</Show>
-            <Show when={contextual(f.s)}><span class="shrink-0 text-[0.6875rem] font-normal text-neutral-500">{t("projects.sessions.context")}</span></Show>
+            <Show when={contextual(f.s) && !tarjetaDelRiel()}><span class="shrink-0 text-[0.6875rem] font-normal text-neutral-500">{t("projects.sessions.context")}</span></Show>
             <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"><WithMentions>{f.s.subagent ? readableSessionTitle(title()) : title()}</WithMentions></span>
-                <Show when={tarjetaDelRiel() && fijada(f.s)}>{marcaDeFijada()}</Show>
-                <Show when={tarjetaDelRiel() && compacta() && !hideFolder(f.s)}>
-                  <span title={props.carpetaDe?.(f.s)} class="ml-auto flex shrink-0 pl-1"><FolderSquare id={projectOf(f.s)} /></span>
-                </Show>
           </div>
         }
       >
@@ -796,6 +924,276 @@ export default function Sessions(props: {
         props.vivas.includes(f.s.id) || props.aprobando.includes(f.s.id),
       );
 
+    /**
+     * El menú de acciones de la fila. En la tarjeta del riel su disparador es
+     * el hueco del estado y empieza por fijar; en las demás listas vive en la
+     * capa de acciones, con la etapa.
+     */
+    const Menu = (m: { riel: boolean }) => (
+      <Popover
+        open={menu() === f.s.id}
+        onOpenChange={(abierto) => {
+          setMenu(abierto ? f.s.id : null);
+          if (!abierto) setConfirmando(null);
+        }}
+        placement="right-start"
+        gutter={6}
+      >
+        {/* Sin `onClick` propio: ver la cabecera del módulo. */}
+        <PopoverTrigger
+          as={(p: object) => (
+            <button
+              {...p}
+              class={m.riel
+                ? cn(
+                    "grid h-5 w-[22px] place-items-center rounded-[5px] border-0 bg-transparent p-0 text-neutral-500 hover:bg-neutral-200 hover:text-neutral-950 focus-visible:outline-2 focus-visible:outline-primary",
+                    menu() === f.s.id && "bg-neutral-200 text-neutral-950",
+                  )
+                : "grid place-items-center rounded-sm border-0 bg-transparent px-1 py-0.5 leading-[1.3] text-neutral-500 hover:bg-neutral-200 hover:text-neutral-950"}
+              aria-label={t("projects.sessions.actions_named", {
+                title: f.s.title,
+              })}
+              aria-haspopup="menu"
+              title={t("projects.sessions.actions")}
+            >
+              <MoreVertical size={m.riel ? 14 : 15} />
+            </button>
+          )}
+        />
+        <PopoverContent
+          role={confirmando() === f.s.id ? "alertdialog" : "menu"}
+          aria-label={confirmando() === f.s.id ? t("projects.sessions.delete") : undefined}
+          class={confirmando() === f.s.id ? "w-72 p-3" : "max-h-72 w-56 overflow-y-auto p-1"}
+        >
+          <Show when={confirmando() === f.s.id} fallback={<>
+              {/* En la tarjeta del riel fijar va primero: el alfiler ya no
+                  tiene botón propio en la fila. */}
+              <Show when={m.riel && props.onPin}>
+                <button
+                  role="menuitem"
+                  data-session-pin
+                  class={`${ITEM_DE_MENU} flex items-center gap-2 font-semibold`}
+                  onClick={() => void setPinned(f.s)}
+                >
+                  <Show when={fijada(f.s)} fallback={<Pin size={14} class="shrink-0 text-neutral-500" aria-hidden="true" />}>
+                    <PinOff size={14} class="shrink-0 text-neutral-500" aria-hidden="true" />
+                  </Show>
+                  {fijada(f.s) ? t("projects.sessions.unpin") : t("projects.sessions.pin")}
+                </button>
+                <span class="my-1 block h-px bg-border" />
+              </Show>
+              {/* La etapa no se marca desde la tarjeta del riel, que no la enseña. */}
+              <Show when={!m.riel}>
+              <Popover placement="right-start" gutter={6}>
+                <div onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
+                  <PopoverTrigger as={(trigger: object) => (
+                    <button {...trigger} role="menuitem" aria-haspopup="menu" class={`${ITEM_DE_MENU} flex items-center justify-between gap-2`}>
+                      {t("projects.sessions.stage")}<ChevronRight size={14} />
+                    </button>
+                  )} />
+                </div>
+                <PopoverContent role="menu" class="w-56 p-1">
+                  <For each={ETAPAS}>
+                    {(e) => (
+                      <button
+                        role="menuitemradio"
+                        aria-checked={f.s.stage === e.id}
+                        class={cn(
+                          ITEM_DE_MENU,
+                          "truncate",
+                          f.s.stage === e.id && "font-semibold",
+                        )}
+                        onClick={() => {
+                          setMenu(null);
+                          props.onEtapa(f.s.id, e.id);
+                        }}
+                      >
+                        {e.rotulo()}
+                      </button>
+                    )}
+                  </For>
+                  <button
+                    role="menuitemradio"
+                    aria-checked={!f.s.stage}
+                    class={cn(
+                      ITEM_DE_MENU,
+                      "truncate",
+                      !f.s.stage && "font-semibold",
+                    )}
+                    onClick={() => {
+                      setMenu(null);
+                      props.onEtapa(f.s.id, null);
+                    }}
+                  >
+                    {t("projects.stage.none")}
+                  </button>
+                </PopoverContent>
+              </Popover>
+              <span class="my-1 block h-px bg-border" />
+              </Show>
+
+              {/* Renombrar está escrito, y el doble clic es el atajo.
+                El gesto de la fila no lo encuentra quien no lo prueba, y
+                con el teclado no se da: si la única forma de cambiarle el
+                nombre a una tarea fuera un doble clic, para media pantalla
+                no existiría. */}
+              <button
+                role="menuitem"
+                class={ITEM_DE_MENU}
+                onClick={() => empezarARenombrar(f.s)}
+              >
+                {t("projects.sessions.rename")}
+              </button>
+              <span class="my-1 block h-px bg-border" />
+
+              <Show when={!f.s.parent && destinosDe(f.s).length > 0}>
+                <Popover placement="right-start" gutter={6}>
+                  <div onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
+                    <PopoverTrigger as={(trigger: object) => (
+                      <button {...trigger} role="menuitem" aria-haspopup="menu" class={`${ITEM_DE_MENU} flex items-center justify-between gap-2`}>
+                        {t("projects.sessions.move_to")}<ChevronRight size={14} />
+                      </button>
+                    )} />
+                  </div>
+                  <PopoverContent role="menu" class="max-h-72 w-56 overflow-y-auto p-1">
+                    <For each={destinosDe(f.s)}>
+                      {(d) => (
+                        <button
+                          role="menuitem"
+                          class={`${ITEM_DE_MENU} truncate`}
+                          onClick={() => {
+                            setMenu(null);
+                            props.onMove(f.s.id, d.id);
+                          }}
+                        >
+                          {d.name}
+                        </button>
+                      )}
+                    </For>
+                  </PopoverContent>
+                </Popover>
+                <span class="my-1 block h-px bg-border" />
+              </Show>
+
+              <Show when={!f.s.parent && !f.s.archived && otherSpaces(f.s).length > 0}>
+                <Popover placement="right-start" gutter={6}>
+                  <div onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
+                    <PopoverTrigger as={(trigger: object) => (
+                      <button {...trigger} role="menuitem" aria-haspopup="menu" data-move-space={f.s.id} class={`${ITEM_DE_MENU} flex items-center justify-between gap-2`}>
+                        {t("spaces.move.to")}<ChevronRight size={14} />
+                      </button>
+                    )} />
+                  </div>
+                  <PopoverContent role="menu" aria-label={t("spaces.move.to")} class="max-h-72 w-60 overflow-y-auto p-1">
+                    <For each={otherSpaces(f.s)}>
+                      {(d) => (
+                        <button
+                          role="menuitem"
+                          class={`${ITEM_DE_MENU} truncate`}
+                          onClick={() => {
+                            setMenu(null);
+                            props.onMoveToSpace?.(f.s.id, d.id);
+                          }}
+                        >
+                          {d.name}
+                        </button>
+                      )}
+                    </For>
+                    <Show when={props.carpetaDe?.(f.s) ?? props.carpeta}>
+                      {(c) => <p class="m-0 px-2 pt-1 pb-1.5 text-[0.6875rem] text-neutral-500">{t("spaces.move.folder_stays", { folder: c() })}</p>}
+                    </Show>
+                  </PopoverContent>
+                </Popover>
+              </Show>
+
+              <Show when={!f.s.parent && projectOf(f.s) !== ""}>
+                <button
+                  role="menuitem"
+                  class={ITEM_DE_MENU}
+                  onClick={() => {
+                    setMenu(null);
+                    props.onMove(f.s.id, "");
+                  }}
+                >
+                  {t("projects.sessions.remove_from_project")}
+                </button>
+              </Show>
+
+              <Show when={props.onBringHere && f.s.machine && canBringHere()}>
+                <button
+                  role="menuitem"
+                  class={ITEM_DE_MENU}
+                  data-bring-here-menu
+                  onClick={() => {
+                    setMenu(null);
+                    props.onBringHere?.(f.s.id);
+                  }}
+                >
+                  {bringHereLabel()}
+                </button>
+              </Show>
+
+              <Show when={!f.s.archived && !fijada(f.s)}>
+                <button
+                  role="menuitem"
+                  class={ITEM_DE_MENU}
+                  disabled={archiving().includes(f.s.id)}
+                  onClick={() => void intentar(f.s.id, false)}
+                >
+                  {t("projects.sessions.archive")}
+                </button>
+              </Show>
+              <Show when={m.riel}><span class="my-1 block h-px bg-border" /></Show>
+              <button
+                role="menuitem"
+                class={`${ITEM_DE_MENU} text-error-strong`}
+                onClick={() => {
+                  setConfirmando(f.s.id);
+                }}
+              >
+                {t("projects.sessions.delete")}
+              </button>
+          </>}>
+            <div
+              data-session-confirm
+              class="min-w-0"
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") { setConfirmando(null); setMenu(null); }
+              }}
+            >
+              <p class="m-0 mb-1.5 text-xs leading-[1.4] text-neutral-500">
+                {t("projects.sessions.delete_confirm")}
+              </p>
+              <div class="flex gap-1.5">
+                <Button
+                  variant="danger"
+                  size="compact"
+                  ref={(el: HTMLElement) =>
+                    queueMicrotask(() => el.focus({ preventScroll: true }))
+                  }
+                  onClick={() => {
+                    setConfirmando(null);
+                    setMenu(null);
+                    props.onDelete(f.s.id);
+                  }}
+                >
+                  {t("projects.sessions.delete")}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="compact"
+                  onClick={() => { setConfirmando(null); setMenu(null); }}
+                >
+                  {t("projects.sessions.keep")}
+                </Button>
+              </div>
+            </div>
+          </Show>
+        </PopoverContent>
+      </Popover>
+    );
+
     return (
       <ConTarjeta s={f.s}>
         {/* `aria-current` además de la clase, y no es adorno: la fila
@@ -812,7 +1210,21 @@ export default function Sessions(props: {
           data-sesion={f.s.id}
           data-pinned={fijada(f.s) ? "true" : undefined}
           data-legacy={f.s.chat_de_agente ? "true" : undefined}
-          class={cn(
+          data-apagada={apagada() ? "true" : undefined}
+          class={tarjetaDelRiel() ? cn(
+            // La tarjeta: 52 px fijos y dos líneas, pase lo que pase con los datos.
+            "group/session relative flex h-[52px] min-w-0 cursor-pointer flex-col justify-center gap-[5px] rounded-[10px] border border-transparent py-[7px] pr-2 pl-2.5 hover:bg-neutral-100 focus-visible:outline-2 focus-visible:outline-primary",
+            // Abierta: un tinte y un borde suave. Ni barra de color, ni negrita, ni sombra.
+            f.s.id === props.current && "border-border bg-neutral-200 hover:bg-neutral-200",
+            // Fijada: el borde lo dibuja `::after` para poder abrirle un hueco
+            // arriba al centro, donde va el alfiler sin fondo; los 7 px de
+            // arriba son los que el alfiler necesita para no recortarse.
+            fijada(f.s) && "tarjeta-fijada mt-[7px] border-transparent",
+            renombrando() === f.s.id && "bg-neutral-200 hover:bg-neutral-200",
+            menu() === f.s.id && f.s.id !== props.current && "bg-neutral-100",
+            (props.draggedTask ?? tareaEnVuelo()?.id) === f.s.id &&
+              "border-neutral-500 bg-transparent opacity-45 [border-style:dashed] hover:bg-transparent",
+          ) : cn(
             "group/session relative grid min-w-0 cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-0.5 rounded-sm border border-transparent py-1 pr-1 pl-2 hover:bg-neutral-100 focus-visible:outline-2 focus-visible:outline-primary",
             f.s.id === props.current &&
               "border-neutral-500 bg-neutral-200 font-semibold text-neutral-950 shadow-sm",
@@ -991,12 +1403,41 @@ export default function Sessions(props: {
             <EtapaDeTarea etapa={f.s.stage} class="mt-[3px]" />
           </div>
           }>
-            <FilaDelRiel s={f.s} actividad={activity()} titulo={<Titulo />} />
+            <Show when={fijada(f.s)}>
+              {/* El alfiler va en el hueco del borde, arriba al centro, sin fondo. */}
+              <span role="img" aria-label={t("projects.sessions.pinned")} class="pointer-events-none absolute -top-1.5 left-1/2 flex size-3 -translate-x-1/2 items-center justify-center text-neutral-500">
+                <Pin size={11} class="tarjeta-fijada-alfiler" aria-hidden="true" />
+              </span>
+            </Show>
+            <FilaDelRiel
+              s={f.s}
+              actividad={activity()}
+              titulo={<Titulo />}
+              apagada={apagada()}
+              conMenu={conMenu()}
+              menu={() => <Menu riel />}
+              cohete={() => (
+                <Show when={puedeFinalizar() && renombrando() !== f.s.id}>
+                  <span data-session-actions data-finish-slot class="flex">
+                    <FinishTaskButton
+                      compact
+                      label={t("projects.sessions.finish")}
+                      description={f.s.subagent || gitRows()[f.s.id]?.shared_with
+                        ? t("projects.sessions.finish_shared_description")
+                        : t("projects.sessions.finish_description")}
+                      busy={finishing().includes(f.s.id)}
+                      onFinish={rect => void intentar(f.s.id, true, rect)}
+                    />
+                  </span>
+                </Show>
+              )}
+            />
           </Show>
 
           {/* Fuera del flujo y junto al título para no tapar el PR de la segunda línea.
-              `right-8` deja libre el menú de acciones. */}
-          <Show when={puedeFinalizar() && renombrando() !== f.s.id}>
+              `right-8` deja libre el menú de acciones. La tarjeta del riel lo
+              lleva en línea, antes de la hora. */}
+          <Show when={!tarjetaDelRiel() && puedeFinalizar() && renombrando() !== f.s.id}>
             <span data-session-actions data-finish-slot class="absolute top-0 right-8 z-10 flex">
               <FinishTaskButton
                 label={t("projects.sessions.finish")}
@@ -1014,7 +1455,7 @@ export default function Sessions(props: {
               encima de otra —el menú arriba, fijar abajo— para no tapar más
               renglón del que tapaba el menú solo. El velo va en `neutral-100`,
               el fondo que tiene la fila mientras se ve. */}
-          <Show when={!props.readOnly}><div
+          <Show when={!props.readOnly && !tarjetaDelRiel()}><div
             data-session-actions
             class={cn(
               "absolute inset-y-1 right-1 flex flex-col items-center justify-center gap-0.5 rounded-sm bg-neutral-100 opacity-0 group-hover/session:opacity-100 group-focus-within/session:opacity-100",
@@ -1029,243 +1470,7 @@ export default function Sessions(props: {
               aria-hidden="true"
               class="pointer-events-none absolute inset-y-0 right-full w-8 bg-linear-to-l from-neutral-100"
             />
-            <Popover
-              open={menu() === f.s.id}
-              onOpenChange={(abierto) => {
-                setMenu(abierto ? f.s.id : null);
-                if (!abierto) setConfirmando(null);
-              }}
-              placement="right-start"
-              gutter={6}
-            >
-              {/* Sin `onClick` propio: ver la cabecera del módulo. */}
-              <PopoverTrigger
-                as={(p: object) => (
-                  <button
-                    {...p}
-                    class="grid place-items-center rounded-sm border-0 bg-transparent px-1 py-0.5 leading-[1.3] text-neutral-500 hover:bg-neutral-200 hover:text-neutral-950"
-                    aria-label={t("projects.sessions.actions_named", {
-                      title: f.s.title,
-                    })}
-                    aria-haspopup="menu"
-                    title={t("projects.sessions.actions")}
-                  >
-                    <MoreVertical size={15} />
-                  </button>
-                )}
-              />
-              <PopoverContent
-                role={confirmando() === f.s.id ? "alertdialog" : "menu"}
-                aria-label={confirmando() === f.s.id ? t("projects.sessions.delete") : undefined}
-                class={confirmando() === f.s.id ? "w-72 p-3" : "max-h-72 w-56 overflow-y-auto p-1"}
-              >
-                <Show when={confirmando() === f.s.id} fallback={<>
-                    <Popover placement="right-start" gutter={6}>
-                      <div onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
-                        <PopoverTrigger as={(trigger: object) => (
-                          <button {...trigger} role="menuitem" aria-haspopup="menu" class={`${ITEM_DE_MENU} flex items-center justify-between gap-2`}>
-                            {t("projects.sessions.stage")}<ChevronRight size={14} />
-                          </button>
-                        )} />
-                      </div>
-                      <PopoverContent role="menu" class="w-56 p-1">
-                        <For each={ETAPAS}>
-                          {(e) => (
-                            <button
-                              role="menuitemradio"
-                              aria-checked={f.s.stage === e.id}
-                              class={cn(
-                                ITEM_DE_MENU,
-                                "truncate",
-                                f.s.stage === e.id && "font-semibold",
-                              )}
-                              onClick={() => {
-                                setMenu(null);
-                                props.onEtapa(f.s.id, e.id);
-                              }}
-                            >
-                              {e.rotulo()}
-                            </button>
-                          )}
-                        </For>
-                        <button
-                          role="menuitemradio"
-                          aria-checked={!f.s.stage}
-                          class={cn(
-                            ITEM_DE_MENU,
-                            "truncate",
-                            !f.s.stage && "font-semibold",
-                          )}
-                          onClick={() => {
-                            setMenu(null);
-                            props.onEtapa(f.s.id, null);
-                          }}
-                        >
-                          {t("projects.stage.none")}
-                        </button>
-                      </PopoverContent>
-                    </Popover>
-                    <span class="my-1 block h-px bg-border" />
-
-                    {/* **Renombrar está escrito, y el doble clic es el atajo.**
-                      El gesto de la fila no lo encuentra quien no lo prueba, y
-                      con el teclado no se da: si la única forma de cambiarle el
-                      nombre a una tarea fuera un doble clic, para media pantalla
-                      no existiría. */}
-                    <button
-                      role="menuitem"
-                      class={ITEM_DE_MENU}
-                      onClick={() => empezarARenombrar(f.s)}
-                    >
-                      {t("projects.sessions.rename")}
-                    </button>
-                    <span class="my-1 block h-px bg-border" />
-
-                    <Show when={!f.s.parent && destinosDe(f.s).length > 0}>
-                      <Popover placement="right-start" gutter={6}>
-                        <div onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
-                          <PopoverTrigger as={(trigger: object) => (
-                            <button {...trigger} role="menuitem" aria-haspopup="menu" class={`${ITEM_DE_MENU} flex items-center justify-between gap-2`}>
-                              {t("projects.sessions.move_to")}<ChevronRight size={14} />
-                            </button>
-                          )} />
-                        </div>
-                        <PopoverContent role="menu" class="max-h-72 w-56 overflow-y-auto p-1">
-                          <For each={destinosDe(f.s)}>
-                            {(d) => (
-                              <button
-                                role="menuitem"
-                                class={`${ITEM_DE_MENU} truncate`}
-                                onClick={() => {
-                                  setMenu(null);
-                                  props.onMove(f.s.id, d.id);
-                                }}
-                              >
-                                {d.name}
-                              </button>
-                            )}
-                          </For>
-                        </PopoverContent>
-                      </Popover>
-                      <span class="my-1 block h-px bg-border" />
-                    </Show>
-
-                    <Show when={!f.s.parent && !f.s.archived && otherSpaces(f.s).length > 0}>
-                      <Popover placement="right-start" gutter={6}>
-                        <div onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
-                          <PopoverTrigger as={(trigger: object) => (
-                            <button {...trigger} role="menuitem" aria-haspopup="menu" data-move-space={f.s.id} class={`${ITEM_DE_MENU} flex items-center justify-between gap-2`}>
-                              {t("spaces.move.to")}<ChevronRight size={14} />
-                            </button>
-                          )} />
-                        </div>
-                        <PopoverContent role="menu" aria-label={t("spaces.move.to")} class="max-h-72 w-60 overflow-y-auto p-1">
-                          <For each={otherSpaces(f.s)}>
-                            {(d) => (
-                              <button
-                                role="menuitem"
-                                class={`${ITEM_DE_MENU} truncate`}
-                                onClick={() => {
-                                  setMenu(null);
-                                  props.onMoveToSpace?.(f.s.id, d.id);
-                                }}
-                              >
-                                {d.name}
-                              </button>
-                            )}
-                          </For>
-                          <Show when={props.carpetaDe?.(f.s) ?? props.carpeta}>
-                            {(c) => <p class="m-0 px-2 pt-1 pb-1.5 text-[0.6875rem] text-neutral-500">{t("spaces.move.folder_stays", { folder: c() })}</p>}
-                          </Show>
-                        </PopoverContent>
-                      </Popover>
-                    </Show>
-
-                    <Show when={!f.s.parent && projectOf(f.s) !== ""}>
-                      <button
-                        role="menuitem"
-                        class={ITEM_DE_MENU}
-                        onClick={() => {
-                          setMenu(null);
-                          props.onMove(f.s.id, "");
-                        }}
-                      >
-                        {t("projects.sessions.remove_from_project")}
-                      </button>
-                    </Show>
-
-                    <Show when={props.onBringHere && f.s.machine && canBringHere()}>
-                      <button
-                        role="menuitem"
-                        class={ITEM_DE_MENU}
-                        data-bring-here-menu
-                        onClick={() => {
-                          setMenu(null);
-                          props.onBringHere?.(f.s.id);
-                        }}
-                      >
-                        {bringHereLabel()}
-                      </button>
-                    </Show>
-
-                    <Show when={!f.s.archived && !fijada(f.s)}>
-                      <button
-                        role="menuitem"
-                        class={ITEM_DE_MENU}
-                        disabled={archiving().includes(f.s.id)}
-                        onClick={() => void intentar(f.s.id, false)}
-                      >
-                        {t("projects.sessions.archive")}
-                      </button>
-                    </Show>
-                    <button
-                      role="menuitem"
-                      class={`${ITEM_DE_MENU} text-error-strong`}
-                      onClick={() => {
-                        setConfirmando(f.s.id);
-                      }}
-                    >
-                      {t("projects.sessions.delete")}
-                    </button>
-                </>}>
-                  <div
-                    data-session-confirm
-                    class="min-w-0"
-                    onClick={(e) => e.stopPropagation()}
-                    onKeyDown={(e) => {
-                      if (e.key === "Escape") { setConfirmando(null); setMenu(null); }
-                    }}
-                  >
-                    <p class="m-0 mb-1.5 text-xs leading-[1.4] text-neutral-500">
-                      {t("projects.sessions.delete_confirm")}
-                    </p>
-                    <div class="flex gap-1.5">
-                      <Button
-                        variant="danger"
-                        size="compact"
-                        ref={(el: HTMLElement) =>
-                          queueMicrotask(() => el.focus({ preventScroll: true }))
-                        }
-                        onClick={() => {
-                          setConfirmando(null);
-                          setMenu(null);
-                          props.onDelete(f.s.id);
-                        }}
-                      >
-                        {t("projects.sessions.delete")}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="compact"
-                        onClick={() => { setConfirmando(null); setMenu(null); }}
-                      >
-                        {t("projects.sessions.keep")}
-                      </Button>
-                    </div>
-                  </div>
-                </Show>
-              </PopoverContent>
-            </Popover>
+            <Menu riel={false} />
             <Show when={props.onPin}>
               <button
                 type="button"
@@ -1288,7 +1493,7 @@ export default function Sessions(props: {
   };
 
   /** Una raíz con su rama de encargos. La pintan las dos listas: activas y archivadas. */
-  const Rama = (r: { rama: RamaDeTareas<SessionRow>; hija?: boolean }) => {
+  const Rama = (r: { rama: RamaDeTareas<SessionRow>; hija?: boolean; trasLasFijadas?: boolean }) => {
     const rama = () => r.rama;
     // Cuenta y estado del plegado: todo lo de debajo, a cualquier nivel.
     const escondidas = () => descendientes(rama());
@@ -1301,6 +1506,9 @@ export default function Sessions(props: {
     };
     return (
       <li>
+        <Show when={r.trasLasFijadas}>
+          <span aria-hidden="true" data-pinned-divider class="mx-1.5 my-[5px] block h-px bg-border" />
+        </Show>
         <Fila s={rama().tarea} />
         <Show when={rama().hijas.length > 0}>
           <button
@@ -1336,7 +1544,7 @@ export default function Sessions(props: {
               )}
               viva={escondidas().some((h) => props.vivas.includes(h.id))}
               esperando={escondidas().some((h) => h.esperando)}
-              outcome={escondidas().some((h) => h.outcome === "failed") ? "failed" : null}
+              outcome={rolledOutcome(escondidas())}
               sinVer={escondidas().some((h) => h.sin_ver)}
             />
             {/* Sin repetirlo al lector de pantalla: el `aria-label` del
@@ -1377,7 +1585,15 @@ export default function Sessions(props: {
     // El orden relativo viene del backend; solo las fijadas suben dentro de su agente.
     const ofAuthor = (key: string) => groupProps.branches.filter(branch => authorKey(branch.tarea, props.groupByHandler) === key)
       .sort((a, b) => Number(fijada(b.tarea)) - Number(fijada(a.tarea)));
-    return <Show when={props.groupByAuthor !== false} fallback={<ul class="m-0 flex min-w-0 list-none flex-col gap-2 p-0 [&>li]:min-w-0"><KeyedList each={[...groupProps.branches].sort((a, b) => Number(fijada(b.tarea)) - Number(fijada(a.tarea)))} by={branch => taskIdentity(branch.tarea)}>{branch => <Rama rama={branch()} />}</KeyedList></ul>}>
+    const ordenadas = createMemo(() => [...groupProps.branches].sort((a, b) => Number(fijada(b.tarea)) - Number(fijada(a.tarea))));
+    // En el riel una línea fina separa las fijadas de las demás: va en la primera que no lo está.
+    const trasLasFijadas = createMemo(() => {
+      if (!props.sidebar) return null;
+      const lista = ordenadas();
+      const primera = lista.findIndex((branch) => !fijada(branch.tarea));
+      return primera > 0 ? taskIdentity(lista[primera].tarea) : null;
+    });
+    return <Show when={props.groupByAuthor !== false} fallback={<ul class={cn("m-0 flex min-w-0 list-none flex-col p-0 [&>li]:min-w-0", tarjetaDelRiel() ? "gap-0.5" : "gap-2")}><KeyedList each={ordenadas()} by={branch => taskIdentity(branch.tarea)}>{branch => <Rama rama={branch()} trasLasFijadas={trasLasFijadas() === taskIdentity(branch().tarea)} />}</KeyedList></ul>}>
       <For each={keys()}>{key => <section data-task-author={key} aria-label={authorLabel(key)} class="flex min-w-0 flex-col gap-1">
       <div class="group/task-author flex items-center gap-1.5 px-2 pt-1 text-xs font-medium text-neutral-500">
         <Show
