@@ -34,8 +34,10 @@ export function usageSummary(credential: Pick<Credential, "machines">): string {
   const ms = credentialMachines(credential);
   const using = ms.filter((m) => m.state === "active" || m.state === "signed_in").map(nameOf);
   const pending = ms.filter((m) => m.state === "pending").map(nameOf);
+  const unsupported = ms.filter((m) => m.state === "unsupported").map(nameOf);
   const parts = [using.length ? t("danil.credentials.in_use", { machines: list(using) }) : t("danil.credentials.in_use_none")];
   if (pending.length) parts.push(t("danil.credentials.pending_on", { machines: list(pending) }));
+  if (unsupported.length) parts.push(t("danil.credentials.unsupported_on", { machines: list(unsupported) }));
   return parts.join(" · ");
 }
 
@@ -78,6 +80,10 @@ export function CredentialMachines(props: { credential: Credential; onChanged?: 
                 <Show when={m.state === "removed"}>
                   <Badge>{t("danil.credentials.state.removed")}</Badge>
                 </Show>
+                <Show when={m.state === "unsupported"}>
+                  <Badge title={t("danil.credentials.state.unsupported_why")}>{t("danil.credentials.state.unsupported")}</Badge>
+                </Show>
+                <Show when={m.state !== "unsupported"}>
                 <Show
                   when={m.state === "removed"}
                   fallback={
@@ -95,6 +101,7 @@ export function CredentialMachines(props: { credential: Credential; onChanged?: 
                   <Button variant="ghost" size="compact" disabled={busy() !== null} onClick={() => void run(m.computer_id, true)}>
                     {t("danil.credentials.restore")}
                   </Button>
+                </Show>
                 </Show>
               </div>
               <Show when={asking() === m.computer_id}>

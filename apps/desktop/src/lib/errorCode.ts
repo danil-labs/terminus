@@ -11,3 +11,10 @@ export function errorCode(e: unknown): string | null {
   if (typeof inner === "string") return inner;
   return typeof code === "string" ? code : null;
 }
+
+/** El motor no conoce la orden (`command` del proxy o del relay): un motor anterior; solo esa función se apaga. */
+export function unknownCommand(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const code = errorCode(error);
+  return code === "command" || code === "unsupported" || (error as { what?: { clave?: unknown } }).what?.clave === "shell.service.command";
+}

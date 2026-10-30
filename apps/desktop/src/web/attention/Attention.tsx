@@ -1,6 +1,8 @@
 import { createEffect, createSignal, For, onCleanup, onMount, Show } from 'solid-js';
 import { createInbox, matchesFilter, type Account, type Conversation, type ConversationCounts, type InboxFilter, type InboxSession, type Message } from '../../../../../packages/attention/src/inbox.ts';
 import { t } from '../../lib/i18n';
+import { inboxDraft } from './inbox-drafts';
+import { createMessaging } from '../../../../../packages/attention/src/messaging.ts';
 import { publishConversations, requestedConversation, requestConversation } from './loaded';
 import { Button } from '../../ui/Button';
 import { Skeleton } from '../../ui/Skeleton';
@@ -17,6 +19,7 @@ export function Attention(props: { demo: boolean; session?: InboxSession & { sub
   const [busy, setBusy] = createSignal(false);
   const [loadingThread, setLoadingThread] = createSignal(false);
   const [error, setError] = createSignal('');
+  const [canReply, setCanReply] = createSignal(false);
   const [consent, setConsent] = createSignal(false);
   const [detail, setDetail] = createSignal(false);
   const [query, setQuery] = createSignal('');
@@ -24,9 +27,11 @@ export function Attention(props: { demo: boolean; session?: InboxSession & { sub
   const [filter, setFilter] = createSignal<InboxFilter>('all');
   const [counts, setCounts] = createSignal<ConversationCounts>({ assistance: null, aiDisabled: null });
   const api = props.session ? createInbox(props.session, fetch, `${import.meta.env.BASE_URL}alpha-api`) : null;
+  const draftSession = props.session ?? { getToken: async () => '', unauthorized: async () => false };
+  const messaging = props.session ? createMessaging(props.session, fetch, `${import.meta.env.BASE_URL}alpha-api`) : null;
   let epoch = 0;
   let thread = 0;
-  const clear = () => { epoch++; thread++; setRows([]); setSelected(undefined); setMessages([]); setMore(false); setOlder(false); setError(''); setDetail(false); setLoadingThread(false); setQuery(''); setChannel(null); setFilter('all'); setCounts({ assistance: null, aiDisabled: null }); };
+  const clear = () => { epoch++; thread++; setCanReply(false); setRows([]); setSelected(undefined); setMessages([]); setMore(false); setOlder(false); setError(''); setDetail(false); setLoadingThread(false); setQuery(''); setChannel(null); setFilter('all'); setCounts({ assistance: null, aiDisabled: null }); };
   onCleanup(() => { epoch++; thread++; });
   onMount(() => {
     const stop = props.session?.subscribe?.(() => { clear(); setAccounts([]); setAccount(undefined); setConsent(false); setBusy(false); });
@@ -43,7 +48,7 @@ export function Attention(props: { demo: boolean; session?: InboxSession & { sub
   async function load(id: number, append = false) {
     if (!append) { clear(); setAccount(id); }
     const request=epoch; setBusy(true); setError('');
-    try { if (!api) return; const page=await api.conversations(id,append?rows().length:0); if(request===epoch){setRows(append?[...rows(),...page.rows]:page.rows);setMore(page.hasMore);setCounts(page.counts);} }
+    try { if (!api) return; const [page, permissions] = await Promise.all([api.conversations(id,append?rows().length:0), api.permissions(id).catch(() => null)]); if(request===epoch)setCanReply(permissions?.permissions.includes('inbox.respond') === true); if(request===epoch){setRows(append?[...rows(),...page.rows]:page.rows);setMore(page.hasMore);setCounts(page.counts);} }
     catch(cause){if(request===epoch)setError(cause instanceof Error?cause.message:t("web.alpha.error"));}
     finally{if(request===epoch)setBusy(false);}
   }
@@ -88,7 +93,7 @@ export function Attention(props: { demo: boolean; session?: InboxSession & { sub
       <section aria-label={t("customize.conversations")} class={`min-h-0 w-full min-w-0 flex-col overflow-hidden dark:bg-surface @[46rem]:flex @[46rem]:border-r @[46rem]:border-border ${selected() ? 'hidden' : 'flex'}`}>
         <header class="flex min-h-11 w-full min-w-0 shrink-0 items-center gap-2 border-b border-border px-3 py-1">
           <span class="min-w-0 flex-1 truncate text-[0.85rem] font-semibold text-neutral-950">{t("web.alpha.inbox")}</span>
-          <span class="shrink-0 rounded-full border border-border px-2 py-[3px] text-[0.68rem] font-medium text-neutral-500">{t("customize.read_only")}</span>
+          <span class="shrink-0 rounded-full border border-border px-2 py-[3px] text-[0.68rem] font-medium text-neutral-500">{canReply() ? t("inbox-writes.enabled") : t("customize.read_only")}</span>
           <Show when={channels().length > 1}><ChannelFilter channels={channels()} value={channel()} onChange={setChannel}/></Show>
         </header>
         <div class="grid w-full min-w-0 shrink-0 gap-2 border-b border-border px-3 py-2"><ConversationSearch value={query()} onChange={setQuery}/><FilterChips value={filter()} counts={chipCounts()} onChange={setFilter}/></div>
@@ -117,7 +122,15 @@ export function Attention(props: { demo: boolean; session?: InboxSession & { sub
                   <Show when={!loadingThread() && !error() && messages().length === 0}><p class="m-0 p-3 text-center text-[0.85rem] text-neutral-500">{t("web.alpha.no_messages")}</p></Show>
                 </div>
               </div>
-              <InboxComposer/>
+              <InboxComposer draft={inboxDraft(draftSession, account() ?? 0, row().id)} conversation={row().id} allowed={canReply() && !props.demo && !row().contact_blocked} onSend={async (id, text, clientId, signal) => {
+                if (!messaging || !canReply()) throw new Error(t("inbox-writes.denied"));
+                return messaging.reply(id, text, clientId, signal);
+              }} onRefresh={async () => {
+                if (!api || !account()) throw new Error(t("web.alpha.session_required"));
+                const currentEpoch = epoch, currentThread = thread;
+                const page = await api.messages(account()!, row().id);
+                if (currentEpoch === epoch && currentThread === thread) { setMessages(page.rows); setOlder(page.hasMore); }
+              }}/>
             </div>
             <Show when={detail()}>
               <button type="button" class="absolute inset-0 z-10 bg-neutral-950/30 @[40rem]/detail:hidden" aria-label={t("web.alpha.close_details")} onClick={() => setDetail(false)}/>

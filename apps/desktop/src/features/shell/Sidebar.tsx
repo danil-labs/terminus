@@ -74,11 +74,24 @@ const RECIBE_LA_TAREA = ["ring-2", "ring-primary"];
  * tarea porque es de ella.
  */
 export function createSidebar() {
-  const [colapsado, setColapsado] = createPref("sidebar.collapsed", false);
+  const [savedCollapsed, setSavedCollapsed] = createPref("sidebar.collapsed", false);
+  const media = window.matchMedia("(max-width: 600px)");
+  const [narrow, setNarrow] = createSignal(media.matches);
+  const [narrowCollapsed, setNarrowCollapsed] = createSignal(true);
+  const update = () => {
+    setNarrow(media.matches);
+    if (media.matches) setNarrowCollapsed(true);
+  };
+  media.addEventListener("change", update);
+  onCleanup(() => media.removeEventListener("change", update));
+  // El teléfono abre sin historial y no cambia la preferencia del escritorio.
+  const colapsado = () => narrow() ? narrowCollapsed() : savedCollapsed();
 
   return {
     colapsado,
-    alternar: () => setColapsado(!colapsado()),
+    alternar: () => narrow()
+      ? setNarrowCollapsed(!narrowCollapsed())
+      : setSavedCollapsed(!savedCollapsed()),
   };
 }
 
