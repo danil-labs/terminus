@@ -73,7 +73,7 @@ test("the page shows the computer, takes a new name and approves the code", asyn
     assert.equal(approve?.url, `${API}/approve`);
     assert.deepEqual(approve?.body, { user_code: "WDJB-MJHT", name: "Mac de Alberto" });
     assert.equal(root()?.dataset.webConnect, "done");
-    assert.ok(text().includes("Listo, vuelve a Terminus."));
+    assert.ok(text().includes("Listo, vuelve a Danil."));
     assert.deepEqual(app.fallos, []);
   } finally {
     restore();

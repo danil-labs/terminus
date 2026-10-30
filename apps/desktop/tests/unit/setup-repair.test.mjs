@@ -349,7 +349,7 @@ caso("Estado del entorno lista solo los extras y lo incluido en una línea con �
   const filas = [...app.w.document.querySelectorAll("tbody tr")].map((tr) => tr.textContent);
   assert.ok(filas.some((f) => f.includes("GitHub CLI")), `no se lista lo detectado en el sistema: ${filas}`);
   assert.ok(!filas.some((f) => /Node\.js|npm|pnpm|Bun|Rust|Git\b|Python/.test(f)), `se listan herramientas que no son extras: ${filas}`);
-  assert.ok(cuerpo.includes("Entorno de Terminus: necesita reparación"));
+  assert.ok(cuerpo.includes("Entorno de Danil: necesita reparación"));
   assert.ok(cuerpo.includes("Editar Excel, Word, PowerPoint y PDF"));
   const reparar = [...app.w.document.querySelectorAll("[data-environment-bundled] button")].find((b) => b.textContent.trim() === "Reparar");
   reparar.click();
