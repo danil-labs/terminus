@@ -232,3 +232,18 @@ test("crear, renombrar y eliminar espacios y cambiar Mantener despierta enciende
   assert.deepEqual(woken, ["cmp_vm"]);
   machines.close();
 });
+
+test("set_keep_awake desde una sesión que no es la de la máquina: command_not_here, sin ocultar Mantener despierta", async () => {
+  FakeSocket.replies.set("cmp_vm", ({ command }) => {
+    if (command === "keep_awake_status") return { value: { mode: "agent", active: false, supported: true } };
+    if (command === "set_keep_awake") return { error: { code: "command_not_allowed", detail: { command: "set_keep_awake", scope: "machine" } } };
+    return undefined;
+  });
+  const { machines, byId } = await start([{ ...VM, state: "online" }]);
+  socketOf("cmp_vm").open("online");
+  const vm = byId("cmp_vm");
+  await vm.call("keep_awake_status", "w1", {});
+  await assert.rejects(vm.call("set_keep_awake", "w1", { mode: "on" }), (e: HostError) => e.code === "command_not_here" && e.detail === "set_keep_awake");
+  assert.equal(vm.available?.("keep_awake"), "yes");
+  machines.close();
+});

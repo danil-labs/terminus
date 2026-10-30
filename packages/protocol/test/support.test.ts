@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { APP_COMMANDS, APP_FEATURES, COMMAND_UNSUPPORTED, CommandSupport, isUnknownCommand } from "../src/index.ts";
+import { APP_COMMANDS, APP_FEATURES, COMMAND_NOT_HERE, COMMAND_UNSUPPORTED, CommandSupport, isScopeRefusal, isUnknownCommand } from "../src/index.ts";
 
 test("cada comando de una función está en la lista cerrada", () => {
   for (const commands of Object.values(APP_FEATURES)) for (const c of commands) assert.ok(APP_COMMANDS.includes(c), c);
@@ -37,4 +37,16 @@ test("una función se enseña cuando contesta su lectura y se oculta si rechaza 
   assert.equal(changed.length, 3, "sin cambio no avisa");
   support.forget("vm");
   assert.equal(support.feature("vm", "keep_awake"), "unknown", "otro motor: se vuelve a saber al llamar");
+});
+
+test("el rechazo de alcance del relay (scope: machine) no es «no lo conoce»; el 403 de un bridge anterior sí", () => {
+  const scope = { code: "command_not_allowed", detail: { command: "set_keep_awake", scope: "machine" } };
+  assert.equal(isScopeRefusal(scope), true);
+  assert.equal(isUnknownCommand(scope), false);
+  assert.equal(isScopeRefusal({ code: COMMAND_NOT_HERE }), true);
+  assert.equal(isUnknownCommand({ code: "command_not_allowed", detail: "set_keep_awake" }), true, "bridge anterior: detail es el comando");
+  const support = new CommandSupport();
+  support.note("vm", "keep_awake_status");
+  assert.equal(support.note("vm", "set_keep_awake", scope), false);
+  assert.equal(support.feature("vm", "keep_awake"), "yes", "no oculta la función");
 });

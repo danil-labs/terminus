@@ -226,6 +226,9 @@ lleva su comentario allí:
 primera respuesta, `yes` si contestó la lectura de la función y `no` si
 rechazó cualquiera de sus comandos; el cambio avisa por `onChange`. La máquina
 nunca sale desactualizada por eso, y al volver a encenderse se vuelve a saber.
+`command_not_allowed` con `detail.scope` no cuenta: es el relay diciendo que un
+comando `scope: "machine"` (como `set_keep_awake`) solo pasa desde la sesión por
+omisión de la máquina. Sale `command_not_here` y la función no se oculta.
 
 En Consumos, «Almacenamiento» consulta el resumen de disco al desplegarlo y el
 workspace seleccionado al abrir una máquina o medir manualmente. No hay

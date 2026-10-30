@@ -19,7 +19,7 @@ import {
   wakes,
 } from "@terminus/computers";
 import { Fleet, type FleetEvent, type Link, type Slice, type StorageLike, isFleetError, isRead } from "@terminus/fleet";
-import { type AppCommand, type AppFeature, COMMAND_UNSUPPORTED, CommandSupport, type EngineError, type EngineEvent, type Support, isAppCommand, isUnknownCommand } from "@terminus/protocol";
+import { type AppCommand, type AppFeature, COMMAND_NOT_HERE, COMMAND_UNSUPPORTED, CommandSupport, type EngineError, type EngineEvent, type Support, isAppCommand, isScopeRefusal } from "@terminus/protocol";
 
 export class HostError extends Error {
   code: string;
@@ -73,8 +73,13 @@ function allowed(command: string) {
   if (!isAppCommand(command)) throw new HostError("command_not_allowed", command);
 }
 
-/** Anota en `support` lo que contestó `command` y nombra el fallo: el comando que la máquina no conoce sale `command_unsupported`. */
+/**
+ * Anota en `support` lo que contestó `command` y nombra el fallo: el comando que
+ * la máquina no conoce sale `command_unsupported`; el que el relay no deja desde
+ * esta sesión (`scope: "machine"`), `command_not_here`, sin anotarlo.
+ */
 function noted(support: CommandSupport, machine: string, command: string, error: unknown): HostError {
+  if (isScopeRefusal(error)) return new HostError(COMMAND_NOT_HERE, command);
   if (support.note(machine, command, error)) return new HostError(COMMAND_UNSUPPORTED, command);
   return error instanceof HostError ? error : new HostError("io", error instanceof Error ? error.message : String(error));
 }

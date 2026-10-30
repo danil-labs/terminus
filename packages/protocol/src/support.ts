@@ -8,11 +8,19 @@
  * relay lo pasa igual y también puede contestar `unsupported` o
  * `command_not_allowed` (una función que no deja pasar). El teléfono lo
  * nombra `command_unsupported`.
+ *
+ * No es lo mismo el rechazo de alcance: un comando con `scope: "machine"` solo
+ * pasa por el relay desde la sesión por omisión de la máquina, y desde otra el
+ * relay contesta `command_not_allowed` con `{ command, scope: "machine" }`
+ * (`PROVENANCE.md`, seldon-host #106/#110). El motor sí lo conoce: el teléfono
+ * lo nombra `command_not_here` y no lo anota.
  */
 import { APP_FEATURES, type AppCommand, type AppFeature } from "./commands.ts";
 
 /** El código con que el teléfono dice que la máquina no conoce el comando; `detail` es el comando. */
 export const COMMAND_UNSUPPORTED = "command_unsupported";
+/** El código con que el teléfono dice que el comando no se puede desde esta sesión (`scope`); `detail` es el comando. */
+export const COMMAND_NOT_HERE = "command_not_here";
 
 const UNKNOWN_CODES: ReadonlySet<string> = new Set(["command", "unsupported", "command_not_allowed", "unknown_command", COMMAND_UNSUPPORTED]);
 const UNKNOWN_KEY = "shell.service.command";
@@ -25,13 +33,21 @@ function keyOf(value: unknown): string | null {
   return typeof key === "string" ? key : null;
 }
 
+/** Si el relay lo rechazó por alcance (`command_not_allowed` con `detail.scope`), no porque el motor no lo conozca. */
+export function isScopeRefusal(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const { code, detail } = error as { code?: unknown; detail?: unknown };
+  if (code === COMMAND_NOT_HERE) return true;
+  return code === "command_not_allowed" && !!detail && typeof detail === "object" && typeof (detail as { scope?: unknown }).scope === "string";
+}
+
 /**
  * Si el fallo dice que la máquina no conoce el comando: por el código (el del
  * relay, el del bridge o el de la flota), por el código dentro de `detail`
  * (`command_failed` con el `Failure` del motor) o por la frase del motor.
  */
 export function isUnknownCommand(error: unknown): boolean {
-  if (!error || typeof error !== "object") return false;
+  if (!error || typeof error !== "object" || isScopeRefusal(error)) return false;
   const { code, detail } = error as { code?: unknown; detail?: unknown };
   if (typeof code === "string" && UNKNOWN_CODES.has(code)) return true;
   if (keyOf(error) === UNKNOWN_KEY) return true;
