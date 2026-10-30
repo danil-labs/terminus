@@ -30,7 +30,7 @@ export function ContextMenuContent(props: ComponentProps<typeof Kobalte.Content>
 
 /** El renglón de un menú de Kobalte; lo comparte `DropdownMenu.tsx`. */
 export const RENGLON_DE_MENU =
-  "block w-full cursor-default rounded-sm px-2 py-1.5 text-left text-[0.8125rem] text-neutral-950 outline-none data-[highlighted]:bg-surface-muted focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary data-[disabled]:pointer-events-none data-[disabled]:opacity-60";
+  "block w-full cursor-default rounded-sm px-2 py-1.5 text-left text-ui text-neutral-950 outline-none data-[highlighted]:bg-surface-muted focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary data-[disabled]:pointer-events-none data-[disabled]:opacity-60";
 
 export function ContextMenuItem(props: ComponentProps<typeof Kobalte.Item>) {
   const [propios, resto] = splitProps(props, ["class"]);
@@ -44,7 +44,7 @@ export function ContextMenuItem(props: ComponentProps<typeof Kobalte.Item>) {
 }
 
 /** El título de un grupo de un menú de Kobalte; lo comparte `DropdownMenu.tsx`. */
-export const TITULO_DE_GRUPO = "block truncate px-2 pt-1 pb-1 text-[0.6875rem] font-medium text-neutral-500";
+export const TITULO_DE_GRUPO = "block truncate px-2 pt-1 pb-1 text-caption font-medium text-neutral-500";
 
 export function ContextMenuGroupLabel(props: ComponentProps<typeof Kobalte.GroupLabel>) {
   const [propios, resto] = splitProps(props, ["class"]);

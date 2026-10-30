@@ -428,7 +428,7 @@ export default function Appearance(props: { proyecto: string }) {
 
       <SettingsSection title={t("settings.appearance.avatar.title")}>
         <Show when={cargado() && filas().length === 0}>
-          <p class="m-0 py-3.5 text-[0.8125rem] text-neutral-500">
+          <p class="m-0 py-3.5 text-ui text-neutral-500">
             {t("settings.appearance.avatar.empty")}
           </p>
         </Show>
@@ -521,7 +521,7 @@ function StylePicker(props: {
                   </span>
                 </span>
               </span>
-              <span class="truncate px-0.5 text-[0.6875rem] text-neutral-950">{label}</span>
+              <span class="truncate px-0.5 text-caption text-neutral-950">{label}</span>
             </button>
           )}
         </For>

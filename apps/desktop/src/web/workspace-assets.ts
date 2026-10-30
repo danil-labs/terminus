@@ -5,7 +5,7 @@
  * the person's session. Images are shown as `data:` URIs: the page's CSP
  * loads no remote images.
  */
-import { ACCOUNT_ASSET_MAX_BYTES, ACCOUNT_ASSET_TYPES, accountAssetUrl, readAccountAsset } from "@terminus/computers";
+import { accountAssetUrl, readAccountAsset } from "@terminus/computers";
 import { blobToDataUrl } from "../features/settings/account-profile.ts";
 import { apiUrl } from "./computers.ts";
 
@@ -27,10 +27,6 @@ export type WorkspaceAssetsSource = {
   /** Read the list again on the next call. */
   forget(): void;
 };
-
-/** Las mismas reglas que el teléfono (`@terminus/computers`). */
-export const ASSET_TYPES = ACCOUNT_ASSET_TYPES;
-export const ASSET_MAX_BYTES: Record<WorkspaceAssetKind, number> = ACCOUNT_ASSET_MAX_BYTES;
 
 type Row = Record<string, unknown> & { id: string };
 

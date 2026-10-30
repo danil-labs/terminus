@@ -138,12 +138,12 @@ export default function Codigo(props: {
               <header class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-2 border-b border-border py-2 pr-3 pl-3">
                 <WorkdirIcon kind={a.kind} cloud={a.cloud} class="mt-0.5 shrink-0 text-neutral-500" />
                 <div class="min-w-0">
-                  <div class="truncate text-[0.8125rem] font-medium" title={a.path}>
+                  <div class="truncate text-ui font-medium" title={a.path}>
                     {a.name}
                   </div>
                   <Show when={workLabel(a.branch, a.alias)}>
                     {(etiqueta) => (
-                      <div class="mt-0.5 flex min-w-0 items-center gap-1 font-mono text-[0.6875rem] text-neutral-500">
+                      <div class="mt-0.5 flex min-w-0 items-center gap-1 font-mono text-caption text-neutral-500">
                         <GitBranch size={11} class="shrink-0" aria-hidden="true" />
                         <span class="min-w-0 truncate" title={etiqueta()}>{etiqueta()}</span>
                       </div>
@@ -168,7 +168,7 @@ export default function Codigo(props: {
                 </Show>
                 <Show when={a.dirty_before}>
                   {(n) => (
-                    <p class="m-0 px-3 pt-2 text-[0.6875rem] text-neutral-500">
+                    <p class="m-0 px-3 pt-2 text-caption text-neutral-500">
                       {t("code.tree.dirty_before", { count: n() })}
                     </p>
                   )}

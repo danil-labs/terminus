@@ -249,7 +249,7 @@ export default function VistaPreviaTypst(props: {
           <IconButton label={t("code.file.image.zoom_out")} onClick={() => fijarZoom(props.session, props.arbol, clampZoom(zoom() / ZOOM_STEP))}>
             <ZoomOut size={13} />
           </IconButton>
-          <span class="min-w-11 text-center font-mono text-[0.6875rem] tabular-nums text-neutral-500">
+          <span class="min-w-11 text-center font-mono text-caption tabular-nums text-neutral-500">
             {Math.round(zoom() * 100)}%
           </span>
           <IconButton label={t("code.file.image.zoom_in")} onClick={() => fijarZoom(props.session, props.arbol, clampZoom(zoom() * ZOOM_STEP))}>
@@ -287,7 +287,7 @@ export default function VistaPreviaTypst(props: {
               </span>
             </Show>
           </Show>
-          <span class="ml-auto flex min-w-0 items-center gap-1.5 overflow-hidden font-mono text-[0.6875rem] text-neutral-500">
+          <span class="ml-auto flex min-w-0 items-center gap-1.5 overflow-hidden font-mono text-caption text-neutral-500">
             <Show when={compilado()?.pages}>
               {(n) => <span class="shrink-0">{t("code.file.pdf.pages", { count: n(), n: n() })}</span>}
             </Show>
@@ -315,7 +315,7 @@ export default function VistaPreviaTypst(props: {
 
         <Show when={exportado()}>
           {(x) => (
-            <div aria-live="polite" class="shrink-0 border-b border-border bg-surface-raised text-[0.6875rem]">
+            <div aria-live="polite" class="shrink-0 border-b border-border bg-surface-raised text-caption">
               <div class="flex items-center gap-2 px-3 py-1">
                 <Show
                   when={x().pdf}
@@ -382,7 +382,7 @@ export default function VistaPreviaTypst(props: {
         </div>
 
         <Show when={errores().length + avisos().length > 0}>
-          <div class="shrink-0 border-t border-border bg-surface-raised text-[0.6875rem]">
+          <div class="shrink-0 border-t border-border bg-surface-raised text-caption">
             <div class="flex items-center gap-2 py-1 pr-1.5 pl-3">
               <button
                 type="button"

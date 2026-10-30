@@ -501,7 +501,7 @@ export default function Herramientas(props: { solo?: string | string[] }) {
                         `name` — el camino lo dice el control de abajo. */}
                     {/* Base propia, no `flex-1`: con base cero el nombre se
                         encogía hasta «F…» en vez de bajar el chip. */}
-                    <span class="flex min-w-0 flex-[1_1_10rem] items-center gap-2 text-[0.8125rem] font-semibold">
+                    <span class="flex min-w-0 flex-[1_1_10rem] items-center gap-2 text-ui font-semibold">
                       <MarcaProveedor id={formas[0].grupo} size={16} />
                       <span class="truncate">{formas[0].name}</span>
                     </span>
@@ -694,7 +694,7 @@ export default function Herramientas(props: { solo?: string | string[] }) {
                       sin gritar. */}
                   <Show when={c().conectado && c().pide_sesion && !autorizaElMotor(c()) && reciben().length > 0}>
                     <div class="mt-0.5 grid gap-1 border-t border-border pt-2">
-                      <p class="m-0 text-[0.6875rem] font-medium uppercase tracking-wide text-neutral-500">
+                      <p class="m-0 text-caption font-medium uppercase tracking-wide text-neutral-500">
                         {t("settings.tools.session")}
                       </p>
                       <For each={reciben()}>
@@ -813,7 +813,7 @@ export default function Herramientas(props: { solo?: string | string[] }) {
       <Show when={!props.solo}>
         <section class="grid grid-cols-[minmax(0,1fr)] gap-2">
           <div class="flex items-center justify-between gap-2">
-            <h3 class="m-0 text-[0.8125rem] font-semibold">{t("settings.tools.others")}</h3>
+            <h3 class="m-0 text-ui font-semibold">{t("settings.tools.others")}</h3>
             <Button
               variant="ghost"
               size="sm"
@@ -834,7 +834,7 @@ export default function Herramientas(props: { solo?: string | string[] }) {
               </p>
               <Textarea
                 rows={4}
-                class="font-mono text-[0.6875rem]"
+                class="font-mono text-caption"
                 value={bloque()}
                 onInput={(e) => setBloque(e.currentTarget.value)}
               />
@@ -868,10 +868,10 @@ export default function Herramientas(props: { solo?: string | string[] }) {
                         `shrink-0` ensanchaba la pantalla y sacaba «Quitar» de
                         la hoja. Lo que no cabe se corta; entera en `title`. */}
                     <span class="grid min-w-0 flex-1 gap-0.5">
-                      <span class="truncate text-[0.8125rem] font-semibold">{p.name}</span>
+                      <span class="truncate text-ui font-semibold">{p.name}</span>
                       {/* De dónde sale, nunca su credencial. */}
                       <span
-                        class="truncate font-mono text-[0.6875rem] text-neutral-500"
+                        class="truncate font-mono text-caption text-neutral-500"
                         title={p.detalle || undefined}
                       >
                         {p.detalle || t("settings.tools.no_source")}
@@ -1008,7 +1008,7 @@ export function ConexionesMenu(props: {
         <Show
           when={pide()}
           fallback={
-            <div class="flex min-h-8 items-center gap-2 px-2 py-1 text-[0.8125rem]" title={p.detalle || undefined}>
+            <div class="flex min-h-8 items-center gap-2 px-2 py-1 text-ui" title={p.detalle || undefined}>
               {contenido()}
               {/* Ámbar si está muerto, verde si está puesto y sano. */}
               <span
@@ -1036,7 +1036,7 @@ export function ConexionesMenu(props: {
               when={estado() === "waiting"}
               fallback={<span class="size-1.5 shrink-0 rounded-full bg-error-strong" />}
             >
-              <span class="shrink-0 text-[0.6875rem] text-neutral-500">
+              <span class="shrink-0 text-caption text-neutral-500">
                 {mcpLoginUrl() ? t("settings.tools.open_login") : t("settings.tools.opening")}
               </span>
             </Show>

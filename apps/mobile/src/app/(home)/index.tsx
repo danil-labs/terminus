@@ -1,3 +1,4 @@
+import { RADIUS, TEXT } from "@terminus/design";
 import { applySidebarView, folderCounts, groupKey, groupLabel, isPinned, type SidebarView } from "@terminus/tasks";
 import { router } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -183,7 +184,7 @@ export default function Home() {
               <Text numberOfLines={1} style={[styles.chipText, { color: theme.text }]}>{current?.name ?? "Terminus"}</Text>
             </View>
             <Tap testID="rename-done" accessibilityRole="button" onPress={() => void saveName()} style={[styles.done, { backgroundColor: theme.text }]}>
-              <Text style={{ color: theme.dark ? theme.bg : "#ffffff", fontWeight: "700", fontSize: 15 }}>{t("attention.close")}</Text>
+              <Text style={{ color: theme.onPrimary, fontWeight: "700", fontSize: TEXT.lead }}>{t("attention.close")}</Text>
             </Tap>
           </>
         ) : (
@@ -290,7 +291,7 @@ export default function Home() {
                         </View>
                       ))}
                     </View>
-                    {working ? <Text style={{ color: theme.textMuted, fontSize: 14 }}>{t("home.agents_working", { count: working })}</Text> : null}
+                    {working ? <Text style={{ color: theme.textMuted, fontSize: TEXT.body }}>{t("home.agents_working", { count: working })}</Text> : null}
                   </View>
                 }
                 chevron
@@ -372,18 +373,18 @@ const styles = StyleSheet.create({
   page: { flex: 1 },
   top: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 16, paddingBottom: 6 },
   chip: { flexDirection: "row", alignItems: "center", gap: 8, minHeight: 40, paddingLeft: 6, paddingRight: 12, borderRadius: 20, borderWidth: StyleSheet.hairlineWidth, flexShrink: 1, marginRight: "auto" },
-  chipText: { fontSize: 15, fontWeight: "700", flexShrink: 1 },
+  chipText: { fontSize: TEXT.lead, fontWeight: "700", flexShrink: 1 },
   tools: { flexDirection: "row", borderRadius: 20, borderWidth: StyleSheet.hairlineWidth, overflow: "hidden" },
   tool: { width: 44, height: 40, alignItems: "center", justifyContent: "center" },
   avatarTap: { width: 44, height: 44, alignItems: "center", justifyContent: "center", borderRadius: 22 },
   avatar: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
-  avatarText: { color: "#ffffff", fontWeight: "700", fontSize: 14 },
-  avatarDot: { position: "absolute", top: 3, right: 3, width: 12, height: 12, borderRadius: 6, borderWidth: 2 },
+  avatarText: { color: "#ffffff", fontWeight: "700", fontSize: TEXT.body },
+  avatarDot: { position: "absolute", top: 3, right: 3, width: 12, height: 12, borderRadius: RADIUS.md, borderWidth: 2 },
   done: { marginLeft: "auto", minHeight: 40, paddingHorizontal: 18, borderRadius: 20, justifyContent: "center" },
   pullSearch: { flexDirection: "row", alignItems: "center", gap: 8, marginHorizontal: 16, marginBottom: 8, height: 44, borderRadius: 12, paddingHorizontal: 12 },
-  renameInput: { borderWidth: 1.5, borderRadius: 8, paddingHorizontal: 6, minHeight: 48 },
+  renameInput: { borderWidth: 1.5, borderRadius: RADIUS.lg, paddingHorizontal: 6, minHeight: 48 },
   faces: { flexDirection: "row", alignItems: "center", gap: 8 },
   faceRow: { flexDirection: "row" },
-  notice: { marginHorizontal: 16, marginBottom: 12, padding: 12, borderRadius: 12, fontSize: 14 },
-  empty: { paddingHorizontal: 32, paddingVertical: 8, fontSize: 14 },
+  notice: { marginHorizontal: 16, marginBottom: 12, padding: 12, borderRadius: 12, fontSize: TEXT.body },
+  empty: { paddingHorizontal: 32, paddingVertical: 8, fontSize: TEXT.body },
 });

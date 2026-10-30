@@ -268,7 +268,7 @@ function SingleAccount() {
           </Match>
           <Match when={status()}>
             <SettingsBlock>
-              <label class="grid max-w-sm gap-1.5 text-[0.8125rem] text-neutral-500">
+              <label class="grid max-w-sm gap-1.5 text-ui text-neutral-500">
                 {t("danil.account.name_label")}
                 <Input value={name()} onInput={(e) => setName(e.currentTarget.value)} disabled={busy()} data-machine-name="" />
                 <span class="text-xs">{t("danil.account.name_hint")}</span>
@@ -289,7 +289,7 @@ function SingleAccount() {
           </SettingsBlock>
         </Show>
         <Show when={session.message()}>
-          {(text) => <p class="m-0 pt-2 text-[0.8125rem] text-error-strong" role="alert">{text()}</p>}
+          {(text) => <p class="m-0 pt-2 text-ui text-error-strong" role="alert">{text()}</p>}
         </Show>
       </SettingsSection>
       <Show when={status()?.state === "connected"}>

@@ -8,7 +8,7 @@
  * pudo releer (la máquina no contesta, o está apagada) se conserva con
  * `stale`: la tarjeta lo enseña en gris, sin afirmar ni el rojo del CI.
  */
-import { resolveTaskGit, UNKNOWN_TASK_GIT, type TaskGitStatus, type TaskGitSession } from "@terminus/tasks";
+import { resolveTaskGit, retainGitObservation, UNKNOWN_TASK_GIT, type TaskGitStatus, type TaskGitSession } from "@terminus/tasks";
 
 export type GitAsk = { host: string; workspace: string; project: string; priority: string[] };
 
@@ -36,7 +36,8 @@ const isRow = (v: unknown): v is TaskGitStatus => !!v && typeof v === "object" &
 
 /**
  * La respuesta de una carpeta en el libro. Una fila que el motor no pudo leer
- * (`kind: "unknown"`) no borra lo que ya se sabía: queda vieja.
+ * (`kind: "unknown"`) no borra lo que ya se sabía: queda vieja. Una más antigua
+ * tampoco pisa lo más nuevo.
  */
 export function withGitAnswer(book: GitBook, host: string, answer: unknown): GitBook {
   if (!answer || typeof answer !== "object") return book;
@@ -45,8 +46,8 @@ export function withGitAnswer(book: GitBook, host: string, answer: unknown): Git
     if (!isRow(row)) continue;
     const key = `${host}/${id}`;
     const before = book[key];
-    const value = (row as { kind?: string }).kind === "unknown" && before ? { ...before, stale: true } : row;
-    if (before && JSON.stringify(before) === JSON.stringify(value)) continue;
+    const value = retainGitObservation(before ? { [id]: before } : {}, { [id]: row })[id];
+    if (value === before) continue;
     next ??= { ...book };
     next[key] = value;
   }

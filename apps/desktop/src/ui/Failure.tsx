@@ -8,13 +8,13 @@ export { asFailure, claveDe, detalleDe, prosaDe, type Failure } from "../lib/fai
 export function FailureNote(props: { f: Failure }) {
   return (
     <div class="flex flex-col gap-1 py-3 pr-3.5 font-mono text-xs text-error-strong">
-      <span class="font-sans text-[0.8125rem]">{prosa(props.f.what)}</span>
+      <span class="font-sans text-ui">{prosa(props.f.what)}</span>
       <Show when={props.f.detail}>
         <details>
-          <summary class="cursor-pointer font-sans text-[0.6875rem] text-neutral-500">
+          <summary class="cursor-pointer font-sans text-caption text-neutral-500">
             {t("common.failure.detail")}
           </summary>
-          <p class="m-0 mt-1 font-mono text-[0.6875rem] break-all whitespace-pre-wrap text-neutral-500">
+          <p class="m-0 mt-1 font-mono text-caption break-all whitespace-pre-wrap text-neutral-500">
             {props.f.detail}
           </p>
         </details>

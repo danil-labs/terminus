@@ -691,7 +691,7 @@ export default function Setup(props: { children: JSX.Element }) {
               <h2 class="m-0 mt-2 mb-1.5 text-base font-display font-bold tracking-[-0.01em] text-neutral-950">
                 {consejos()[consejo()][0]}
               </h2>
-              <p class="m-0 min-h-[58px] max-w-[42ch] text-[13px] text-neutral-500">{consejos()[consejo()][1]}</p>
+              <p class="m-0 min-h-[58px] max-w-[42ch] text-ui text-neutral-500">{consejos()[consejo()][1]}</p>
               <div class="mt-2.5 flex gap-1.5">
                 <For each={consejos()}>
                   {(_, i) => (

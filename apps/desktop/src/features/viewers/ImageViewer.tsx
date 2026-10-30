@@ -78,7 +78,7 @@ export default function ZoomableImage(props: { src: string; alt: string }) {
         <IconButton label={t("code.file.image.zoom_out")} onClick={() => zoomAt({ x: 0, y: 0 }, 1 / ZOOM_STEP)}>
           <ZoomOut size={13} />
         </IconButton>
-        <span class="min-w-11 text-center font-mono text-[0.6875rem] tabular-nums text-neutral-500">
+        <span class="min-w-11 text-center font-mono text-caption tabular-nums text-neutral-500">
           {Math.round(zoom() * 100)}%
         </span>
         <IconButton label={t("code.file.image.zoom_in")} onClick={() => zoomAt({ x: 0, y: 0 }, ZOOM_STEP)}>

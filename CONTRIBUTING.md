@@ -1,7 +1,7 @@
 # Contributing to Terminus
 
-Thanks for helping. This repository is the Terminus window: the desktop app and
-its release tooling. The engine (`seldon-runtime`) is a separate, proprietary
+Thanks for helping. This repository holds the Terminus clients: the desktop app, the
+mobile app, the packages they share and their release tooling. The engine (`seldon-runtime`) is a separate, proprietary
 binary; changes to how projects, tasks, agents or accounts behave inside the
 engine can't be made here, but bug reports about them are welcome as issues.
 
@@ -15,7 +15,7 @@ engine can't be made here, but bug reports about them are welcome as issues.
 
 ## Making a change
 
-1. Fork the repository and create a branch from `main`.
+1. Fork the repository and create a branch from `dev`.
 2. Make the change. Keep it focused: one concern per pull request.
 3. Run the chain and make sure it passes:
 
@@ -27,10 +27,11 @@ engine can't be made here, but bug reports about them are welcome as issues.
 4. Check the change in the real window when it affects what people see
    (`pnpm window:build` and `pnpm engine:start`). Say in the pull request what
    you checked, on which platform, and what you could not check.
-5. Open a pull request against `main` and fill in the template.
+5. Open a pull request against `dev` and fill in the template; `dev` goes to
+   `main` after QA.
 
-CI runs `verify` on every pull request. It runs with read-only permissions and
-without secrets, so it works the same from a fork.
+The chain runs locally, on every platform the change touches, before a merge.
+GitHub Actions is not the gate.
 
 ## Developer Certificate of Origin (DCO)
 

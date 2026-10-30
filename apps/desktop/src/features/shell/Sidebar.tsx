@@ -413,7 +413,7 @@ export default function Sidebar(props: {
     // En un memo: con `class` como único atributo vivo, Solid lo reescribe en cada
     // cambio del grupo aunque valga lo mismo (`tests/perf/open-task-cost.mjs`).
     const clase = createMemo(() => cn(
-      "group flex h-7 min-w-0 items-center gap-1.5 px-2 pt-1 text-[0.6875rem] font-medium",
+      "group flex h-7 min-w-0 items-center gap-1.5 px-2 pt-1 text-caption font-medium",
       p.accion && "pr-0",
       p.tono === "need" ? "text-warning" : "text-neutral-500",
     ));
@@ -436,7 +436,7 @@ export default function Sidebar(props: {
    */
   const FilaDeClon = (pp: { clon: ClonEnCurso }) => (
     <button
-      class="grid min-w-0 grid-cols-[22px_minmax(0,1fr)] items-center gap-0.5 rounded-[var(--radius-sm)] px-2 py-1 text-left outline-none hover:bg-surface-muted focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+      class="grid min-w-0 grid-cols-[22px_minmax(0,1fr)] items-center gap-0.5 rounded-sm px-2 py-1 text-left outline-none hover:bg-surface-muted focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
       onClick={() => props.onAbrirClon()}
     >
       <Show
@@ -452,10 +452,10 @@ export default function Sidebar(props: {
         <Spinner size={14} class="justify-self-center text-neutral-500" />
       </Show>
       <span class="grid min-w-0">
-        <span class="truncate text-[0.8125rem] font-medium text-neutral-500">
+        <span class="truncate text-ui font-medium text-neutral-500">
           {pp.clon.name || t("shell.sidebar.clone_unnamed")}
         </span>
-        <span class="truncate text-[0.6875rem] text-neutral-500">
+        <span class="truncate text-caption text-neutral-500">
           {pp.clon.failed
             ? t("projects.add.clone_failed")
             : `${t("projects.add.cloning")} ${faseDeClon(pp.clon.phase)}${
@@ -487,7 +487,7 @@ export default function Sidebar(props: {
             fallback={
               <div
                 data-destino={g().kind === "folder" ? "" : undefined}
-                class={cn("rounded-[var(--radius-sm)]", g().kind === "folder" && (props.dragFolder ?? destinoEnVuelo()) === "" && RECIBE_LA_TAREA)}
+                class={cn("rounded-sm", g().kind === "folder" && (props.dragFolder ?? destinoEnVuelo()) === "" && RECIBE_LA_TAREA)}
               >
                 <Rotulo
                   tono={necesita() ? "need" : undefined}
@@ -538,7 +538,7 @@ export default function Sidebar(props: {
           <Show when={abierto()}>
             <Show
               when={g().tasks.length > 0}
-              fallback={<p class="m-0 py-0.5 pl-7 text-[0.6875rem] text-neutral-500" data-folder-empty="">{t("shell.sidebar.folder_empty")}</p>}
+              fallback={<p class="m-0 py-0.5 pl-7 text-caption text-neutral-500" data-folder-empty="">{t("shell.sidebar.folder_empty")}</p>}
             >
               <Historial filas={g().tasks} sinCarpeta={g().kind === "folder" && !!g().key} />
             </Show>

@@ -310,7 +310,7 @@ function CopiarEnlace(props: { destino: string }) {
       </button>
       <Show when={fallo()}>
         {(texto) => (
-          <p role="alert" class="flex max-w-64 items-start gap-2 px-2 py-1.5 text-[0.75rem] text-error-strong">
+          <p role="alert" class="flex max-w-64 items-start gap-2 px-2 py-1.5 text-label text-error-strong">
             <TriangleAlert size={13} class="mt-0.5 shrink-0" />
             {texto()}
           </p>

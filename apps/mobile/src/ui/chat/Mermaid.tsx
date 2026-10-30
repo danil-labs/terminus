@@ -1,3 +1,4 @@
+import { RADIUS } from "@terminus/design";
 import { useState } from "react";
 import { Platform, StyleSheet, Text, View } from "react-native";
 import { useTheme } from "../theme";
@@ -56,5 +57,5 @@ export function CodeFallback({ text }: { text: string }) {
 
 const styles = StyleSheet.create({
   block: { alignSelf: "stretch", marginVertical: 4 },
-  mono: { fontFamily: Platform.select({ ios: "Menlo", default: "monospace" }), fontSize: 12.5, lineHeight: 18, padding: 10, borderRadius: 8 },
+  mono: { fontFamily: Platform.select({ ios: "Menlo", default: "monospace" }), fontSize: 12.5, lineHeight: 18, padding: 10, borderRadius: RADIUS.lg },
 });

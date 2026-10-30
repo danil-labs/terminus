@@ -107,7 +107,7 @@ function SecretItem(props: { row: SecretRow; overrides: boolean; onChange: () =>
   return (
     <SettingsBlock data-secret={props.row.slot}>
       <div class="flex min-w-0 items-center gap-2">
-        <span class="min-w-0 truncate font-mono text-[0.8125rem] text-neutral-950">{props.row.name}</span>
+        <span class="min-w-0 truncate font-mono text-ui text-neutral-950">{props.row.name}</span>
         <Show when={props.row.hint}>{(hint) => <Badge forma="dato">{`••••${hint()}`}</Badge>}</Show>
         <span class="flex-1" />
         <Button variant="ghost" size="compact" onClick={() => props.onChange()}>
@@ -394,7 +394,7 @@ export default function Secrets() {
           </Match>
           <Match when={engineState() === "unsupported"}>
             <div class="mt-2 grid gap-1 rounded-md border border-border bg-surface-raised px-3 py-2.5" data-secrets-unsupported="">
-              <p class="m-0 text-[0.8125rem] font-semibold">{t("danil.secrets.engine_unsupported")}</p>
+              <p class="m-0 text-ui font-semibold">{t("danil.secrets.engine_unsupported")}</p>
               <p class="m-0 text-xs text-neutral-500">{t("danil.secrets.engine_unsupported_help")}</p>
             </div>
           </Match>
@@ -429,7 +429,7 @@ export default function Secrets() {
                 <KeyedList each={groups()} by={(g) => g.folder ?? "*"}>
                   {(g) => (
                     <div class="grid min-w-0" data-secrets-group={g().folder ?? "*"}>
-                      <p class="m-0 pt-3 text-[0.8125rem] font-semibold">
+                      <p class="m-0 pt-3 text-ui font-semibold">
                         {g().folder === null ? t("danil.secrets.scope_workspace") : t("danil.secrets.scope_folder", { folder: folderName(g().folder!) })}
                       </p>
                       <KeyedList each={g().items} by={(r) => r.slot}>

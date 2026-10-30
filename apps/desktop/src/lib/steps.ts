@@ -15,6 +15,7 @@
  * máquina, y por eso van en mono al lado del verbo—: traducirlos rompería el
  * emparejamiento con lo que manda `runtime/chat/`.
  */
+import { bareCommand, classify, fileName, type StepKind } from "@terminus/chat/steps";
 import { manifiesto, t } from "./i18n.ts";
 
 /** Qué clase de acto fue. Decide el verbo y el ícono de la fila. */
@@ -85,43 +86,10 @@ export type Paso = {
   decidio?: string;
 };
 
-/**
- * De qué clase es una herramienta.
- *
- * Los nombres de Claude y los tipos de item de Codex conviven en la misma tabla
- * porque nombran lo mismo: `Bash` y `command_execution` son «ejecutó algo». Lo
- * que no está en la tabla cae en `otro` y se muestra con su nombre crudo, que es
- * más honesto que forzarlo a una categoría.
- */
-export function clasificar(nombre: string): Clase {
-  switch (nombre) {
-    case "Read":
-    case "NotebookRead":
-      return "leer";
-    case "Write":
-    case "Edit":
-    case "NotebookEdit":
-    case "file_change":
-      return "editar";
-    case "Bash":
-    case "BashOutput":
-    case "KillShell":
-    case "command_execution":
-      return "ejecutar";
-    case "Glob":
-    case "Grep":
-      return "buscar";
-    case "WebFetch":
-    case "WebSearch":
-    case "web_search":
-      return "web";
-    case "TodoWrite":
-    case "todo_list":
-      return "plan";
-    default:
-      return "otro";
-  }
-}
+const CLASE: Record<StepKind, Clase> = { read: "leer", search: "buscar", edit: "editar", run: "ejecutar", web: "web", plan: "plan", other: "otro" };
+
+/** De qué clase es una herramienta; la tabla es la misma en todos los clientes. */
+export const clasificar = (nombre: string): Clase => CLASE[classify(nombre)];
 
 /** Un paso recién abierto. Es la puerta por la que entra todo. */
 export function pasoDe(
@@ -243,10 +211,7 @@ function archivosDistintos(pasos: Paso[]) {
   return new Set(pasos.map((p, i) => p.objetivo ?? `#${i}`)).size;
 }
 
-/** El nombre de archivo de una ruta, en las dos convenciones de barra. */
-export function nombreDe(ruta: string) {
-  return ruta.split(/[\\/]/).filter(Boolean).pop() || ruta;
-}
+export const nombreDe = fileName;
 
 /**
  * La extensión, sin punto y tal como viene, o vacía si el nombre no la trae.
@@ -260,32 +225,10 @@ export function extensionDe(ruta: string) {
 }
 
 /**
- * Lo que se ejecutó, sin el envoltorio del shell **ni el `cd` que lo precede**.
- *
- * Son dos envoltorios y el motivo es el mismo: enseñar la fontanería en el sitio
- * donde va lo que el agente decidió hacer.
- *
- * - Codex no manda el comando: manda `/bin/zsh -lc "…"` con el comando dentro.
- *   Verificado sobre un turno real.
- * - Y **el 52 % de los comandos empieza por `cd "<ruta absoluta>" && `**, medido
- *   sobre 14 sesiones. Ese prefijo ocupa 137 caracteres de mediana —la ruta de
- *   una carpeta de trabajo de Terminus es larga— y es idéntico en todas las
- *   filas de la misma tarea: no distingue una de otra y desplaza a la derecha lo
- *   único que sí.
- *
- * **Se quita al pintar, no al guardar.** El rastro es lo que el gate aprueba, y
- * ahí el comando tiene que ser el que se ejecutó de verdad. Lo que se recorta es
- * la lectura.
- *
- * El `cd` se quita **solo cuando hay algo detrás**: un `cd` suelto es lo que el
- * agente hizo y se enseña tal cual.
+ * Se quita al pintar, no al guardar: el rastro es lo que el gate aprueba, y ahí
+ * el comando tiene que ser el que se ejecutó de verdad.
  */
-export function comando(cmd: string) {
-  const envuelto = /^\S*(?:sh|bash|zsh)\s+-[a-z]*c\s+(["'])([\s\S]*)\1\s*$/.exec(cmd.trim());
-  const desnudo = (envuelto ? envuelto[2] : cmd).trim();
-  const conCd = /^cd\s+(?:"[^"]*"|'[^']*'|\S+)\s*&&\s*([\s\S]+)$/.exec(desnudo);
-  return (conCd ? conCd[1] : desnudo).trim();
-}
+export const comando = bareCommand;
 
 /**
  * La cabecera de una fila: el verbo en prosa y el sujeto como dato de máquina.

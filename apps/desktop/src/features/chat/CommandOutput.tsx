@@ -58,11 +58,11 @@ export default function SalidaDeComando(props: {
           {...props}
           derecha={
             <Show when={props.durationMs}>
-              {(ms) => <span class="shrink-0 text-[0.6875rem] text-neutral-500">{formatearDuracion(ms())}</span>}
+              {(ms) => <span class="shrink-0 text-caption text-neutral-500">{formatearDuracion(ms())}</span>}
             </Show>
           }
         >
-          <p class="m-0 flex min-w-0 items-center gap-1.5 text-[0.8125rem]">
+          <p class="m-0 flex min-w-0 items-center gap-1.5 text-ui">
             <Check size={14} class="shrink-0 text-success-strong" aria-hidden="true" />
             <span class="font-semibold text-neutral-950">{t("chat.command.compacted")}</span>
             <Show when={Number(props.text) > 0}>
@@ -75,7 +75,7 @@ export default function SalidaDeComando(props: {
       </Match>
       <Match when={props.clase === "empty"}>
         <Tarjeta {...props}>
-          <p class="m-0 text-[0.8125rem] text-neutral-500">
+          <p class="m-0 text-ui text-neutral-500">
             {t("chat.command.empty", { command: props.text || escrito() })}
           </p>
         </Tarjeta>
@@ -91,7 +91,7 @@ function Aviso(props: { texto: string; nota?: string; clase: string }) {
       data-sender="system"
       data-command-output={props.clase}
     >
-      <p class="m-0 flex min-w-0 items-start gap-2 text-[0.8125rem] text-neutral-950">
+      <p class="m-0 flex min-w-0 items-start gap-2 text-ui text-neutral-950">
         <TriangleAlert size={14} class="mt-0.5 shrink-0 text-warning-strong" aria-hidden="true" />
         <span class="min-w-0 break-words">{props.texto}</span>
       </p>
@@ -124,9 +124,9 @@ function Tarjeta(props: {
           <span class="min-w-0 truncate font-mono text-xs font-medium text-neutral-950">
             {props.command}
           </span>
-          <span class="text-[0.6875rem] text-neutral-500" aria-hidden="true">·</span>
+          <span class="text-caption text-neutral-500" aria-hidden="true">·</span>
         </Show>
-        <span class="shrink-0 text-[0.6875rem] text-neutral-500">{props.agentLabel}</span>
+        <span class="shrink-0 text-caption text-neutral-500">{props.agentLabel}</span>
         <Show when={props.derecha}>
           <span class="ml-auto flex shrink-0 items-center">{props.derecha}</span>
         </Show>

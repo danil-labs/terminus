@@ -1,6 +1,7 @@
 # Historial acotado en host, relay, escritorio y web
 
-Estado: propuesta de implementación, 2026-10-28. Preparada a petición de la
+Estado: propuesta del 2026-10-28; la parte del cliente ya entró (#441 y
+`history_request` en `features/machines/router.ts`), host y relay se confirman en su repo. Preparada a petición de la
 persona; no es aceptación de arquitectura ni autorización de despliegue.
 Base del cliente inspeccionada: `4cc7a618`. Lectores: responsables del motor,
 Computers y clientes. Resultado esperado: cualquier conversación existente abre

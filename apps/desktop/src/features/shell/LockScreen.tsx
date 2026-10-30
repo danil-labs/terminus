@@ -21,7 +21,7 @@ export default function PantallaDeBloqueo(props: { frase: Frase }) {
     <div class="flex h-full flex-col items-center justify-center gap-3 bg-surface px-8">
       <TriangleAlert size={28} class="shrink-0 text-warning-strong" aria-hidden="true" />
       <p
-        class="m-0 max-w-[46ch] text-center text-[0.8125rem] leading-relaxed text-neutral-700"
+        class="m-0 max-w-[46ch] text-center text-ui leading-relaxed text-neutral-700"
         role="status"
       >
         {prosa(props.frase)}

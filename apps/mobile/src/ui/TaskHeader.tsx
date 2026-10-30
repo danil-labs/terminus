@@ -1,3 +1,4 @@
+import { TEXT } from "@terminus/design";
 import { router } from "expo-router";
 import { canFinishTask, cardPull, isPinned, type TaskGit } from "@terminus/tasks";
 import { useState } from "react";
@@ -107,12 +108,12 @@ const styles = StyleSheet.create({
   rocket: { borderRadius: 12 },
   heading: { flex: 1, minWidth: 0 },
   titleTarget: { minHeight: 28, justifyContent: "center" },
-  title: { fontSize: 15, fontWeight: "600" },
+  title: { fontSize: TEXT.lead, fontWeight: "600" },
   meta: { minHeight: 24, flexDirection: "row", alignItems: "center", gap: 5 },
   dot: { width: 5, height: 5, borderRadius: 3 },
-  machine: { fontSize: 11, flexShrink: 1 },
-  pull: { fontSize: 11, flexShrink: 1 },
+  machine: { fontSize: TEXT.caption, flexShrink: 1 },
+  pull: { fontSize: TEXT.caption, flexShrink: 1 },
   body: { paddingHorizontal: 20, gap: 12 },
   fullTitle: { fontSize: 17, fontWeight: "600" },
-  description: { fontSize: 14, lineHeight: 21 },
+  description: { fontSize: TEXT.body, lineHeight: 21 },
 });

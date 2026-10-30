@@ -31,7 +31,7 @@
 import { readFileSync, } from "node:fs";
 import { relative } from "node:path";
 // `.pathname` de un `file://` da `/C:/Users/…` en Windows, y `readdirSync` lo
-// resuelve contra la unidad actual. Ver `scripts/paths.mjs`.
+// resuelve contra la unidad actual.
 import { fileURLToPath } from "node:url";
 import { walkFiles } from "../git.mjs";
 

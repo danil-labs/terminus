@@ -287,7 +287,7 @@ function Marcas(props: { fila: Fila }) {
         {(d) => {
           const b = () => balance(comparado(d()));
           return (
-            <span class="ml-auto shrink-0 font-mono text-[0.6875rem] tabular-nums">
+            <span class="ml-auto shrink-0 font-mono text-caption tabular-nums">
               <Show when={b().pone > 0}>
                 <span class="text-success-strong">+{b().pone}</span>
               </Show>
@@ -301,7 +301,7 @@ function Marcas(props: { fila: Fila }) {
 
       <Match when={codigo()}>
         {(c) => (
-          <span class="ml-auto shrink-0 font-mono text-[0.6875rem] tabular-nums text-error-strong">
+          <span class="ml-auto shrink-0 font-mono text-caption tabular-nums text-error-strong">
             {t("chat.timeline.exit_code", { code: c() })}
           </span>
         )}
@@ -311,7 +311,7 @@ function Marcas(props: { fila: Fila }) {
           herramienta rechazó —permiso denegado, ruta prohibida— no llegó a
           correr, y esta transcripción es lo que el gate aprueba. */}
       <Match when={props.fila.pasos.some((p) => p.ok === false)}>
-        <span class="ml-auto shrink-0 text-[0.6875rem] text-error-strong">
+        <span class="ml-auto shrink-0 text-caption text-error-strong">
           {t("chat.timeline.failed")}
         </span>
       </Match>
@@ -338,7 +338,7 @@ function Cuerpo(props: { paso: Paso }) {
           <div class={cn(es() && "border-l border-border pl-3")}>
             <Show when={salida()?.cwd}>
               {(cwd) => (
-                <p class="m-0 pb-1 font-mono text-[0.625rem] text-neutral-500">
+                <p class="m-0 pb-1 font-mono text-2xs text-neutral-500">
                   {cwd()}
                 </p>
               )}
@@ -346,7 +346,7 @@ function Cuerpo(props: { paso: Paso }) {
             <Show
               when={es()}
               fallback={
-                <p class="m-0 font-mono text-[0.6875rem] break-all text-neutral-700">{o()}</p>
+                <p class="m-0 font-mono text-caption break-all text-neutral-700">{o()}</p>
               }
             >
               <Comando texto={comando(o())} />
@@ -367,7 +367,7 @@ function Cuerpo(props: { paso: Paso }) {
           !props.paso.corriendo
         }
       >
-        <p class="m-0 text-[0.6875rem] text-neutral-500 italic">
+        <p class="m-0 text-caption text-neutral-500 italic">
           {props.paso.nombre === "file_change"
             ? t("chat.timeline.edit.codex_no_content")
             : t("chat.timeline.edit.no_content")}
@@ -393,14 +393,14 @@ function Comando(props: { texto: string }) {
 
   return (
     <>
-      <p class="m-0 font-mono text-[0.6875rem] break-all whitespace-pre-wrap text-neutral-700">
+      <p class="m-0 font-mono text-caption break-all whitespace-pre-wrap text-neutral-700">
         {`$ ${visible()}`}
       </p>
       <Show when={recorte()}>
         <button
           type="button"
           onClick={() => setEntero(!entero())}
-          class="mt-1 text-[0.6875rem] text-neutral-500 hover:text-neutral-700 hover:underline"
+          class="mt-1 text-caption text-neutral-500 hover:text-neutral-700 hover:underline"
         >
           {entero() ? t("chat.timeline.command.show_less") : t("chat.timeline.command.show_all")}
         </button>
@@ -413,11 +413,11 @@ function Comando(props: { texto: string }) {
 function Terminal(props: { salida: Extract<Detalle, { kind: "output" }> }) {
   return (
     <div class="min-w-0">
-      <pre class="m-0 max-h-72 overflow-auto border-l border-border pl-3 font-mono text-[0.6875rem] leading-[1.5] whitespace-pre-wrap text-neutral-950">
+      <pre class="m-0 max-h-72 overflow-auto border-l border-border pl-3 font-mono text-caption leading-[1.5] whitespace-pre-wrap text-neutral-950">
         <AnsiText text={props.salida.text || " "} />
       </pre>
       <Show when={props.salida.truncated}>
-        <p class="m-0 pt-1 text-[0.6875rem] text-neutral-500 italic">
+        <p class="m-0 pt-1 text-caption text-neutral-500 italic">
           {t("chat.timeline.output.truncated")}
         </p>
       </Show>

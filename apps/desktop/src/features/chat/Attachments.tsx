@@ -118,10 +118,10 @@ function Tarjeta(props: { rel: string }) {
         <FileText size={15} class="text-neutral-500" />
       </span>
       <span class="min-w-0 flex-1">
-        <span class="block truncate text-[0.6875rem] font-medium text-neutral-950">
+        <span class="block truncate text-caption font-medium text-neutral-950">
           {nombreDe(props.rel)}
         </span>
-        <span class="block text-[0.625rem] tracking-wide text-neutral-500 uppercase">
+        <span class="block text-2xs tracking-wide text-neutral-500 uppercase">
           {extensionDe(props.rel) || t("chat.attachments.file_type_unknown")}
         </span>
       </span>
