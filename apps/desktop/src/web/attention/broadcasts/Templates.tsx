@@ -1,7 +1,7 @@
 import { createEffect, createSignal, For, Match, onMount, Show, Switch } from 'solid-js';
 import RefreshCw from 'lucide-solid/icons/refresh-cw';
 import Trash2 from 'lucide-solid/icons/trash-2';
-import { draftContent, extractTemplateVariables, normalizeTemplateName, parseTemplateText, templateContent, type HeaderFormat, type Template, type TemplateContent, type TemplateInput, type TemplateSyncResult, type TextNode } from '../../../../../../packages/attention/src/broadcasts.ts';
+import { draftContent, extractTemplateVariables, normalizeTemplateName, parseTemplateText, templateContent, type HeaderFormat, type Template, type TemplateContent, type TemplateInput, type TemplateSyncResult, type TextNode } from '../../../../../../packages/attention/src/broadcast-panel.ts';
 import { t } from '../../../lib/i18n';
 import { Button } from '../../../ui/Button';
 import { Input } from '../../../ui/Input';

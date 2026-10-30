@@ -1,5 +1,5 @@
 import { Show, type JSX } from 'solid-js';
-import type { Broadcasts, CampaignStatus, Template } from '../../../../../../packages/attention/src/broadcasts.ts';
+import type { BroadcastPanel, CampaignStatus, Template } from '../../../../../../packages/attention/src/broadcast-panel.ts';
 import { t } from '../../../lib/i18n';
 import { Badge } from '../../../ui/Badge';
 import { Button } from '../../../ui/Button';
@@ -9,9 +9,15 @@ export const STATUS_TONE: Record<CampaignStatus, Tone> = { draft: 'neutral', sch
 const TEMPLATE_TONE: Record<string, Tone> = { DRAFT: 'neutral', APPROVED: 'success', PENDING: 'warning', REJECTED: 'danger', DELETED: 'neutral' };
 
 /** Lo que toda vista de Difusiones recibe: el cliente y si esta persona puede escribir aquí. */
-export type Context = { api: Broadcasts; canWrite: () => boolean; accountName: () => string };
+export type Context = { api: BroadcastPanel; canWrite: () => boolean; canManage: () => boolean; canOperate: (channel: number | null) => boolean; accountName: () => string };
 
-export const errorText = (cause: unknown) => !(cause instanceof Error) ? t("web.alpha.error") : cause.message === 'writes_disabled' ? t("broadcasts.writes_off") : cause.message;
+export function errorText(cause: unknown) {
+  if (!(cause instanceof Error)) return t("web.alpha.error");
+  if ((cause as { uncertain?: boolean }).uncertain) return t("broadcast-writes.write_error");
+  if (cause.message === 'account_mismatch') return t("broadcast-writes.account_mismatch");
+  if (cause.message === 'missing_active_account') return t("broadcast-writes.missing_active_account");
+  return cause.message === 'writes_disabled' ? t("broadcasts.writes_off") : cause.message;
+}
 
 export function StatusBadge(props: { status: CampaignStatus }) {
   return <Badge tone={STATUS_TONE[props.status]}>{t(`broadcasts.status_${props.status}`)}</Badge>;

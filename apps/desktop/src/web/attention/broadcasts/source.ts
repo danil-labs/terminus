@@ -1,4 +1,4 @@
-import type { BroadcastSource } from '../../../../../../packages/attention/src/broadcasts.ts';
+import type { BroadcastSource } from '../../../../../../packages/attention/src/broadcast-panel.ts';
 import { activeAccountOf } from '../../audit-log';
 
 /** La web: por la entrada alfa y con la cuenta activa del JWT. Otro cliente trae su propia fuente. */

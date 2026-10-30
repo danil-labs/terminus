@@ -1,12 +1,11 @@
-// Difusiones por la entrada alfa: listas cerradas de rutas del BFF de appv2, con query y cuerpo
-// reconstruidos campo por campo. Una ruta nueva aquí es un cambio de frontera y se revisa.
+// Difusiones por la entrada alfa, sobre lo que ya cubre marketingProxy: listas cerradas de rutas
+// del BFF, con query y cuerpo reconstruidos. Una ruta nueva aquí es un cambio de frontera y se revisa.
 const ID = "[1-9]\\d{0,15}";
 const CAMPAIGN = `/api/marketing/campaigns/(${ID})`;
 const TEMPLATE = `/api/marketing/templates/(${ID})`;
 const KB = 1024;
 const JSON_MAX = 64 * KB;
-// Unos 60 000 ids de contacto.
-const IDS_MAX = 512 * KB;
+const IDS_MAX = 4 * KB;
 // El archivo de encabezado de una plantilla; el Worker lo lee entero antes de reenviarlo.
 const MEDIA_MAX = 16 * 1024 * KB;
 
@@ -23,16 +22,10 @@ const page = (params) => {
   if ([...params.keys()].sort().join() !== "limit,offset" || !/^\d+$/.test(params.get("limit")) || !/^\d+$/.test(params.get("offset")) || limit < 1 || limit > 200 || !Number.isSafeInteger(offset) || offset > 1_000_000) return null;
   return new URLSearchParams({ limit: String(limit), offset: String(offset) });
 };
-const approvedOnly = (params) => {
-  if (!params.size) return new URLSearchParams();
-  return params.size === 1 && params.get("status") === "APPROVED" ? new URLSearchParams({ status: "APPROVED" }) : null;
-};
 
 const READS = [
-  ["/auth/account/features", accountOnly], ["/auth/account/my-permissions", accountOnly],
-  ["/api/marketing/campaigns", none], [`${CAMPAIGN}/stats`, none], [`${CAMPAIGN}/messages`, page],
-  ["/api/marketing/templates", approvedOnly], [TEMPLATE, none], [`${TEMPLATE}/channels`, none],
-  ["/api/contacts", none], ["/api/contacts/metadata-keys", none],
+  ["/auth/account/features", accountOnly],
+  [`${CAMPAIGN}/messages`, page], [TEMPLATE, none], ["/api/contacts/metadata-keys", none],
   ["/api/funnels", none], [`/api/funnels/(${ID})/board`, none],
 ].map(([path, query]) => [new RegExp(`^${path}$`), query]);
 
@@ -58,14 +51,12 @@ const exact = (fields) => (parse) => (bytes, type) => {
   return JSON.stringify(Object.fromEntries(fields.filter((field) => value[field] !== undefined).map((field) => [field, value[field]])));
 };
 
-const mapping = (value) => value === undefined || (value !== null && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length <= 100 && Object.entries(value).every(([key, item]) => text(key, 100, 1) && text(item, 1024, 1)));
 const header = (value) => value === null || value === undefined || (typeof value === "object" && only(value, ["format", "text", "media_url"]) && ["TEXT", "IMAGE", "VIDEO", "DOCUMENT"].includes(value.format) && (value.text == null || text(value.text, 60)) && (value.media_url == null || text(value.media_url, 2048)));
 const body = (value) => value === undefined || (value && typeof value === "object" && only(value, ["text"]) && text(value.text, 1024, 1));
 const footer = (value) => value === null || value === undefined || (typeof value === "object" && only(value, ["text"]) && text(value.text, 60, 1));
 const templateCore = (value) => (value.name === undefined || (text(value.name, 512, 1) && /^[a-z0-9_]+$/.test(value.name))) && (value.category === undefined || ["MARKETING", "UTILITY"].includes(value.category)) && (value.language === undefined || text(value.language, 12, 2)) && (value.channel_id === undefined || safeId(value.channel_id)) && header(value.header) && body(value.body) && footer(value.footer);
 
 const TEMPLATE_FIELDS = ["channel_id", "name", "category", "language", "header", "body", "footer"];
-const createCampaign = exact(["template_id", "channel_id", "name", "variable_mapping"])((value) => safeId(value.template_id) && safeId(value.channel_id) && text(value.name, 200, 1) && mapping(value.variable_mapping));
 const addContacts = exact(["contact_account_ids"])((value) => Array.isArray(value.contact_account_ids) && value.contact_account_ids.length > 0 && value.contact_account_ids.every(safeId));
 const schedule = exact(["scheduled_at"])((value) => text(value.scheduled_at, 40, 1) && !Number.isNaN(Date.parse(value.scheduled_at)));
 const createTemplate = exact([...TEMPLATE_FIELDS, "submit"])((value) => safeId(value.channel_id) && value.name !== undefined && value.category !== undefined && value.body !== undefined && typeof value.submit === "boolean" && templateCore(value));
@@ -75,10 +66,9 @@ const requestAccess = exact(["account_id", "feature", "phone"])((value) => safeI
 const media = (bytes, type) => (/^multipart\/form-data;\s*boundary=/i.test(type) ? bytes : null);
 
 const WRITES = [
-  ["POST", "/api/marketing/campaigns", { parse: createCampaign, max: JSON_MAX }],
-  ["POST", `${CAMPAIGN}/contacts`, { parse: addContacts, max: IDS_MAX }],
-  ["POST", `${CAMPAIGN}/(?:start|pause|resume|cancel)`, { parse: null, max: 0 }],
-  ["POST", `${CAMPAIGN}/schedule`, { parse: schedule, max: KB }],
+  ["POST", `${CAMPAIGN}/contacts`, { parse: addContacts, max: IDS_MAX, delivery: true }],
+  ["POST", `${CAMPAIGN}/(?:start|resume)`, { parse: null, max: 0, delivery: true }],
+  ["POST", `${CAMPAIGN}/schedule`, { parse: schedule, max: KB, delivery: true }],
   ["POST", "/api/marketing/templates", { parse: createTemplate, max: JSON_MAX }],
   ["POST", "/api/marketing/templates/sync", { parse: syncTemplates, max: KB }],
   ["PATCH", TEMPLATE, { parse: updateTemplate, max: JSON_MAX }],

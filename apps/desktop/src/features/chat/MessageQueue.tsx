@@ -92,7 +92,7 @@ export type ColaDeMensajesProps = {
   onEditando: (activo: boolean) => void;
   onMandar: () => void;
   /** Abre la tarea que mandó una entrega. */
-  onOpenTask?: (folder: string, task: string) => void;
+  onOpenTask?: (folder: string, task: string, machine?: string | null) => void;
 };
 
 /**
@@ -225,7 +225,7 @@ export default function ColaDeMensajes(props: ColaDeMensajesProps) {
                                   type="button"
                                   class="cursor-pointer underline underline-offset-2"
                                   aria-label={t("chat.recipients.open_task", { title: sender().title })}
-                                  onClick={() => props.onOpenTask?.(sender().folder, sender().task)}
+                                  onClick={() => props.onOpenTask?.(sender().folder, sender().task, sender().machine)}
                                 >
                                   {t("chat.task_completed.open")}
                                 </button>

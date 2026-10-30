@@ -1,6 +1,6 @@
 import { For, Show } from 'solid-js';
 import CheckCheck from 'lucide-solid/icons/check-check';
-import { campaignProgress, nothingReachedMeta, sendsDone, type CampaignStats, type CampaignStatus } from '../../../../../../packages/attention/src/broadcasts.ts';
+import { campaignProgress, nothingReachedMeta, sendsDone, type CampaignStats, type CampaignStatus } from '../../../../../../packages/attention/src/broadcast-panel.ts';
 import { t } from '../../../lib/i18n';
 import { ProgressBar } from '../../../ui/ProgressBar';
 import { Eyebrow } from './parts';

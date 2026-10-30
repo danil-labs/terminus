@@ -1,5 +1,5 @@
 import { createEffect, createMemo, createSignal, For, on, Show } from 'solid-js';
-import { templateHasUnmappableParams, templateVariables, type StatusOut } from '../../../../../../packages/attention/src/broadcasts.ts';
+import { templateHasUnmappableParams, templateVariables, type StatusOut } from '../../../../../../packages/attention/src/broadcast-panel.ts';
 import { t } from '../../../lib/i18n';
 import { Button } from '../../../ui/Button';
 import { EmptyState } from '../../../ui/EmptyState';
@@ -33,7 +33,7 @@ export function CreateCampaign(props: { context: Context; onDone: (created: Stat
   const noChannels = () => templateId() !== null && !!channels.data() && eligible().length === 0;
   const channelOk = () => eligible().some(row => row.id === channelId());
   const complete = () => variables().every(name => values()[name]?.trim());
-  const ready = () => !!name().trim() && templateId() !== null && channelOk() && complete() && !unmappable() && !busy() && props.context.canWrite();
+  const ready = () => !!name().trim() && templateId() !== null && channelOk() && complete() && !unmappable() && !busy() && props.context.canOperate(channelId());
 
   createEffect(() => { const first = templates.data()?.[0]; if (templateId() === null && first) setTemplateId(first.id); });
   createEffect(on(templateId, () => { setValues({}); setLiteral({}); }));

@@ -285,82 +285,91 @@ test("WorkOS sign-in routes stay in the Worker; the sign-in page is an asset", a
   assert.equal(h.calls.length, 1);
 });
 
-test("broadcast reads are an exact list with rebuilt queries", async () => {
+test("the panel adds exact reads over marketingProxy", async () => {
   const h = harness();
-  for (const path of ["/auth/account/features?account_id=7", "/auth/account/my-permissions?account_id=7", "/api/marketing/campaigns", "/api/marketing/campaigns/4/stats", "/api/marketing/campaigns/4/messages?limit=200&offset=0", "/api/marketing/templates", "/api/marketing/templates?status=APPROVED", "/api/marketing/templates/9", "/api/marketing/templates/9/channels", "/api/contacts", "/api/contacts/metadata-keys", "/api/funnels", "/api/funnels/3/board"]) {
+  for (const path of ["/auth/account/features?account_id=7", "/api/marketing/campaigns/4/messages?limit=200&offset=0", "/api/marketing/templates/9", "/api/contacts/metadata-keys", "/api/funnels", "/api/funnels/3/board"]) {
     const response = await h.fetch(prefix + path, { headers: auth });
     assert.equal(response.status, 200, path);
     assert.equal(new URL(h.calls.at(-1).url).pathname + new URL(h.calls.at(-1).url).search, path);
     assert.equal(h.calls.at(-1).headers.get("Cookie"), null);
   }
   const before = h.calls.length;
-  for (const path of ["/api/marketing/campaigns?x=1", "/api/marketing/campaigns/4/messages?limit=201&offset=0", "/api/marketing/campaigns/4/messages?limit=5", "/api/marketing/templates?status=DRAFT", "/auth/account/features", "/auth/account/features?account_id=7&x=1", "/api/contacts?q=ana"]) {
+  for (const path of ["/api/marketing/campaigns/4/messages?limit=201&offset=0", "/api/marketing/campaigns/4/messages?limit=5", "/auth/account/features", "/auth/account/features?account_id=7&x=1", "/api/marketing/templates/9?x=1"]) {
     assert.equal((await h.fetch(prefix + path, { headers: auth })).status, 400, path);
   }
-  for (const path of ["/api/marketing/campaigns/0/stats", "/api/marketing/campaigns/4", "/api/marketing/other", "/api/contacts/5", "/api/contacts/imports/1", "/api/funnels/3", "/api/media"]) {
+  for (const path of ["/api/marketing/campaigns/4", "/api/marketing/other", "/api/contacts/5", "/api/contacts/imports/1", "/api/funnels/3", "/api/media"]) {
     assert.equal((await h.fetch(prefix + path, { headers: auth })).status, 404, path);
   }
-  assert.equal((await h.fetch(prefix + "/api/marketing/campaigns")).status, 401);
+  assert.equal((await h.fetch(prefix + "/api/funnels")).status, 401);
   assert.equal(h.calls.length, before);
 });
 
-const writes = [
-  ["POST", "/api/marketing/campaigns", { template_id: 1, channel_id: 2, name: "Promo", variable_mapping: { nombre: "contact.name" } }],
-  ["POST", "/api/marketing/campaigns/4/contacts", { contact_account_ids: [1, 2] }],
-  ["POST", "/api/marketing/campaigns/4/start"], ["POST", "/api/marketing/campaigns/4/pause"], ["POST", "/api/marketing/campaigns/4/resume"], ["POST", "/api/marketing/campaigns/4/cancel"],
-  ["POST", "/api/marketing/campaigns/4/schedule", { scheduled_at: "2026-11-01T12:00:00.000Z" }],
+const accountToken = { Authorization: `Bearer a.${btoa(JSON.stringify({ active_account_id: 7 }))}.c` };
+const metaWrites = [
   ["POST", "/api/marketing/templates", { channel_id: 2, name: "promo", category: "MARKETING", language: "es_MX", header: null, body: { text: "Hola" }, footer: null, submit: false }],
   ["POST", "/api/marketing/templates/sync", {}],
   ["PATCH", "/api/marketing/templates/9", { name: "promo_2", body: { text: "Hola" } }],
   ["POST", "/api/marketing/templates/9/submit"], ["DELETE", "/api/marketing/templates/9"],
   ["POST", "/auth/account/request-access", { account_id: 7, feature: "campaigns", phone: "+525512345678" }],
 ];
-const send = (h, method, path, body, extra = {}) => h.fetch(prefix + path, { method, headers: { ...auth, Origin: origin, ...(body === undefined ? {} : { "Content-Type": "application/json" }), ...extra }, body: body === undefined ? undefined : JSON.stringify(body) });
+const deliveryWrites = [
+  ["POST", "/api/marketing/campaigns/4/contacts?account_id=7", { contact_account_ids: [1, 2] }],
+  ["POST", "/api/marketing/campaigns/4/start?account_id=7"], ["POST", "/api/marketing/campaigns/4/resume?account_id=7"],
+  ["POST", "/api/marketing/campaigns/4/schedule?account_id=7", { scheduled_at: "2026-11-01T12:00:00.000Z" }],
+];
+const send = (h, method, path, body, extra = {}) => h.fetch(prefix + path, { method, headers: { ...accountToken, Origin: origin, ...(body === undefined ? {} : { "Content-Type": "application/json" }), ...extra }, body: body === undefined ? undefined : JSON.stringify(body) });
 
-test("broadcast writes answer 403 unless the switch is on, and never reach the BFF", async () => {
+test("switch off: Meta writes answer 403, delivery keeps its 409, nothing reaches the BFF", async () => {
   const h = harness();
-  for (const [method, path, body] of writes) {
+  for (const [method, path, body] of metaWrites) {
     const response = await send(h, method, path, body);
     assert.equal(response.status, 403, path);
     assert.deepEqual(await response.json(), { error: "broadcast_writes_disabled" });
   }
-  assert.equal((await h.fetch(prefix + "/api/media", { method: "POST", headers: { ...auth, Origin: origin, "Content-Type": "multipart/form-data; boundary=x" }, body: "--x--" })).status, 403);
+  for (const [method, path, body] of deliveryWrites) {
+    const response = await send(h, method, path, body);
+    assert.equal(response.status, 409, path);
+    assert.deepEqual(await response.json(), { error: "campaign_delivery_unavailable" });
+  }
+  assert.equal((await h.fetch(prefix + "/api/media", { method: "POST", headers: { ...accountToken, Origin: origin, "Content-Type": "multipart/form-data; boundary=x" }, body: "--x--" })).status, 403);
   assert.equal(h.calls.length, 0);
 });
 
-test("with the switch on each write keeps its barriers and sends a rebuilt body", async () => {
+test("switch on: each write keeps its barriers and sends a rebuilt body", async () => {
   const h = harness();
   h.env.BROADCAST_WRITES = "on";
-  for (const [method, path, body] of writes) {
+  for (const [method, path, body] of [...metaWrites, ...deliveryWrites]) {
     assert.equal((await send(h, method, path, body)).status, 200, path);
     const call = h.calls.at(-1);
     assert.equal(call.method, method);
-    assert.equal(new URL(call.url).pathname, path);
+    assert.equal(new URL(call.url).pathname, path.split("?")[0]);
+    assert.equal(new URL(call.url).search, "");
     assert.equal(call.headers.get("Cookie"), null);
     if (body) assert.deepEqual(await call.json(), body);
   }
   const before = h.calls.length;
-  const [method, path, body] = writes[0];
-  assert.equal((await h.fetch(prefix + path, { method, headers: { ...auth, Origin: "https://evil.example", "Content-Type": "application/json" }, body: JSON.stringify(body) })).status, 403);
+  const [method, path, body] = metaWrites[0];
+  assert.equal((await h.fetch(prefix + path, { method, headers: { ...accountToken, Origin: "https://evil.example", "Content-Type": "application/json" }, body: JSON.stringify(body) })).status, 403);
   assert.equal((await h.fetch(prefix + path, { method, headers: { Origin: origin, "Content-Type": "application/json" }, body: JSON.stringify(body) })).status, 401);
   assert.equal((await send(h, method, path, body, { "X-Danil-Actor": "ai" })).status, 403);
   assert.equal((await send(h, method, path + "?x=1", body)).status, 400);
+  assert.equal((await send(h, "POST", "/api/marketing/campaigns/4/start?account_id=8")).status, 403, "another account");
+  assert.equal((await send(h, "POST", "/api/marketing/campaigns/4/start")).status, 403, "no account");
   for (const [badPath, bad] of [
-    ["/api/marketing/campaigns", { ...body, extra: 1 }], ["/api/marketing/campaigns", { ...body, name: "" }], ["/api/marketing/campaigns", { ...body, variable_mapping: { a: 1 } }],
-    ["/api/marketing/campaigns/4/contacts", { contact_account_ids: [] }], ["/api/marketing/campaigns/4/contacts", { contact_account_ids: [1.5] }],
-    ["/api/marketing/campaigns/4/schedule", { scheduled_at: "mañana" }],
-    ["/api/marketing/templates", { ...writes[7][2], name: "Con Espacios" }], ["/api/marketing/templates", { ...writes[7][2], submit: "yes" }], ["/api/marketing/templates", { ...writes[7][2], body: { text: "x".repeat(1025) } }],
+    ["/api/marketing/campaigns/4/contacts?account_id=7", { contact_account_ids: [] }], ["/api/marketing/campaigns/4/contacts?account_id=7", { contact_account_ids: [1.5] }],
+    ["/api/marketing/campaigns/4/schedule?account_id=7", { scheduled_at: "mañana" }],
+    ["/api/marketing/templates", { ...body, name: "Con Espacios" }], ["/api/marketing/templates", { ...body, submit: "yes" }], ["/api/marketing/templates", { ...body, body: { text: "x".repeat(1025) } }],
     ["/auth/account/request-access", { account_id: 7, feature: "funnels", phone: "+525512345678" }],
   ]) assert.equal((await send(h, "POST", badPath, bad)).status, 400, JSON.stringify(bad));
-  assert.equal((await h.fetch(prefix + path, { method, headers: { ...auth, Origin: origin, "Content-Type": "text/plain" }, body: JSON.stringify(body) })).status, 400);
-  for (const [m, p] of [["PUT", "/api/marketing/templates/9"], ["DELETE", "/api/marketing/campaigns/4"], ["POST", "/api/marketing/campaigns/4/delete"], ["POST", "/api/contacts"], ["POST", "/api/contacts/import"]]) {
-    assert.equal((await h.fetch(prefix + p, { method: m, headers: { ...auth, Origin: origin } })).status, 405, p);
+  assert.equal((await h.fetch(prefix + path, { method, headers: { ...accountToken, Origin: origin, "Content-Type": "text/plain" }, body: JSON.stringify(body) })).status, 400);
+  for (const [m, p] of [["PUT", "/api/marketing/templates/9"], ["POST", "/api/contacts"], ["POST", "/api/contacts/import"]]) {
+    assert.equal((await h.fetch(prefix + p, { method: m, headers: { ...accountToken, Origin: origin } })).status, 405, p);
   }
   assert.equal(h.calls.length, before);
-  const upload = await h.fetch(prefix + "/api/media", { method: "POST", headers: { ...auth, Origin: origin, "Content-Type": "multipart/form-data; boundary=x" }, body: "--x--" });
+  const upload = await h.fetch(prefix + "/api/media", { method: "POST", headers: { ...accountToken, Origin: origin, "Content-Type": "multipart/form-data; boundary=x" }, body: "--x--" });
   assert.equal(upload.status, 200);
   assert.match(h.calls.at(-1).headers.get("Content-Type"), /^multipart\/form-data; boundary=x/);
-  assert.equal((await h.fetch(prefix + "/api/media", { method: "POST", headers: { ...auth, Origin: origin, "Content-Type": "application/json" }, body: "{}" })).status, 400);
+  assert.equal((await h.fetch(prefix + "/api/media", { method: "POST", headers: { ...accountToken, Origin: origin, "Content-Type": "application/json" }, body: "{}" })).status, 400);
 });
 
 test("a 204 from the BFF passes without a body", async () => {
@@ -368,4 +377,108 @@ test("a 204 from the BFF passes without a body", async () => {
   h.env.BROADCAST_WRITES = "on";
   h.env.APPV2_BFF = { fetch: async () => new Response(null, { status: 204 }) };
   assert.equal((await send(h, "DELETE", "/api/marketing/templates/9")).status, 204);
+});
+
+const replyBody = { conversation_id: 12, text: ' hola ', client_message_id: 'ea6db9df-1c8c-4b53-9b36-0d60575ef400' };
+const replyHeaders = { ...auth, Origin: origin, 'Content-Type': 'application/json' };
+test('reply is an exact JSON write preserving user identity and target, stripping ambient authority', async () => {
+  const h = harness();
+  const response = await h.fetch(prefix + '/api/messaging/reply', { method: 'POST', headers: { ...replyHeaders, Cookie: 'admin=true', 'X-Account-Id': '9' }, body: JSON.stringify(replyBody) });
+  assert.equal(response.status, 200);
+  assert.equal(h.calls.length, 1);
+  const upstream = h.calls[0];
+  assert.equal(upstream.url, origin + '/api/messaging/reply');
+  assert.equal(upstream.headers.get('Authorization'), auth.Authorization);
+  assert.equal(upstream.headers.get('Cookie'), null);
+  assert.equal(upstream.headers.get('X-Account-Id'), null);
+  assert.deepEqual(await upstream.json(), { ...replyBody, text: 'hola' });
+});
+test('reply rejects CSRF, AI identity, extra fields, malformed targets and non JSON before BFF', async () => {
+  const h = harness();
+  const options = { method: 'POST', headers: replyHeaders, body: JSON.stringify(replyBody) };
+  for (const headers of [{ ...replyHeaders, Origin: 'https://evil.example' }, { ...replyHeaders, Origin: '' }, { ...replyHeaders, 'X-Danil-Actor': ' AI ' }]) {
+    assert.equal((await h.fetch(prefix + '/api/messaging/reply', { ...options, headers })).status, 403);
+  }
+  for (const body of [{ ...replyBody, account_id: 9 }, { ...replyBody, conversation_id: 0 }, { ...replyBody, conversation_id: 9007199254740992 }, { ...replyBody, text: '  ' }, { ...replyBody, text: 'x'.repeat(4097) }, { ...replyBody, client_message_id: 'anything' }, []]) {
+    assert.equal((await h.fetch(prefix + '/api/messaging/reply', { ...options, body: JSON.stringify(body) })).status, 400);
+  }
+  assert.equal((await h.fetch(prefix + '/api/messaging/reply?account_id=7', options)).status, 400);
+  assert.equal((await h.fetch(prefix + '/api/messaging/reply', { ...options, headers: { ...replyHeaders, 'Content-Type': 'application/json-evil' } })).status, 400);
+  const stream = new ReadableStream({ start(controller) { controller.enqueue(new TextEncoder().encode(' '.repeat(20 * 1024 + 1))); controller.close(); } });
+  assert.equal((await h.fetch(prefix + '/api/messaging/reply', { ...options, body: stream, duplex: 'half' })).status, 400);
+  assert.equal(h.calls.length, 0);
+});
+test('effective permissions are account scoped and server write denials remain denials', async () => {
+  const h = harness();
+  assert.equal((await h.fetch(prefix + '/auth/account/my-permissions?account_id=7', { headers: auth })).status, 200);
+  for (const query of ['', 'account_id=0', 'account_id=7&limit=30', 'account_id=7&account_id=8']) assert.equal((await h.fetch(prefix + '/auth/account/my-permissions?' + query, { headers: auth })).status, 400);
+  for (const status of [401, 402, 403, 404, 503]) {
+    h.env.APPV2_BFF.fetch = async () => Response.json({ error: 'forbidden_read_only' }, { status });
+    assert.equal((await h.fetch(prefix + '/api/messaging/reply', { method: 'POST', headers: replyHeaders, body: JSON.stringify(replyBody) })).status, status);
+  }
+});
+
+const marketingToken = account => `Bearer header.${Buffer.from(JSON.stringify({ active_account_id: account })).toString('base64url')}.signature`;
+const marketingHeaders = { Authorization: marketingToken(7), Origin: origin, 'Content-Type': 'application/json' };
+function marketingHarness() {
+  const h = harness();
+  h.env.APPV2_BFF.fetch = async request => {
+    h.calls.push(request);
+    return Response.json(new URL(request.url).pathname === '/auth/account/my-permissions' ? { role: 'custom', permissions: ['campaigns.manage'], scoped: [] } : { id: 4, status: 'draft' });
+  };
+  return h;
+}
+test('marketing reads are exact and account query must match the same Bearer claim', async () => {
+  const h = marketingHarness();
+  for (const path of ['/api/marketing/campaigns?account_id=7', '/api/marketing/templates?status=APPROVED&account_id=7', '/api/marketing/templates/2/channels?account_id=7', '/api/marketing/campaigns/4/stats?account_id=7', '/api/contacts?account_id=7']) {
+    assert.equal((await h.fetch(prefix + path, { headers: marketingHeaders })).status, 200);
+  }
+  const before = h.calls.length;
+  for (const path of ['/api/marketing/campaigns?account_id=8', '/api/contacts?account_id=8']) assert.equal((await h.fetch(prefix + path, { headers: marketingHeaders })).status, 403);
+  for (const query of ['', 'account_id=7&limit=1000', 'account_id=7&account_id=7', 'account_id=9007199254740992']) assert.equal((await h.fetch(prefix + '/api/marketing/campaigns?' + query, { headers: marketingHeaders })).status, 400);
+  assert.equal((await h.fetch(prefix + '/api/marketing/campaigns?account_id=7', { headers: auth })).status, 403);
+  assert.equal(h.calls.length, before);
+});
+test('marketing create and safety stops check effective permission on every write before BFF authority', async () => {
+  const h = marketingHarness();
+  const create = { method: 'POST', headers: { ...marketingHeaders, Cookie: 'admin=true', 'X-Account-Id': '9' }, body: JSON.stringify({ name: ' Draft ', template_id: 2, channel_id: 3, variable_mapping: { first_name: 'Persona' } }) };
+  assert.equal((await h.fetch(prefix + '/api/marketing/campaigns?account_id=7', create)).status, 200);
+  assert.equal(h.calls.length, 2);
+  assert.match(h.calls[0].url, /my-permissions\?account_id=7$/);
+  const upstream = h.calls[1];
+  assert.equal(upstream.headers.get('Authorization'), marketingHeaders.Authorization);
+  assert.equal(upstream.headers.get('Cookie'), null);
+  assert.equal(upstream.headers.get('X-Account-Id'), null);
+  assert.equal((await upstream.json()).name, 'Draft');
+  for (const action of ['pause', 'cancel']) assert.equal((await h.fetch(prefix + `/api/marketing/campaigns/4/${action}?account_id=7`, { method: 'POST', headers: marketingHeaders })).status, 200);
+  assert.equal(h.calls.length, 6);
+  for (const permissions of [[], ['channels.manage']]) {
+    const denied = marketingHarness();
+    denied.env.APPV2_BFF.fetch = async request => { denied.calls.push(request); return Response.json({ role: 'owner', permissions, scoped: [] }); };
+    assert.equal((await denied.fetch(prefix + '/api/marketing/campaigns?account_id=7', create)).status, 403);
+    assert.equal(denied.calls.length, 1);
+  }
+});
+test('delivery, scheduling and audience additions remain closed without any upstream calls', async () => {
+  const h = marketingHarness();
+  for (const action of ['start', 'resume', 'schedule', 'contacts']) {
+    const response = await h.fetch(prefix + `/api/marketing/campaigns/4/${action}?account_id=7`, { method: 'POST', headers: marketingHeaders, body: '{}' });
+    assert.equal(response.status, 409);
+    assert.deepEqual(await response.json(), { error: 'campaign_delivery_unavailable' });
+  }
+  assert.equal(h.calls.length, 0);
+});
+test('marketing rejects unknown methods, routes and bodies before authorization preflight', async () => {
+  const h = marketingHarness();
+  const options = { method: 'POST', headers: marketingHeaders };
+  const base = { name: 'Draft', template_id: 2, channel_id: 3 };
+  for (const body of [{ ...base, budget: 999 }, { ...base, name: '' }, { ...base, channel_id: 0 }, { ...base, variable_mapping: { x: 'x'.repeat(1025) } }, { ...base, variable_mapping: { __header_media_url: 'https://evil.example' } }]) assert.equal((await h.fetch(prefix + '/api/marketing/campaigns?account_id=7', { ...options, body: JSON.stringify(body) })).status, 400);
+  assert.equal((await h.fetch(prefix + '/api/marketing/campaigns?account_id=7', { ...options, headers: { ...marketingHeaders, Origin: 'https://evil.example' }, body: JSON.stringify(base) })).status, 403);
+  assert.equal((await h.fetch(prefix + '/api/marketing/campaigns?account_id=7', { ...options, headers: { ...marketingHeaders, 'X-Danil-Actor': 'ai' }, body: JSON.stringify(base) })).status, 403);
+  assert.equal((await h.fetch(prefix + '/api/marketing/campaigns/4/pause?account_id=7', { ...options, body: '{}' })).status, 400);
+  assert.equal((await h.fetch(prefix + '/api/contacts?account_id=7', options)).status, 405);
+  assert.equal((await h.fetch(prefix + '/api/marketing/campaigns/4/start?account_id=7', { headers: marketingHeaders })).status, 405);
+  assert.equal((await h.fetch(prefix + '/api/marketing/templates/2/submit', options)).status, 403);
+  for (const path of ['/api/marketing/campaigns/4/unknown', '/api/marketing/channels']) assert.ok([404, 405].includes((await h.fetch(prefix + path, options)).status));
+  assert.equal(h.calls.length, 0);
 });

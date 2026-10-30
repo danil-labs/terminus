@@ -1,120 +1,258 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { actionsFor, campaignProgress, cleanReason, contactTagLabels, contactsInWindow, createBroadcasts, failureReason, maskPhone, nothingReachedMeta, parseTemplateText, sendsDone, summarizeFailures, summarizeRejections, templateContent, templateHasUnmappableParams, templateVariables, type Recipient } from '../src/broadcasts.ts';
+import { BroadcastError, broadcastActions, broadcastTemplate, canManageBroadcast, createBroadcasts } from '../src/broadcasts.ts';
 
-const session = (refresh = true) => ({ getToken: async () => 'jwt', unauthorized: async () => refresh });
-const reply = (body: unknown, status = 200) => (async () => Response.json(body, { status })) as unknown as typeof fetch;
-const stats = (over = {}) => ({ by_process_status: {}, by_delivery_status: {}, responded: 0, total: 0, ...over });
+const freshSession = () => ({ getToken: async () => 'user-jwt', unauthorized: async () => true });
+const campaign = { id: 5, account_id: 7, template_id: 11, channel_id: 3, name: 'Test', status: 'draft' };
+const fake = (body: unknown) => (async () => Response.json(body)) as typeof fetch;
 
-test('with writes off every mutation stops before the network', async () => {
-  let calls = 0;
-  const api = createBroadcasts(session(), (async () => { calls++; return Response.json({}); }) as typeof fetch);
-  const attempts = [
-    () => api.createCampaign({ template_id: 1, channel_id: 1, name: 'x' }), () => api.addContacts(1, [1]), () => api.start(1), () => api.pause(1), () => api.resume(1), () => api.cancel(1), () => api.schedule(1, 'x'),
-    () => api.syncTemplates(), () => api.submitTemplate(1), () => api.deleteTemplate(1), () => api.uploadMedia(new File(['x'], 'x.png')), () => api.requestAccess(1, '5551234567'),
-  ];
-  for (const attempt of attempts) await assert.rejects(attempt(), /writes_disabled/);
-  assert.equal(calls, 0);
+test('permissions fail closed and channel scope never grants another channel', () => {
+  assert.equal(canManageBroadcast(null, 3), false);
+  assert.equal(canManageBroadcast({ permissions: [], scoped: [] }, 3), false);
+  const scoped = { permissions: ['campaigns.manage'], scoped: [{ permission: 'channels.manage', scope_type: 'channel', scope_id: 3 }] };
+  assert.equal(canManageBroadcast(scoped, 3), true);
+  assert.equal(canManageBroadcast(scoped, 4), false);
+  assert.equal(canManageBroadcast(scoped, null), false);
+  assert.equal(canManageBroadcast({ permissions: ['campaigns.manage', 'channels.manage'], scoped: [] }, null), true);
 });
 
-test('reads retry one 401 and phones never leave the parser whole', async () => {
+test('only approved, understood template bodies support variables', async () => {
+  const template = broadcastTemplate({ id: 1, name: 'Hello', components: [{ type: 'BODY', text: 'Hi {{name}} {{name}}' }] });
+  assert.deepEqual(template.variables, ['name']);
+  assert.equal(template.supported, true);
+  assert.equal(broadcastTemplate({ id: 1, name: 'Header', components: [{ type: 'BODY', text: 'Hi' }, { type: 'HEADER', text: '{{title}}' }] }).supported, false);
+  assert.equal(broadcastTemplate({ id: 1, name: 'Unknown' }).supported, false);
+  const templates = await createBroadcasts(freshSession(), fake({ items: [{ id: 1, name: 'Rejected', status: 'REJECTED' }] })).templates(7);
+  assert.deepEqual(templates, []);
+});
+
+test('read validates account and lifecycle state, never silently accepts another scope', async () => {
+  assert.deepEqual(await createBroadcasts(freshSession(), fake({ items: [campaign] })).list(7), [campaign]);
+  await assert.rejects(createBroadcasts(freshSession(), fake({ items: [campaign] })).list(8), /invalid_scope/);
+  await assert.rejects(createBroadcasts(freshSession(), fake({ items: [{ ...campaign, status: 'future' }] })).list(7), /invalid_response/);
+  await assert.rejects(createBroadcasts(freshSession(), fake({ role: 'owner', permissions: null, scoped: [] })).permissions(7), /invalid_response/);
+  await assert.rejects(createBroadcasts(freshSession(), fake({ campaign_id: 9, total: 4 })).stats(7, 5), /invalid_scope/);
+});
+
+test('closed route shapes carry user authorization and explicit target account', async () => {
+  const calls: { url: string; method: string; body: unknown }[] = [];
+  const request = (async (url: string, init: RequestInit) => {
+    assert.equal((init.headers as Record<string, string>).Authorization, 'Bearer user-jwt');
+    calls.push({ url, method: init.method!, body: init.body ? JSON.parse(init.body as string) : null });
+    if (url.includes('/contacts?')) return Response.json({ added: 1, requested: 2, rejected: [{ contact_account_id: 2, reason: 'no_phone' }] });
+    return Response.json({ id: 5, status: 'draft' });
+  }) as typeof fetch;
+  const api = createBroadcasts(freshSession(), request);
+  await api.create(7, { name: ' Test ', template_id: 11, channel_id: 3, variable_mapping: { name: 'Hi' } });
+  const added = await api.addContacts(7, 5, [1, 2, 1]);
+  assert.equal(added.rejected[0].reason, 'no_phone');
+  await api.transition(7, 5, 'start');
+  const future = new Date(Date.now() + 86400000).toISOString();
+  await api.transition(7, 5, 'schedule', future);
+  assert.deepEqual(calls, [
+    { url: '/alpha-api/api/marketing/campaigns?account_id=7', method: 'POST', body: { name: 'Test', template_id: 11, channel_id: 3, variable_mapping: { name: 'Hi' } } },
+    { url: '/alpha-api/api/marketing/campaigns/5/contacts?account_id=7', method: 'POST', body: { contact_account_ids: [1, 2] } },
+    { url: '/alpha-api/api/marketing/campaigns/5/start?account_id=7', method: 'POST', body: null },
+    { url: '/alpha-api/api/marketing/campaigns/5/schedule?account_id=7', method: 'POST', body: { scheduled_at: future } },
+  ]);
+});
+
+test('mutations never retry uncertain or unauthorized requests', async () => {
+  let count = 0;
+  const api = createBroadcasts(freshSession(), (async () => { count++; return new Response('', { status: 401 }); }) as typeof fetch);
+  await assert.rejects(api.transition(7, 5, 'start'), /HTTP 401/);
+  assert.equal(count, 1);
+  await assert.rejects(api.transition(7, 5, 'schedule', '2020-01-01'), /invalid_input/);
+  await assert.rejects(api.create(7, { name: '', channel_id: 3, template_id: 11 }), /invalid_input/);
+  assert.equal(count, 1);
+});
+
+test('terminal campaigns have no controls and malformed write replies fail', async () => {
+  assert.deepEqual(broadcastActions('completed'), []);
+  assert.deepEqual(broadcastActions('running'), ['pause', 'cancel']);
+  await assert.rejects(createBroadcasts(freshSession(), fake({ id: 9, status: 'running' })).transition(7, 5, 'start'), /invalid_scope/);
+  await assert.rejects(createBroadcasts(freshSession(), fake({ added: -1, requested: 1 })).addContacts(7, 5, [1]), /invalid_response/);
+});
+
+test('read routes preserve filters and refresh authentication only for GET', async () => {
   const calls: string[] = [];
   let first = true;
   const request = (async (url: string) => {
     calls.push(url);
     if (first) { first = false; return new Response('', { status: 401 }); }
-    return Response.json({ items: [{ id: 1, name: 'Ana', phone: '+52 55 1234 5678', tags: { items: [{ label: 'VIP' }] }, last_active_at: null }, { id: 2, phone: '12', tags: [] }, { id: 3, phone: null }] });
+    if (url.includes('/my-permissions')) return Response.json({ role: 'viewer', permissions: [], scoped: [] });
+    if (url.includes('/channels?')) return Response.json({ channels: [{ id: 3, name: null, provider: 'whatsapp_cloud', active: true }] });
+    if (url.includes('/stats?')) return Response.json({ campaign_id: 5, total: 2 });
+    return Response.json({ items: [] });
   }) as typeof fetch;
-  const rows = await createBroadcasts(session(), request, '/alpha-api').contacts();
-  assert.deepEqual(calls, ['/alpha-api/api/contacts', '/alpha-api/api/contacts']);
-  assert.deepEqual(rows.map(row => [row.phone, row.sendable, row.tags]), [['••••5678', true, ['VIP']], [null, true, []], [null, false, []]]);
-  assert.equal(JSON.stringify(rows).includes('1234 5678'), false);
+  const api = createBroadcasts(freshSession(), request, '/terminus/alpha-api');
+  assert.deepEqual(await api.permissions(7), { permissions: [], scoped: [] });
+  await api.templates(7);
+  await api.channels(7, 11);
+  await api.contacts(7);
+  assert.equal(await api.stats(7, 5), 2);
+  assert.deepEqual(calls, [
+    '/terminus/alpha-api/auth/account/my-permissions?account_id=7',
+    '/terminus/alpha-api/auth/account/my-permissions?account_id=7',
+    '/terminus/alpha-api/api/marketing/templates?status=APPROVED&account_id=7',
+    '/terminus/alpha-api/api/marketing/templates/11/channels?account_id=7',
+    '/terminus/alpha-api/api/contacts?account_id=7',
+    '/terminus/alpha-api/api/marketing/campaigns/5/stats?account_id=7',
+  ]);
 });
 
-test('server errors keep their detail and malformed answers fail', async () => {
-  const api = (body: unknown, status = 200) => createBroadcasts(session(), reply(body, status));
-  await assert.rejects(api({ detail: 'Plantilla inválida' }, 422).campaigns(), /Plantilla inválida/);
-  await assert.rejects(api({ detail: { error: 'code_x' } }, 403).campaigns(), (error: { code: string; status: number }) => error.code === 'code_x' && error.status === 403);
-  await assert.rejects(api({ error: 'not_found' }, 404).campaigns(), /not_found/);
-  await assert.rejects(api({}).campaigns(), /invalid_response/);
-  await assert.rejects(api({ items: [{ id: 1, name: 'x', status: 'future' }] }).campaigns(), /invalid_response/);
+test('a header variable is unsupported even when its name is also used in the body', () => {
+  assert.equal(broadcastTemplate({ id: 1, name: 'Test', components: [{ type: 'BODY', text: '{{name}}' }, { type: 'HEADER', text: '{{name}}' }] }).supported, false);
+  assert.equal(broadcastTemplate({ id: 1, name: 'Empty', components: [] }).supported, false);
 });
 
-test('writes with the switch on send JSON or multipart and a delete takes the 204', async () => {
-  const seen: { url: string; init: RequestInit }[] = [];
-  const api = createBroadcasts(session(), (async (url: string, init: RequestInit) => {
-    seen.push({ url, init });
-    if (init.method === 'DELETE') return new Response(null, { status: 204 });
-    return Response.json({ id: 1, status: 'running', public_url: 'https://x/y.png', added: 1, requested: 2, rejected: [{ reason: 'no_phone' }] });
-  }) as typeof fetch, '', { writes: true });
-  assert.deepEqual(await api.start(1), { id: 1, status: 'running' });
-  assert.equal(seen[0]!.init.body, undefined);
-  assert.deepEqual((await api.addContacts(1, [4, 5])).rejected, [{ contact_account_id: null, reason: 'no_phone' }]);
-  assert.equal(seen[1]!.init.body, '{"contact_account_ids":[4,5]}');
-  assert.equal(await api.uploadMedia(new File(['x'], 'x.png')), 'https://x/y.png');
-  assert.equal((seen[2]!.init.body as FormData).get('kind'), 'template');
-  assert.equal(new Headers(seen[2]!.init.headers).has('Content-Type'), false);
-  await api.deleteTemplate(9);
-  assert.equal(seen[3]!.url, '/api/marketing/templates/9');
+test('aborting while token is pending prevents POST and releases the unsent operation', async () => {
+  let resolveToken!: (token: string) => void;
+  let posts = 0;
+  const session = { getToken: () => new Promise<string>(resolve => { resolveToken = resolve; }), unauthorized: async () => false };
+  const api = createBroadcasts(session, (async () => { posts++; return Response.json({ id: 5, status: 'running' }); }) as typeof fetch);
+  const controller = new AbortController();
+  const pending = api.transition(7, 5, 'start', undefined, controller.signal);
+  controller.abort();
+  resolveToken('old-user-token');
+  await assert.rejects(pending, (cause: unknown) => cause instanceof BroadcastError && !cause.uncertain);
+  assert.equal(posts, 0);
+  assert.equal(api.blocked(7, 'campaign:5'), false);
 });
 
-test('channels follow the operable rule of Appv2', async () => {
-  const api = createBroadcasts(session(), reply({ channels: [{ id: 1, name: 'Ventas' }, { id: 2, name: 'prueba_x' }, { id: 3, name: 'Web', provider: 'web_preview' }, { id: 4, name: 'Old', archived: true }] }));
-  assert.deepEqual(await api.channels(), [{ id: 1, name: 'Ventas' }]);
+test('in-flight abort is uncertain across clients and normal navigation reads; only explicit fresh read releases it', async () => {
+  const session = freshSession();
+  let dispatched!: () => void;
+  const started = new Promise<void>(resolve => { dispatched = resolve; });
+  const controller = new AbortController();
+  const api = createBroadcasts(session, (async (_url: string, init: RequestInit) => {
+    assert.ok(init.signal);
+    dispatched();
+    return new Promise<Response>(() => {});
+  }) as typeof fetch);
+  const pending = api.transition(7, 5, 'start', undefined, controller.signal);
+  await started;
+  controller.abort();
+  await assert.rejects(pending, (cause: unknown) => cause instanceof BroadcastError && cause.uncertain);
+  const remounted = createBroadcasts(session, fake({ items: [campaign] }));
+  assert.equal(remounted.blocked(7, 'campaign:5'), true);
+  assert.equal(remounted.blocked(8, 'campaign:5'), false);
+  assert.equal(createBroadcasts(freshSession()).blocked(7, 'campaign:5'), false);
+  await remounted.list(7);
+  assert.equal(remounted.blocked(7, 'campaign:5'), true);
+  await assert.rejects(remounted.transition(7, 5, 'start'), /reconcile_required/);
+  await assert.rejects(createBroadcasts(session, fake({ items: [{ ...campaign, account_id: 8 }] })).list(7, undefined, true), /invalid_scope/);
+  assert.equal(remounted.blocked(7, 'campaign:5'), true);
+  await remounted.list(7, undefined, true);
+  assert.equal(remounted.blocked(7, 'campaign:5'), false);
 });
 
-test('only the legal transitions of each state are offered', () => {
-  assert.deepEqual(actionsFor('draft'), ['start', 'schedule', 'cancel']);
-  assert.deepEqual(actionsFor('scheduled'), ['start', 'cancel']);
-  assert.deepEqual(actionsFor('running'), ['pause', 'cancel']);
-  assert.deepEqual(actionsFor('paused'), ['resume', 'cancel']);
-  for (const status of ['cancelled', 'completed', 'failed'] as const) assert.deepEqual(actionsFor(status), []);
+test('ambiguous create and audience writes require their own successful server reread', async () => {
+  const session = freshSession();
+  const api = createBroadcasts(session, (async () => { throw new TypeError('network failure'); }) as typeof fetch);
+  await assert.rejects(api.create(7, { name: 'Test', channel_id: 3, template_id: 11 }), (cause: unknown) => cause instanceof BroadcastError && cause.uncertain);
+  await assert.rejects(api.addContacts(7, 5, [1]), (cause: unknown) => cause instanceof BroadcastError && cause.uncertain);
+  const fresh = createBroadcasts(session, (async (url: string) => Response.json(url.includes('/stats?') ? { campaign_id: 5, total: 1 } : { items: [campaign] })) as typeof fetch);
+  await fresh.list(7, undefined, true);
+  assert.equal(fresh.blocked(7, 'create'), false);
+  assert.equal(fresh.blocked(7, 'contacts:5'), true);
+  await fresh.stats(7, 5);
+  assert.equal(fresh.blocked(7, 'contacts:5'), true);
+  await fresh.stats(7, 5, undefined, true);
+  assert.equal(fresh.blocked(7, 'contacts:5'), false);
 });
 
-test('progress reads open maps; an all-dead send counts as failed', () => {
-  const value = stats({ by_process_status: { pending: 2, queued: 1, dispatched: 5, dead: 2 }, by_delivery_status: { delivered: 3, failed: 1 }, responded: 1, total: 10 });
-  assert.deepEqual(campaignProgress(value), { pending: 3, sent: 5, delivered: 3, read: 0, failed: 3, responded: 1, processed: 7, total: 10 });
-  assert.equal(sendsDone(stats({ by_process_status: { dispatched: 1 }, total: 1 }), 'running'), true);
-  assert.equal(sendsDone(stats(), 'draft'), false);
-  assert.equal(nothingReachedMeta(stats({ by_process_status: { dead: 2 }, total: 2 })), true);
+test('definitive 4xx preserves wallet/template codes and does not require uncertain reconciliation', async () => {
+  for (const [status, code] of [[402, 'insufficient_balance'], [422, 'template_not_approved'], [403, 'account_mismatch']] as const) {
+    const api = createBroadcasts(freshSession(), (async () => Response.json({ detail: { error: code } }, { status })) as typeof fetch);
+    await assert.rejects(api.transition(7, 5, 'start'), (cause: unknown) => cause instanceof BroadcastError && cause.code === code && cause.status === status && !cause.uncertain);
+    assert.equal(api.blocked(7, 'campaign:5'), false);
+  }
 });
 
-test('failure reasons prefer the Meta code and never stay blank', () => {
-  assert.deepEqual(failureReason({ detail: 'Status 400: (#132000) mismatch' }), { code: '132000', text: '' });
-  assert.deepEqual(failureReason({ code: 131042 }), { code: '131042', text: '' });
-  assert.deepEqual(failureReason({ detail: 'Boom {"error":{"code":1}}' }), { code: null, text: 'Boom' });
-  assert.equal(cleanReason('x'.repeat(200)).length, 138);
-  const row = (id: number, over: Partial<Recipient>): Recipient => ({ id, contact_account_id: id, name: null, phone: null, status: 'dispatched', status_detail: null, delivery_status: null, delivery_error_code: null, delivery_error_message: null, ...over });
-  const groups = summarizeFailures([row(1, { status: 'dead', status_detail: '(#131026) a' }), row(2, { delivery_status: 'failed', delivery_error_code: 131026 }), row(3, { status: 'failed', status_detail: 'Otro' }), row(4, {})]);
-  assert.deepEqual(groups.map(group => [group.code, group.text, group.count]), [['131026', '', 2], [null, 'Otro', 1]]);
-  assert.deepEqual(summarizeRejections([{ contact_account_id: 1, reason: 'invalid_format' }, { contact_account_id: 2, reason: 'invalid_phone' }, { contact_account_id: 3, reason: 'nuevo' }]), [{ reason: 'invalid_phone', count: 2 }, { reason: 'other', count: 1 }]);
+test('contacts and mappings enforce proxy bounds before any network request', async () => {
+  let calls = 0;
+  const api = createBroadcasts(freshSession(), (async () => { calls++; return Response.json({ id: 5, status: 'draft' }); }) as typeof fetch);
+  await assert.rejects(api.addContacts(7, 5, Array.from({ length: 101 }, (_, n) => n + 1)), /invalid_input/);
+  const input = { name: 'Test', template_id: 11, channel_id: 3 };
+  for (const variable_mapping of [Object.fromEntries(Array.from({ length: 51 }, (_, n) => [`key${n}`, 'x'])), { ['a'.repeat(65)]: 'x' }, { 'café': 'x' }, { name: 'x'.repeat(1025) }, { name: '' }]) {
+    await assert.rejects(api.create(7, { ...input, variable_mapping }), /invalid_input/);
+  }
+  assert.equal(calls, 0);
+  await api.create(7, { ...input, variable_mapping: { ['a'.repeat(64)]: 'x'.repeat(1024) } });
+  assert.equal(calls, 1);
 });
 
-test('templates: variables, the refusal outside the body and both component shapes', () => {
-  const draft = { header: { format: 'TEXT', text: 'Hola' }, body: { text: 'Hola {{nombre}} y {{ nombre }}, {{codigo}}' }, footer: null };
-  assert.deepEqual(templateVariables(draft), ['nombre', 'codigo']);
-  assert.equal(templateHasUnmappableParams(draft), false);
-  const meta = [{ type: 'HEADER', format: 'image' }, { type: 'BODY', text: 'Hola {{nombre}}' }, { type: 'FOOTER', text: 'Pie' }, { type: 'BUTTONS', buttons: [{ url: 'https://x/{{codigo}}' }] }];
-  assert.deepEqual(templateContent(meta), { header: { format: 'IMAGE', text: null, media_url: null }, body: { text: 'Hola {{nombre}}' }, footer: { text: 'Pie' } });
-  assert.equal(templateHasUnmappableParams(meta), true);
-  assert.deepEqual(templateVariables(null), []);
+test('30-second deadline covers delayed authentication and in-flight transport', async context => {
+  context.mock.timers.enable({ apis: ['setTimeout'] });
+  const tokenSession = { getToken: () => new Promise<string>(() => {}), unauthorized: async () => false };
+  const unsent = createBroadcasts(tokenSession);
+  const first = unsent.transition(7, 5, 'start');
+  context.mock.timers.tick(30_000);
+  await assert.rejects(first, (cause: unknown) => cause instanceof BroadcastError && !cause.uncertain);
+  let dispatched!: () => void;
+  const started = new Promise<void>(resolve => { dispatched = resolve; });
+  const sent = createBroadcasts(freshSession(), (async () => { dispatched(); return new Promise<Response>(() => {}); }) as typeof fetch);
+  const second = sent.transition(7, 5, 'start');
+  await started;
+  context.mock.timers.tick(30_000);
+  await assert.rejects(second, (cause: unknown) => cause instanceof BroadcastError && cause.uncertain);
 });
 
-test('contact helpers: masks, tag shapes and the activity window', () => {
-  assert.equal(maskPhone('+52 55 1234 5678'), '••••5678');
-  assert.equal(maskPhone('123'), null);
-  assert.deepEqual(contactTagLabels(['a', { label: 'b' }, ' a ']), ['a', 'b']);
-  assert.deepEqual(contactTagLabels({ items: [{ label: 'x' }] }), ['x']);
-  const now = Date.parse('2026-10-30T00:00:00Z');
-  const rows = [{ last_active_at: '2026-10-28T00:00:00Z' }, { last_active_at: '2026-10-01T00:00:00Z' }, { last_active_at: null }];
-  assert.equal(contactsInWindow(rows, 'all', now).length, 3);
-  assert.equal(contactsInWindow(rows, '7d', now).length, 1);
-  assert.equal(contactsInWindow(rows, '30d', now).length, 2);
+test('active account selection reads only the JWT claim; missing/malformed claim fails closed', async () => {
+  const jwt = (claim: unknown) => `x.${btoa(JSON.stringify({ active_account_id: claim }))}.x`;
+  assert.equal(await createBroadcasts({ ...freshSession(), getToken: async () => jwt(7) }).activeAccount(), 7);
+  assert.equal(await createBroadcasts({ ...freshSession(), getToken: async () => jwt('7') }).activeAccount(), 7);
+  for (const claim of [null, 0, -1, '7oops']) await assert.rejects(createBroadcasts({ ...freshSession(), getToken: async () => jwt(claim) }).activeAccount(), /missing_active_account/);
 });
 
-test('template text paints what WhatsApp paints, nothing more', () => {
-  assert.deepEqual(parseTemplateText('Hola *{{nombre}}*'), [{ type: 'text', value: 'Hola ' }, { type: 'bold', children: [{ type: 'variable', name: 'nombre' }] }]);
-  assert.deepEqual(parseTemplateText('2 * 3 * 4'), [{ type: 'text', value: '2 * 3 * 4' }]);
-  assert.deepEqual(parseTemplateText('*a\nb*'), [{ type: 'text', value: '*a\nb*' }]);
-  assert.deepEqual(parseTemplateText('```a*b*```'), [{ type: 'mono', value: 'a*b*' }]);
+test('delivery-unavailable 409 is a definitive rejection and never retried', async () => {
+  for (const action of ['start', 'resume', 'schedule'] as const) {
+    let calls = 0;
+    const api = createBroadcasts(freshSession(), (async () => {
+      calls++;
+      return Response.json({ error: 'campaign_delivery_unavailable' }, { status: 409 });
+    }) as typeof fetch);
+    await assert.rejects(api.transition(7, 5, action, new Date(Date.now() + 86400000).toISOString()), (cause: unknown) => cause instanceof BroadcastError && cause.code === 'campaign_delivery_unavailable' && !cause.uncertain);
+    assert.equal(calls, 1);
+    assert.equal(api.blocked(7, 'campaign:5'), false);
+  }
+  const api = createBroadcasts(freshSession(), (async () => Response.json({ error: 'campaign_delivery_unavailable' }, { status: 409 })) as typeof fetch);
+  await assert.rejects(api.addContacts(7, 5, [1]), (cause: unknown) => cause instanceof BroadcastError && cause.status === 409 && !cause.uncertain);
+});
+
+test('a reread started before a failed write cannot release the resulting uncertainty', async () => {
+  const session = freshSession();
+  let rejectWrite!: (cause: Error) => void;
+  let resolveRead!: (response: Response) => void;
+  let startedWrite!: () => void;
+  let startedRead!: () => void;
+  const writeStarted = new Promise<void>(resolve => { startedWrite = resolve; });
+  const readStarted = new Promise<void>(resolve => { startedRead = resolve; });
+  const api = createBroadcasts(session, (async (_url: string, init: RequestInit) => {
+    if (init.method === 'POST') {
+      startedWrite();
+      return new Promise<Response>((_resolve, reject) => { rejectWrite = reject; });
+    }
+    startedRead();
+    return new Promise<Response>(resolve => { resolveRead = resolve; });
+  }) as typeof fetch);
+  const pendingWrite = api.transition(7, 5, 'pause');
+  await writeStarted;
+  const pendingRead = api.list(7, undefined, true);
+  await readStarted;
+  rejectWrite(new Error('connection lost'));
+  await assert.rejects(pendingWrite);
+  resolveRead(Response.json({ items: [campaign] }));
+  await pendingRead;
+  assert.equal(api.blocked(7, 'campaign:5'), true);
+});
+
+test('account profile reads use the same cancellation/deadline transport without a target query', async () => {
+  const api = createBroadcasts(freshSession(), (async (url: string, init: RequestInit) => {
+    assert.equal(url, '/alpha-api/auth/profile');
+    assert.ok(init.signal);
+    return Response.json({ user: { accounts: [{ id: 7, name: 'Test' }] } });
+  }) as typeof fetch);
+  assert.deepEqual(await api.accounts(), [{ id: 7, name: 'Test' }]);
 });

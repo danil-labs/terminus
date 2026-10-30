@@ -1,46 +1,33 @@
 import type { InboxSession } from './inbox.ts';
 
-// Difusiones: contrato y reglas de Appv2 (`features/marketing`), sin texto: las frases las
-// pone cada cliente. El BFF responde siempre por la cuenta activa del JWT.
-
-export const CAMPAIGN_STATUSES = ['draft', 'scheduled', 'running', 'paused', 'cancelled', 'completed', 'failed'] as const;
-export type CampaignStatus = typeof CAMPAIGN_STATUSES[number];
-export type Campaign = { id: number; template_id: number | null; channel_id: number | null; name: string; status: CampaignStatus; scheduled_at: string | null };
-export type StatusOut = { id: number; status: CampaignStatus };
-export type CampaignStats = { by_process_status: Record<string, number>; by_delivery_status: Record<string, number>; responded: number; total: number };
-/** `phone` llega ya enmascarado: el número completo no pasa de este módulo. */
-export type Recipient = { id: number; contact_account_id: number; name: string | null; phone: string | null; status: string; status_detail: string | null; delivery_status: string | null; delivery_error_code: string | number | null; delivery_error_message: string | null };
-export type Rejection = { contact_account_id: number | null; reason: string };
-export type AddContactsResult = { added: number; requested: number; rejected: Rejection[] };
-export type Template = { id: number; name: string; category: string | null; language: string | null; status: string; waba_id: string | null; components: unknown; rejection_reason: string | null };
-export type TemplateChannel = { id: number; name: string | null; provider: string; active: boolean };
-export type TemplateSyncResult = { wabas: number; imported: number; updated: number; marked_deleted: number; unchanged: number };
-export type HeaderFormat = 'TEXT' | 'IMAGE' | 'VIDEO' | 'DOCUMENT';
-export type TemplateHeader = { format: HeaderFormat; text: string | null; media_url: string | null };
-export type TemplateContent = { header: TemplateHeader | null; body: { text: string }; footer: { text: string } | null };
-export type TemplateInput = TemplateContent & { channel_id: number; name: string; category: 'MARKETING' | 'UTILITY'; language: string };
-export type CampaignInput = { template_id: number; channel_id: number; name: string; variable_mapping?: Record<string, string> };
-/** `phone` enmascarado; `sendable` dice si tiene teléfono aunque no alcance para enmascarar. */
-export type Contact = { id: number; name: string | null; email: string | null; phone: string | null; sendable: boolean; tags: string[]; last_active_at: string | null };
-export type Funnel = { id: number; name: string; stages: { id: number; name: string }[] };
-export type FunnelBoard = { stages: { id: number; name: string }[]; cards: { stage_id: number; contact_account_id: number }[] };
-export type Permissions = { permissions: string[]; scoped: { permission: string }[] };
-
-/** Lo que cada cliente inyecta: con quién habla, con qué sesión y sobre qué cuenta. */
-export type BroadcastSource = {
-  session: InboxSession & { subscribe?: (clear: () => void) => () => void };
-  request: typeof fetch;
-  prefix: string;
-  writes: boolean;
-  demo: boolean;
-  /** La cuenta a la que el servidor anclará las lecturas; null si la sesión no tiene ninguna. */
-  account: () => Promise<number | null>;
-};
+export const BROADCAST_STATES = ['draft', 'scheduled', 'running', 'paused', 'cancelled', 'completed', 'failed'] as const;
+export type BroadcastState = typeof BROADCAST_STATES[number];
+export type Broadcast = { id: number; account_id: number; template_id: number | null; channel_id: number | null; name: string; status: BroadcastState };
+export type BroadcastTemplate = { id: number; name: string; variables: string[]; supported: boolean };
+export type BroadcastChannel = { id: number; name: string; provider: string; active: boolean };
+export type BroadcastContact = { id: number; name: string; phone: string };
+export type BroadcastPermissions = { permissions: string[]; scoped: { permission: string; scope_type: string; scope_id: number }[] };
+export type BroadcastAction = 'start' | 'pause' | 'resume' | 'cancel' | 'schedule';
 
 export class BroadcastError extends Error {
-  readonly status: number;
-  readonly code?: string;
-  constructor(message: string, status: number, code?: string) { super(message); this.name = 'BroadcastError'; this.status = status; this.code = code; }
+  readonly code: string;
+  readonly uncertain: boolean;
+  readonly status?: number;
+  constructor(code: string, uncertain = false, status?: number) { super(code); this.code = code; this.uncertain = uncertain; this.status = status; }
+}
+
+type Operation = { state: 'pending' | 'uncertain' };
+// Vive fuera del componente para conservar incertidumbre al cerrar o remontar la vista.
+const operations = new WeakMap<InboxSession, Map<string, Operation>>();
+const mappingKey = /^[a-zA-Z0-9_.]{1,64}$/;
+
+function abortable<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const abort = () => reject(signal.reason);
+    promise.then(resolve, reject).finally(() => signal.removeEventListener('abort', abort));
+    if (signal.aborted) { reject(signal.reason); return; }
+    signal.addEventListener('abort', abort, { once: true });
+  });
 }
 
 const object = (value: unknown): Record<string, unknown> => {
@@ -51,277 +38,214 @@ const id = (value: unknown): number => {
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value <= 0) throw new Error('invalid_response');
   return value;
 };
-const whole = (value: unknown): number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : 0;
-const text = (value: unknown): string | null => typeof value === 'string' ? value : null;
-const required = (value: unknown): string => {
+const text = (value: unknown): string => {
   if (typeof value !== 'string') throw new Error('invalid_response');
   return value;
 };
-const list = (value: unknown): unknown[] => {
+const array = (value: unknown): unknown[] => {
   if (!Array.isArray(value)) throw new Error('invalid_response');
   return value;
 };
-const counts = (value: unknown): Record<string, number> => Object.fromEntries(Object.entries(object(value)).map(([key, n]) => [key, whole(n)]));
-const status = (value: unknown): CampaignStatus => {
-  if (!CAMPAIGN_STATUSES.includes(value as CampaignStatus)) throw new Error('invalid_response');
-  return value as CampaignStatus;
+const state = (value: unknown): BroadcastState => {
+  if (!BROADCAST_STATES.includes(value as BroadcastState)) throw new Error('invalid_response');
+  return value as BroadcastState;
 };
+const variables = (value: string) => [...new Set([...value.matchAll(/\{\{\s*([a-zA-Z0-9_.]+)\s*\}\}/g)].map(match => match[1]))];
 
-/** `••••1234`: basta para distinguir contactos parecidos sin mostrar el número. */
-export function maskPhone(phone: string | null | undefined): string | null {
-  const digits = (phone ?? '').replace(/\D/g, '');
-  return digits.length < 4 ? null : `••••${digits.slice(-4)}`;
-}
-
-/** Tolera las dos formas de `contact_accounts.tags`: `{items:[{label}]}` y el arreglo antiguo. */
-export function contactTagLabels(tags: unknown): string[] {
-  const items = Array.isArray(tags) ? tags : tags && typeof tags === 'object' && Array.isArray((tags as { items?: unknown }).items) ? (tags as { items: unknown[] }).items : [];
-  const labels = items.map(item => typeof item === 'string' ? item : item && typeof item === 'object' ? (item as { label?: unknown }).label : null);
-  return [...new Set(labels.flatMap(label => typeof label === 'string' && label.trim() ? [label.trim()] : []))];
-}
-
-const campaign = (value: unknown): Campaign => {
+export function broadcastTemplate(value: unknown): BroadcastTemplate {
   const row = object(value);
-  return { id: id(row.id), template_id: typeof row.template_id === 'number' ? row.template_id : null, channel_id: typeof row.channel_id === 'number' ? row.channel_id : null, name: required(row.name), status: status(row.status), scheduled_at: text(row.scheduled_at) };
-};
-const statusOut = (value: unknown): StatusOut => { const row = object(value); return { id: id(row.id), status: status(row.status) }; };
-const template = (value: unknown): Template => {
-  const row = object(value);
-  return { id: id(row.id), name: required(row.name), category: text(row.category), language: text(row.language), status: required(row.status), waba_id: text(row.waba_id), components: row.components, rejection_reason: text(row.rejection_reason) };
-};
-const recipient = (value: unknown): Recipient => {
-  const row = object(value);
-  const code = row.delivery_error_code;
-  return { id: id(row.id), contact_account_id: id(row.contact_account_id), name: text(row.name), phone: maskPhone(text(row.phone)), status: required(row.status), status_detail: text(row.status_detail), delivery_status: text(row.delivery_status), delivery_error_code: typeof code === 'string' || typeof code === 'number' ? code : null, delivery_error_message: text(row.delivery_error_message) };
-};
-const contact = (value: unknown): Contact => {
-  const row = object(value);
-  const phone = text(row.phone);
-  return { id: id(row.id), name: text(row.name), email: text(row.email), phone: maskPhone(phone), sendable: !!phone?.trim(), tags: contactTagLabels(row.tags), last_active_at: text(row.last_active_at) };
-};
-const stage = (value: unknown) => { const row = object(value); return { id: id(row.id), name: required(row.name) }; };
-
-async function failure(response: Response): Promise<BroadcastError> {
-  let body: unknown;
-  try { body = await response.json(); } catch { body = undefined; }
-  const data = body && typeof body === 'object' ? body as { detail?: unknown; error?: unknown } : {};
-  const detail = data.detail && typeof data.detail === 'object' ? data.detail as { detail?: unknown; error?: unknown } : null;
-  const code = text(detail?.error) ?? text(data.error) ?? undefined;
-  return new BroadcastError(text(data.detail) || text(detail?.detail) || code || `HTTP ${response.status}`, response.status, code);
-}
-
-/** `writes` apagado corta aquí, antes de la red: ninguna vista puede saltarse el interruptor. */
-export function createBroadcasts(session: InboxSession, request: typeof fetch = fetch, prefix = '/terminus/alpha-api', options: { writes: boolean } = { writes: false }) {
-  async function call(path: string, init: RequestInit = {}) {
-    const attempt = async () => request(`${prefix}${path}`, { ...init, headers: { ...init.headers, Authorization: `Bearer ${await session.getToken()}` }, cache: 'no-store' });
-    let response = await attempt();
-    if (response.status === 401 && await session.unauthorized()) response = await attempt();
-    if (!response.ok) throw await failure(response);
-    return response;
+  const components = row.components;
+  let body = '';
+  let understood = false;
+  let outside = false;
+  if (Array.isArray(components)) {
+    understood = components.some(c => text(object(c).type).toUpperCase() === 'BODY' && typeof object(c).text === 'string');
+    body = components.filter(c => text(object(c).type).toUpperCase() === 'BODY').map(c => text(object(c).text ?? '')).join(' ');
+    outside = components.some(c => text(object(c).type).toUpperCase() !== 'BODY' && variables(JSON.stringify(c)).length > 0);
+  } else if (components && typeof components === 'object') {
+    const source = object(components);
+    if (source.body && typeof source.body === 'object') { body = text(object(source.body).text); understood = true; }
+    outside = Object.entries(source).some(([key, value]) => key !== 'body' && variables(JSON.stringify(value) ?? '').length > 0);
   }
-  const get = async (path: string) => object(await (await call(path)).json());
-  async function write(method: 'POST' | 'PATCH' | 'DELETE', path: string, body?: unknown) {
-    if (!options.writes) throw new BroadcastError('writes_disabled', 403, 'writes_disabled');
-    const payload = body === undefined ? {} : body instanceof FormData ? { body } : { body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } };
-    return call(path, { method, ...payload });
-  }
-  const post = async (path: string, body?: unknown) => object(await (await write('POST', path, body)).json());
-  const transition = (action: 'start' | 'pause' | 'resume' | 'cancel') => async (campaignId: number) => statusOut(await post(`/api/marketing/campaigns/${id(campaignId)}/${action}`));
-  return {
-    writes: options.writes,
-    async account(active: number): Promise<string | null> {
-      const accounts = list(object((await get('/auth/profile')).user).accounts ?? []);
-      return accounts.map(object).find(row => row.id === active)?.name as string | undefined ?? null;
-    },
-    async features(account: number): Promise<string[]> { return list((await get(`/auth/account/features?account_id=${id(account)}`)).features).filter((row): row is string => typeof row === 'string'); },
-    async permissions(account: number): Promise<Permissions> {
-      const data = await get(`/auth/account/my-permissions?account_id=${id(account)}`);
-      return { permissions: list(data.permissions).filter((row): row is string => typeof row === 'string'), scoped: Array.isArray(data.scoped) ? data.scoped.map(row => ({ permission: String(object(row).permission) })) : [] };
-    },
-    async campaigns(): Promise<Campaign[]> { return list((await get('/api/marketing/campaigns')).items).map(campaign); },
-    async stats(campaignId: number): Promise<CampaignStats> {
-      const data = await get(`/api/marketing/campaigns/${id(campaignId)}/stats`);
-      return { by_process_status: counts(data.by_process_status), by_delivery_status: counts(data.by_delivery_status), responded: whole(data.responded), total: whole(data.total) };
-    },
-    async recipients(campaignId: number): Promise<Recipient[]> { return list((await get(`/api/marketing/campaigns/${id(campaignId)}/messages?limit=200&offset=0`)).items).map(recipient); },
-    async templates(approvedOnly = false): Promise<Template[]> { return list((await get(`/api/marketing/templates${approvedOnly ? '?status=APPROVED' : ''}`)).items).map(template); },
-    async template(templateId: number): Promise<Template> { return template(await get(`/api/marketing/templates/${id(templateId)}`)); },
-    async templateChannels(templateId: number): Promise<TemplateChannel[]> {
-      return list((await get(`/api/marketing/templates/${id(templateId)}/channels`)).channels).map(value => {
-        const row = object(value);
-        return { id: id(row.id), name: text(row.name), provider: required(row.provider), active: row.active === true };
-      });
-    },
-    async contacts(): Promise<Contact[]> { return list((await get('/api/contacts')).items).map(contact); },
-    async metadataKeys(): Promise<string[]> { return list((await get('/api/contacts/metadata-keys')).keys).filter((row): row is string => typeof row === 'string'); },
-    async funnels(): Promise<Funnel[]> {
-      return list((await get('/api/funnels')).funnels).map(value => { const row = object(value); return { id: id(row.id), name: required(row.name), stages: list(row.stages ?? []).map(stage) }; });
-    },
-    async board(funnelId: number): Promise<FunnelBoard> {
-      const data = await get(`/api/funnels/${id(funnelId)}/board`);
-      return { stages: list(data.stages).map(stage), cards: list(data.cards).map(value => { const row = object(value); return { stage_id: id(row.stage_id), contact_account_id: id(row.contact_account_id) }; }) };
-    },
-    async channels(): Promise<{ id: number; name: string | null }[]> {
-      const rows = list((await get('/api/channels')).channels).map(object);
-      return operableChannels(rows).map(row => ({ id: id(row.id), name: text(row.name) }));
-    },
-    async createCampaign(input: CampaignInput): Promise<StatusOut> { return statusOut(await post('/api/marketing/campaigns', input)); },
-    async addContacts(campaignId: number, ids: number[]): Promise<AddContactsResult> {
-      const data = await post(`/api/marketing/campaigns/${id(campaignId)}/contacts`, { contact_account_ids: ids.map(id) });
-      const rejected = Array.isArray(data.rejected) ? data.rejected.map(value => { const row = object(value); return { contact_account_id: typeof row.contact_account_id === 'number' ? row.contact_account_id : null, reason: required(row.reason) }; }) : [];
-      return { added: whole(data.added), requested: whole(data.requested), rejected };
-    },
-    start: transition('start'), pause: transition('pause'), resume: transition('resume'), cancel: transition('cancel'),
-    async schedule(campaignId: number, scheduledAt: string): Promise<StatusOut> { return statusOut(await post(`/api/marketing/campaigns/${id(campaignId)}/schedule`, { scheduled_at: scheduledAt })); },
-    async syncTemplates(): Promise<TemplateSyncResult> {
-      const data = await post('/api/marketing/templates/sync', {});
-      return { wabas: whole(data.wabas), imported: whole(data.imported), updated: whole(data.updated), marked_deleted: whole(data.marked_deleted), unchanged: whole(data.unchanged) };
-    },
-    async createTemplate(input: TemplateInput & { submit: boolean }): Promise<Template> { return template(await post('/api/marketing/templates', input)); },
-    async updateTemplate(templateId: number, input: TemplateInput): Promise<Template> { return template(object(await (await write('PATCH', `/api/marketing/templates/${id(templateId)}`, input)).json())); },
-    async submitTemplate(templateId: number): Promise<Template> { return template(await post(`/api/marketing/templates/${id(templateId)}/submit`)); },
-    async deleteTemplate(templateId: number): Promise<void> { await write('DELETE', `/api/marketing/templates/${id(templateId)}`); },
-    async uploadMedia(file: File): Promise<string> {
-      const form = new FormData();
-      form.append('file', file);
-      form.append('kind', 'template');
-      return required((await post('/api/media', form)).public_url);
-    },
-    async requestAccess(account: number, phone: string): Promise<void> { await post('/auth/account/request-access', { account_id: id(account), feature: 'campaigns', phone }); },
-  };
-}
-export type Broadcasts = ReturnType<typeof createBroadcasts>;
-
-/** Sin archivados, sin canales de vista previa y sin los `prueba_`, como `operableChannels` de Appv2. */
-export function operableChannels<T extends Record<string, unknown>>(rows: T[]): T[] {
-  return rows.filter(row => row.archived !== true && row.provider !== 'web_preview' && !String(row.name ?? '').toLowerCase().startsWith('prueba_'));
+  const bodyVariables = variables(body);
+  const all = variables(JSON.stringify(components ?? ''));
+  return { id: id(row.id), name: text(row.name), variables: bodyVariables, supported: bodyVariables.length <= 50 && bodyVariables.every(key => mappingKey.test(key)) && understood && !outside && all.every(v => bodyVariables.includes(v)) };
 }
 
-export const FAILED_PROCESS_STATUSES = ['failed', 'dead', 'error'] as const;
-export const countFailedProcess = (byStatus: Record<string, number> | undefined) => FAILED_PROCESS_STATUSES.reduce((sum, key) => sum + (byStatus?.[key] ?? 0), 0);
+export function canManageBroadcast(perms: BroadcastPermissions | null, channel: number | null): boolean {
+  return !!perms && perms.permissions.includes('campaigns.manage') && (perms.permissions.includes('channels.manage') || (channel !== null && perms.scoped.some(grant => grant.permission === 'channels.manage' && grant.scope_type === 'channel' && grant.scope_id === channel)));
+}
 
-export type CampaignAction = 'start' | 'schedule' | 'pause' | 'resume' | 'cancel';
-/** Solo las transiciones legales de cada estado; el servidor es quien las valida. */
-export function actionsFor(value: CampaignStatus): CampaignAction[] {
-  if (value === 'draft') return ['start', 'schedule', 'cancel'];
-  if (value === 'scheduled') return ['start', 'cancel'];
-  if (value === 'running') return ['pause', 'cancel'];
-  if (value === 'paused') return ['resume', 'cancel'];
+export function broadcastActions(status: BroadcastState): BroadcastAction[] {
+  if (status === 'draft') return ['start', 'schedule', 'cancel'];
+  if (status === 'scheduled') return ['start', 'cancel'];
+  if (status === 'running') return ['pause', 'cancel'];
+  if (status === 'paused') return ['resume', 'cancel'];
   return [];
 }
-export const buildingAudience = (value: CampaignStatus) => value === 'draft' || value === 'scheduled' || value === 'paused';
 
-export function campaignProgress(stats: CampaignStats) {
-  const process = stats.by_process_status, delivery = stats.by_delivery_status;
-  const pending = (process.pending ?? 0) + (process.queued ?? 0);
-  return { pending, sent: process.dispatched ?? 0, delivered: delivery.delivered ?? 0, read: delivery.read ?? 0, failed: countFailedProcess(process) + (delivery.failed ?? 0), responded: stats.responded, processed: Math.max(0, stats.total - pending), total: stats.total };
-}
-/** La cola puede vaciarse antes de que cambie el estado: se avisa, pero no se inventa la transición. */
-export const sendsDone = (stats: CampaignStats, value: CampaignStatus) => { const c = campaignProgress(stats); return (value === 'running' || value === 'paused') && c.total > 0 && c.pending === 0; };
-export const nothingReachedMeta = (stats: CampaignStats) => { const c = campaignProgress(stats); return c.failed > 0 && c.total > 0 && Object.keys(stats.by_delivery_status).length === 0; };
-
-const META_ERROR_CODES = new Set(['131009', '131042', '131026', '131047', '131051', '131000', '132000', '132001', '133010', '130472', '368']);
-export function cleanReason(raw: string | null | undefined): string {
-  if (!raw) return '';
-  const before = raw.split(/\s*[{[]/, 1)[0]?.trim() || '';
-  const line = (before || raw).replace(/\s+/g, ' ').trim();
-  return line.length > 140 ? `${line.slice(0, 137)}…` : line;
-}
-/** El código de Meta si se reconoce; si no, el motivo crudo limpio. Un fallo nunca queda en blanco. */
-export function failureReason(input: { code?: string | number | null; detail?: string | null; deliveryMessage?: string | null }): { code: string | null; text: string } {
-  const explicit = input.code != null ? String(input.code).trim() : '';
-  if (META_ERROR_CODES.has(explicit)) return { code: explicit, text: '' };
-  const raw = (input.detail || input.deliveryMessage || '').trim();
-  // Primero `#132000`: un dígito suelto agarraría antes el estado HTTP de «Status 400: (#132000)».
-  const code = [raw.match(/#(\d{2,6})/)?.[1], raw.match(/\b(\d{2,6})\b/)?.[1]].find(found => found && META_ERROR_CODES.has(found));
-  return code ? { code, text: '' } : { code: null, text: cleanReason(raw) };
-}
-export function summarizeFailures(rows: Recipient[] | undefined) {
-  const groups = new Map<string, { code: string | null; text: string; count: number; raw?: string }>();
-  for (const row of rows ?? []) {
-    if (!(FAILED_PROCESS_STATUSES as readonly string[]).includes(row.status) && row.delivery_status !== 'failed') continue;
-    const reason = failureReason({ code: row.delivery_error_code, detail: row.status_detail, deliveryMessage: row.delivery_error_message });
-    const key = reason.code ?? reason.text;
-    const raw = (row.status_detail || row.delivery_error_message || '').trim();
-    const group = groups.get(key);
-    if (group) group.count++;
-    else groups.set(key, { ...reason, count: 1, raw: raw && raw !== reason.text ? raw : undefined });
-  }
-  return [...groups.values()].sort((a, b) => b.count - a.count);
-}
-export function summarizeRejections(rows: Rejection[]) {
-  const groups = new Map<string, number>();
-  for (const row of rows) { const key = ['no_phone', 'invalid_format', 'invalid_phone'].includes(row.reason) ? row.reason.replace('invalid_format', 'invalid_phone') : 'other'; groups.set(key, (groups.get(key) ?? 0) + 1); }
-  return [...groups.entries()].map(([reason, count]) => ({ reason, count })).sort((a, b) => b.count - a.count);
-}
-
-const DAY = 24 * 60 * 60 * 1000;
-export const ACTIVITY_WINDOWS = { all: null, '7d': 7, '30d': 30 } as const;
-export type ActivityWindow = keyof typeof ACTIVITY_WINDOWS;
-export function contactsInWindow<T extends { last_active_at: string | null }>(rows: T[], window: ActivityWindow, now = Date.now()): T[] {
-  const days = ACTIVITY_WINDOWS[window];
-  if (days === null) return rows;
-  return rows.filter(row => { const at = Date.parse(row.last_active_at ?? ''); return Number.isFinite(at) && now - at <= days * DAY; });
-}
-
-export function extractTemplateVariables(body: string): string[] {
-  return [...new Set([...body.matchAll(/\{\{\s*([a-zA-Z0-9_.]+)\s*\}\}/g)].map(match => match[1]!))];
-}
-const HEADER_FORMATS: readonly string[] = ['TEXT', 'IMAGE', 'VIDEO', 'DOCUMENT'];
-const header = (value: unknown): TemplateHeader | null => {
-  if (!value || typeof value !== 'object') return null;
-  const row = value as Record<string, unknown>;
-  return HEADER_FORMATS.includes(String(row.format)) ? { format: row.format as HeaderFormat, text: text(row.text), media_url: text(row.media_url) } : null;
-};
-/** La forma de un borrador, o null. Tras enviarlo a Meta `components` pasa a ser un arreglo. */
-export function draftContent(components: unknown): TemplateContent | null {
-  if (!components || typeof components !== 'object' || Array.isArray(components)) return null;
-  const row = components as Record<string, unknown>;
-  const body = row.body && typeof row.body === 'object' ? text((row.body as { text?: unknown }).text) : null;
-  if (body === null) return null;
-  const footer = row.footer && typeof row.footer === 'object' ? text((row.footer as { text?: unknown }).text) : null;
-  return { header: header(row.header), body: { text: body }, footer: footer === null ? null : { text: footer } };
-}
-/** Lo que pinta la vista previa, venga del borrador o del arreglo final de Meta. */
-export function templateContent(components: unknown): TemplateContent {
-  const draft = draftContent(components);
-  if (draft) return draft;
-  const rows = Array.isArray(components) ? components.filter((row): row is Record<string, unknown> => !!row && typeof row === 'object') : [];
-  const byType = (type: string) => rows.find(row => String(row.type).toUpperCase() === type);
-  const top = byType('HEADER');
-  const footer = text(byType('FOOTER')?.text);
-  return { header: top ? header({ format: String(top.format).toUpperCase(), text: top.text }) : null, body: { text: text(byType('BODY')?.text) ?? '' }, footer: footer === null ? null : { text: footer } };
-}
-export const templateVariables = (components: unknown) => extractTemplateVariables(templateContent(components).body.text);
-/** Una variable fuera del cuerpo no se puede mapear y Meta rechazaría el envío: se rehúsa la plantilla. */
-export function templateHasUnmappableParams(components: unknown): boolean {
-  const body = new Set(templateVariables(components));
-  return extractTemplateVariables(JSON.stringify(components ?? '')).some(name => !body.has(name));
-}
-export const normalizeTemplateName = (raw: string) => raw.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
-
-export type TextNode = { type: 'text' | 'mono'; value: string } | { type: 'variable'; name: string } | { type: 'bold' | 'italic' | 'strike'; children: TextNode[] };
-const WRAPPERS: Record<string, 'bold' | 'italic' | 'strike'> = { '*': 'bold', _: 'italic', '~': 'strike' };
-/** Lo que WhatsApp pinta en línea: el marcador pega a su contenido y cierra en la misma línea. */
-export function parseTemplateText(source: string): TextNode[] {
-  const nodes: TextNode[] = [];
-  let buffer = '', i = 0;
-  const flush = () => { if (buffer) nodes.push({ type: 'text', value: buffer }); buffer = ''; };
-  while (i < source.length) {
-    if (source.startsWith('```', i)) {
-      const end = source.indexOf('```', i + 3);
-      if (end > i + 3) { flush(); nodes.push({ type: 'mono', value: source.slice(i + 3, end) }); i = end + 3; continue; }
+/** Rutas cerradas del frontend Appv2; presupuesto y validación final pertenecen al servidor. */
+export function createBroadcasts(session: InboxSession, request: typeof fetch = fetch, prefix = '/alpha-api') {
+  const locks = operations.get(session) ?? new Map<string, Operation>();
+  operations.set(session, locks);
+  const key = (account: number, resource: string) => `${prefix}:${id(account)}:${resource}`;
+  // Una lectura iniciada antes del fallo no puede confirmar esa operación.
+  const snapshot = (account: number) => [...locks.entries()].filter(([name, operation]) => name.startsWith(`${prefix}:${id(account)}:`) && operation.state === 'uncertain');
+  const reconcile = (entries: [string, Operation][], resource?: string) => {
+    for (const [name, operation] of entries) {
+      if (locks.get(name) === operation && (resource ? name.endsWith(`:${resource}`) : !name.includes(':contacts:'))) locks.delete(name);
     }
-    const variable = /^\{\{\s*([a-zA-Z0-9_.]+)\s*\}\}/.exec(source.slice(i, i + 140));
-    if (variable) { flush(); nodes.push({ type: 'variable', name: variable[1]! }); i += variable[0].length; continue; }
-    const wrapper = WRAPPERS[source[i]!];
-    if (wrapper) {
-      const end = source.indexOf(source[i]!, i + 1);
-      const content = end > i + 1 ? source.slice(i + 1, end) : '';
-      if (content && !content.includes('\n') && !/^\s|\s$/.test(content)) { flush(); nodes.push({ type: wrapper, children: parseTemplateText(content) }); i = end + 1; continue; }
+  };
+  async function call(account: number | null, path: string, method = 'GET', body?: unknown, signal?: AbortSignal, trace?: { sent: boolean }) {
+    const query = account === null ? '' : `${path.includes('?') ? '&' : '?'}account_id=${id(account)}`;
+    const controller = new AbortController();
+    const cancel = () => controller.abort(signal?.reason);
+    signal?.addEventListener('abort', cancel, { once: true });
+    if (signal?.aborted) cancel();
+    const timer = setTimeout(() => controller.abort(new Error('timeout')), 30_000);
+    const active = controller.signal;
+    const send = async () => {
+      active.throwIfAborted();
+      const token = await abortable(session.getToken(), active);
+      active.throwIfAborted();
+      if (trace) trace.sent = true;
+      return abortable(request(`${prefix}${path}${query}`, {
+        method, signal: active, headers: { Authorization: `Bearer ${token}`, ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }), cache: 'no-store',
+      }), active);
+    };
+    try {
+      let response = await send();
+      if (method === 'GET' && response.status === 401 && await abortable(session.unauthorized(), active)) response = await send();
+      if (!response.ok) {
+        let code = `HTTP ${response.status}`;
+        try {
+          const data = object(await abortable(response.json(), active));
+          const detail = data.detail && typeof data.detail === 'object' ? object(data.detail) : null;
+          const candidate = data.error ?? data.code ?? detail?.error ?? detail?.code ?? data.detail;
+          if (typeof candidate === 'string' && /^[a-zA-Z0-9_.-]{1,80}$/.test(candidate)) code = candidate;
+        } catch { /* La clasificación HTTP no depende del formato del error. */ }
+        throw new BroadcastError(code, response.status >= 500 || response.status === 408, response.status);
+      }
+      return object(await abortable(response.json(), active));
+    } finally {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', cancel);
     }
-    buffer += source[i]; i++;
   }
-  flush();
-  return nodes;
+  async function write<T>(account: number, resource: string, execute: (trace: { sent: boolean }) => Promise<T>): Promise<T> {
+    const name = key(account, resource);
+    if (locks.has(name)) throw new BroadcastError('reconcile_required', true);
+    const operation: Operation = { state: 'pending' };
+    locks.set(name, operation);
+    const trace = { sent: false };
+    try {
+      const value = await execute(trace);
+      locks.delete(name);
+      return value;
+    } catch (cause) {
+      const error = cause instanceof BroadcastError ? cause : new BroadcastError(cause instanceof Error ? cause.message : 'request_failed', trace.sent);
+      if (error.uncertain) operation.state = 'uncertain'; else locks.delete(name);
+      throw error;
+    }
+  }
+  const base = '/api/marketing';
+  const result = (data: Record<string, unknown>, expected?: number) => {
+    const value = { id: id(data.id), status: state(data.status) };
+    if (expected !== undefined && value.id !== expected) throw new Error('invalid_scope');
+    return value;
+  };
+  return {
+    async accounts(signal?: AbortSignal): Promise<{ id: number; name: string }[]> {
+      const user = object((await call(null, '/auth/profile', 'GET', undefined, signal)).user);
+      return array(user.accounts ?? []).map(value => { const row = object(value); return { id: id(row.id), name: text(row.name) }; });
+    },
+    async activeAccount(signal?: AbortSignal): Promise<number> {
+      const controller = new AbortController();
+      const cancel = () => controller.abort(signal?.reason);
+      signal?.addEventListener('abort', cancel, { once: true });
+      if (signal?.aborted) cancel();
+      const timer = setTimeout(() => controller.abort(new Error('timeout')), 30_000);
+      try {
+        controller.signal.throwIfAborted();
+        const token = await abortable(session.getToken(), controller.signal);
+        controller.signal.throwIfAborted();
+        try {
+          const payload = object(JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))));
+          const account = typeof payload.active_account_id === 'string' && /^[1-9][0-9]*$/.test(payload.active_account_id) ? Number(payload.active_account_id) : payload.active_account_id;
+          return id(account);
+        } catch { throw new BroadcastError('missing_active_account'); }
+      } finally { clearTimeout(timer); signal?.removeEventListener('abort', cancel); }
+    },
+    blocked(account: number, resource: string) { return locks.has(key(account, resource)); },
+    async permissions(account: number, signal?: AbortSignal): Promise<BroadcastPermissions> {
+      const data = await call(account, '/auth/account/my-permissions', 'GET', undefined, signal);
+      text(data.role);
+      return { permissions: array(data.permissions).map(text), scoped: array(data.scoped).map(value => {
+        const row = object(value); return { permission: text(row.permission), scope_type: text(row.scope_type), scope_id: id(row.scope_id) };
+      }) };
+    },
+    async list(account: number, signal?: AbortSignal, reconcileWrites = false): Promise<Broadcast[]> {
+      const before = snapshot(account);
+      const rows = array((await call(account, `${base}/campaigns`, 'GET', undefined, signal)).items).map(value => {
+        const row = object(value);
+        if (row.account_id !== account) throw new Error('invalid_scope');
+        return { id: id(row.id), account_id: account, template_id: row.template_id === null ? null : id(row.template_id), channel_id: row.channel_id === null ? null : id(row.channel_id), name: text(row.name), status: state(row.status) };
+      });
+      signal?.throwIfAborted();
+      if (reconcileWrites) reconcile(before);
+      return rows;
+    },
+    async templates(account: number, signal?: AbortSignal): Promise<BroadcastTemplate[]> {
+      return array((await call(account, `${base}/templates?status=APPROVED`, 'GET', undefined, signal)).items).filter(value => object(value).status === 'APPROVED').map(broadcastTemplate);
+    },
+    async channels(account: number, template: number, signal?: AbortSignal): Promise<BroadcastChannel[]> {
+      return array((await call(account, `${base}/templates/${id(template)}/channels`, 'GET', undefined, signal)).channels).map(value => {
+        const row = object(value);
+        if (typeof row.active !== 'boolean') throw new Error('invalid_response');
+        return { id: id(row.id), name: row.name == null ? '' : text(row.name), provider: text(row.provider), active: row.active };
+      });
+    },
+    async stats(account: number, campaign: number, signal?: AbortSignal, reconcileWrites = false): Promise<number> {
+      const before = snapshot(account);
+      const data = await call(account, `${base}/campaigns/${id(campaign)}/stats`, 'GET', undefined, signal);
+      if (data.campaign_id !== campaign) throw new Error('invalid_scope');
+      if (typeof data.total !== 'number' || !Number.isSafeInteger(data.total) || data.total < 0) throw new Error('invalid_response');
+      signal?.throwIfAborted();
+      if (reconcileWrites) reconcile(before, `contacts:${campaign}`);
+      return data.total;
+    },
+    async contacts(account: number, signal?: AbortSignal): Promise<BroadcastContact[]> {
+      return array((await call(account, '/api/contacts', 'GET', undefined, signal)).items).map(value => {
+        const row = object(value); return { id: id(row.id), name: row.name == null ? '' : text(row.name), phone: row.phone == null ? '' : text(row.phone) };
+      });
+    },
+    async create(account: number, input: { name: string; template_id: number; channel_id: number; variable_mapping?: Record<string, string> }, signal?: AbortSignal) {
+      const name = input.name.trim();
+      if (!name || name.length > 200) throw new Error('invalid_input');
+      const mapping = input.variable_mapping;
+      if (mapping !== undefined && (!mapping || typeof mapping !== 'object' || Array.isArray(mapping))) throw new Error('invalid_input');
+      if (mapping && (Object.keys(mapping).length > 50 || Object.entries(mapping).some(([key, value]) => !mappingKey.test(key) || typeof value !== 'string' || !value.trim() || value.length > 1024))) throw new Error('invalid_input');
+      const body = { name, template_id: id(input.template_id), channel_id: id(input.channel_id), ...(mapping ? { variable_mapping: mapping } : {}) };
+      return write(account, 'create', async trace => result(await call(account, `${base}/campaigns`, 'POST', body, signal, trace)));
+    },
+    async addContacts(account: number, campaign: number, contacts: number[], signal?: AbortSignal) {
+      if (!contacts.length || contacts.length > 100) throw new Error('invalid_input');
+      const body = { contact_account_ids: [...new Set(contacts.map(id))] };
+      const campaignId = id(campaign);
+      return write(account, `contacts:${campaignId}`, async trace => {
+        const data = await call(account, `${base}/campaigns/${campaignId}/contacts`, 'POST', body, signal, trace);
+        if (![data.added, data.requested].every(value => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0)) throw new Error('invalid_response');
+        return { added: data.added as number, requested: data.requested as number, rejected: array(data.rejected ?? []).map(value => {
+          const row = object(value); return { contact_account_id: row.contact_account_id == null ? null : id(row.contact_account_id), reason: text(row.reason) };
+        }) };
+      });
+    },
+    async transition(account: number, campaign: number, action: BroadcastAction, scheduledAt?: string, signal?: AbortSignal) {
+      if (!['start', 'pause', 'resume', 'cancel', 'schedule'].includes(action)) throw new Error('invalid_input');
+      if (action === 'schedule' && (!scheduledAt || !Number.isFinite(Date.parse(scheduledAt)) || Date.parse(scheduledAt) <= Date.now())) throw new Error('invalid_input');
+      const campaignId = id(campaign);
+      return write(account, `campaign:${campaignId}`, async trace => result(await call(account, `${base}/campaigns/${campaignId}/${action}`, 'POST', action === 'schedule' ? { scheduled_at: new Date(scheduledAt!).toISOString() } : undefined, signal, trace), campaignId));
+    },
+  };
 }

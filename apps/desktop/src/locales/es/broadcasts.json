@@ -4,7 +4,7 @@
   "broadcasts.templates": "Plantillas",
   "broadcasts.account_hint": "Las difusiones son de la cuenta activa de tu sesión en Danil, no de este workspace.",
   "broadcasts.demo_note": "Datos de ejemplo. Nada sale de esta página y los cambios se pierden al recargar.",
-  "broadcasts.writes_off": "Solo lectura en alfa: crear, lanzar, pausar y enviar plantillas a Meta están apagados.",
+  "broadcasts.writes_off": "Solo lectura para lo que llega a clientes o a Meta: en alfa puedes crear borradores, pausar y cancelar; lanzar, agregar contactos y enviar plantillas están apagados.",
   "broadcasts.no_active_account": "Tu sesión no tiene una cuenta activa de Danil.",
   "broadcasts.view_label": "Ver difusiones o plantillas",
   "broadcasts.new_broadcast": "Nueva difusión",

@@ -54,7 +54,7 @@ export default function TitleBar(props: {
       data-tauri-drag-region=""
       onDblClick={toggleMaximizeFromHeader}
     >
-      <div ref={grupo} class="flex min-w-0 shrink-0 items-center gap-1 pr-2" style={{ width: ancho() }}>
+      <div ref={grupo} class="flex min-w-0 shrink-0 items-center gap-1 pr-2 max-[600px]:max-w-[calc(100%-2rem)] max-[600px]:shrink" style={{ width: ancho() }}>
         {props.izquierda}
         <span class="min-w-0 flex-1" data-tauri-drag-region="" />
         {props.finDeIzquierda}

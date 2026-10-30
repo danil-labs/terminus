@@ -1,6 +1,6 @@
 import { createEffect, createMemo, createSignal, For, on, Show } from 'solid-js';
 import X from 'lucide-solid/icons/x';
-import { ACTIVITY_WINDOWS, contactsInWindow, summarizeRejections, type ActivityWindow, type Contact, type Rejection } from '../../../../../../packages/attention/src/broadcasts.ts';
+import { ACTIVITY_WINDOWS, contactsInWindow, summarizeRejections, type ActivityWindow, type Contact, type Rejection } from '../../../../../../packages/attention/src/broadcast-panel.ts';
 import { t } from '../../../lib/i18n';
 import { Button } from '../../../ui/Button';
 import { Select } from '../../../ui/Select';

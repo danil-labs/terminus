@@ -4,7 +4,7 @@ import Pause from 'lucide-solid/icons/pause';
 import Play from 'lucide-solid/icons/play';
 import Square from 'lucide-solid/icons/square';
 import UserPlus from 'lucide-solid/icons/user-plus';
-import { actionsFor, buildingAudience, campaignProgress, summarizeFailures, type Campaign, type Recipient } from '../../../../../../packages/attention/src/broadcasts.ts';
+import { actionsFor, buildingAudience, campaignProgress, summarizeFailures, type Campaign, type Recipient } from '../../../../../../packages/attention/src/broadcast-panel.ts';
 import { t } from '../../../lib/i18n';
 import { Button } from '../../../ui/Button';
 import { Input } from '../../../ui/Input';
@@ -30,7 +30,8 @@ export function CampaignDetail(props: { context: Context; campaign: Campaign; on
   const [when, setWhen] = createSignal('');
   const [adding, setAdding] = createSignal(false);
   const actions = () => actionsFor(props.campaign.status);
-  const canWrite = props.context.canWrite;
+  const canDeliver = () => props.context.canWrite() && props.context.canOperate(props.campaign.channel_id);
+  const canOperate = () => props.context.canOperate(props.campaign.channel_id);
   const emptyAudience = () => stats.data()?.total === 0;
 
   async function act(action: () => Promise<unknown>) {
@@ -47,11 +48,11 @@ export function CampaignDetail(props: { context: Context; campaign: Campaign; on
         <h2 class="m-0 mt-0.5 flex items-center gap-2 text-base"><span class="truncate">{props.campaign.name}</span><StatusBadge status={props.campaign.status}/></h2>
       </div>
       <div class="flex flex-wrap items-center gap-2">
-        <Show when={actions().includes('start')}><Button size="sm" type="button" disabled={busy() || emptyAudience() || !canWrite()} title={emptyAudience() ? t("broadcasts.empty_audience") : undefined} onClick={() => setConfirm('start')}><Play size={15}/>{props.campaign.status === 'scheduled' ? t("broadcasts.start_now") : t("broadcasts.start")}</Button></Show>
-        <Show when={actions().includes('schedule')}><Button size="sm" variant="secondary" type="button" disabled={!canWrite()} onClick={() => setScheduling(!scheduling())}><CalendarClock size={15}/>{t("broadcasts.schedule")}</Button></Show>
-        <Show when={actions().includes('pause')}><Button size="sm" variant="secondary" type="button" disabled={busy() || !canWrite()} onClick={() => void act(() => api.pause(id))}><Pause size={15}/>{t("broadcasts.pause")}</Button></Show>
-        <Show when={actions().includes('resume')}><Button size="sm" type="button" disabled={busy() || !canWrite()} onClick={() => void act(() => api.resume(id))}><Play size={15}/>{t("broadcasts.resume")}</Button></Show>
-        <Show when={actions().includes('cancel')}><Button size="sm" variant="danger" type="button" disabled={busy() || !canWrite()} onClick={() => setConfirm('cancel')}><Square size={14}/>{t("broadcasts.cancel_broadcast")}</Button></Show>
+        <Show when={actions().includes('start')}><Button size="sm" type="button" disabled={busy() || emptyAudience() || !canDeliver()} title={emptyAudience() ? t("broadcasts.empty_audience") : undefined} onClick={() => setConfirm('start')}><Play size={15}/>{props.campaign.status === 'scheduled' ? t("broadcasts.start_now") : t("broadcasts.start")}</Button></Show>
+        <Show when={actions().includes('schedule')}><Button size="sm" variant="secondary" type="button" disabled={!canDeliver()} onClick={() => setScheduling(!scheduling())}><CalendarClock size={15}/>{t("broadcasts.schedule")}</Button></Show>
+        <Show when={actions().includes('pause')}><Button size="sm" variant="secondary" type="button" disabled={busy() || !canOperate()} onClick={() => void act(() => api.pause(id))}><Pause size={15}/>{t("broadcasts.pause")}</Button></Show>
+        <Show when={actions().includes('resume')}><Button size="sm" type="button" disabled={busy() || !canDeliver()} onClick={() => void act(() => api.resume(id))}><Play size={15}/>{t("broadcasts.resume")}</Button></Show>
+        <Show when={actions().includes('cancel')}><Button size="sm" variant="danger" type="button" disabled={busy() || !canOperate()} onClick={() => setConfirm('cancel')}><Square size={14}/>{t("broadcasts.cancel_broadcast")}</Button></Show>
       </div>
     </header>
     <div class="grid min-h-0 flex-1 content-start gap-4 overflow-y-auto p-4">
@@ -61,7 +62,7 @@ export function CampaignDetail(props: { context: Context; campaign: Campaign; on
       <Show when={scheduling() && actions().includes('schedule')}>
         <form class="flex flex-wrap items-end gap-2 rounded-md border border-border bg-surface-muted p-3" onSubmit={event => { event.preventDefault(); if (when()) void act(() => api.schedule(id, new Date(when()).toISOString())); }}>
           <label class="grid gap-1 text-[0.8rem] text-neutral-500">{t("broadcasts.schedule_at")}<Input type="datetime-local" class="w-auto" value={when()} onInput={event => setWhen(event.currentTarget.value)}/></label>
-          <Button type="submit" size="sm" disabled={!when() || busy() || !canWrite()}>{t("broadcasts.schedule")}</Button>
+          <Button type="submit" size="sm" disabled={!when() || busy() || !canDeliver()}>{t("broadcasts.schedule")}</Button>
           <Button type="button" size="sm" variant="ghost" onClick={() => setScheduling(false)}>{t("broadcasts.cancel")}</Button>
         </form>
       </Show>

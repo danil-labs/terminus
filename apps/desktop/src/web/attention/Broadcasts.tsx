@@ -1,7 +1,7 @@
 import { createMemo, createSignal, For, onCleanup, onMount, Show } from 'solid-js';
 import ArrowLeft from 'lucide-solid/icons/arrow-left';
 import Plus from 'lucide-solid/icons/plus';
-import { createBroadcasts, type Broadcasts as BroadcastsApi, type BroadcastSource, type StatusOut } from '../../../../../packages/attention/src/broadcasts.ts';
+import { canManageBroadcast, createBroadcastPanel, type BroadcastPanel, type BroadcastSource, type StatusOut } from '../../../../../packages/attention/src/broadcast-panel.ts';
 import { t } from '../../lib/i18n';
 import { Button } from '../../ui/Button';
 import { EmptyState } from '../../ui/EmptyState';
@@ -19,7 +19,7 @@ const CAMPAIGNS_POLL = 8000;
 /** Sesión, transporte y cuenta los pone la capability: esta vista no sabe en qué cliente corre. */
 export function Broadcasts(props: { source?: BroadcastSource }) {
   const source = props.source;
-  const api = source ? createBroadcasts(source.session, source.request, source.prefix, { writes: source.writes }) : null;
+  const api = source ? createBroadcastPanel(source) : null;
   const [generation, setGeneration] = createSignal(1);
   onMount(() => {
     const stop = source?.session.subscribe?.(() => setGeneration(value => value + 1));
@@ -30,7 +30,7 @@ export function Broadcasts(props: { source?: BroadcastSource }) {
   </Show>;
 }
 
-function Workspace(props: { api: BroadcastsApi; source: BroadcastSource }) {
+function Workspace(props: { api: BroadcastPanel; source: BroadcastSource }) {
   const api = props.api;
   // Las funciones y los permisos se muestran mientras no se sepan: el servidor es quien rechaza.
   const access = createQuery(async () => {
@@ -40,9 +40,10 @@ function Workspace(props: { api: BroadcastsApi; source: BroadcastSource }) {
     return { account, name, features, permissions };
   }, { focus: true });
   const gated = () => { const features = access.data()?.features; return !!features && !features.includes('campaigns'); };
-  const manage = () => { const value = access.data()?.permissions; return !value || value.permissions.includes('campaigns.manage') || value.scoped.some(row => row.permission === 'campaigns.manage'); };
+  const canOperate = (channel: number | null) => canManageBroadcast(access.data()?.permissions ?? null, channel);
+  const manage = () => access.data()?.permissions?.permissions.includes('campaigns.manage') ?? false;
   const accountName = () => { const value = access.data(); return value?.name || t("broadcasts.account_fallback", { id: value?.account ?? 0 }); };
-  const context: Context = { api, canWrite: () => api.writes && manage(), accountName };
+  const context: Context = { api, canWrite: () => api.writes && manage(), canManage: manage, canOperate, accountName };
   return <section class="@container flex h-full min-h-0 min-w-0 flex-col overflow-hidden" data-broadcasts="" aria-label={t("broadcasts.title")}>
     <Show when={props.source.demo}><p class="m-0 border-b border-border px-4 py-2 text-xs text-neutral-500">{t("web.alpha.demo_badge")} · {t("broadcasts.demo_note")}</p></Show>
     <Show when={!api.writes}><p role="note" class="m-0 border-b border-border bg-surface-muted px-4 py-2 text-xs text-neutral-500">{t("broadcasts.writes_off")}</p></Show>
@@ -75,7 +76,7 @@ function Panes(props: { context: Context }) {
   function back() { setCreating(false); setSelected(null); setNewTemplate(false); setTemplateId(null); }
   function switchMode(next: 'campaigns' | 'templates') { back(); setQuery(''); setMode(next); }
   function created(row: StatusOut | null) { setCreating(false); if (row) { setSelected(row.id); void campaigns.refresh(); } }
-  const canCreate = () => props.context.canWrite();
+  const canCreate = () => mode() === 'templates' ? props.context.canWrite() : props.context.canManage();
   const startNew = () => { back(); if (mode() === 'templates') setNewTemplate(true); else setCreating(true); };
   return <div class="flex min-h-0 flex-1 overflow-hidden @[46rem]:grid @[46rem]:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
     <section aria-label={t("broadcasts.title")} class={`min-h-0 w-full min-w-0 flex-col overflow-hidden @[46rem]:flex @[46rem]:border-r @[46rem]:border-border ${open() ? 'hidden' : 'flex'}`}>

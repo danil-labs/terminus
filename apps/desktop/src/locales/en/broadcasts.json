@@ -4,7 +4,7 @@
   "broadcasts.templates": "Templates",
   "broadcasts.account_hint": "Broadcasts belong to the active account of your Danil session, not to this workspace.",
   "broadcasts.demo_note": "Sample data. Nothing leaves this page and changes are lost on reload.",
-  "broadcasts.writes_off": "Read-only on alpha: creating, launching, pausing and sending templates to Meta are off.",
+  "broadcasts.writes_off": "Read-only for anything that reaches customers or Meta: on alpha you can create drafts, pause and cancel; launching, adding contacts and sending templates are off.",
   "broadcasts.no_active_account": "Your session has no active Danil account.",
   "broadcasts.view_label": "View broadcasts or templates",
   "broadcasts.new_broadcast": "New broadcast",

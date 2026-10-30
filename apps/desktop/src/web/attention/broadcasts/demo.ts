@@ -1,4 +1,4 @@
-import type { BroadcastSource } from '../../../../../../packages/attention/src/broadcasts.ts';
+import type { BroadcastSource } from '../../../../../../packages/attention/src/broadcast-panel.ts';
 
 // `?demo=1`: el mismo cliente sobre un transporte en memoria. Nada sale a la red y todo se
 // pierde al recargar.
@@ -109,7 +109,7 @@ function route(path: string, method: string, body: Row, query: URLSearchParams, 
   if (method === 'GET') {
     if (path === '/auth/profile') return json({ user: { accounts: [{ id: 1, name: 'Cuenta de ejemplo' }] } });
     if (path === '/auth/account/features') return json({ features: gated ? ['inbox'] : ['inbox', 'campaigns'] });
-    if (path === '/auth/account/my-permissions') return json({ role: 'admin', permissions: ['campaigns.manage'], scoped: [] });
+    if (path === '/auth/account/my-permissions') return json({ role: 'admin', permissions: ['campaigns.manage', 'channels.manage'], scoped: [] });
     if (path === '/api/marketing/campaigns') return json({ items: state.campaigns });
     if (path === '/api/marketing/templates') return json({ items: query.get('status') ? state.templates.filter(row => row.status === query.get('status')) : state.templates });
     if (path === '/api/contacts') return json({ items: state.contacts });
