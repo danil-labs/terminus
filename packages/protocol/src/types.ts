@@ -182,6 +182,8 @@ export type SessionRow = {
   chat_de_agente?: boolean;
   /** Un hilo nuevo del agente (no su chat de siempre). */
   agent_thread?: boolean;
+  /** El título es solo el comando con que nació; un motor viejo no lo manda. */
+  command_title?: boolean;
   inbox?: boolean;
   parent?: string | null;
   launched_by?: string | null;
