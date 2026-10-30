@@ -23,6 +23,7 @@ import { resolveWorkspaceAccount } from "../../../../../packages/attention/src/w
 import { t } from "../../lib/i18n";
 import { Badge } from "../../ui/Badge";
 import { Button } from "../../ui/Button";
+import { Select } from "../../ui/Select";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "../../ui/sidebar";
 import type { SupportAccessSource } from "../../features/settings/SupportAccess";
 import { SettingsPanel, SettingsRow, SettingsSection } from "../../features/settings/layout";
@@ -137,6 +138,16 @@ export function AdminPage(props: { source: AdminSource }) {
                     </div>
                   </div>
                 </div>
+                <Select class="md:hidden" aria-label={t("web.admin.title")} value={section()} onChange={(event) => setSection(event.currentTarget.value as Section)}>
+                  <For each={GROUPS}>{(group) => (
+                    <optgroup label={group.name()}>
+                      <For each={SECTIONS.filter((entry) => entry.group === group.id)}>
+                        {(entry) => <option value={entry.id}>{entry.name()}{isSoon(entry.soon) ? ` (${t("settings.nav.soon")})` : ""}</option>}
+                      </For>
+                    </optgroup>
+                  )}</For>
+                </Select>
+                <div class="hidden md:contents">
                 <For each={GROUPS}>
                   {(g) => (
                     <div class="grid gap-1 pb-3">
@@ -166,6 +177,7 @@ export function AdminPage(props: { source: AdminSource }) {
                     </div>
                   )}
                 </For>
+                </div>
                 <div class="mt-auto border-0 border-t border-solid border-border px-1 pt-2">{back}</div>
               </nav>
               <section class="min-h-0 min-w-0 flex-1 overflow-auto bg-surface px-6 pb-10 pt-6 md:px-8">
