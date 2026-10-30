@@ -185,9 +185,9 @@ export default function Environment() {
     <SettingsPanel>
       <Show when={appVersion()}>
         {(version) => <SettingsSection title={t("settings.environment.release")}>
-          <p class="m-0 font-mono text-sm text-neutral-950" data-app-release="">{version()}</p>
+          <p class="m-0 font-mono text-body text-neutral-950" data-app-release="">{version()}</p>
           <Show when={version().split("-")[1]?.split(".")[0]}>
-            {(channel) => <p class="m-0 text-sm text-neutral-500">{t("settings.environment.release_channel", { channel: channel() })}</p>}
+            {(channel) => <p class="m-0 text-body text-neutral-500">{t("settings.environment.release_channel", { channel: channel() })}</p>}
           </Show>
         </SettingsSection>}
       </Show>
