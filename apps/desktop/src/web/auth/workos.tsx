@@ -10,7 +10,7 @@ const ERRORS = new Set(["callback_failed", "email_not_verified", "unknown_person
 export function WorkosAuthPage(props: { base: string; next: string; error: string | null }) {
   const [busy, setBusy] = createSignal(true);
   const [error, setError] = createSignal(props.error ? (ERRORS.has(props.error) ? props.error : "callback_failed") : "");
-  const go = (provider: "authkit" | "GoogleOAuth" | "MicrosoftOAuth") => {
+  const go = (provider: "authkit" | "GoogleOAuth") => {
     setBusy(true);
     const url = new URL(`${props.base}auth/workos/start`, window.location.origin);
     url.searchParams.set("provider", provider);
@@ -37,10 +37,7 @@ export function WorkosAuthPage(props: { base: string; next: string; error: strin
           <h2 class="m-0 text-xl font-semibold">{t("web.auth.signin_title")}</h2>
           <p class="m-0 text-sm text-neutral-500" role="status">{t("web.auth.identity_hint")}</p>
         </div>
-        <div class="grid gap-3">
-          <Button class="min-h-11 border-neutral-500" variant="secondary" disabled={busy()} onClick={() => go("GoogleOAuth")}>{t("web.auth.google")}</Button>
-          <Button class="min-h-11 border-neutral-500" variant="secondary" disabled={busy()} onClick={() => go("MicrosoftOAuth")}>{t("web.auth.microsoft")}</Button>
-        </div>
+        <Button class="min-h-11 border-neutral-500" variant="secondary" disabled={busy()} onClick={() => go("GoogleOAuth")}>{t("web.auth.google")}</Button>
         <p class="m-0 text-center text-sm text-neutral-500">{t("web.auth.or_email")}</p>
         <Button class="min-h-11" disabled={busy()} onClick={() => go("authkit")}>{t("web.auth.workos_email")}</Button>
         <p class="m-0 text-sm text-neutral-500">{t("web.auth.workos_password_hint")}</p>

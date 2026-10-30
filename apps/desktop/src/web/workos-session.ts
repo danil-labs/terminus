@@ -1,8 +1,8 @@
 /**
- * The alfa session with WorkOS. The browser holds no WorkOS token: the entry
- * Worker keeps the session in an HttpOnly cookie and `POST <base>auth/session`
- * returns a short access token that the API, the relay and the database accept
- * like a Supabase one. Same interface as `supabaseSession`.
+ * The alfa session with WorkOS. The browser holds no WorkOS or refresh token:
+ * the entry Worker keeps both in an HttpOnly cookie and `POST <base>auth/session`
+ * returns the Supabase access token of that person, to ask again by
+ * `expires_at`. Same interface as `supabaseSession`.
  */
 import type { AccountUser } from "./accounts";
 import type { WatchedSession } from "./session";

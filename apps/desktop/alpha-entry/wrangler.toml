@@ -22,7 +22,7 @@ binding = "APPV2_BFF"
 service = "appv2"
 
 # Entrada con WorkOS (session.mjs). Secretos: WORKOS_API_KEY, SUPABASE_SERVICE_ROLE_KEY,
-# DANIL_SIGNING_JWK (JWK privado ES256 con kid, importado en Supabase) y SESSION_COOKIE_KEY (32 bytes base64url).
+# y SESSION_COOKIE_KEY (32 bytes base64url, versión v1 del sello).
 # Sin WORKOS_CLIENT_ID o sin un secreto, /terminus/auth/session responde 503 y nadie entra.
 [vars]
 SUPABASE_URL = "https://sqonjbpvairwfksotadj.supabase.co"

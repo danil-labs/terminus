@@ -1,10 +1,10 @@
 /**
- * WorkOS sign-in for alfa. The browser never holds a WorkOS token: the Worker
- * keeps the WorkOS session id in a sealed HttpOnly cookie and, on each POST to
- * `/terminus/auth/session`, checks that session in WorkOS, resolves the person
- * in the database and mints a short access token shaped like Supabase's, signed
- * with a key of the project's JWKS. RLS, the appv2 BFF and computers verify it
- * as they verify a Supabase token. Any failure denies; there is no fallback.
+ * WorkOS sign-in for alfa. The browser never holds a WorkOS or refresh token:
+ * at the callback the Worker resolves the person (`resolve_login`) and opens a
+ * real Supabase session for `users.uuid`; the cookie keeps the WorkOS session
+ * id and that refresh token, sealed. Each POST to `/terminus/auth/session`
+ * checks the WorkOS session and refreshes in GoTrue, so bans, the hook and RLS
+ * stay those of app.danil.ai. Any failure denies; there is no fallback.
  */
 const WORKOS_API = "https://api.workos.com";
 const HOST_ORIGIN = "https://alfa-app.danil.ai";
@@ -12,9 +12,12 @@ const FLOW_COOKIE = "__Host-danil_alfa_flow";
 const SESSION_COOKIE = "__Host-danil_alfa";
 const FLOW_SECONDS = 600;
 const SESSION_SECONDS = 30 * 86_400;
-export const TOKEN_SECONDS = 600;
+/** The page asks again within this time, so an ended WorkOS session stops it soon. */
+export const RECHECK_SECONDS = 600;
+const COOKIE_VERSION = "v1";
 const SESSION_PAGES = 20;
-const PROVIDERS = new Set(["authkit", "GoogleOAuth", "MicrosoftOAuth"]);
+// Microsoft waits for xms_edov: WorkOS does not expose it, and an unverified email never links a person.
+const PROVIDERS = new Set(["authkit", "GoogleOAuth"]);
 const ID_RE = /^[A-Za-z0-9_-]{1,200}$/;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const NO_STORE = { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" };
@@ -44,7 +47,7 @@ export function sessionConfig(env) {
   const supabaseUrl = env.SUPABASE_URL?.trim().replace(/\/+$/, "");
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY?.trim();
   if (!clientId || !ID_RE.test(clientId) || !apiKey || !supabaseUrl?.startsWith("https://") || !serviceKey ||
-      !env.DANIL_SIGNING_JWK || !env.SESSION_COOKIE_KEY) return null;
+      !env.SESSION_COOKIE_KEY) return null;
   return { clientId, apiKey, supabaseUrl, serviceKey, env };
 }
 
@@ -54,19 +57,19 @@ async function cookieKey(env) {
   return crypto.subtle.importKey("raw", raw, "AES-GCM", false, ["encrypt", "decrypt"]);
 }
 
-/** AES-GCM with the cookie name as associated data, so one cookie never opens as the other. */
+/** AES-GCM with name and version as associated data, so one cookie never opens as the other or as an older format. */
 async function seal(env, name, value) {
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const data = await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: encoder.encode(name) }, await cookieKey(env), encoder.encode(JSON.stringify(value)));
-  return b64url(iv) + "." + b64url(data);
+  const data = await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: encoder.encode(`${name}.${COOKIE_VERSION}`) }, await cookieKey(env), encoder.encode(JSON.stringify(value)));
+  return `${COOKIE_VERSION}.${b64url(iv)}.${b64url(data)}`;
 }
 
 async function open(env, name, sealed) {
-  const [iv, data, extra] = (sealed ?? "").split(".");
-  if (!iv || !data || extra !== undefined) throw new Denied("no_session");
+  const [version, iv, data, extra] = (sealed ?? "").split(".");
+  if (version !== COOKIE_VERSION || !iv || !data || extra !== undefined) throw new Denied("no_session");
   let value;
   try {
-    const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: fromB64url(iv), additionalData: encoder.encode(name) }, await cookieKey(env), fromB64url(data));
+    const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: fromB64url(iv), additionalData: encoder.encode(`${name}.${COOKIE_VERSION}`) }, await cookieKey(env), fromB64url(data));
     value = JSON.parse(new TextDecoder().decode(plain));
   } catch {
     throw new Denied("no_session");
@@ -82,7 +85,8 @@ function readCookie(request, name) {
   }
   return null;
 }
-const setCookie = (name, value, maxAge) => `${name}=${value}; Path=/; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=Lax`;
+// `__Host-` needs Path=/. The flow cookie must survive the return from WorkOS (Lax); the session one never leaves the site (Strict).
+const setCookie = (name, value, maxAge) => `${name}=${value}; Path=/; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=${name === SESSION_COOKIE ? "Strict" : "Lax"}`;
 
 /** A return path inside this Terminus installation; anything else goes to its root. */
 export function safeNext(value) {
@@ -130,6 +134,7 @@ async function supabase(config, path, init = {}) {
     throw unavailable();
   }
   if (response.status === 404 && path.startsWith("/auth/v1/admin/users/")) throw new Denied("no_login_yet", 403);
+  if (response.status >= 400 && response.status < 500 && init.refusal) throw new Denied(init.refusal.code, init.refusal.status);
   if (response.status !== 200) throw unavailable();
   try {
     return await response.json();
@@ -171,9 +176,8 @@ async function checkSession(config, userId, sessionId) {
 }
 
 /**
- * WorkOS user → Danil person with a Supabase login. The database is the
- * authority: a merged, unknown or banned person, or one without `users.uuid`,
- * does not get a token.
+ * WorkOS user → Danil person with a Supabase login. Only the callback calls
+ * it: `resolve_login` writes (links logins, may create a person).
  */
 async function resolvePerson(config, workosUserId) {
   const user = await workos(config, `/user_management/users/${encodeURIComponent(workosUserId)}`);
@@ -183,56 +187,40 @@ async function resolvePerson(config, workosUserId) {
   const name = [user.first_name, user.last_name].filter(v => typeof v === "string" && v.trim()).join(" ").trim() || null;
   const personId = await rpc(config, "resolve_login", { p_provider: "workos", p_subject: workosUserId, p_email: email, p_email_verified: true, p_name: name });
   if (!Number.isSafeInteger(personId) || personId < 1) throw new Denied("unknown_person", 403);
-  const rows = await supabase(config, `/rest/v1/users?id=eq.${personId}&select=id,uuid,email,name,merged_into_user_id&limit=1`);
+  const rows = await supabase(config, `/rest/v1/users?id=eq.${personId}&select=id,uuid,merged_into_user_id&limit=1`);
   const row = Array.isArray(rows) ? rows[0] : null;
   if (!row || row.id !== personId || row.merged_into_user_id != null) throw new Denied("unknown_person", 403);
   if (typeof row.uuid !== "string" || !UUID_RE.test(row.uuid)) throw new Denied("no_login_yet", 403);
   const login = await supabase(config, `/auth/v1/admin/users/${row.uuid}`);
-  if (login?.id !== row.uuid) throw unavailable();
-  if (login.banned_until && Date.parse(login.banned_until) > Date.now()) throw new Denied("login_banned", 403);
-  return { personId, uuid: row.uuid, email: typeof row.email === "string" && row.email ? row.email : email, name: row.name ?? name };
+  if (login?.id !== row.uuid || typeof login.email !== "string" || !login.email) throw new Denied("no_login_yet", 403);
+  if ((login.banned_until && Date.parse(login.banned_until) > Date.now()) || login.deleted_at) throw new Denied("login_banned", 403);
+  return { uuid: row.uuid, loginEmail: login.email };
 }
 
-/** Same rule as the Supabase hook: the hook itself decides `active_account_id`. */
-async function activeAccount(config, uuid) {
-  const event = await rpc(config, "custom_access_token_hook", { event: { user_id: uuid, claims: {} } });
-  const id = event?.claims?.active_account_id;
-  return Number.isSafeInteger(id) && id > 0 ? id : null;
-}
-
-/** A stable uuid for the WorkOS session, where Supabase puts its own session id. */
-async function sessionUuid(sessionId) {
-  const hex = [...new Uint8Array(await crypto.subtle.digest("SHA-256", encoder.encode(`workos:${sessionId}`)))].slice(0, 16).map(b => b.toString(16).padStart(2, "0")).join("");
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-8${hex.slice(13, 16)}-${(8 | (parseInt(hex[16], 16) & 3)).toString(16)}${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
-}
-
-export async function mintToken(config, person, accountId, sessionId, method) {
-  const jwk = JSON.parse(config.env.DANIL_SIGNING_JWK);
-  if (jwk.kty !== "EC" || jwk.crv !== "P-256" || !jwk.d || typeof jwk.kid !== "string") throw unavailable();
-  const { kid, ...material } = jwk;
-  const key = await crypto.subtle.importKey("jwk", { kty: material.kty, crv: material.crv, x: material.x, y: material.y, d: material.d }, { name: "ECDSA", namedCurve: "P-256" }, false, ["sign"]);
-  const iat = now();
-  const claims = {
-    iss: `${config.supabaseUrl}/auth/v1`,
-    sub: person.uuid,
-    aud: "authenticated",
-    exp: iat + TOKEN_SECONDS,
-    iat,
-    email: person.email,
-    phone: "",
-    app_metadata: { provider: "workos", providers: ["workos"] },
-    user_metadata: person.name ? { full_name: person.name } : {},
-    role: "authenticated",
-    aal: "aal1",
-    amr: [{ method: method === "password" ? "password" : method === "magic_auth" ? "otp" : "oauth", timestamp: iat }],
-    session_id: await sessionUuid(sessionId),
-    is_anonymous: false,
-    ...(accountId ? { active_account_id: accountId } : {}),
+/** GoTrue's answer as the page gets it; the refresh token stays in the cookie. */
+function sessionOf(body, uuid) {
+  const user = body?.user;
+  if (typeof body?.access_token !== "string" || typeof body.refresh_token !== "string" || !body.refresh_token ||
+      !Number.isFinite(body.expires_at) || user?.id !== uuid) throw unavailable();
+  const meta = user.user_metadata ?? {};
+  const name = [meta.full_name, meta.name].find(v => typeof v === "string" && v.trim()) ?? null;
+  return {
+    refresh: body.refresh_token,
+    answer: { access_token: body.access_token, expires_at: Math.min(body.expires_at, now() + RECHECK_SECONDS), user: { user_id: uuid, email: user.email ?? null, name } },
   };
-  const head = b64url(encoder.encode(JSON.stringify({ alg: "ES256", kid, typ: "JWT" })));
-  const body = b64url(encoder.encode(JSON.stringify(claims)));
-  const signature = await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, key, encoder.encode(`${head}.${body}`));
-  return { token: `${head}.${body}.${b64url(signature)}`, exp: claims.exp };
+}
+
+/** A real Supabase session for that login, as a magic link would open it; nothing is emailed. */
+async function openSupabaseSession(config, person) {
+  const link = await supabase(config, "/auth/v1/admin/generate_link", { method: "POST", body: JSON.stringify({ type: "magiclink", email: person.loginEmail }), refusal: { code: "login_banned", status: 403 } });
+  const tokenHash = link?.hashed_token ?? link?.properties?.hashed_token;
+  if (typeof tokenHash !== "string" || !tokenHash) throw unavailable();
+  return sessionOf(await supabase(config, "/auth/v1/verify", { method: "POST", body: JSON.stringify({ type: "magiclink", token_hash: tokenHash }), refusal: { code: "login_banned", status: 403 } }), person.uuid);
+}
+
+/** GoTrue refuses a banned, deleted or signed-out login here. */
+async function refreshSupabaseSession(config, refreshToken, uuid) {
+  return sessionOf(await supabase(config, "/auth/v1/token?grant_type=refresh_token", { method: "POST", body: JSON.stringify({ refresh_token: refreshToken }), refusal: { code: "session_ended", status: 401 } }), uuid);
 }
 
 const json = (body, status, headers = {}) => Response.json(body, { status, headers: { ...NO_STORE, ...headers } });
@@ -283,8 +271,8 @@ async function callback(config, request, url) {
     const sessionId = typeof answer.access_token === "string" ? sessionIdOf(answer.access_token) : null;
     if (typeof userId !== "string" || !ID_RE.test(userId) || !sessionId) throw unavailable();
     const person = await resolvePerson(config, userId);
-    const method = typeof answer.authentication_method === "string" ? answer.authentication_method : "oauth";
-    const session = await seal(config.env, SESSION_COOKIE, { user: userId, sid: sessionId, person: person.personId, method, exp: now() + SESSION_SECONDS });
+    const opened = await openSupabaseSession(config, person);
+    const session = await seal(config.env, SESSION_COOKIE, { user: userId, sid: sessionId, uuid: person.uuid, refresh: opened.refresh, exp: now() + SESSION_SECONDS });
     const headers = new Headers({ ...NO_STORE, Location: new URL(flow.next, url.origin).href });
     headers.append("Set-Cookie", setCookie(FLOW_COOKIE, "", 0));
     headers.append("Set-Cookie", setCookie(SESSION_COOKIE, session, SESSION_SECONDS));
@@ -309,13 +297,11 @@ async function issue(config, request) {
   try {
     await emptyBody(request);
     const session = await open(config.env, SESSION_COOKIE, readCookie(request, SESSION_COOKIE));
-    if (!ID_RE.test(session.user ?? "") || !ID_RE.test(session.sid ?? "")) throw new Denied("no_session");
+    if (!ID_RE.test(session.user ?? "") || !ID_RE.test(session.sid ?? "") || !UUID_RE.test(session.uuid ?? "") || typeof session.refresh !== "string") throw new Denied("no_session");
     await checkSession(config, session.user, session.sid);
-    const person = await resolvePerson(config, session.user);
-    if (person.personId !== session.person) throw new Denied("session_changed");
-    const accountId = await activeAccount(config, person.uuid);
-    const { token, exp } = await mintToken(config, person, accountId, session.sid, session.method);
-    return json({ access_token: token, expires_at: exp, user: { user_id: person.uuid, email: person.email, name: person.name } }, 200);
+    const renewed = await refreshSupabaseSession(config, session.refresh, session.uuid);
+    const sealed = await seal(config.env, SESSION_COOKIE, { ...session, refresh: renewed.refresh });
+    return json(renewed.answer, 200, { "Set-Cookie": setCookie(SESSION_COOKIE, sealed, Math.max(0, session.exp - now())) });
   } catch (error) {
     const response = failure(error);
     if (error instanceof Denied && error.status === 401) response.headers.set("Set-Cookie", setCookie(SESSION_COOKIE, "", 0));

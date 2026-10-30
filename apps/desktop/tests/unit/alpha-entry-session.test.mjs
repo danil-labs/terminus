@@ -7,10 +7,7 @@ const origin = "https://alfa-app.danil.ai";
 const supabaseUrl = "https://project.supabase.co";
 const uuid = "6f1c2b8e-3a4d-4e5f-8a9b-0c1d2e3f4a5b";
 const b64url = bytes => Buffer.from(bytes).toString("base64url");
-const decode = part => JSON.parse(Buffer.from(part, "base64url").toString());
 
-const pair = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
-const privateJwk = { ...(await crypto.subtle.exportKey("jwk", pair.privateKey)), kid: "danil-alfa-test" };
 const workosAccess = `${b64url(Buffer.from("{}"))}.${b64url(Buffer.from(JSON.stringify({ sid: "session_01ABC", sub: "user_01ABC" })))}.sig`;
 
 /** WorkOS and Supabase as the Worker sees them; `state` changes what each answers. */
@@ -19,9 +16,10 @@ function world(overrides = {}) {
     workosUser: { id: "user_01ABC", email: "Prueba@danil.ai", email_verified: true, first_name: "Prueba", last_name: "Danil" },
     sessions: [{ id: "session_01ABC", user_id: "user_01ABC", status: "active", ended_at: null, expires_at: new Date(Date.now() + 3_600_000).toISOString() }],
     person: 42,
-    row: { id: 42, uuid, email: "prueba@danil.ai", name: "Prueba", merged_into_user_id: null },
-    login: { id: uuid, banned_until: null },
-    account: 7,
+    row: { id: 42, uuid, merged_into_user_id: null },
+    login: { id: uuid, email: "prueba@danil.ai", banned_until: null },
+    refreshes: 0,
+    gotrueRefuses: false,
     workosDown: false,
     ...overrides,
   };
@@ -47,10 +45,21 @@ function world(overrides = {}) {
       if (url.pathname === "/rest/v1/rpc/resolve_login") return Response.json(state.person);
       if (url.pathname === "/rest/v1/users") return Response.json(state.row ? [state.row] : []);
       if (url.pathname === `/auth/v1/admin/users/${uuid}`) return state.login ? Response.json(state.login) : Response.json({}, { status: 404 });
-      if (url.pathname === "/rest/v1/rpc/custom_access_token_hook") {
-        const { event } = JSON.parse(init.body);
-        assert.equal(event.user_id, uuid);
-        return Response.json({ ...event, claims: { ...event.claims, ...(state.account ? { active_account_id: state.account } : {}) } });
+      const gotrue = (refresh) => Response.json({ access_token: `sb.${refresh}`, refresh_token: refresh, expires_in: 3600, expires_at: Math.floor(Date.now() / 1000) + 3600,
+        user: { id: uuid, email: state.login.email, user_metadata: { full_name: "Prueba Danil" } } });
+      if (url.pathname === "/auth/v1/admin/generate_link") {
+        assert.deepEqual(JSON.parse(init.body), { type: "magiclink", email: state.login.email });
+        return Response.json({ id: uuid, hashed_token: "hash_1", action_link: "https://never.example" });
+      }
+      if (url.pathname === "/auth/v1/verify") {
+        assert.deepEqual(JSON.parse(init.body), { type: "magiclink", token_hash: "hash_1" });
+        return gotrue("rt_0");
+      }
+      if (url.pathname === "/auth/v1/token" && url.searchParams.get("grant_type") === "refresh_token") {
+        if (state.gotrueRefuses) return Response.json({ error_code: "user_banned" }, { status: 400 });
+        assert.equal(JSON.parse(init.body).refresh_token, `rt_${state.refreshes}`);
+        state.refreshes += 1;
+        return gotrue(`rt_${state.refreshes}`);
       }
     }
     return Response.json({}, { status: 500 });
@@ -60,7 +69,6 @@ function world(overrides = {}) {
     WORKOS_API_KEY: "sk_test",
     SUPABASE_URL: supabaseUrl,
     SUPABASE_SERVICE_ROLE_KEY: "service",
-    DANIL_SIGNING_JWK: JSON.stringify(privateJwk),
     SESSION_COOKIE_KEY: b64url(Buffer.alloc(32, 7)),
     TERMINUS_WEB: { fetch: async () => new Response("assets") },
   };
@@ -80,6 +88,7 @@ async function withFetch(w, run) {
 const call = (w, path, init = {}) => withFetch(w, () => worker.fetch(new Request(origin + path, { redirect: "manual", ...init }), w.env));
 const cookiesOf = response => response.headers.getSetCookie().map(c => c.split(";")[0]);
 const cookieHeader = response => cookiesOf(response).filter(c => !c.endsWith("=")).join("; ");
+const latest = (before, response) => cookieHeader(response) || before;
 
 async function signedIn(w, next = "/terminus/inbox") {
   const started = await call(w, `/terminus/auth/workos/start?provider=GoogleOAuth&next=${encodeURIComponent(next)}`);
@@ -92,63 +101,46 @@ const session = (w, cookie, headers = {}) => call(w, "/terminus/auth/session", {
 
 test("start sends to WorkOS with PKCE and a sealed, host-only flow cookie", async () => {
   const w = world();
-  const response = await call(w, "/terminus/auth/workos/start?provider=MicrosoftOAuth&next=/terminus/inbox");
+  const response = await call(w, "/terminus/auth/workos/start?provider=GoogleOAuth&next=/terminus/inbox");
   assert.equal(response.status, 303);
   const location = new URL(response.headers.get("Location"));
   assert.equal(location.origin + location.pathname, "https://api.workos.com/user_management/authorize");
   assert.equal(location.searchParams.get("client_id"), "client_01TEST");
   assert.equal(location.searchParams.get("redirect_uri"), `${origin}/terminus/auth/workos/callback`);
-  assert.equal(location.searchParams.get("provider"), "MicrosoftOAuth");
+  assert.equal(location.searchParams.get("provider"), "GoogleOAuth");
   assert.equal(location.searchParams.get("code_challenge_method"), "S256");
   const cookie = response.headers.getSetCookie()[0];
-  assert.match(cookie, /^__Host-danil_alfa_flow=[\w-]+\.[\w-]+; Path=\/; Max-Age=600; HttpOnly; Secure; SameSite=Lax$/);
+  assert.match(cookie, /^__Host-danil_alfa_flow=v1\.[\w-]+\.[\w-]+; Path=\/; Max-Age=600; HttpOnly; Secure; SameSite=Lax$/);
   assert.ok(!cookie.includes(location.searchParams.get("state")));
-  assert.equal((await call(w, "/terminus/auth/workos/start?provider=GitHubOAuth")).status, 400);
+  for (const provider of ["GitHubOAuth", "MicrosoftOAuth"]) assert.equal((await call(w, `/terminus/auth/workos/start?provider=${provider}`)).status, 400);
   assert.equal((await call(w, "/terminus/auth/workos/start", { method: "POST" })).status, 405);
 });
 
-test("callback opens a session and the session mints a Supabase-shaped token signed by the project key", async () => {
+test("callback opens a real Supabase session and the page only ever gets its access token", async () => {
   const w = world();
   const { back, cookie } = await signedIn(w);
   assert.equal(back.status, 303);
   assert.equal(back.headers.get("Location"), `${origin}/terminus/inbox`);
-  assert.match(cookie, /^__Host-danil_alfa=/);
-  const authenticate = w.calls.find(c => c.url.endsWith("/user_management/authenticate"));
-  const sent = JSON.parse(authenticate.body);
+  assert.match(back.headers.getSetCookie().find(c => c.startsWith("__Host-danil_alfa=")), /^__Host-danil_alfa=v1\.[\w-]+\.[\w-]+; Path=\/; Max-Age=\d+; HttpOnly; Secure; SameSite=Strict$/);
+  assert.ok(!cookie.includes("rt_0"));
+  const sent = JSON.parse(w.calls.find(c => c.url.endsWith("/user_management/authenticate")).body);
   assert.equal(sent.grant_type, "authorization_code");
   assert.ok(sent.code_verifier.length >= 43);
-  assert.equal(sent.client_secret, "sk_test");
-
-  const response = await session(w, cookie);
-  assert.equal(response.status, 200);
-  assert.equal(response.headers.get("Cache-Control"), "no-store");
-  const body = await response.json();
-  assert.deepEqual(body.user, { user_id: uuid, email: "prueba@danil.ai", name: "Prueba" });
-  const [head, claims, signature] = body.access_token.split(".");
-  assert.deepEqual(decode(head), { alg: "ES256", kid: "danil-alfa-test", typ: "JWT" });
-  const verified = await crypto.subtle.verify({ name: "ECDSA", hash: "SHA-256" }, pair.publicKey, Buffer.from(signature, "base64url"), new TextEncoder().encode(`${head}.${claims}`));
-  assert.ok(verified);
-  const c = decode(claims);
-  assert.equal(c.iss, `${supabaseUrl}/auth/v1`);
-  assert.equal(c.sub, uuid);
-  assert.equal(c.aud, "authenticated");
-  assert.equal(c.role, "authenticated");
-  assert.equal(c.email, "prueba@danil.ai");
-  assert.equal(c.active_account_id, 7);
-  assert.equal(c.is_anonymous, false);
-  assert.equal(c.exp - c.iat, 600);
-  assert.equal(body.expires_at, c.exp);
-  assert.match(c.session_id, /^[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
-  assert.equal((await (await session(w, cookie)).json()).access_token.split(".").length, 3);
   const resolve = JSON.parse(w.calls.find(x => x.url.endsWith("/rpc/resolve_login")).body);
   assert.deepEqual(resolve, { p_provider: "workos", p_subject: "user_01ABC", p_email: "prueba@danil.ai", p_email_verified: true, p_name: "Prueba Danil" });
-});
 
-test("a person without an active account still gets a token, without the claim", async () => {
-  const w = world({ account: null });
-  const { cookie } = await signedIn(w);
-  const claims = decode((await (await session(w, cookie)).json()).access_token.split(".")[1]);
-  assert.equal("active_account_id" in claims, false);
+  const first = await session(w, cookie);
+  assert.equal(first.status, 200);
+  assert.equal(first.headers.get("Cache-Control"), "no-store");
+  const body = await first.json();
+  assert.equal(body.access_token, "sb.rt_1");
+  assert.deepEqual(body.user, { user_id: uuid, email: "prueba@danil.ai", name: "Prueba Danil" });
+  assert.equal("refresh_token" in body, false);
+  assert.ok(body.expires_at <= Math.floor(Date.now() / 1000) + 600, "the page asks again within ten minutes");
+  const rotated = latest(cookie, first);
+  assert.notEqual(rotated, cookie);
+  assert.equal((await (await session(w, rotated)).json()).access_token, "sb.rt_2");
+  assert.equal(w.calls.filter(x => x.url.endsWith("/rpc/resolve_login")).length, 1, "resolve_login writes: only at the callback");
 });
 
 test("callback refuses a forged state, a missing flow cookie and a refused code", async () => {
@@ -167,19 +159,20 @@ test("the database decides who enters", async () => {
   for (const [overrides, error] of [
     [{ workosUser: { id: "user_01ABC", email: "prueba@danil.ai", email_verified: false } }, "email_not_verified"],
     [{ person: null }, "unknown_person"],
-    [{ row: { id: 42, uuid, email: "x@danil.ai", merged_into_user_id: 9 } }, "unknown_person"],
-    [{ row: { id: 42, uuid: null, email: "x@danil.ai", merged_into_user_id: null } }, "no_login_yet"],
-    [{ login: { id: uuid, banned_until: "2126-01-01T00:00:00Z" } }, "login_banned"],
+    [{ row: { id: 42, uuid, merged_into_user_id: 9 } }, "unknown_person"],
+    [{ row: { id: 42, uuid: null, merged_into_user_id: null } }, "no_login_yet"],
+    [{ login: null }, "no_login_yet"],
+    [{ login: { id: uuid, email: "prueba@danil.ai", banned_until: "2126-01-01T00:00:00Z" } }, "login_banned"],
   ]) {
     const { back } = await signedIn(world(overrides));
     assert.equal(back.headers.get("Location"), `${origin}/terminus/auth?error=${error}`, error);
   }
   const w = world();
   const { cookie } = await signedIn(w);
-  w.state.login = { id: uuid, banned_until: "2126-01-01T00:00:00Z" };
+  w.state.gotrueRefuses = true;
   const response = await session(w, cookie);
-  assert.equal(response.status, 403);
-  assert.deepEqual(await response.json(), { error: "login_banned" });
+  assert.equal(response.status, 401, "GoTrue refuses a login banned after the callback");
+  assert.deepEqual(cookiesOf(response), ["__Host-danil_alfa="]);
 });
 
 test("an ended WorkOS session or a tampered cookie gives no token and clears the cookie", async () => {
@@ -191,8 +184,8 @@ test("an ended WorkOS session or a tampered cookie gives no token and clears the
   assert.deepEqual(await ended.json(), { error: "session_ended" });
   assert.deepEqual(cookiesOf(ended), ["__Host-danil_alfa="]);
   const tampered = cookie.slice(0, -2) + (cookie.endsWith("A") ? "BB" : "AA");
-  const forged = await session(world(), tampered);
-  assert.equal(forged.status, 401);
+  assert.equal((await session(world(), tampered)).status, 401);
+  assert.equal((await session(world(), cookie.replace("=v1.", "=v0."))).status, 401);
   assert.equal((await session(world(), "")).status, 401);
 });
 
@@ -240,7 +233,7 @@ test("logout clears the cookie and ends the WorkOS session in the browser", asyn
 
 test("without its configuration sign-in is unavailable, never open", async () => {
   const w = world();
-  delete w.env.DANIL_SIGNING_JWK;
+  delete w.env.SESSION_COOKIE_KEY;
   assert.equal((await call(w, "/terminus/auth/workos/start")).status, 503);
   assert.equal((await session(w, "")).status, 503);
   assert.equal((await call(w, "/terminus/auth")).status, 200);
