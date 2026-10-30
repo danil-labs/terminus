@@ -396,6 +396,27 @@ export default function Sessions(props: {
       : (props.spaces ?? []).filter((i) => i.id !== row.space);
   const [finishing, setFinishing] = createSignal<string[]>([]);
   const [archiving, setArchiving] = createSignal<string[]>([]);
+  /**
+   * Las que se acaban de archivar o finalizar y la lista todavía no trae
+   * archivadas: salen de la barra en el mismo gesto, no cuando vuelve el motor
+   * (que mata turnos y toma los candados de la familia) y la relectura. Si el
+   * motor lo rechaza, vuelven. Se sueltan solas cuando la fila llega archivada.
+   */
+  const [saliendo, setSaliendo] = createSignal<ReadonlySet<string>>(new Set());
+  const sacar = (id: string) => setSaliendo((ids) => new Set(ids).add(id));
+  const devolver = (id: string) => setSaliendo((ids) => {
+    if (!ids.has(id)) return ids;
+    const next = new Set(ids);
+    next.delete(id);
+    return next;
+  });
+  createEffect(() => {
+    const ids = saliendo();
+    if (ids.size === 0) return;
+    const filas = new Map(props.sessions.map((s) => [s.id, s]));
+    const quedan = [...ids].filter((id) => filas.has(id) && !filas.get(id)?.archived);
+    if (quedan.length !== ids.size) setSaliendo(new Set(quedan));
+  });
   const [actionFailure, setActionFailure] = createSignal<Failure | null>(null);
   const [aviso, setAviso] = createSignal<Aviso | null>(null);
   const finishTask = async (id: string, rect: DOMRect) => {
@@ -404,6 +425,7 @@ export default function Sessions(props: {
     setActionFailure(null);
     try {
       const project = projectOfId(id);
+      sacar(id);
       await invoke("finish_task", { project, id }, enSuMaquina(id));
       // `anunciar` no actualiza esta ventana: su firma es la de quien
       // escribió, y el sondeo la descarta. Sin este aviso el archivado
@@ -411,6 +433,7 @@ export default function Sessions(props: {
       avisarCambio(project);
       celebrateFinishedTask(rect);
     } catch (error) {
+      devolver(id);
       setActionFailure(asFailure(error));
     } finally {
       setFinishing(ids => ids.filter(value => value !== id));
@@ -422,10 +445,12 @@ export default function Sessions(props: {
     setActionFailure(null);
     try {
       const project = projectOfId(id);
+      sacar(id);
+      setMenu(null);
       await invoke("set_task_archived", { project, id, archived: true }, enSuMaquina(id));
       avisarCambio(project);
-      setMenu(null);
     } catch (error) {
+      devolver(id);
       setActionFailure(asFailure(error));
     } finally {
       setArchiving(ids => ids.filter(value => value !== id));
@@ -445,10 +470,14 @@ export default function Sessions(props: {
     }
     marcar(ids => [...ids, id]);
     setActionFailure(null);
+    // Fuera de la barra ya: lo común es que no haya nada que la detenga. Si lo
+    // hay, vuelve con el aviso.
+    sacar(id);
     let blockers: Blockers;
     try {
       blockers = await invoke<Blockers>("task_blockers", { project: projectOfId(id), id, finish }, enSuMaquina(id));
     } catch (error) {
+      devolver(id);
       setActionFailure(asFailure(error));
       return;
     } finally {
@@ -458,6 +487,7 @@ export default function Sessions(props: {
       await (finish && rect ? finishTask(id, rect) : archiveTask(id));
       return;
     }
+    devolver(id);
     setAviso({ id, finish, rect, blockers });
   };
   const descartarYSeguir = async () => {
@@ -484,7 +514,7 @@ export default function Sessions(props: {
   // cientos archivadas, pedir su git y su historial en cada barrido trababa la ventana.
   // En la barra no se anidan subtareas: se consultan desde la vista de subtareas
   // del chat. Solo asoman, sueltas, al buscar o si las fijaron.
-  const enBarra = createMemo(() => props.sessions.filter(s => (props.includeArchived || !s.archived)
+  const enBarra = createMemo(() => props.sessions.filter(s => (props.includeArchived || (!s.archived && !saliendo().has(s.id)))
     && (!props.sidebar || !!props.search?.trim() || s.pinned || !isSubtask(s))));
   // Un observador de git, de perfiles y de historiales por carpeta de la
   // lista: las cachés son por carpeta y se comparten con las demás vistas.

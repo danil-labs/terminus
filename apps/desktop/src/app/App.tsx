@@ -448,6 +448,16 @@ export default function App() {
    * la reclamara. `sesionesConEstado` las junta para pintar.
    */
   const [naciendo, setNaciendo] = createSignal<{ project: string; row: SessionRow }[]>([]);
+  /**
+   * Lo que la persona acaba de cambiarle a una fila (fijarla, su etapa, su
+   * nombre) y el disco todavía no confirma. Se pinta encima de `sesiones` en el
+   * mismo gesto —ir y volver al motor, a veces por el relay, no puede ser lo que
+   * tarde el riel en reaccionar— y se suelta cuando la relectura de su carpeta
+   * ya lo trae, o se deshace si el motor lo rechaza. `sesiones` sigue siendo el
+   * espejo del disco. Lo pone `retocarFila`.
+   */
+  const [retoques, setRetoques] = createSignal<Record<string, { cambio: Partial<SessionRow>; n: number }>>({});
+  let ultimoRetoque = 0;
   const retirarNaciendo = (id: string) =>
     setNaciendo((ns) => ns.filter((n) => n.row.id !== id));
   // La que ya llegó del disco deja de nacer: su fila de verdad la sustituye.
@@ -1856,7 +1866,10 @@ export default function App() {
       const propias = nuevas
         .filter((n) => n.project === project && !enDisco.has(n.row.id))
         .map((n) => n.row);
-      return [project, [...propias, ...rows.map(row => {
+      const cambios = retoques();
+      return [project, [...propias, ...rows.map(leida => {
+        const retoque = cambios[leida.id];
+        const row = retoque ? { ...leida, ...retoque.cambio } : leida;
         const preview = threadPreview(hilos()[row.id]?.vivo ?? []) ?? row.last_message;
         const sinVer = unseen.has(row.id);
         return row.esperando === pending.has(row.id) && preview === row.last_message && !!row.sin_ver === sinVer ? row : {
@@ -1884,6 +1897,20 @@ export default function App() {
   onCleanup(() => sessionLists.reset());
   function refreshSessions(proyectos: string[]) {
     return sessionLists.refresh(proyectos);
+  }
+  /**
+   * Qué carpetas relee un aviso sobre `session`: la suya y la de su padre, que
+   * pinta el estado de sus hijas. Una tarea que el riel todavía no conoce (la
+   * creó otra ventana u otra máquina) puede estar en cualquiera: todas.
+   */
+  function carpetasDeTarea(session: string, project?: string | null): string[] {
+    const listas = sesiones();
+    const buscar = (id: string) => Object.keys(listas).find((p) => listas[p].some((r) => r.id === id));
+    const suya = project ?? buscar(session);
+    if (suya === undefined) return grupos();
+    const fila = listas[suya]?.find((r) => r.id === session);
+    const delPadre = fila?.parent ? buscar(fila.parent) : undefined;
+    return [...new Set([suya, ...(delPadre === undefined ? [] : [delPadre])])];
   }
   /** La relectura que pide un evento del servicio; la de un gesto de la persona va sin espera. */
   function refreshSessionsOnEvent(proyectos: string[]) {
@@ -2747,7 +2774,7 @@ export default function App() {
           setEnFondo((ids) => ids.filter((id) => id !== session));
           marcarViva(session);
         }
-        if (esDelWorkspaceAbierto(workspace)) void refreshSessionsOnEvent(grupos());
+        if (esDelWorkspaceAbierto(workspace)) void refreshSessionsOnEvent(carpetasDeTarea(session));
       }
 
       // Cada evento cae en el hilo de SU sesión, esté abierta o no (ver
@@ -2781,7 +2808,7 @@ export default function App() {
         if (task && id) append(messages => messages.some(message => message.turno === id) ? messages : [
           ...messages, { role: "system", text: "", meta: "task_launched", fromTask: task, turno: id },
         ]);
-        if (esDelWorkspaceAbierto(workspace)) void refreshSessionsOnEvent(grupos());
+        if (esDelWorkspaceAbierto(workspace)) void refreshSessionsOnEvent(carpetasDeTarea(session));
         return;
       }
 
@@ -3159,7 +3186,8 @@ export default function App() {
     onCleanup(() => window.removeEventListener("harness:open-task-link", taskLink));
     // Con proyecto lo avisa un gesto de `Sessions.tsx`; sin él, `cli-changed`.
     const tasksChanged = (event: Event) => {
-      void ((event as CustomEvent<{ project?: string } | null>).detail?.project ? refreshSessions : refreshSessionsOnEvent)(grupos());
+      const project = (event as CustomEvent<{ project?: string } | null>).detail?.project;
+      void (project !== undefined ? refreshSessions([project]) : refreshSessionsOnEvent(grupos()));
     };
     window.addEventListener("harness:tasks-changed", tasksChanged);
     onCleanup(() => window.removeEventListener("harness:tasks-changed", tasksChanged));
@@ -3244,8 +3272,9 @@ export default function App() {
       if (!esDelWorkspaceAbierto(workspace)) return;
       // El historial primero, y para todos: una tarea que la otra ventana
       // acaba de crear no está en ningún hilo de esta. Releer solo la abierta
-      // la dejaría invisible hasta cambiar de proyecto.
-      void refreshSessionsOnEvent(grupos());
+      // la dejaría invisible hasta cambiar de proyecto. Su carpeta basta: el
+      // aviso la trae, y releerlas todas esperaba a la más lenta.
+      void refreshSessionsOnEvent(carpetasDeTarea(session, project));
       // La otra instancia escribió esa tarea: su árbol también pudo moverse.
       // Mismo motivo que en el cierre de turno.
       avisarDeLosArboles(session);
@@ -5054,7 +5083,7 @@ export default function App() {
           setProyectoAbierto(vista);
         }
       }
-      void refreshSessions(grupos());
+      void refreshSessions([proyecto]);
       return true;
     } catch (e) {
       // El árbol tiene archivos que no están en Git. No se deja en disco sin
@@ -5079,7 +5108,7 @@ export default function App() {
       await invoke("move_session", { project: de, id, to: a }, deLaTarea(id));
       if (id === sessionId()) setProject(a);
       pestanas.moveToProject(id, a);
-      void refreshSessions(grupos());
+      void refreshSessions([de, a]);
       setProjectList(await invoke<Project[]>("list_projects"));
     } catch (e) {
       setError(prosaDe(e));
@@ -5088,9 +5117,9 @@ export default function App() {
 
   /**
    * Marca en qué etapa está una tarea, o le quita la marca con `null`.
-   * Relee la lista del disco en vez de tocarla en memoria, igual que
-   * mover y borrar: con dos ventanas sobre el mismo workspace, la que
-   * no marcó se quedaría con la fila de antes.
+   * Se ve al instante (`retocarFila`), pero lo que queda es lo que relee
+   * del disco: con dos ventanas sobre el mismo workspace, la que no marcó
+   * se enteraría tarde o nunca si solo se tocara la memoria.
    */
   async function etaparSesion(
     proyecto: string,
@@ -5098,16 +5127,41 @@ export default function App() {
     etapa: Etapa | null,
   ) {
     try {
-      await invoke("set_session_stage", { project: proyecto, id, stage: etapa }, deLaTarea(id));
-      void refreshSessions(grupos());
+      await retocarFila(proyecto, id, { stage: etapa }, () =>
+        invoke("set_session_stage", { project: proyecto, id, stage: etapa }, deLaTarea(id)));
     } catch (e) {
       setError(prosaDe(e));
     }
   }
 
+  /**
+   * Cambia una fila en pantalla ya y la escribe detrás (`retoques`). Después
+   * relee solo su carpeta: releer todas esperaba a la más lenta, y otra máquina
+   * apagada o lejos retrasaba lo que acababa de cambiar aquí. Si el motor lo
+   * rechaza, la fila vuelve a como estaba y el error sube a quien llamó.
+   */
+  async function retocarFila(proyecto: string, id: string, cambio: Partial<SessionRow>, escribir: () => Promise<unknown>) {
+    const n = ++ultimoRetoque;
+    setRetoques((rs) => ({ ...rs, [id]: { cambio: { ...rs[id]?.cambio, ...cambio }, n } }));
+    // Solo el suyo: un segundo clic sobre la misma fila mientras vuelve el primero manda.
+    const soltar = () => setRetoques((rs) => {
+      if (rs[id]?.n !== n) return rs;
+      const { [id]: _, ...resto } = rs;
+      return resto;
+    });
+    try {
+      await escribir();
+    } catch (e) {
+      soltar();
+      throw e;
+    }
+    await refreshSessions([proyecto]);
+    soltar();
+  }
+
   async function fijarSesion(proyecto: string, id: string, pinned: boolean) {
-    await invoke("set_session_pinned", { project: proyecto, id, pinned }, deLaTarea(id));
-    void refreshSessions(grupos());
+    await retocarFila(proyecto, id, { pinned }, () =>
+      invoke("set_session_pinned", { project: proyecto, id, pinned }, deLaTarea(id)));
   }
 
   /**
@@ -5118,8 +5172,8 @@ export default function App() {
    */
   async function renombrarSesion(proyecto: string, id: string, title: string) {
     try {
-      await invoke("rename_session", { project: proyecto, id, title }, deLaTarea(id));
-      void refreshSessions(grupos());
+      await retocarFila(proyecto, id, { title: title.trim() }, () =>
+        invoke("rename_session", { project: proyecto, id, title }, deLaTarea(id)));
       return true;
     } catch (e) {
       setError(prosaDe(e));
@@ -5698,6 +5752,12 @@ export default function App() {
   function pintarNaciendo(proyecto: string, titulo: string, con: { provider: string; model: string | null }, encargado: string | null): string {
     const provisional = idProvisional();
     const ahora = Date.now();
+    // Dónde va a nacer, como las filas que luego traiga esa máquina
+    // (`@terminus/fleet` `tag`): sin ella, en la web el riel la ponía en un grupo
+    // «Esta máquina» aparte hasta que llegaba su fila del disco. La de la
+    // ventana no lleva máquina, igual que sus filas.
+    const destino = draftMachine() ?? capabilities().remoteCreate?.(workspaceActivo())?.machine ?? null;
+    const machine = destino && !machines().find((m) => m.id === destino)?.local ? destino : undefined;
     setNaciendo((ns) => [
       ...ns,
       {
@@ -5718,6 +5778,7 @@ export default function App() {
           agent: encargado,
           parent_agent: null,
           chat_de_agente: false,
+          ...(machine ? { machine } : {}),
         },
       },
     ]);
