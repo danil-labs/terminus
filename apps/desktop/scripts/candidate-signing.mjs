@@ -14,6 +14,7 @@ const relative = value => typeof value === 'string' && value !== '' &&
   !path.isAbsolute(value) && !/^[a-z]:/i.test(value);
 
 if (command === 'validate') {
+  if (!['windows', 'macos', 'linux'].includes(platform)) fail('Unsupported platform');
   const directory = await realpath(input);
   const manifest = JSON.parse(await readFile(path.join(directory, 'manifest.json'), 'utf8'));
   if (!/^[a-f0-9]{40}$/.test(sourceOid ?? '') || manifest.source_oid !== sourceOid ||
@@ -44,7 +45,7 @@ if (command === 'validate') {
   }
   await walk(directory);
   for (const name of [...Object.keys(files), ...Object.keys(links)]) if (!seen.has(name)) fail(`Missing input: ${name}`);
-  const required = platform === 'windows' ? ['main', 'engine', 'nsis_script', 'installer'] : ['app', 'dmg'];
+  const required = platform === 'windows' ? ['main', 'engine', 'nsis_script', 'installer'] : platform === 'macos' ? ['app', 'dmg'] : ['appimage'];
   for (const key of required) if (!relative(manifest[key])) fail(`Missing relative role: ${key}`);
   if (platform === 'windows') {
     if (!/^[a-f0-9]{64}$/.test(manifest.makensis_sha256 ?? '')) fail('Missing NSIS toolchain hash');
@@ -53,7 +54,9 @@ if (command === 'validate') {
     if (/work-tools/i.test(manifest.main + manifest.engine)) fail('Cannot sign work-tools');
     if (path.basename(manifest.main) !== 'terminus.exe' ||
         !/^seldon-runtime(?:-x86_64-pc-windows-msvc)?\.exe$/.test(path.basename(manifest.engine))) fail('Unexpected executable roles');
-  } else if (manifest.app !== 'Terminus.app' || manifest.dmg !== 'template.dmg' || !files[manifest.dmg]) fail('Unexpected macOS layout');
+  } else if (platform === 'macos') {
+    if (manifest.app !== 'Terminus.app' || manifest.dmg !== 'template.dmg' || !files[manifest.dmg]) fail('Unexpected macOS layout');
+  } else if (!files[manifest.appimage] || !manifest.appimage.endsWith('.AppImage')) fail('AppImage not inventoried');
   console.log(`Validated ${seen.size} input files/links for ${sourceOid}`);
 } else if (command === 'verify') {
   const config = JSON.parse(await readFile(path.join(root, 'apps/desktop/src-tauri/tauri.conf.json'), 'utf8'));

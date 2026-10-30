@@ -16,6 +16,9 @@ on:
       macos_sha256:
         description: SHA256 de macos-signing-input.zip (vacío omite macOS)
         required: false
+      linux_sha256:
+        description: SHA256 de linux-signing-input.zip (vacío omite Linux)
+        required: false
 
 permissions:
   contents: read
@@ -24,6 +27,46 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  linux:
+    if: github.repository == 'danil-labs/terminus' && inputs.linux_sha256 != ''
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    env:
+      INPUT_RELEASE: ${{ inputs.input_release }}
+      INPUT_SHA256: ${{ inputs.linux_sha256 }}
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+      - name: Fetch and validate reviewed AppImage
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_OID: ${{ inputs.source_oid }}
+        run: |
+          set -euo pipefail
+          gh release download "$INPUT_RELEASE" --repo danil-labs/terminus --pattern linux-signing-input.zip --dir input
+          [[ "$INPUT_SHA256" =~ ^[a-f0-9]{64}$ ]]
+          printf '%s  %s\n' "$INPUT_SHA256" input/linux-signing-input.zip | sha256sum -c -
+          unzip -q input/linux-signing-input.zip -d candidate
+          node apps/desktop/scripts/candidate-signing.mjs validate candidate linux "$SOURCE_OID"
+          mkdir output
+          node --input-type=module -e 'import fs from "node:fs";const m=JSON.parse(fs.readFileSync("candidate/manifest.json","utf8"));fs.copyFileSync(`candidate/${m.appimage}`,"output/Terminus-Linux-x86_64.AppImage")'
+          npm install --prefix signing-cli --ignore-scripts --no-audit --no-fund @tauri-apps/cli@2.11.4
+      - name: Sign and verify existing AppImage
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          signing-cli/node_modules/.bin/tauri signer sign output/Terminus-Linux-x86_64.AppImage
+          node apps/desktop/scripts/candidate-signing.mjs verify output/Terminus-Linux-x86_64.AppImage
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: signed-existing-linux
+          path: output/*
+          if-no-files-found: error
+          retention-days: 7
+
   windows:
     if: github.repository == 'danil-labs/terminus' && inputs.windows_sha256 != ''
     runs-on: windows-2022

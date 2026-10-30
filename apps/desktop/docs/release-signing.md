@@ -130,7 +130,8 @@ durante siete días. No se sube este workflow sin decisión del coordinador.
 
 Entradas: OID completo del código compilado, tag de una pre-release de inputs
 revisados y SHA-256 de cada ZIP. Un hash vacío omite esa plataforma. Los ZIP
-se llaman `windows-signing-input.zip` y `macos-signing-input.zip` y contienen
+se llaman `windows-signing-input.zip`, `macos-signing-input.zip` y
+`linux-signing-input.zip` y contienen
 un `manifest.json` con `source_oid`, `version: "0.3.0-rc.1"`, `platform`,
 `files` (mapa ruta relativa → SHA-256) y `links` (ruta → destino de symlink).
 Se exige inventario exhaustivo; no se admiten enlaces que salgan del árbol.
@@ -149,6 +150,10 @@ nombres exactos. El DMG debe tener capacidad para reemplazar su app y conservar
 la disposición existente. Su conversión y el reemplazo no se han ensayado en
 esta preparación. Si falta espacio, el job falla y requiere otro template;
 no compila ni modifica herramientas como respaldo.
+
+Linux añade `appimage`, ruta al AppImage inventariado. El job Ubuntu sólo
+valida/copia esos bytes, crea su firma minisign y la verifica contra la pubkey
+instalada; no ejecuta el AppImage, no lo reempaqueta ni instala Rust.
 
 Los scripts de firma son `scripts/sign-existing-windows.ps1` y
 `scripts/sign-existing-macos.sh`. El validador y la verificación con la pubkey

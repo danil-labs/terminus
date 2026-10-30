@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 const script = fileURLToPath(new URL('../../scripts/candidate-signing.mjs', import.meta.url));
 const source = 'a'.repeat(40);
 const hash = value => createHash('sha256').update(value).digest('hex');
-async function fixture(change = async () => {}) {
+async function fixture(change = async () => {}, requestedPlatform = 'windows') {
   const directory = await mkdtemp(join(tmpdir(), 'candidate-signing-'));
   const manifest = {source_oid: source, version: '0.3.0-rc.1', platform: 'windows',
     main: 'terminus.exe', engine: 'seldon-runtime.exe', nsis_script: 'installer.nsi',
@@ -22,7 +22,7 @@ async function fixture(change = async () => {}) {
   try {
     await change(directory, manifest);
     await writeFile(join(directory, 'manifest.json'), JSON.stringify(manifest));
-    return spawnSync(process.execPath, [script, 'validate', directory, 'windows', source], {encoding: 'utf8'});
+    return spawnSync(process.execPath, [script, 'validate', directory, requestedPlatform, source], {encoding: 'utf8'});
   } finally { await rm(directory, {recursive: true, force: true}); }
 }
 test('accepts an exhaustive input inventory tied to source OID', async () => {
@@ -50,4 +50,21 @@ test('rejects a symlink outside the input tree', {skip: process.platform === 'wi
   });
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /External symlink/);
+});
+test('accepts the existing Linux artifact without repackaging', async () => {
+  const result = await fixture(async (d, m) => {
+    m.platform = 'linux';
+    m.appimage = 'Terminus.AppImage';
+    await writeFile(join(d, m.appimage), 'existing-appimage');
+    m.files[m.appimage] = hash('existing-appimage');
+  }, 'linux');
+  assert.equal(result.status, 0, result.stderr);
+});
+test('rejects a Linux artifact absent from the inventory', async () => {
+  const result = await fixture(async (_d, m) => {
+    m.platform = 'linux';
+    m.appimage = 'missing.AppImage';
+  }, 'linux');
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /AppImage not inventoried/);
 });
