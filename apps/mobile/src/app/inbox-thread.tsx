@@ -49,7 +49,8 @@ export default function InboxThread() {
         <View style={[styles.assist, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <Text style={{ color: theme.text, fontWeight: "700", fontSize: 14 }}>{w("web.alpha.ai_assistance")}</Text>
           <Text numberOfLines={1} style={{ color: theme.textMuted, fontSize: 13, flex: 1 }}>{w("web.alpha.ai_read_only")}</Text>
-          <Switch disabled value={row?.ai_assistance ?? false} trackColor={{ true: `${theme.merged}88`, false: theme.border }} thumbColor="#ffffff" accessibilityLabel={w("web.alpha.ai_assistance")} />
+          <Switch disabled value={row?.ai_assistance ?? false} trackColor={{ true: `${theme.merged}88`, false: theme.border }} thumbColor="#ffffff"
+                        {...({ activeThumbColor: "#ffffff" } as object)} accessibilityLabel={w("web.alpha.ai_assistance")} />
         </View>
         <ScrollView contentContainerStyle={styles.thread}>
           {inbox.busy ? <Text style={[styles.note, { color: theme.textMuted }]}>{t("alpha.loading")}</Text> : null}

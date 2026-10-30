@@ -17,6 +17,13 @@ import { type Theme, useTheme } from "./theme";
 /** En claro la lista va sobre `surface-muted`; en oscuro, sobre el fondo. */
 export const pageColor = (theme: Theme) => (theme.dark ? theme.bg : theme.muted);
 
+/** En la web, el anillo de foco solo con teclado (como `:focus-visible`): tocar o hacer clic lo apaga. */
+let keyboard = false;
+if (Platform.OS === "web" && typeof window !== "undefined") {
+  window.addEventListener("keydown", (event) => { if (event.key === "Tab") keyboard = true; }, true);
+  window.addEventListener("pointerdown", () => { keyboard = false; }, true);
+}
+
 type TapProps = Omit<PressableProps, "style"> & { style?: StyleProp<ViewStyle>; pressedColor?: string };
 
 /** Un `Pressable` con la respuesta de cada plataforma. */
@@ -30,7 +37,7 @@ export function Tap({ style, pressedColor, ...props }: TapProps) {
         return [
           style,
           Platform.OS !== "android" && state.pressed ? { backgroundColor: pressedColor ?? theme.border } : null,
-          Platform.OS === "web" && focused ? ({ outlineColor: theme.primary, outlineStyle: "solid", outlineWidth: 2, outlineOffset: -2 } as ViewStyle) : null,
+          Platform.OS === "web" && focused && keyboard ? ({ outlineColor: theme.primary, outlineStyle: "solid", outlineWidth: 2, outlineOffset: -2 } as ViewStyle) : null,
         ];
       }}
       {...props}

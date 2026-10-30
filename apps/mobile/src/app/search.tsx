@@ -76,7 +76,9 @@ export default function Search() {
   const hit = (...fields: (string | null | undefined)[]) => !q || fields.some((f) => f && plain(f).includes(q));
   const tasks = q ? all.filter((task) => hit(taskTitle(lang, task), task.last_message)) : [];
   const old = q ? (archived ?? []).filter((task) => hit(taskTitle(lang, task))) : [];
-  const folders = q ? (snapshot?.folders ?? []).filter((f) => hit(f.name)) : [];
+  // Una carpeta de la cuenta tiene el mismo id en cada máquina: sale una vez, con sus máquinas.
+  const folders = q ? [...new Map((snapshot?.folders ?? []).filter((f) => hit(f.name)).map((f) => [f.id, f])).values()] : [];
+  const machinesOf = (id: string) => (snapshot?.folders ?? []).filter((f) => f.id === id).map((f) => hostOf(f.host)?.label ?? f.host).join(" · ");
   const chats = q ? inbox.rows.filter((row) => hit(row.contact_name, row.last_message, row.channel_name)) : [];
   const actions = q ? folders.slice(0, 3) : [];
   const recent = [...all].sort((a, b) => (b.last_turn_at ?? b.updated_at) - (a.last_turn_at ?? a.updated_at)).slice(0, 6);
@@ -154,7 +156,7 @@ export default function Search() {
             <GroupHeader>{w("search.group.folders")}</GroupHeader>
             <Group inset={52}>
               {folders.map((f) => (
-                <ListRow key={f.key} left={<FolderSquare id={f.key} size={14} />} title={f.name} subtitle={hostOf(f.host)?.label} chevron onPress={() => router.push({ pathname: "/new", params: { folder: f.id, host: f.host } })} />
+                <ListRow key={f.key} left={<FolderSquare id={f.key} size={14} />} title={f.name} subtitle={machinesOf(f.id)} chevron onPress={() => router.push({ pathname: "/new", params: { folder: f.id, host: f.host } })} />
               ))}
             </Group>
           </>
@@ -205,7 +207,7 @@ export default function Search() {
 const styles = StyleSheet.create({
   bar: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, paddingBottom: 10 },
   field: { flex: 1, flexDirection: "row", alignItems: "center", gap: 8, height: 44, borderRadius: 12, paddingHorizontal: 12 },
-  input: { flex: 1, fontSize: 16, paddingVertical: 8, minWidth: 0 },
+  input: { flex: 1, fontSize: 16, paddingVertical: 8, minWidth: 0, ...(Platform.OS === "web" ? ({ outlineStyle: "none" } as object) : null) },
   clear: { width: 24, height: 24, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   cancel: { minHeight: 44, justifyContent: "center" },
   chipsScroll: { flexGrow: 0 },

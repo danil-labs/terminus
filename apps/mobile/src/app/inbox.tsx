@@ -1,6 +1,6 @@
 import { Redirect, router, usePathname } from "expo-router";
 import { useState } from "react";
-import { Linking, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Linking, Platform, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   contactDisplayName,
@@ -155,7 +155,7 @@ const styles = StyleSheet.create({
   dot: { width: 10, height: 10, borderRadius: 5 },
   note: { flexDirection: "row", alignItems: "center", gap: 6 },
   search: { flexDirection: "row", alignItems: "center", gap: 8, marginHorizontal: 16, height: 44, borderRadius: 12, paddingHorizontal: 12 },
-  searchInput: { flex: 1, fontSize: 16, minWidth: 0 },
+  searchInput: { flex: 1, fontSize: 16, minWidth: 0, ...(Platform.OS === "web" ? ({ outlineStyle: "none" } as object) : null) },
   chips: { gap: 8, paddingHorizontal: 16, paddingVertical: 12 },
   avatar: { alignItems: "center", justifyContent: "center" },
   channelDot: { position: "absolute", right: -1, bottom: -1, width: 13, height: 13, borderRadius: 7, borderWidth: 2 },

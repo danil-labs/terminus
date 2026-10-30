@@ -63,6 +63,7 @@ export default function Personalize() {
                         onValueChange={() => void model.toggle(entry.id)}
                         trackColor={{ true: theme.merged, false: theme.border }}
                         thumbColor="#ffffff"
+                        {...({ activeThumbColor: "#ffffff" } as object)}
                         accessibilityLabel={entry.title}
                       />
                     ) : <SoonTag />}

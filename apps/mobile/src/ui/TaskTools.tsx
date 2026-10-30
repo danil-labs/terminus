@@ -2,7 +2,7 @@ import { usageTone, windowLabel, windowLeft } from "@terminus/computers";
 import type { AccountLimits, UsageWindow } from "@terminus/protocol";
 import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { type ProviderUsage, providerUsage } from "../lib/accountUsage";
 import type { Host } from "../lib/hosts";
 import { lang, t, w } from "../lib/i18n";
@@ -186,7 +186,7 @@ const styles = StyleSheet.create({
   longTrack: { height: 6, borderRadius: 3, overflow: "hidden" },
   fill: { height: "100%", borderRadius: 3 },
   find: { flexDirection: "row", alignItems: "center", gap: 8, marginHorizontal: 12, marginBottom: 8, height: 40, borderRadius: 10, paddingLeft: 12 },
-  findInput: { flex: 1, fontSize: 15, minWidth: 0 },
+  findInput: { flex: 1, fontSize: 15, minWidth: 0, ...(Platform.OS === "web" ? ({ outlineStyle: "none" } as object) : null) },
   close: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
   rail: { gap: 8, paddingHorizontal: 12, paddingBottom: 10 },
   railCard: { width: 170, borderRadius: 12, padding: 10, gap: 4, borderWidth: 1 },
