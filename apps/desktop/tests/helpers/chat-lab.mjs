@@ -43,13 +43,13 @@ async function open(options) {
   await page.addInitScript(backend, options);
   await page.goto(url);
   await page.getByText("Tarea lab-0").first().click({ timeout: 20_000 });
-  await page.waitForSelector("[data-chat-thread] [data-thread-key]", { timeout: 20_000 });
+  await page.waitForSelector("[data-chat-thread] article, [data-chat-thread] [data-thread-key]", { timeout: 20_000 });
   await page.waitForTimeout(600);
   return { page, context, failures };
 }
 
 const nodes = (page) => page.evaluate(() => ({
-  rows: document.querySelectorAll("[data-thread-key]").length,
+  rows: document.querySelector("[data-chat-thread]").children.length,
   dom: document.querySelector("[data-chat-thread]").querySelectorAll("*").length,
 }));
 const wheelTo = (page, top) => page.evaluate(async (y) => {
@@ -284,7 +284,7 @@ const cases = {
     const sample = async () => {
       await page.evaluate(() => globalThis.gc?.());
       await page.waitForTimeout(120);
-      return page.evaluate(() => ({ heap: performance.memory?.usedJSHeapSize ?? null, ...{ rows: document.querySelectorAll("[data-thread-key]").length, dom: document.querySelectorAll("*").length } }));
+      return page.evaluate(() => ({ heap: performance.memory?.usedJSHeapSize ?? null, ...{ rows: document.querySelector("[data-chat-thread]").children.length, dom: document.querySelectorAll("*").length } }));
     };
     const box = await page.evaluate(() => document.querySelector("[data-chat-thread]").parentElement.scrollHeight);
     const rounds = [];

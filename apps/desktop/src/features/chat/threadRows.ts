@@ -7,28 +7,38 @@ export function createBlockKeys() {
   let alias = new Map<string, string>();
   let provisional: string[] = [];
   let seen = new Set<string>();
-  let next = 0;
+  let renames: [string, string][] = [];
   return {
     reset() {
       alias = new Map();
       provisional = [];
       seen = new Set();
-      next = 0;
+      renames = [];
+    },
+    /** Lo que heredó una clave provisional: quien guarde algo por clave lo copia a la definitiva. */
+    takeRenames() {
+      const taken = renames;
+      renames = [];
+      return taken;
     },
     assign(sources: readonly (string | null)[]): string[] {
       const queue = [...provisional];
       const used = new Set<string>();
       const nextProvisional: string[] = [];
+      let unsaved = 0;
       const keys = sources.map((source, position) => {
         let key: string;
         if (source === null) {
-          key = queue.shift() ?? `vivo:${next++}`;
+          // Determinista: volver a la tarea tiene que dar la misma fila, con su pliegue.
+          key = queue.shift() ?? `vivo:${alias.size + unsaved}`;
+          unsaved++;
           nextProvisional.push(key);
         } else {
           key = alias.get(source) ?? source;
           if (key === source && !seen.has(source) && queue.length) {
             key = queue.shift()!;
             alias.set(source, key);
+            renames.push([key, source]);
           }
         }
         if (used.has(key)) key = `${key}#${position}`;

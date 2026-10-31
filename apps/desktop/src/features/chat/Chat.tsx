@@ -34,13 +34,14 @@ import {
   Show,
   type Signal,
   Switch,
+  untrack,
 } from "solid-js";
 import { Dynamic, Portal } from "solid-js/web";
 import type { ThreadSearchTarget } from "./ThreadSearch";
 import { taskChatPresentation } from "./TaskChatPresentation";
 import type { OlderState } from "./history";
 import { createBlockKeys, estimateBlock } from "./threadRows";
-import { VirtualThread, type VirtualThreadApi } from "./VirtualThread";
+import type { VirtualThreadApi } from "./VirtualThread";
 import { CHUNK, chunkAt, chunkIds, chunkOf, chunkStart, headChunk, tailChunk, type Lectura } from "./threadWindow";
 import { workLabel } from "../projects/branchLabel";
 import { sangrarTerminal } from "./terminalIndent";
@@ -1193,7 +1194,8 @@ export default function Chat(props: ChatProps) {
     if (lectura && bloque !== null) {
       if (hiloVirtual) {
         hilo.soltar();
-        return queueMicrotask(() => void hiloDeFilas?.jump(bloque, lectura.desfase));
+        lecturaPorSaltar = lectura;
+        return queueMicrotask(saltarALaLectura);
       }
       return hilo.retomar(bloque - chunkStart(shownFrom(), origen()), lectura.desfase);
     }
@@ -1683,14 +1685,31 @@ export default function Chat(props: ChatProps) {
     const asignadas = clavesDeBloques.assign(lista.map((b) => props.msgs[b.i]?.clave ?? null));
     return { lista: asignadas, deBloque: new Map(lista.map((b, k) => [b, asignadas[k]])) };
   });
-  const claveFila = (b: Bloque) => claveDeBloque(clavesDelHilo().deBloque.get(b) ?? String(b.i));
+  createEffect(() => {
+    clavesDelHilo();
+    const renombradas = clavesDeBloques.takeRenames().filter(([vieja]) => claveDeBloque(vieja) in untrack(trabajos));
+    if (!renombradas.length) return;
+    setTrabajos({ ...untrack(trabajos), ...Object.fromEntries(renombradas.map(([vieja, nueva]) => [claveDeBloque(nueva), untrack(trabajos)[claveDeBloque(vieja)]])) });
+  });
+  const claveFila = (b: Bloque) => claveDeBloque(props.msgs[b.i]?.clave ?? clavesDelHilo().deBloque.get(b) ?? String(b.i));
   const bloqueDeLectura = (lectura: Lectura) => {
     const at = clavesDelHilo().lista.indexOf(lectura.clave);
     return at < 0 ? null : at;
   };
-  // Sin CSS no hay layout (jsdom): el hilo se monta entero por tramos.
-  const hiloVirtual = typeof CSS !== "undefined" && typeof ResizeObserver !== "undefined" && !localStorage.getItem(HILO_POR_TRAMOS);
+  // Sin layout (jsdom) todo mide cero: el hilo se monta entero por tramos.
+  const hiloVirtual = typeof ResizeObserver !== "undefined" && document.documentElement.getBoundingClientRect().width > 0 && !localStorage.getItem(HILO_POR_TRAMOS);
+  // En su propio trozo: la carga inicial tiene techo y el hilo llega después de pintar la ventana.
+  const [hiloDeFilasListo, setHiloDeFilasListo] = createSignal<typeof import("./VirtualThread").VirtualThread>();
+  if (hiloVirtual) void import("./VirtualThread").then((module) => setHiloDeFilasListo(() => module.VirtualThread));
   let hiloDeFilas: VirtualThreadApi | undefined;
+  let lecturaPorSaltar: Lectura | null = null;
+  const saltarALaLectura = () => {
+    const lectura = lecturaPorSaltar;
+    const bloque = lectura && bloqueDeLectura(lectura);
+    if (!lectura || bloque === null || !hiloDeFilas) return;
+    lecturaPorSaltar = null;
+    void hiloDeFilas.jump(bloque, lectura.desfase);
+  };
   const volverAReciente = () => void Promise.resolve(props.onRecientes?.()).then(() => hilo.bajar({ animacion: "instantanea", duracion: 300, ignorarEscapes: true }));
   const [primeraFila, setPrimeraFila] = createSignal<number | null>(null);
   const [cajaDeFilas, setCajaDeFilas] = createSignal<HTMLElement>();
@@ -3354,7 +3373,7 @@ export default function Chat(props: ChatProps) {
               que WebKit encogiera y recompusiera el hilo en dos movimientos.
               `Index` conserva cada sitio del DOM y solo actualiza sus datos. */}
           <Show
-            when={hiloVirtual ? cajaVirtual() : undefined}
+            when={hiloDeFilasListo() ? cajaVirtual() : undefined}
             keyed
             fallback={
               <Show when={!hiloVirtual}>
@@ -3369,7 +3388,8 @@ export default function Chat(props: ChatProps) {
             }
           >
             {(caja) => (
-              <VirtualThread
+              <Dynamic
+                component={hiloDeFilasListo()!}
                 scroller={caja.el}
                 keys={() => clavesDelHilo().lista}
                 estimate={altoEstimado}
@@ -3377,8 +3397,8 @@ export default function Chat(props: ChatProps) {
                 write={hilo.escribir}
                 settled={hilo.sostener}
                 onRange={setPrimeraFila}
-                ref={(api) => { hiloDeFilas = api; }}
-                row={(_clave, indice) => filaDelHilo(createMemo<Bloque>((previo) => bloques()[indice()] ?? previo, bloques()[indice()]), indice)}
+                ref={(api: VirtualThreadApi) => { hiloDeFilas = api; saltarALaLectura(); }}
+                row={(_clave: string, indice: () => number) => filaDelHilo(createMemo<Bloque>((previo) => bloques()[indice()] ?? previo, bloques()[indice()]), indice)}
               />
             )}
           </Show>
