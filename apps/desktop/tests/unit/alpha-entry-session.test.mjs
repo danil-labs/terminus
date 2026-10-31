@@ -147,7 +147,8 @@ test("callback refuses a forged state, a missing flow cookie and a refused code"
   const w = world();
   const started = await call(w, "/auth/workos/start");
   const state = new URL(started.headers.get("Location")).searchParams.get("state");
-  for (const [query, cookie] of [[`code=code_ok&state=x${state.slice(1)}`, cookieHeader(started)], [`code=code_ok&state=${state}`, ""], [`code=bad&state=${state}`, cookieHeader(started)], [`error=access_denied&state=${state}`, cookieHeader(started)]]) {
+  const forged = `${state[0] === "x" ? "y" : "x"}${state.slice(1)}`;
+  for (const [query, cookie] of [[`code=code_ok&state=${forged}`, cookieHeader(started)], [`code=code_ok&state=${state}`, ""], [`code=bad&state=${state}`, cookieHeader(started)], [`error=access_denied&state=${state}`, cookieHeader(started)]]) {
     const response = await call(w, `/auth/workos/callback?${query}`, { headers: { Cookie: cookie } });
     assert.equal(response.status, 303);
     assert.equal(response.headers.get("Location"), `${origin}/auth?error=callback_failed`);
