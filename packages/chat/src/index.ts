@@ -1,4 +1,5 @@
 export * from "./history.ts";
+export * from "./historyDetail.ts";
 export * from "./links.ts";
 export * from "./steps.ts";
 export * from "./nextSteps.ts";

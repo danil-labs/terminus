@@ -55,7 +55,7 @@ import { ThreadSearch, type ThreadSearchTarget } from "../features/chat/ThreadSe
 import TranscriptSource from "../features/chat/TranscriptSource";
 import type { Lectura } from "../features/chat/threadWindow";
 import { lotesDeDeltas } from "../features/chat/deltaFrames";
-import { type LoadedHistory, prependHistory, refreshHistory } from "../features/chat/history";
+import { hasOlder, hasRecentGap, HistoryPager, type OlderState } from "../features/chat/history";
 import {
   anexarDeltas,
   anexarImagen,
@@ -210,7 +210,7 @@ import {
 import { createPref, escribirPref, leerPref } from "../lib/prefs";
 import type { Frase } from "../lib/prose";
 import { editDraft, insertMention, insertRecipient, type Recipient, type RecipientCandidate, recipientCandidatesOf, type SenderTask, trimDraft } from "../lib/recipients";
-import { conservar, conservarEnOrden, conservarPorElFinal, sessionRefresh } from "../lib/sessionRefresh";
+import { conservar, conservarEnOrden, conservarPorClave, sessionRefresh } from "../lib/sessionRefresh";
 import { readShellCache, shellCacheWriter } from "../lib/shellCache";
 import {
   accionDeAtajo,
@@ -1248,7 +1248,8 @@ export default function App() {
   // (`guardar_segmento_pregunta`): ese turno llega por partida doble, de
   // `base` y de `vivo`. Se identifican por `turno`; a `base` se le copia
   // su `questionRequestId`, o la respuesta cae al canal de archivo.
-  const releer = (session: string, leida: Msg[], vaciarVivo: boolean, antepuesta = false, guardados?: ReadonlySet<string>) => {
+  type IdsDeTurnos = ReadonlySet<string>;
+  const releer = (session: string, leida: Msg[], vaciarVivo: boolean, antepuesta = false, guardados?: IdsDeTurnos, cola?: IdsDeTurnos) => {
     deltasPorCuadro.vaciar();
     setHilos((hs) => {
       const previo = hs[session];
@@ -1258,9 +1259,11 @@ export default function App() {
           .filter((m) => m.turno && m.questionRequestId)
           .map((m) => [m.turno as string, m.questionRequestId]),
       );
-      const persistidos = new Set(
-        leida.map((m) => m.turno).filter((t): t is string => !!t),
-      );
+      // `cola`: lo que acaba de leerse aunque la ventana no lo tenga, porque se quedó atrás leyendo.
+      const persistidos = new Set([
+        ...leida.map((m) => m.turno).filter((t): t is string => !!t),
+        ...(cola ?? []),
+      ]);
       const atada =
         ataduras.size === 0
           ? leida
@@ -1270,7 +1273,7 @@ export default function App() {
                 : m,
             );
       // El chat identifica filas por referencia: un objeto nuevo por mensaje remonta el hilo entero.
-      const base = (antepuesta ? conservarPorElFinal : conservarEnOrden)(previo?.base ?? [], atada);
+      const base = (antepuesta ? conservarPorClave : conservarEnOrden)(previo?.base ?? [], atada);
       const vivo = vaciarVivo
         ? []
         : vivoPrevio.filter((m) => !m.turno || !persistidos.has(m.turno));
@@ -1294,17 +1297,36 @@ export default function App() {
       return machine ? { ...resto, [id]: machine } : resto;
     });
   // Los turnos de cada tarea que trajo `service history`, desde `start`; lo anterior se pide al subir.
-  const historias = new Map<string, LoadedHistory<Session["turns"][number]>>();
+  const historias = new Map<string, HistoryPager<Session["turns"][number]>>();
+  const proyectosDeHistoria = new Map<string, string>();
+  const leyendoLejos = new Set<string>();
   const [conAntiguos, setConAntiguos] = createSignal<Readonly<Record<string, boolean>>>({});
   const [conRecientes, setConRecientes] = createSignal<Readonly<Record<string, boolean>>>({});
-  const marcarAntiguos = (id: string, loaded: LoadedHistory<unknown>) => {
-    setConAntiguos((all) => (!!all[id] === loaded.start > 0 ? all : { ...all, [id]: loaded.start > 0 }));
-    const recent = loaded.start + loaded.turns.length < loaded.total;
-    setConRecientes(all => !!all[id] === recent ? all : { ...all, [id]: recent });
+  const [estadoAntiguos, setEstadoAntiguos] = createSignal<Readonly<Record<string, OlderState>>>({});
+  const marcarAntiguos = (id: string, pager: HistoryPager<unknown>) => {
+    const loaded = pager.loaded;
+    if (loaded) {
+      setConAntiguos((all) => (!!all[id] === hasOlder(loaded) ? all : { ...all, [id]: hasOlder(loaded) }));
+      const recent = hasRecentGap(loaded);
+      setConRecientes(all => !!all[id] === recent ? all : { ...all, [id]: recent });
+    }
+    setEstadoAntiguos(all => (all[id] ?? "idle") === pager.older ? all : { ...all, [id]: pager.older });
+  };
+  const [colaSuelta, setColaSuelta] = createSignal<Readonly<Record<string, Msg[]>>>({});
+  const historiaDe = (id: string) => {
+    const hay = historias.get(id);
+    if (hay) return hay;
+    const pager: HistoryPager<Session["turns"][number]> = new HistoryPager({
+      read: (before) => leerTarea(proyectosDeHistoria.get(id) ?? project(), id, before),
+      onChange: () => marcarAntiguos(id, pager),
+    });
+    historias.set(id, pager);
+    return pager;
   };
   // Con el stream empujado el motor sabe paginar: abrir trae los últimos turnos y no la transcripción entera.
   let historialPaginado = false;
   const leerTarea = async (project: string, id: string, before: number | null = null) => {
+    proyectosDeHistoria.set(id, project);
     const result = historialPaginado
       ? await invoke<Session>("load_history", { project, id, before }, deLaTarea(id))
       : await invoke<Session>("load_session", { project, id, history_request: { version: 1, before } }, deLaTarea(id));
@@ -1317,35 +1339,29 @@ export default function App() {
   };
   /**
    * La página anterior a lo cargado de `id`, lista para anteponerse: devuelve con qué
-   * ponerla, para que el hilo la monte sin mover lo que se lee. `null` si no hay o ya no encaja.
+   * ponerla, para que el hilo la monte sin mover lo que se lee. `null` si no hay o falló.
    */
-  const pidiendoAntiguos = new Set<string>();
   async function cargarAntiguos(project: string, id: string): Promise<(() => void) | null> {
-    const loaded = historias.get(id);
-    if (!loaded || loaded.start === 0 || pidiendoAntiguos.has(id)) return null;
-    pidiendoAntiguos.add(id);
+    const pager = historias.get(id);
+    if (!pager) return null;
+    proyectosDeHistoria.set(id, project);
     const generation = sessionGeneration;
-    try {
-      const page = await leerTarea(project, id, loaded.start);
-      if (generation !== sessionGeneration || historias.get(id) !== loaded) return null;
-      const merged = prependHistory(loaded, page.turns, page.history);
-      if (!merged) {
-        // Se reescribió entre páginas: se vuelve a la primera.
-        historias.delete(id);
-        void leerTarea(project, id).then((s) => loadResult(id, s, false, generation)).catch(() => {});
-        return null;
-      }
-      return () => {
-        if (generation !== sessionGeneration || historias.get(id) !== loaded) return;
-        historias.set(id, merged);
-        marcarAntiguos(id, merged);
-        releer(id, transcripcion(merged.turns), false, true, idsDeTurnos(merged.turns));
-      };
-    } catch {
-      return null;
-    } finally {
-      pidiendoAntiguos.delete(id);
-    }
+    const poner = await pager.fetchOlder();
+    pintarHistoria(id, pager, false);
+    if (!poner || generation !== sessionGeneration) return null;
+    return () => {
+      if (generation !== sessionGeneration) return;
+      poner();
+      pintarHistoria(id, pager, true);
+    };
+  }
+  /** El hilo de lo que tiene la ventana de `id`; separado de lo más reciente si se quedó atrás. */
+  function pintarHistoria(id: string, pager: HistoryPager<Session["turns"][number]>, antepuesta: boolean, clear = false, leidos?: ReadonlySet<string>) {
+    const loaded = pager.loaded;
+    if (!loaded) return;
+    const leida = transcripcion(loaded.turns, loaded.start);
+    if (hasRecentGap(loaded)) leida.push({ role: "system", text: "", meta: "history_gap", clave: "history_gap" });
+    releer(id, leida, clear, antepuesta, idsDeTurnos(loaded.turns), leidos);
   }
   /** Lo que se dice de la máquina de la tarea abierta mientras está apagada o encendiéndose. */
   const avisoDeMaquina = () => {
@@ -1369,10 +1385,15 @@ export default function App() {
   function loadResult(id: string, session: Session, clear: boolean, generation: number) {
     if (generation !== sessionGeneration) return;
     anotar(setApagadas, id, session.offline?.machine ?? null);
-    const loaded = refreshHistory(historias.get(id), session.turns, session.history);
-    historias.set(id, loaded);
-    marcarAntiguos(id, loaded);
-    releer(id, transcripcion(loaded.turns), clear, false, idsDeTurnos(loaded.turns));
+    const pager = historiaDe(id);
+    const loaded = pager.accept(session.turns, session.history, { reading: leyendoLejos.has(id) });
+    setColaSuelta((all) => {
+      if (hasRecentGap(loaded)) return { ...all, [id]: transcripcion(session.turns, session.history?.start ?? 0) };
+      if (!(id in all)) return all;
+      const { [id]: _, ...resto } = all;
+      return resto;
+    });
+    pintarHistoria(id, pager, false, clear, idsDeTurnos(session.turns));
     const origen = session.transcript ?? null;
     setOrigenes((o) =>
       id in o && o[id]?.file === origen?.file && o[id]?.from_cli === origen?.from_cli ? o : { ...o, [id]: origen },
@@ -1385,6 +1406,8 @@ export default function App() {
   const soltarHilo = (session: string) => {
     deltasPorCuadro.vaciar();
     setHilos((hs) => {
+      historias.get(session)?.close();
+      historias.delete(session);
       if (!(session in hs)) return hs;
       const { [session]: _, ...resto } = hs;
       return resto;
@@ -1813,7 +1836,11 @@ export default function App() {
         (m.preguntas ?? []).some((p) => !contestadas.has(clave(m.turno!, p.id))),
     );
   };
-  const esperando = createMemo(() => preguntasPendientes(msgs()));
+  // Con la ventana lejos del final, lo que espera es lo de la última cola leída, no lo que se ve.
+  const esperando = createMemo(() => {
+    const cola = colaSuelta()[claveDelHilo()];
+    return preguntasPendientes(cola ? [...cola, ...(hiloAbierto()?.vivo ?? [])] : msgs());
+  });
   /**
    * Qué tareas tienen una pregunta sin contestar, para la tira. De la abierta
    * manda lo derivado de su conversación —es más fresco que el historial, que
@@ -2079,6 +2106,7 @@ export default function App() {
   // en qué cliente se está sin leer el nombre.
     aplicarTemaDeTerminal(activo?.terminal_theme ?? null);
     sessionGeneration++;
+    for (const pager of historias.values()) pager.close();
     sessionLists.reset();
     const generation = sessionGeneration;
     const previousWorkspace = workspaceActivo();
@@ -7116,11 +7144,22 @@ export default function App() {
            opcional: `tsc` no avisa si se pierde. */
         cargando={cargandoHilo() !== null && cargandoHilo() === pp.sesion}
         masRecientes={!!conRecientes()[pp.sesion ?? ""]}
-        onRecientes={() => {
+        onRecientes={async () => {
           if (!pp.sesion) return;
-          const id = pp.sesion, generation = sessionGeneration;
-          historias.delete(id);
-          void leerTarea(proyectoDeLaCelda()?.id ?? "", id).then(s => loadResult(id, s, false, generation)).catch(setError);
+          const id = pp.sesion, pager = historias.get(id), generation = sessionGeneration;
+          if (!pager) return;
+          try {
+            await pager.latest();
+            if (generation === sessionGeneration) pintarHistoria(id, pager, false);
+          } catch (e) {
+            setError(prosaDe(e));
+          }
+        }}
+        estadoAntiguos={estadoAntiguos()[pp.sesion ?? ""] ?? "idle"}
+        onLeyendo={(leyendo) => {
+          if (!pp.sesion) return;
+          if (leyendo) leyendoLejos.add(pp.sesion);
+          else leyendoLejos.delete(pp.sesion);
         }}
         masAntiguos={!!conAntiguos()[pp.sesion ?? ""]}
         onAntiguos={() => cargarAntiguos(proyectoDeLaCelda()?.id ?? "", pp.sesion ?? "")}
@@ -7509,6 +7548,7 @@ export default function App() {
               disabled={!task()?.session}
               messages={target()?.messages() ?? []} thread={() => target()?.thread()}
               onJump={block => target()?.jump(block)}
+              onMove={delta => target()?.move(delta)}
               tools={<>
                 <Show keyed when={delegatedToolbarTargets().get(`${workspaceActivo()}/${task()?.session ?? ""}`)} fallback={<DelegatedNone />}>{render => render()}</Show>
                 <UsageTool usage={consumo} agent={agenteDeLaVentana()} onGestionarCuentas={() => setSettings("proveedores-ia")} />

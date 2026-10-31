@@ -54,7 +54,7 @@ test("a new revision with the same turns is an append, not a rewrite", () => {
 
 test("reading the whole of an active task reaches its first turn", async () => {
   const engine = new Engine(388);
-  const pager = new HistoryPager<Turn>({ read: async before => engine.page(before) });
+  const pager = new HistoryPager<Turn>({ retryMs: 0, read: async before => engine.page(before) });
   const opened = engine.page(null);
   pager.accept(opened.turns, opened.history);
   for (let n = 0; n < 200 && pager.loaded!.start > 0; n++) {
@@ -73,6 +73,7 @@ test("an append that lands while the page travels neither loses it nor leaves a 
   const gate = deferred<void>();
   let held = false;
   const pager = new HistoryPager<Turn>({
+    retryMs: 0,
     read: async before => {
       const answer = engine.page(before);
       if (held) { held = false; await gate.promise; }
@@ -97,7 +98,7 @@ test("an append that lands while the page travels neither loses it nor leaves a 
 
 test("a tail that lands between fetching the page and putting it in stays", async () => {
   const engine = new Engine(200);
-  const pager = new HistoryPager<Turn>({ read: async before => engine.page(before) });
+  const pager = new HistoryPager<Turn>({ retryMs: 0, read: async before => engine.page(before) });
   const opened = engine.page(null);
   pager.accept(opened.turns, opened.history);
   const put = await pager.fetchOlder();
@@ -113,7 +114,7 @@ test("a tail that lands between fetching the page and putting it in stays", asyn
 test("a failed page stays visible, keeps the window and can be retried", async () => {
   const engine = new Engine(200);
   let broken = true;
-  const pager = new HistoryPager<Turn>({ read: async before => { if (broken && before !== null) throw new Error("offline"); return engine.page(before); } });
+  const pager = new HistoryPager<Turn>({ retryMs: 0, read: async before => { if (broken && before !== null) throw new Error("offline"); return engine.page(before); } });
   const opened = engine.page(null);
   const loaded = pager.accept(opened.turns, opened.history);
   assert.equal(await pager.fetchOlder(), null);
@@ -128,7 +129,7 @@ test("a failed page stays visible, keeps the window and can be retried", async (
 test("one request at a time", async () => {
   const engine = new Engine(200);
   let reads = 0;
-  const pager = new HistoryPager<Turn>({ read: async before => { reads++; return engine.page(before); } });
+  const pager = new HistoryPager<Turn>({ retryMs: 0, read: async before => { reads++; return engine.page(before); } });
   const opened = engine.page(null);
   pager.accept(opened.turns, opened.history);
   await Promise.all([pager.fetchOlder(), pager.fetchOlder(), pager.fetchOlder()]);
@@ -138,7 +139,7 @@ test("one request at a time", async () => {
 test("an answer after closing changes nothing", async () => {
   const engine = new Engine(200);
   const gate = deferred<HistoryRead<Turn>>();
-  const pager = new HistoryPager<Turn>({ read: () => gate.promise });
+  const pager = new HistoryPager<Turn>({ retryMs: 0, read: () => gate.promise });
   const opened = engine.page(null);
   const loaded = pager.accept(opened.turns, opened.history);
   const asked = pager.fetchOlder();
@@ -151,7 +152,7 @@ test("an answer after closing changes nothing", async () => {
 
 test("a rewrite under the window goes back to the tail without mixing turns", async () => {
   const engine = new Engine(200);
-  const pager = new HistoryPager<Turn>({ read: async before => engine.page(before) });
+  const pager = new HistoryPager<Turn>({ retryMs: 0, read: async before => engine.page(before) });
   const opened = engine.page(null);
   pager.accept(opened.turns, opened.history);
   engine.turns = Array.from({ length: 200 }, (_, n) => ({ id: `n${n}` }));
@@ -163,7 +164,7 @@ test("a rewrite under the window goes back to the tail without mixing turns", as
 
 test("past the budget the window can reach the first turn, and the tail comes back on request", async () => {
   const engine = new Engine(120, 100_000);
-  const pager = new HistoryPager<Turn>({ read: async before => engine.page(before) });
+  const pager = new HistoryPager<Turn>({ retryMs: 0, read: async before => engine.page(before) });
   const opened = engine.page(null);
   pager.accept(opened.turns, opened.history);
   assert.ok(pager.loaded!.start > 0);
@@ -197,4 +198,86 @@ test("a single turn over the budget survives", () => {
   const engine = new Engine(1, 3 * 1024 * 1024);
   const first = engine.page(null);
   assert.equal(refreshHistory(undefined, first.turns, first.history).turns.length, 1);
+});
+
+test("latest while a page travels leaves the pager usable, even if the tail fails", async () => {
+  const engine = new Engine(200);
+  const gate = deferred<HistoryRead<Turn>>();
+  let mode: "hold" | "fail" | "serve" = "hold";
+  const pager = new HistoryPager<Turn>({ retryMs: 0, read: async before => {
+    if (mode === "hold") return gate.promise;
+    if (mode === "fail") throw new Error("offline");
+    return engine.page(before);
+  } });
+  const opened = engine.page(null);
+  pager.accept(opened.turns, opened.history);
+  const asked = pager.fetchOlder();
+  mode = "fail";
+  await assert.rejects(pager.latest());
+  gate.resolve(engine.page(151));
+  assert.equal(await asked, null);
+  assert.equal(pager.older, "idle");
+  mode = "serve";
+  (await pager.fetchOlder())?.();
+  assert.equal(pager.loaded!.start, 101);
+});
+
+test("latest after closing does not touch the window", async () => {
+  const engine = new Engine(200);
+  const gate = deferred<HistoryRead<Turn>>();
+  const pager = new HistoryPager<Turn>({ read: () => gate.promise });
+  const opened = engine.page(null);
+  const loaded = pager.accept(opened.turns, opened.history);
+  const back = pager.latest();
+  pager.close();
+  gate.resolve(engine.page(null));
+  await back;
+  assert.equal(pager.loaded, loaded);
+});
+
+test("turns without id join although their references name a new revision", () => {
+  const legacy = (n: number, revision: string) => ({ text: "", at: n, history_refs: [{ version: 1, turn: n, pointer: "/text", bytes: 20_000, revision }] });
+  const page = (start: number, end: number, revision: string): HistoryPage => ({ version: 1, revision, total: 200, start, end, limit: 50, has_more: true });
+  const window = { revision: "a", start: 60, total: 200, turns: Array.from({ length: 140 }, (_, n) => legacy(60 + n, "a")) };
+  const next = refreshHistory(window, Array.from({ length: 50 }, (_, n) => legacy(150 + n, "b")), page(150, 200, "b"));
+  assert.equal(next.start, 60);
+});
+
+test("an older answer to the tail costs nothing: shared turns decide, not the total", () => {
+  const turns = (from: number, to: number) => Array.from({ length: to - from }, (_, n) => ({ id: `t${from + n}` }));
+  const page = (start: number, end: number, total: number): HistoryPage => ({ version: 1, revision: `r${total}`, total, start, end, limit: 50, has_more: true });
+  const window = { start: 50, total: 200, turns: turns(50, 200) };
+  const stale = refreshHistory(window, turns(148, 198), page(148, 198, 198));
+  assert.equal(stale.start, 50);
+  assert.equal(stale.total, 198);
+});
+
+test("next to the window with nothing shared is not a join", () => {
+  const turns = (from: number, to: number) => Array.from({ length: to - from }, (_, n) => ({ id: `t${from + n}` }));
+  const page: HistoryPage = { version: 1, revision: "b", total: 150, start: 100, end: 150, limit: 50, has_more: true };
+  const next = refreshHistory({ start: 50, total: 100, turns: turns(50, 100) }, turns(100, 150), page);
+  assert.equal(next.start, 100);
+});
+
+test("a read that collides with a save is retried before anyone sees a failure", async () => {
+  const engine = new Engine(200);
+  let collisions = 2;
+  const pager = new HistoryPager<Turn>({ retryMs: 0, read: async before => {
+    if (before !== null && collisions-- > 0) throw { what: "revision_changed" };
+    return engine.page(before);
+  } });
+  const opened = engine.page(null);
+  pager.accept(opened.turns, opened.history);
+  (await pager.fetchOlder())?.();
+  assert.equal(pager.older, "idle");
+  assert.equal(pager.loaded!.start, 101);
+});
+
+test("a page that adds nothing ends in a visible failure, not a quiet stop", async () => {
+  const engine = new Engine(200, 0, 1);
+  const pager = new HistoryPager<Turn>({ retryMs: 0, read: async before => engine.page(before) });
+  const tail = engine.page(null);
+  pager.accept(engine.turns.slice(100), { ...tail.history!, start: 100 });
+  assert.equal(await pager.fetchOlder(), null);
+  assert.equal(pager.older, "failed");
 });

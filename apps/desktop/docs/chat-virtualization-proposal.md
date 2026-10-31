@@ -1,31 +1,66 @@
-# Propuesta: virtualización del chat con TanStack Virtual
+# Virtualización y recuperación del historial del chat
 
-Estado: propuesta para revisión; no implementada ni aprobada para despliegue.
-Evaluación: 2026-10-31, cliente `b99ee159`. Lectores: responsables de frontend,
-arquitectura y QA. Objetivo: recorrer el historial disponible sin acumular su
-DOM ni perder la posición de lectura cuando llega contenido nuevo.
+Estado: prototipo integrado en `feat/chat-virtualization`, pendiente de QA real y
+sin merge. Actualizado 2026-10-31 sobre `origin/dev` `943b3c61`. Alcance ampliado
+por la persona: desktop, web, Expo nativo y web de teléfono. Lectores:
+responsables de frontend, arquitectura y QA.
 
-## Recomendación y alcance
+## Causa demostrada
 
-Evaluar la adopción de `@tanstack/solid-virtual` mediante un prototipo acotado
-en el chat Solid de desktop y web. La API publicada cubre anclaje al final,
-prepend estable y medición dinámica. La integración completa queda condicionada
-a las pruebas de identidad, scroll, visuales y recuperación de páginas descritas
-abajo. No hay todavía evidencia de rendimiento que justifique activar la migración.
+`history.revision` (`bounded_history_v1`) es un hash de `session.json` entero:
+medido en un motor de laboratorio, cambia con el título, `updated_at`, editar un
+turno o agregar uno. El cliente la leía como «se reescribió»: cada relectura de
+cola tiraba las páginas antiguas y `prependHistory` rechazaba la página en vuelo.
+Con la función base, 388 turnos y un append por paso, la ventana no baja del
+turno 289 y se reinicia 200 veces. El motor fijado en el lock (0.2.73 `4e10efc`)
+no ofrece esa capacidad; los hosts con motores posteriores sí. La misma lectura
+explica `chat.history.error` al abrir contenido largo en tareas activas: su
+referencia lleva la revisión del archivo. La recuperación por relay y los
+archivados no se reprodujeron en ventana.
 
-Usar la biblioteca para geometría y montaje de filas; mantener la carga de
-datos fuera de ella. No agregar TanStack Query sólo para virtualizar. La app
-Expo usa `FlatList`: este cambio no sustituye su virtualizador ni modifica sus
-pantallas. Las políticas de identidad y páginas que necesiten ambos clientes
-pertenecen a `packages/`, conforme a la regla de código compartido.
+## Qué cambia
 
-Este documento complementa [el plan de carga de historial](history-loading-plan.md).
-Ese plan propone cambios de host, relay y transporte para contenido pesado.
-Virtualizar DOM no garantiza que una respuesta quepa en RPC, no reconstruye una
-página ausente ni limita por sí mismo el tamaño de los datos o las mediciones.
-Su evidencia histórica no se presenta aquí como estado actual desplegado.
+- `packages/chat/src/history.ts`: continuidad por turnos, no por `revision`. La
+  página anterior se pide con `before = start + 1` y el turno solapado prueba la
+  unión. `HistoryPager` hace una petición por tarea, reintenta choques con una
+  escritura y deja un fallo visible. Desktop, web, Expo y teléfono usan esta política.
+- Presupuesto de 2 MiB: leyendo lejos, la ventana se separa de la cola y una cola
+  nueva solo actualiza el total. «Volver a los mensajes recientes» recarga la
+  cola; no hay cursor `after`. Lo pendiente sale de la última cola leída, no de la ventana.
+- `packages/chat/src/historyDetail.ts`: tras cambiar el archivo, la referencia se
+  vuelve a pedir comprobando el `id` del turno; sin `id` no se expande.
+- `VirtualThread.tsx`: TanStack (`@tanstack/solid-virtual` 3.13.51, core 3.19.9)
+  decide rango y mide. `seguirElFondo` es el único escritor de `scrollTop`; las
+  escrituras de TanStack y de la búsqueda pasan por `hilo.escribir`. Las filas van
+  en flujo entre márgenes y se insertan sin mover las que siguen: el `For` de Solid
+  las reemplaza al saltar lejos y eso colapsa la selección.
+- Identidad: `clave` por turno y pieza (`transcripcion`), alias vivo → cerrado en
+  `threadRows.ts`. La lectura es clave + desfase, en memoria.
+- Retención: foco, selección, gesto, visual expandido, detalle abierto y fila viva.
+  Un iframe que sale de la vista se desmonta y puede reiniciarse: un visual
+  guarda abierto/cerrado y alto, no su estado interno.
+- `localStorage["terminus.chat.thread-chunks"]` vuelve al hilo por tramos para
+  comparar; es una marca de laboratorio y debe retirarse con ese camino.
+- Expo: conserva `FlatList`. Pasa a `history_request` con la forma exacta de la web,
+  carga páginas al llegar al extremo, abre `history_refs` con un toque y no descarta
+  una respuesta si no puede comprobar su pregunta (`question_unverified`).
 
-## Evidencia del cliente
+## Límites conocidos
+
+- Una reescritura de turnos antiguos que deje igual el turno frontera no se
+  detecta: se vería texto viejo, no una unión equivocada.
+- Una pregunta pendiente a más de 50 turnos del final sin proceso vivo no se ve en
+  Expo. Una señal aditiva de pendientes en `kind:"state"` la resolvería; no es bloqueante.
+- `questions` y `answers` enviados a `history_refs` no se expanden para calcular lo pendiente.
+- La búsqueda cubre lo cargado. No hay salto directo a una página desalojada.
+- Las medidas no se invalidan al cambiar de ancho: una fila fuera de vista conserva su
+  alto anterior hasta montarse y la lectura la sostiene el ancla.
+
+La evaluación original sigue abajo como antecedente; donde difiera, manda lo anterior.
+
+## Evaluación original
+
+### Evidencia del cliente
 
 | Área | Comportamiento observado | Implicación |
 |---|---|---|

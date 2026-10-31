@@ -4,8 +4,9 @@
  * "the file changed", never "the transcript was rewritten". Continuity comes from the turns.
  */
 
-/** The `history` field of a read: `turns[i]` is turn `start + i`. */
-export type HistoryPage = { version?: number; revision?: string; total: number; start: number; end: number; limit: number; has_more: boolean };
+import type { HistoryPage } from "../../protocol/src/types.ts";
+
+export type { HistoryPage };
 
 export type LoadedHistory<T> = { revision?: string; start: number; total: number; turns: T[] };
 
@@ -16,6 +17,7 @@ export type RefreshOptions = { reading?: boolean };
 
 const HISTORY_BYTES = 2 * 1024 * 1024;
 const OLDER_ATTEMPTS = 3;
+const RETRY_MS = 250;
 
 const endOf = (history: LoadedHistory<unknown>) => history.start + history.turns.length;
 
@@ -29,9 +31,15 @@ export const olderCursor = (history: LoadedHistory<unknown>) => (history.turns.l
 
 const turnId = (turn: unknown) => (typeof turn === "object" && turn !== null && "id" in turn ? (turn as { id?: unknown }).id : undefined);
 
+/** A turn without `id`, with the file revision its references carry taken out: that one changes on every write. */
+function contentOf(turn: unknown) {
+  if (typeof turn !== "object" || turn === null || !("history_refs" in turn) || !Array.isArray(turn.history_refs)) return JSON.stringify(turn);
+  return JSON.stringify({ ...turn, history_refs: turn.history_refs.map(({ revision: _revision, ...ref }) => ref) });
+}
+
 function sameTurn(a: unknown, b: unknown) {
-  const id = turnId(a);
-  return id !== undefined && id !== null ? id === turnId(b) : JSON.stringify(a) === JSON.stringify(b);
+  const id = turnId(a), other = turnId(b);
+  return id !== undefined && id !== null && other !== undefined && other !== null ? id === other : contentOf(a) === contentOf(b);
 }
 
 const withRevision = (revision: string | undefined) => (revision ? { revision } : {});
@@ -58,18 +66,21 @@ export function refreshHistory<T>(previous: LoadedHistory<T> | undefined, turns:
   if (!page) return { start: 0, total: turns.length, turns };
   const revision = withRevision(page.revision);
   const fresh = { ...revision, start: page.start, total: page.total, turns };
-  if (!previous || page.total < previous.total) return bounded(fresh, page.version, "tail");
+  if (!previous) return bounded(fresh, page.version, "tail");
   const held = endOf(previous);
-  const shared = Math.min(held, page.end) - Math.max(previous.start, page.start);
-  for (let at = Math.max(previous.start, page.start), n = 0; n < shared; at++, n++) {
-    if (!sameTurn(previous.turns[at - previous.start], turns[at - page.start])) return bounded(fresh, page.version, "tail");
+  const from = Math.max(previous.start, page.start);
+  const shared = Math.min(held, page.end) - from;
+  for (let n = 0; n < shared; n++) {
+    if (!sameTurn(previous.turns[from + n - previous.start], turns[from + n - page.start])) return bounded(fresh, page.version, "tail");
   }
   const window = { ...previous, ...revision, total: page.total };
-  if (page.start > held) return hasRecentGap(previous) || options.reading ? window : bounded(fresh, page.version, "tail");
+  const away = hasRecentGap(previous) || options.reading;
+  // Reads can land out of order and a relay can answer with an older copy: only shared turns prove a join.
+  if (shared <= 0) return away ? window : bounded(fresh, page.version, "tail");
   const start = Math.min(previous.start, page.start);
   const merged = { ...revision, start, total: page.total, turns: [...previous.turns.slice(0, Math.max(0, page.start - previous.start)), ...turns] };
   const fits = page.version !== 1 || sum(sizes(merged.turns)) <= HISTORY_BYTES;
-  return !fits && (hasRecentGap(previous) || options.reading) ? window : bounded(merged, page.version, "tail");
+  return !fits && away ? window : bounded(merged, page.version, "tail");
 }
 
 /** An older page in front of what is loaded; `null` if it no longer joins and the tail must be read again. */
@@ -90,6 +101,8 @@ export type HistoryPagerOptions<T> = {
   read: (before: number | null) => Promise<HistoryRead<T>>;
   /** Something a client paints changed: the window or the state of the older page. */
   onChange?: () => void;
+  /** Wait before asking again: a task that is writing fails a read that overlaps its save. */
+  retryMs?: number;
 };
 
 /**
@@ -114,64 +127,71 @@ export class HistoryPager<T> {
     return this.loaded;
   }
 
-  /** Back to the end, on request: what was read stays until the tail arrives. */
-  async latest(): Promise<LoadedHistory<T>> {
+  /** Back to the end, on request: what was read stays until the tail arrives, and if it never does. */
+  async latest(): Promise<LoadedHistory<T> | undefined> {
     const generation = ++this.generation;
-    const read = await this.options.read(null);
-    if (generation !== this.generation) return this.loaded ?? this.accept(read.turns, read.history);
-    this.loaded = undefined;
     this.setOlder("idle");
+    const read = await this.options.read(null);
+    if (generation !== this.generation) return this.loaded;
+    this.loaded = undefined;
     return this.accept(read.turns, read.history);
   }
 
   /**
    * Fetches the page before the window and returns how to put it in, so a list can hold what
    * is being read around it. `null`: nothing to do, a failure (see `older`) or a transcript
-   * rewritten under the window, which goes back to the tail.
+   * rewritten under the window, which goes back to the tail. Never ends quietly without progress.
    */
   async fetchOlder(): Promise<(() => void) | null> {
     if (this.older === "loading" || !this.loaded || !hasOlder(this.loaded)) return null;
     const generation = this.generation;
     this.setOlder("loading");
-    try {
-      for (let attempt = 0; attempt < OLDER_ATTEMPTS; attempt++) {
-        const asked = this.loaded;
-        if (!asked || !hasOlder(asked)) break;
+    for (let attempt = 0; attempt < OLDER_ATTEMPTS; attempt++) {
+      if (attempt) await new Promise(done => setTimeout(done, this.options.retryMs ?? RETRY_MS));
+      if (generation !== this.generation) return null;
+      const asked = this.loaded;
+      if (!asked || !hasOlder(asked)) return this.settle(generation);
+      try {
         const page = await this.options.read(olderCursor(asked));
         if (generation !== this.generation) return null;
         const current = this.loaded;
         if (!current || current.start !== asked.start) continue;
         const merged = prependHistory(current, page.turns, page.history);
-        if (merged) {
-          this.setOlder("idle");
-          return () => {
-            if (generation !== this.generation || this.loaded?.start !== asked.start) return;
-            // The tail may have moved while the list made room: only the front is taken from the page.
-            const front = merged.turns.slice(0, asked.start - merged.start);
-            this.loaded = { ...merged, turns: [...front, ...this.loaded.turns] };
-            this.loaded = bounded({ ...this.loaded, total: Math.max(this.loaded.total, merged.total) }, page.history?.version, "head");
-            this.options.onChange?.();
-          };
+        if (!merged) {
+          const tail = await this.options.read(null);
+          if (generation !== this.generation) return null;
+          this.loaded = undefined;
+          this.accept(tail.turns, tail.history);
+          return this.settle(generation);
         }
-        const read = await this.options.read(null);
-        if (generation !== this.generation) return null;
-        this.loaded = undefined;
+        if (merged.start >= asked.start) continue;
         this.setOlder("idle");
-        this.accept(read.turns, read.history);
-        return null;
+        return () => {
+          const now = this.loaded;
+          if (generation !== this.generation) return;
+          if (now?.start !== asked.start) return this.setOlder("failed");
+          // The tail may have moved while the list made room: only the front comes from the page.
+          const front = merged.turns.slice(0, asked.start - merged.start);
+          this.loaded = bounded({ ...now, start: merged.start, turns: [...front, ...now.turns] }, page.history?.version, "head");
+          this.options.onChange?.();
+        };
+      } catch {
+        if (generation !== this.generation) return null;
       }
-      this.setOlder("idle");
-      return null;
-    } catch (error) {
-      if (generation === this.generation) this.setOlder("failed");
-      return null;
     }
+    this.setOlder("failed");
+    return null;
   }
 
   /** Stop listening: an answer that arrives afterwards changes nothing. */
   close() {
     this.generation++;
-    if (this.older !== "idle") this.setOlder("idle");
+    this.setOlder("idle");
+  }
+
+  private settle(generation: number) {
+    if (generation === this.generation) this.setOlder("idle");
+    return null;
   }
 
   private setOlder(state: OlderState) {

@@ -184,6 +184,13 @@ export type Pegado = {
   lectura: () => { hijo: number; desfase: number } | null;
   /** Vuelve a dejar el hijo `hijo` a `desfase` del borde, suelto. */
   retomar: (hijo: number, desfase: number) => void;
+  /**
+   * El único camino de un virtualizador a la barra: `seguirElFondo` sigue siendo quien la
+   * escribe. `lectura`: esta es la nueva lectura; sin él, el ancla sigue siendo la de antes.
+   */
+  escribir: (valor: number, lectura?: boolean) => void;
+  /** Devuelve la lectura tras un cambio de alto que el observador no verá en este cuadro. */
+  sostener: () => void;
 };
 
 /**
@@ -781,6 +788,16 @@ export function seguirElFondo(enTurno: () => boolean = () => true): Pegado {
     ponCerca(estaCerca());
   };
 
+  const escribir = (valor: number, lectura = false) => {
+    ponScrollTop(valor);
+    if (lectura && !sigue()) tomarAncla();
+    ponCerca(estaCerca());
+  };
+
+  const sostener = () => {
+    if (!sigue()) restaurarAncla();
+  };
+
   // Quitar el padding no cambia `contentRect`: el observador no avisaría del cierre.
   createEffect(
     on(
@@ -827,5 +844,7 @@ export function seguirElFondo(enTurno: () => boolean = () => true): Pegado {
     anteponer,
     lectura,
     retomar,
+    escribir,
+    sostener,
   };
 }

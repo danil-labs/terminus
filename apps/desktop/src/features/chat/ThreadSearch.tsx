@@ -15,6 +15,7 @@ export type ThreadSearchTarget = {
   messages: () => SearchMessage[];
   thread: () => HTMLElement | undefined;
   jump: (block: number) => void;
+  move: (delta: number) => void;
 };
 
 type Match = { block: number; occurrence: number };
@@ -65,6 +66,7 @@ export function ThreadSearch(props: {
   messages: SearchMessage[];
   thread: () => HTMLElement | undefined;
   onJump: (block: number) => void;
+  onMove: (delta: number) => void;
   /** Sin mensajes todavía (la tarea nueva): el botón queda, apagado y con su porqué. */
   disabled?: boolean;
   leadingTools?: JSX.Element;
@@ -77,6 +79,8 @@ export function ThreadSearch(props: {
   let input: HTMLInputElement | undefined;
   let opener: HTMLElement | null = null;
   let frame = 0;
+  // La fila del resultado puede estar sin montar: se centra en cuanto aparezca.
+  let pendingScroll = false;
   const cache = new Map<string, string>();
   const matches = createMemo<Match[]>(() => {
     if (!open() || !query()) return [];
@@ -110,9 +114,10 @@ export function ThreadSearch(props: {
       const block = Number(element.dataset.threadSearchText);
       return rangesIn(element, query()).slice(0, counts.get(block) ?? 0).map((range, occurrence) => ({ range, active: block === target?.block && occurrence === target.occurrence }));
     });
-    if (scroll) {
+    if (scroll || pendingScroll) {
       const rect = results.find(result => result.active)?.range.getBoundingClientRect();
-      if (rect) thread.scrollTop += rect.top - thread.getBoundingClientRect().top - thread.clientHeight / 3;
+      pendingScroll = !rect;
+      if (rect) props.onMove(rect.top - thread.getBoundingClientRect().top - thread.clientHeight / 3);
     }
     const origin = thread.getBoundingClientRect();
     setPainted(results.flatMap(result => [...result.range.getClientRects()].map(rect => ({
@@ -153,6 +158,7 @@ export function ThreadSearch(props: {
     query();
     if (!open()) return;
     if (match) props.onJump(match.block);
+    pendingScroll = Boolean(match);
     schedule(Boolean(match));
   });
   createEffect(() => {

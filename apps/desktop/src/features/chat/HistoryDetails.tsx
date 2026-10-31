@@ -1,19 +1,33 @@
 import type { HistoryChunk, HistoryRef } from "@terminus/protocol";
+import { currentRef } from "@terminus/chat/historyDetail";
 import { createSignal, For, Show, onCleanup } from "solid-js";
+import { retainRowWhile } from "./threadRow";
 import { invoke } from "../../lib/invoke";
 import { t } from "../../lib/i18n";
 import { machineOf } from "../machines/store";
+import type { Session } from "./transcript";
 
 /** Una sola página de contenido crudo en memoria, incluso con resultados de muchos MB. */
-export function HistoryDetails(props: { refs: HistoryRef[] }) {
+export function HistoryDetails(props: { refs: HistoryRef[]; turnId?: string }) {
   const [selected, setSelected] = createSignal<HistoryRef | null>(null);
   const [chunk, setChunk] = createSignal<HistoryChunk | null>(null);
+  retainRowWhile(() => selected() !== null);
   const [loading, setLoading] = createSignal(false);
   const [failed, setFailed] = createSignal(false);
   const [offsets, setOffsets] = createSignal<number[]>([]);
   let generation = 0;
   onCleanup(() => generation++);
   const close = () => { generation++; setSelected(null); setChunk(null); setOffsets([]); setLoading(false); };
+  // El archivo cambió desde que llegó la referencia: se pide la del mismo turno y se empieza de nuevo.
+  async function reread(ref: HistoryRef, current: number) {
+    const fresh = await currentRef<Session["turns"][number]>(
+      (before) => invoke<Session>("load_session", { project: ref.project, id: ref.session, history_request: { version: 1, before, revision: null } }, machineOf(ref.session)),
+      ref, props.turnId,
+    );
+    if (current !== generation || !fresh || fresh.revision === ref.revision) return false;
+    void read({ ...ref, ...fresh }, 0);
+    return true;
+  }
   async function read(ref: HistoryRef, offset: number, backwards = false) {
     const current = ++generation;
     setSelected(ref); setChunk(null); setFailed(false); setLoading(true);
@@ -26,7 +40,9 @@ export function HistoryDetails(props: { refs: HistoryRef[] }) {
       if (page.version !== 1 || page.offset !== offset || page.revision !== ref.revision || page.text.length > 131072 || (!page.done && page.next <= offset)) throw new Error("invalid history chunk");
       setChunk(page);
       if (!backwards) setOffsets(previous => offset === 0 ? [] : [...previous, offset]);
-    } catch { if (current === generation) setFailed(true); }
+    } catch {
+      if (current === generation && !await reread(ref, current).catch(() => false) && current === generation) setFailed(true);
+    }
     finally { if (current === generation) setLoading(false); }
   }
   return <div class="my-2 text-xs text-neutral-500">
