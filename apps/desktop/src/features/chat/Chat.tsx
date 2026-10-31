@@ -35,6 +35,7 @@ import {
   type Signal,
   Switch,
   untrack,
+  useContext,
 } from "solid-js";
 import { Dynamic, Portal } from "solid-js/web";
 import type { ThreadSearchTarget } from "./ThreadSearch";
@@ -114,6 +115,7 @@ import { Dialog, DialogContent, DialogTitle } from "../../ui/Dialog";
 import { asFailure, type Failure, FailureNote, prosaDe } from "../../ui/Failure";
 import { MarcaAgente } from "../../ui/icons";
 import { FileMachine } from "../../ui/fileMachine";
+import { WorkFace } from "./workFace";
 import { Markdown } from "../../ui/Markdown";
 import { createVisualBudget, type VisualBudget } from "./visualBudget";
 import ChatVisual from "./ChatVisual";
@@ -453,6 +455,8 @@ export type ChatProps = {
   chatName?: string | null;
   chatDescription?: string | null;
   chatBody?: string | null;
+  /** El agente de la tarea: su animación es el indicador del trabajo en curso. */
+  workAgent?: string | null;
   /** Ruta de su imagen propia. Gana al cuerpo. */
   chatAvatar?: string | null;
   /** La cara que eligió cada encargado que firma o recibe un mensaje. */
@@ -3220,6 +3224,7 @@ export default function Chat(props: ChatProps) {
 
   return (
     <FileMachine.Provider value={() => props.machine}>
+    <WorkFace.Provider value={() => props.workAgent ? { name: props.workAgent, body: props.chatBody, avatar: props.chatAvatar } : null}>
       <Dialog open={forkTurn() !== null} onOpenChange={(open) => { if (!open && !forkeando()) setForkTurn(null); }}>
         <DialogContent>
           <DialogTitle class="text-base font-semibold">{t("chat.continuation.title")}</DialogTitle>
@@ -3564,6 +3569,7 @@ export default function Chat(props: ChatProps) {
       </Show>
       </div>
     </Show>
+    </WorkFace.Provider>
     </FileMachine.Provider>
   );
 }
@@ -3608,9 +3614,12 @@ function RegistroDeTrabajo(props: {
       aria-hidden="true"
     />
   );
+  const cara = useContext(WorkFace);
   const girando = () => (
     <Show when={props.corriendo}>
-      <Spinner size={14} class="pointer-events-none text-primary" />
+      <Show when={cara()} fallback={<Spinner size={14} class="pointer-events-none animate-spin-lento text-primary" />}>
+        {(c) => <span class="pointer-events-none inline-flex shrink-0"><AstroAvatar name={c().name} status="working" body={c().body} avatar={c().avatar} size={16} /></span>}
+      </Show>
     </Show>
   );
   const tiempo = () => (
