@@ -338,7 +338,7 @@ if (!roto) {
   // calcula geometría, y lo único que queda para filtrarlos es su ancho en
   // línea.
   const semaforos = () =>
-    [...semaforo.w.document.querySelectorAll('button[aria-label="Cerrar Terminus"]')]
+    [...semaforo.w.document.querySelectorAll('button[aria-label="Cerrar Danil"]')]
       .filter((boton) => !boton.closest('[style*="width: 0px"]')).length;
   // El tirador es lo único que distingue abierta de cerrada: la cabecera de la
   // columna sigue en el documento colapsada, y su botón de cerrar con ella.
@@ -4085,7 +4085,7 @@ if (!roto) {
   assert.deepEqual(altaClaves, ["xai-123456789012"]);
   altaBoton("Continuar").click();
   await sleep(150);
-  assert.equal(altaTitulo(), "Personaliza Terminus.");
+  assert.equal(altaTitulo(), "Personaliza Danil.");
   altaDoc.querySelector('button[aria-label="Renombrar el workspace"]').click();
   await sleep(30);
   const altaNombre = altaDoc.querySelector('input[aria-label="Workspace"]');
@@ -4096,7 +4096,7 @@ if (!roto) {
   assert.deepEqual(altaRenombres, ["Norte"], "el nombre se cambia en su sitio");
   altaBoton("Empezar").click();
   await sleep(200);
-  assert.ok(!altaDoc.body.textContent.includes("Personaliza Terminus."), "empezar entra a la app");
+  assert.ok(!altaDoc.body.textContent.includes("Personaliza Danil."), "empezar entra a la app");
   assert.deepEqual(altaCreados, ["Personal"], "el alta no crea otro workspace");
   assert.deepEqual(alta.fallos, []);
 

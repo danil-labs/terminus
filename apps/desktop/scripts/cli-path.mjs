@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { chmodSync, closeSync, existsSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, closeSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { delimiter, dirname, extname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -44,7 +44,12 @@ export function configure({ action, target, binDir, pathValue = process.env.PATH
   if (!isAbsolute(binDir)) throw new Error("--bin-dir must be absolute");
   const directory = resolve(binDir);
   let ancestor = directory;
-  while (!existsSync(ancestor) && dirname(ancestor) !== ancestor) ancestor = dirname(ancestor);
+  while (true) {
+    try { lstatSync(ancestor); break; } catch (error) {
+      if (error.code !== "ENOENT" || dirname(ancestor) === ancestor) throw error;
+      ancestor = dirname(ancestor);
+    }
+  }
   if (realpathSync(ancestor) !== ancestor) throw new Error("--bin-dir must be a canonical directory");
   let executable;
   if (action === "install") {

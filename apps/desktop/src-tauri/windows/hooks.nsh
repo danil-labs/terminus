@@ -12,7 +12,7 @@
   nsExec::Exec `"${STOPPER}" --stop-engine`
   Pop $0
   ${If} $0 == 3
-    MessageBox MB_OK|MB_ICONEXCLAMATION "Terminus is still working on a task. Let it finish, or stop it, and run this again.$\r$\n$\r$\nTerminus sigue trabajando en una tarea. Deja que termine, o detenla, y vuelve a ejecutar esto." /SD IDOK
+    MessageBox MB_OK|MB_ICONEXCLAMATION "Danil is still working on a task. Let it finish, or stop it, and run this again.$\r$\n$\r$\nDanil sigue trabajando en una tarea. Deja que termine, o detenla, y vuelve a ejecutar esto." /SD IDOK
     Abort
   ${ElseIf} $0 != 0
     !insertmacro TERMINUS_KILL_ENGINE
