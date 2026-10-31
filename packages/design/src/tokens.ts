@@ -23,6 +23,7 @@ export type ThemeTokens = {
   success: string;
   error: string;
   info: string;
+  warningStrong: string;
   approving: string;
   asked: string;
   failedMark: string;
@@ -43,6 +44,7 @@ export const CSS_SOURCE: Partial<Record<keyof ThemeTokens, string>> = {
   textMuted: "--color-neutral-500",
   primary: "--color-primary",
   incomingBubble: "--color-chat-incoming",
+  warningStrong: "--color-warning-strong",
   approving: "--color-warning",
   asked: "--color-brand-yellow",
   failedMark: "--color-error-strong",
@@ -68,6 +70,7 @@ export const THEMES: { light: ThemeTokens; dark: ThemeTokens } = {
     success: "#15803d",
     error: "#dc2626",
     info: "#2563eb",
+    warningStrong: "#92400e",
     approving: "#f59e0b",
     asked: "#f4eb7b",
     failedMark: "#dc2626",
@@ -92,6 +95,7 @@ export const THEMES: { light: ThemeTokens; dark: ThemeTokens } = {
     success: "#4ade80",
     error: "#f87171",
     info: "#60a5fa",
+    warningStrong: "#fbbf24",
     approving: "#f59e0b",
     asked: "#f4eb7b",
     failedMark: "#f87171",

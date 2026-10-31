@@ -40,7 +40,7 @@ export function cardTask(task: Task, marks: Marks): CardTask & { key: string } {
   };
 }
 
-export function cardOf(task: Task, marks: Marks, hideFolder = false): TaskCard {
+export function cardOf(task: Task, marks: Marks, hideFolder = false, hideMachine = false): TaskCard {
   const approving = [...marks.attention].filter(([, s]) => s === "approving").map(([k]) => k);
-  return taskCard(cardTask(task, marks), { live: marks.live, approving, hideFolder });
+  return taskCard(cardTask(task, marks), { live: marks.live, approving, hideFolder, hideMachine });
 }

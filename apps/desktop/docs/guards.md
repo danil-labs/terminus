@@ -1,6 +1,6 @@
 # Verification guards
 
-`pnpm verify` runs `scripts/verify.mjs` and stops at the first failure.
+`pnpm verify` runs `scripts/verify.mjs`, side by side within the budget of the machine, and stops at the first failure.
 `SKIPPED` (skipped) marks a check that could not run. In CI a skip fails the
 run; locally it is allowed and listed in the summary. `--no-cargo` skips the
 Rust steps.

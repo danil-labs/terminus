@@ -39,7 +39,7 @@ export function TaskHeader(props: {
   const [revision, setRevision] = useState(0);
   const [finishing, setFinishing] = useState(false);
   const book = useTaskGit(props.hostOf, [{ host: props.hostId, workspace: props.workspace, folder: props.folder, id: props.id }], revision);
-  const raw = effectiveGit(book, { ...props.task, id: props.id, host: props.hostId, workspace: props.workspace }, props.tasks);
+  const raw = effectiveGit(book, { ...props.task, id: props.id, host: props.hostId, workspace: props.workspace, folder: props.folder }, props.tasks);
   const on = props.host?.power() === "on" && props.host.canAct() === "now";
   const git: TaskGit | undefined = raw && !on ? { ...raw, stale: true } : raw;
   const pull = cardPull(git ? { ...git, shared_with: null } : git);
