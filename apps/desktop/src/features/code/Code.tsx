@@ -143,13 +143,6 @@ export default function Codigo(props: {
                 <Show when={a.kind === "kn"}>
                   <KnCloud project={props.project} session={props.session} />
                 </Show>
-                <Show when={a.dirty_before}>
-                  {(n) => (
-                    <p class="m-0 px-3 pt-2 text-caption text-neutral-500">
-                      {t("code.tree.dirty_before", { count: n() })}
-                    </p>
-                  )}
-                </Show>
                 <ArbolDeArchivos
                   project={props.project}
                   session={props.session}
