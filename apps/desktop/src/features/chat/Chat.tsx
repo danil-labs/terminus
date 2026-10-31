@@ -438,8 +438,6 @@ export type ChatProps = {
   agentTasks?: JSX.Element;
   delegatedTask?: (reference: SenderTask) => JSX.Element;
   coordinator?: JSX.Element;
-  /** Máquina / proyecto / rama, arriba a la izquierda (`TaskLocation`). */
-  location?: JSX.Element;
   /** The task's files panel is open beside the chat: the composer loses its right margin. */
   besideFiles?: boolean;
   /** La máquina de la tarea si no es la de la ventana: los archivos del chat se leen allí. */
@@ -2809,7 +2807,6 @@ export default function Chat(props: ChatProps) {
           hueco y no cambia—. `lib/paste.ts`. */}
       <div class="relative flex min-h-0 flex-1 flex-col">
       <Show when={props.masRecientes}><button type="button" class="shrink-0 py-2 text-xs text-primary underline" onClick={() => props.onRecientes?.()}>{t("chat.history.latest")}</button></Show>
-      {props.location}
       {props.coordinator}
       <Show when={!props.agentDraft ? props.chatEncargado : null}>
         {(name) => (

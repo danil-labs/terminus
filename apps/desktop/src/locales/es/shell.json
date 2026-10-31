@@ -351,7 +351,7 @@
   "shell.window.maximize": "Maximizar",
   "shell.window.minimize": "Minimizar",
   "shell.window.restore": "Restaurar",
-  "shell.work_tree.no_session": "Todavía no hay ninguna tarea abierta",
+  "shell.work_tree.no_session": "Esta tarea no tiene una carpeta de trabajo que ver",
   "shell.folder.open": "Abrir carpeta",
   "shell.folder.view_on": "Ver archivos en {name}",
   "shell.folder.copy": "Copiar ruta",

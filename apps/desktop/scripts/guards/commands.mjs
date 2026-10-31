@@ -71,7 +71,6 @@ const ARBOLES = [WEB].filter((d) => existsSync(d));
 const SIN_INTERFAZ = {
   // La columna derecha de la tarea nueva se quitó: sus archivos viven dentro de la tarea. Siguen en el contrato del motor.
   create_empty_session: "la pedía la columna derecha de la tarea nueva, que ya no existe; queda en el contrato del motor",
-  export_chat: "la pedía el botón «Exportar chat» de esa columna; queda en el contrato del motor",
   // Extensión de orquestadores: las pide el relay de Danil Computers (MCP remoto), no una pantalla.
   connect_external: "la pide el MCP remoto de Danil Computers por el relay",
   connection_call: "la pide el MCP remoto de Danil Computers por el relay",
