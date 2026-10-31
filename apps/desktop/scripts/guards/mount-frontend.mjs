@@ -1737,13 +1737,11 @@ if (!roto) {
     await sleep(100);
     assert.ok(tab("p").querySelector(`.${color} > svg.lucide-${icon}`), kn);
     for (const surface of [row("p"), tab("p")]) assert.equal(surface.querySelector("svg.lucide-git-branch"), null);
-    // La tarjeta del riel solo avisa del borrador sin guardar, con el ícono solo.
+    // Git/kn conserva su sección y color; el detalle queda en la etiqueta.
+    assert.ok(row("p").querySelector(`[data-session-pr].${color} svg.lucide-${icon}`), kn);
     if (kn === "draft") {
-      assert.ok(row("p").querySelector("[data-session-pr] svg.lucide-file-pen-line"), kn);
       assert.match(gitDeFila("p"), /Cone/);
       assert.doesNotMatch(row("p").querySelector("[data-session-pr]").textContent, /Cone/);
-    } else {
-      assert.equal(row("p").querySelector("[data-session-pr]"), null, kn);
     }
     assert.match(tab("p").title, label);
   }
