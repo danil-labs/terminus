@@ -385,9 +385,9 @@ assert.deepEqual(blockedFinishes, [], "no se mata un turno ni se toma un candado
 const changesNotice = blockedApp.w.document.querySelector('[role="dialog"]');
 assert.ok(changesNotice, "los cambios sin guardar avisan, no dan error");
 assert.match(changesNotice.textContent, /src\/a\.ts/, "el aviso nombra el archivo que estorba");
-const descartar = [...changesNotice.querySelectorAll("button")].find(b => b.textContent.trim() === "Descartar y continuar");
-assert.ok(descartar, "el aviso lleva la salida, y borrar se pide explícitamente");
-descartar.click();
+const discardButton = [...changesNotice.querySelectorAll("button")].find(b => b.textContent.trim() === "Descartar y continuar");
+assert.ok(discardButton, "el aviso lleva la salida, y borrar se pide explícitamente");
+discardButton.click();
 await sleep(150);
 assert.deepEqual(discarded, [{ project: "blocked-project", id: "blocked", files: ["src/a.ts"] }], "se descarta solo lo que el aviso enseñó");
 assert.deepEqual(blockedFinishes, [], "lo que apareció con el aviso abierto para el gesto");

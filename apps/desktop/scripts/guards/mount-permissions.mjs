@@ -259,15 +259,15 @@ const HALF_ANSWERED = {
   },
 };
 const halfAnswered = await boot("listo", "preguntas-a-medias", HALF_ANSWERED);
-const docMedias = halfAnswered.w.document;
+const docHalf = halfAnswered.w.document;
 const trace = [];
 const openTaskTab = async (id) => {
-  docMedias.querySelector(`[data-sesion="${id}"]`)?.click();
+  docHalf.querySelector(`[data-sesion="${id}"]`)?.click();
   await sleep(150);
 };
 // La tarjeta que se ve: las de pestañas montadas y escondidas no cuentan.
 const card = () =>
-  [...docMedias.querySelectorAll('[data-interruption="question"]')].find((el) => !el.closest(".hidden, [hidden]"));
+  [...docHalf.querySelectorAll('[data-interruption="question"]')].find((el) => !el.closest(".hidden, [hidden]"));
 const keyOnCard = async (key, extra = {}) => {
   card().dispatchEvent(new halfAnswered.w.KeyboardEvent("keydown", { key, bubbles: true, ...extra }));
   await sleep(40);
@@ -276,7 +276,7 @@ const optionM = (label) =>
   [...card().querySelectorAll("button[data-option]")].find((b) => b.getAttribute("aria-label")?.endsWith(`. ${label}`));
 // La tira de pestañas también lleva `data-ventana`: la celda es la que tiene la conversación.
 const cellM = () =>
-  [...docMedias.querySelectorAll("[data-ventana]")].find(
+  [...docHalf.querySelectorAll("[data-ventana]")].find(
     (el) => !el.classList.contains("hidden") && el.querySelector('[data-interruption="question"], textarea'),
   );
 const segment = () =>
@@ -390,9 +390,9 @@ await keyOnCard("2");
 assert.equal(snapshot("p1, turno nuevo a medias").pagina, "2 de 3");
 
 // Cerrar la pestaña suelta lo contestado a medias: reabrirla empieza de cero.
-docMedias.querySelector('button[aria-label="Cerrar «Pregunta uno»"]')?.click();
+docHalf.querySelector('button[aria-label="Cerrar «Pregunta uno»"]')?.click();
 await sleep(150);
-assert.equal(docMedias.querySelector('button[aria-label="Cerrar «Pregunta uno»"]'), null, "cerrar la pestaña no la cerró");
+assert.equal(docHalf.querySelector('button[aria-label="Cerrar «Pregunta uno»"]'), null, "cerrar la pestaña no la cerró");
 await openTaskTab("p1");
 assert.deepEqual(
   snapshot("p1 reabierta"),

@@ -413,14 +413,14 @@ await typeQueued("Haz los símbolos Git");
 // se perdía lo tecleado.
 {
   const doc = taskApp.w.document;
-  const editar = [...doc.querySelectorAll("button")].find((b) =>
+  const editButton = [...doc.querySelectorAll("button")].find((b) =>
     (b.getAttribute("aria-label") ?? "").startsWith("Editar el mensaje"),
   );
-  if (!editar) {
+  if (!editButton) {
     console.error("No hay con qué editar un mensaje de la cola: releer esta comprobación.");
     process.exit(1);
   }
-  editar.click();
+  editButton.click();
   await sleep(100);
   const queuedField = doc.activeElement;
   if (queuedField?.tagName !== "TEXTAREA" || queuedField.value !== "Haz los símbolos Git") {
