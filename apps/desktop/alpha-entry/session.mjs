@@ -196,6 +196,16 @@ async function resolvePerson(config, workosUserId) {
   return { uuid: row.uuid, loginEmail: login.email };
 }
 
+/** The sealed cookie carries a login UUID; eligibility is read again before every token. */
+async function requireTerminusAccess(config, uuid) {
+  const rows = await supabase(config, `/rest/v1/users?uuid=eq.${uuid}&select=id,uuid,merged_into_user_id&limit=1`);
+  const person = Array.isArray(rows) ? rows[0] : null;
+  if (!person || person.uuid !== uuid || !Number.isSafeInteger(person.id) || person.id < 1 || person.merged_into_user_id != null) throw new Denied("access_required", 403);
+  const allowed = await rpc(config, "user_can_access_terminus", { p_user: person.id });
+  if (allowed === false) throw new Denied("access_required", 403);
+  if (allowed !== true) throw unavailable();
+}
+
 /** GoTrue's answer as the page gets it; the refresh token stays in the cookie. */
 function sessionOf(body, uuid) {
   const user = body?.user;
@@ -299,12 +309,13 @@ async function issue(config, request) {
     const session = await open(config.env, SESSION_COOKIE, readCookie(request, SESSION_COOKIE));
     if (!ID_RE.test(session.user ?? "") || !ID_RE.test(session.sid ?? "") || !UUID_RE.test(session.uuid ?? "") || typeof session.refresh !== "string") throw new Denied("no_session");
     await checkSession(config, session.user, session.sid);
+    await requireTerminusAccess(config, session.uuid);
     const renewed = await refreshSupabaseSession(config, session.refresh, session.uuid);
     const sealed = await seal(config.env, SESSION_COOKIE, { ...session, refresh: renewed.refresh });
     return json(renewed.answer, 200, { "Set-Cookie": setCookie(SESSION_COOKIE, sealed, Math.max(0, session.exp - now())) });
   } catch (error) {
     const response = failure(error);
-    if (error instanceof Denied && error.status === 401) response.headers.set("Set-Cookie", setCookie(SESSION_COOKIE, "", 0));
+    if (error instanceof Denied && (error.status === 401 || error.status === 403)) response.headers.set("Set-Cookie", setCookie(SESSION_COOKIE, "", 0));
     return response;
   }
 }

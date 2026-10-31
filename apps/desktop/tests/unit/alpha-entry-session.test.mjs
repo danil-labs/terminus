@@ -17,6 +17,8 @@ function world(overrides = {}) {
     sessions: [{ id: "session_01ABC", user_id: "user_01ABC", status: "active", ended_at: null, expires_at: new Date(Date.now() + 3_600_000).toISOString() }],
     person: 42,
     resolverMissing: false,
+    access: true,
+    accessRpcMissing: false,
     row: { id: 42, uuid, merged_into_user_id: null },
     login: { id: uuid, email: "prueba@danil.ai", banned_until: null },
     refreshes: 0,
@@ -46,6 +48,9 @@ function world(overrides = {}) {
       if (url.pathname === "/rest/v1/rpc/resolve_existing_terminus_login") return state.resolverMissing
         ? Response.json({ code: "PGRST202" }, { status: 404 })
         : Response.json(state.person);
+      if (url.pathname === "/rest/v1/rpc/user_can_access_terminus") return state.accessRpcMissing
+        ? Response.json({ code: "PGRST202" }, { status: 404 })
+        : Response.json(state.access);
       if (url.pathname === "/rest/v1/users") return Response.json(state.row ? [state.row] : []);
       if (url.pathname === `/auth/v1/admin/users/${uuid}`) return state.login ? Response.json(state.login) : Response.json({}, { status: 404 });
       const gotrue = (refresh) => Response.json({ access_token: `sb.${refresh}`, refresh_token: refresh, expires_in: 3600, expires_at: Math.floor(Date.now() / 1000) + 3600,
@@ -254,5 +259,38 @@ test("return paths stay inside Terminus", () => {
   assert.equal(safeNext("/m/inbox"), "/m/inbox");
   for (const value of [null, "", "inbox", "https://evil.example/", "//evil.example/", "/auth", "/auth?next=x", "/auth/workos/start", "/alpha-api/auth/profile", "/\\evil", "/inbox\n"]) {
     assert.equal(safeNext(value), "/", String(value));
+  }
+});
+
+
+test("each token checks the current grant, including a cookie issued before revocation", async () => {
+  const w = world();
+  const { cookie } = await signedIn(w);
+  const allowed = await session(w, cookie);
+  assert.equal(allowed.status, 200);
+  const current = latest(cookie, allowed);
+  w.state.access = false;
+  const response = await session(w, current);
+  assert.equal(response.status, 403);
+  assert.deepEqual(await response.json(), { error: "access_required" });
+  assert.deepEqual(cookiesOf(response), ["__Host-danil_alfa="]);
+  assert.equal(w.state.refreshes, 1, "a refused grant never refreshes or emits a token");
+  assert.equal(w.calls.filter(c => c.url.endsWith("/rpc/resolve_existing_terminus_login")).length, 1, "refresh does not mutate identity");
+});
+
+test("eligibility lookup fails closed when unavailable, malformed or no longer bound to the login", async () => {
+  for (const change of [
+    { accessRpcMissing: true },
+    { access: "true" },
+    { row: null },
+    { row: { id: 42, uuid, merged_into_user_id: 9 } },
+  ]) {
+    const w = world();
+    const { cookie } = await signedIn(w);
+    Object.assign(w.state, change);
+    const response = await session(w, cookie);
+    assert.ok([403, 503].includes(response.status));
+    assert.equal("access_token" in await response.json(), false);
+    assert.equal(w.state.refreshes, 0);
   }
 });
