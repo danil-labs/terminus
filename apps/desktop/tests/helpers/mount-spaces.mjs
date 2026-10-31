@@ -328,7 +328,7 @@ export async function spaceScenarios({ boot, sleep, withTask: WITH_TASK }) {
     assert.deepEqual(u.pestanas(), ["Tarea t1"]);
     const signalEls = async () => Object.fromEntries((await u.espacios()).map((e) => [e.id, e.senal]));
     // La señal de otro espacio se ve con el menú cerrado: el disparador lleva un punto.
-    const triggerDot = () => u.disparador().querySelector(".bg-info") !== null;
+    const triggerDot = () => u.disparador().querySelector(".signal-dot[data-tone=\"warning\"]") !== null;
     assert.equal(triggerDot(), true, "lo que espera en otro espacio se avisa en la franja");
     assert.deepEqual(await signalEls(), { i1: null, i2: "asked" }, "la otra lleva la señal de sus tareas");
     assert.deepEqual(u.carpetasEnTareas(), ["pa", "pb", "pc"], "la fijada y las que tienen tareas suyas o sin resolver");
