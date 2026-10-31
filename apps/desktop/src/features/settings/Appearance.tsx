@@ -8,11 +8,10 @@ import X from "lucide-solid/icons/x";
 import { For, Show, createResource, createSignal, onCleanup, onMount, type Component } from "solid-js";
 import { invoke } from "../../lib/invoke.ts";
 import { t } from "../../lib/i18n";
-import { capabilities } from "../../lib/platform";
+import { elegirArchivoDeImagen } from "../../lib/pick-image";
 import type { AgentProfile, AgenteDeMaquina, CatalogoDeAgentes } from "../../lib/model";
 import {
   FONDOS,
-  claseDeFondo,
   type FondoDeChat,
 } from "../../lib/chat-background";
 import { elegirFondoDeChat, elegirVeloDeFondo, elegirVeloDePaneles, elegirVeloDePestanas, fondoDeChat, fondoPropio, imagenDelWorkspace, ponerFondoPropio, veloDeFondo, veloDePaneles, veloDePestanas } from "../../lib/chat-background-store";
@@ -40,31 +39,10 @@ import { displayName, notifyProfiles } from "../projects/profiles";
 import { SettingsPanel, SettingsRow, SettingsSection } from "./layout";
 import { LogoDelWorkspace } from "./Workspaces";
 import { createWorkspaces } from "./workspaces-store";
+import { machineOf } from "../machines/store";
 
 const IMAGES = ["png", "jpg", "jpeg", "webp"];
-/** El tope del motor para un fondo (`settings.appearance.background.too_big`): cabe en la copia del relay. */
-const FONDO_MAX = 700_000;
 
-/** En el navegador no hay rutas: la imagen se elige con el selector de archivos y viaja como `data:`. */
-function imagenDelNavegador(): Promise<File | null> {
-  return new Promise((done) => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = IMAGES.map((ext) => `.${ext}`).join(",");
-    input.onchange = () => done(input.files?.[0] ?? null);
-    input.oncancel = () => done(null);
-    input.click();
-  });
-}
-
-function comoDataUrl(file: File): Promise<string> {
-  return new Promise((ok, mal) => {
-    const lector = new FileReader();
-    lector.onload = () => ok(String(lector.result));
-    lector.onerror = () => mal(lector.error);
-    lector.readAsDataURL(file);
-  });
-}
 const VISIBILITY_ID = "settings-appearance-background-visibility";
 const TABS_VEIL_ID = "settings-appearance-tabs-veil";
 const PANELS_VEIL_ID = "settings-appearance-panels-veil";
@@ -211,37 +189,29 @@ export default function Appearance(props: { proyecto: string }) {
   const [vistaPropia] = createResource(propia, async (ruta) => {
     if (!ruta) return null;
     try {
-      return (await invoke<Preview>("preview_file", { path: ruta, rel: ruta })).data_url;
+      return (await invoke<Preview>("preview_file", { path: ruta, rel: ruta }, machineOf(ruta))).data_url;
     } catch {
       return null;
     }
   });
 
   async function elegirImagenPropia() {
-    if (capabilities().browserFiles) {
-      const file = await imagenDelNavegador();
-      if (!file) return;
-      setBackgroundFailure(null);
-      if (file.size > FONDO_MAX) return setBackgroundFailure(t("settings.appearance.background.too_big"));
-      try {
-        setFondo(await (await motor()).elegirFondoDelNavegador(await comoDataUrl(file)));
-      } catch (error) {
-        setBackgroundFailure(prosaDe(error));
-      }
-      return;
-    }
-    const chosen = await open({
-      multiple: false,
-      directory: false,
-      filters: [{ name: t("settings.appearance.avatar.images"), extensions: IMAGES }],
-    });
-    if (typeof chosen !== "string") return;
+    const file = await elegirArchivoDeImagen(IMAGES);
+    if (!file) return;
     setBackgroundFailure(null);
     try {
-      setFondo(await (await motor()).elegirFondoPropio(chosen));
+      setFondo(await (await motor()).elegirFondoPropio(file));
       setPropia(fondoPropio());
     } catch (error) {
-      setBackgroundFailure(prosaDe(error));
+      // `ShrinkError` de `shrink-image.ts`, que llega en el módulo diferido.
+      const code = error instanceof Error && error.name === "ShrinkError" ? (error as Error & { code?: string }).code : null;
+      setBackgroundFailure(
+        code === "too_big"
+          ? t("settings.appearance.background.too_big")
+          : code === "unreadable"
+            ? t("settings.appearance.background.bad_type")
+            : prosaDe(error),
+      );
     }
   }
 
@@ -354,7 +324,7 @@ export default function Appearance(props: { proyecto: string }) {
                             "absolute inset-0",
                             id === "propia"
                               ? "grid place-items-center bg-surface-muted text-neutral-500"
-                              : claseDeFondo(id),
+                              : "bg-surface",
                           )}
                           aria-hidden="true"
                         >
@@ -458,7 +428,7 @@ export default function Appearance(props: { proyecto: string }) {
 
       <SettingsSection title={t("settings.appearance.avatar.title")}>
         <Show when={cargado() && filas().length === 0}>
-          <p class="m-0 py-3.5 text-[0.8125rem] text-neutral-500">
+          <p class="m-0 py-3.5 text-ui text-neutral-500">
             {t("settings.appearance.avatar.empty")}
           </p>
         </Show>
@@ -551,7 +521,7 @@ function StylePicker(props: {
                   </span>
                 </span>
               </span>
-              <span class="truncate px-0.5 text-[0.6875rem] text-neutral-950">{label}</span>
+              <span class="truncate px-0.5 text-caption text-neutral-950">{label}</span>
             </button>
           )}
         </For>

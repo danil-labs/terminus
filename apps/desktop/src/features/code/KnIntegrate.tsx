@@ -1,5 +1,6 @@
 import { For, Show, createSignal } from "solid-js";
 import { invoke } from "../../lib/invoke.ts";
+import { machineOf } from "../machines/store";
 import { Button } from "../../ui/Button";
 import { Dialog, DialogContent, DialogTitle } from "../../ui/Dialog";
 import { FailureNote, asFailure, type Failure } from "../../ui/Failure";
@@ -46,7 +47,7 @@ export default function KnIntegrate(props: {
       setPendientes(await invoke<Resumen>("kn_pending", {
         project: props.project,
         session: props.session,
-      }));
+      }, machineOf(props.session)));
     } catch (e) {
       setFallo(asFailure(e));
     }
@@ -57,7 +58,7 @@ export default function KnIntegrate(props: {
     setOcupado("finish");
     setFallo(null);
     try {
-      await invoke("kn_finish", { project: props.project, session: props.session });
+      await invoke("kn_finish", { project: props.project, session: props.session }, machineOf(props.session));
       setAbierto(false);
       avisarDeLosArboles(props.session);
     } catch (e) {
@@ -72,11 +73,11 @@ export default function KnIntegrate(props: {
     setOcupado("update");
     setFallo(null);
     try {
-      await invoke("kn_update", { project: props.project, session: props.session });
+      await invoke("kn_update", { project: props.project, session: props.session }, machineOf(props.session));
       setPendientes(await invoke<Resumen>("kn_pending", {
         project: props.project,
         session: props.session,
-      }));
+      }, machineOf(props.session)));
     } catch (e) {
       setFallo(asFailure(e));
     } finally {
@@ -102,7 +103,7 @@ export default function KnIntegrate(props: {
       </Button>
       <Dialog open={abierto()} onOpenChange={setAbierto}>
         <DialogContent>
-          <DialogTitle class="m-0 text-[0.9375rem] font-semibold">
+          <DialogTitle class="m-0 text-lead font-semibold">
             {t("kn.integrate.title")}
           </DialogTitle>
           <p class="m-0 mt-3 text-sm leading-6 text-neutral-500">
@@ -118,7 +119,7 @@ export default function KnIntegrate(props: {
                   <For each={lista().files}>
                     {(p) => (
                       <li class="border-t border-border py-2 first:border-t-0">
-                        <div class="font-mono text-[0.75rem] text-neutral-950">{p.path}</div>
+                        <div class="font-mono text-label text-neutral-950">{p.path}</div>
                         <div class="text-xs text-neutral-500">{clase(p.kind)}</div>
                         <div class="text-xs text-neutral-500">
                           {t("kn.pending.task")}: {fecha(p.session_at)}

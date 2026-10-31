@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { createMemo, createRoot } from "solid-js";
 import "../helpers/catalog.ts";
 import { elegirLengua } from "../../src/lib/i18n.ts";
 import {
@@ -9,9 +10,10 @@ import {
   loadSidebarView,
   nonDefaultCount,
   saveSidebarView,
+  setSidebarView,
+  sidebarView,
   sidebarViewKey,
   scopeLabel,
-  sectionOf,
   type SidebarTask,
   type SidebarView,
 } from "../../src/lib/sidebarView.ts";
@@ -39,27 +41,7 @@ const idle = { live: [] as string[], approving: [] as string[] };
 const ids = (tasks: SidebarTask[]) => tasks.map((x) => x.id);
 const view = (extra: Partial<SidebarView>): SidebarView => ({ ...DEFAULT_SIDEBAR_VIEW, ...extra });
 
-test("a task needs you when it waits for approval, asked something or failed", () => {
-  assert.equal(sectionOf(task("a"), { live: [], approving: ["a"] }), "needs_you");
-  assert.equal(sectionOf(task("a", { esperando: true }), idle), "needs_you");
-  assert.equal(sectionOf(task("a", { outcome: "failed" }), idle), "needs_you");
-  assert.equal(sectionOf(task("a", { outcome: "failed" }), { live: new Set(["a"]), approving: [] }), "active", "a live turn hides the old failure");
-});
-
-test("finished tasks stay among the tasks; only what needs you moves up", () => {
-  assert.equal(sectionOf(task("a", { outcome: "delivered" }), idle), "active");
-  assert.equal(sectionOf(task("a", { stage: "done" }), idle), "active");
-  assert.equal(sectionOf(task("a", { outcome: "delivered", sin_ver: true }), idle), "active");
-  assert.equal(sectionOf(task("a", { stage: "done" }), { live: ["a"], approving: [] }), "active");
-  assert.equal(sectionOf(task("a"), idle), "active");
-  assert.equal(
-    sectionOf(task("a", { delegated_activity: { aprobando: true, esperando: false, viva: false } }), idle),
-    "needs_you",
-    "delegated activity wins over the row",
-  );
-});
-
-test("without grouping there are always two sections, finished in place, pinned first", () => {
+test("without grouping there is one list: tasks that need you stay in place, pinned first", () => {
   const tasks = [
     task("new"),
     task("asks", { esperando: true }),
@@ -68,11 +50,10 @@ test("without grouping there are always two sections, finished in place, pinned 
     task("archived", { archived: true }),
     task("chat", { chat_de_agente: true }),
   ];
-  const groups = applySidebarView(tasks, DEFAULT_SIDEBAR_VIEW, idle);
-  assert.deepEqual(groups.map((g) => g.key), ["needs_you", "active"]);
-  assert.deepEqual(ids(groups[0].tasks), ["asks"]);
-  assert.deepEqual(ids(groups[1].tasks), ["pinned", "chat", "new", "done"]);
-  assert.deepEqual(ids(applySidebarView([], DEFAULT_SIDEBAR_VIEW, idle)[0].tasks), []);
+  const groups = applySidebarView(tasks, view({ group: "none" }), idle);
+  assert.deepEqual(groups.map((g) => g.key), ["active"]);
+  assert.deepEqual(ids(groups[0].tasks), ["pinned", "chat", "new", "asks", "done"]);
+  assert.deepEqual(ids(applySidebarView([], view({ group: "none" }), idle)[0].tasks), []);
 });
 
 test("folders and agent filter before grouping", () => {
@@ -110,6 +91,11 @@ test("grouping keeps only non-empty groups; finished tasks stay in theirs", () =
   assert.deepEqual(ids(byStatus[3].tasks), ["e"]);
   assert.equal(groupLabel(byStatus[3], (id) => id), "Terminadas");
 
+  // Detenida por ti no es un fallo: su propio grupo, entre los fallos y lo que no has visto.
+  const stopped = applySidebarView([...tasks, task("f", { outcome: "interrupted" }), task("g", { outcome: "failed" }), task("h", { sin_ver: true })], view({ group: "status" }), { live: ["c"], approving: [] });
+  assert.deepEqual(stopped.map((g) => g.key), ["asked", "working", "failed", "interrupted", "unseen", "idle", "finished"]);
+  assert.equal(groupLabel(stopped[3], (id) => id), "Detenidas");
+
   const byAgent = applySidebarView(tasks, view({ group: "agent" }), idle);
   assert.deepEqual(byAgent.map((g) => g.key), ["ada", "bob", ""]);
   assert.deepEqual(ids(byAgent[2].tasks), ["d", "b", "e"]);
@@ -119,13 +105,27 @@ test("the view survives a restart and bad data falls back to the default", () =>
   store.clear();
   const key = sidebarViewKey("w", "s1");
   assert.deepEqual(loadSidebarView(key), DEFAULT_SIDEBAR_VIEW);
-  const chosen = view({ folders: ["terminus"], agent: "ada", group: "status", density: "compact" });
+  const chosen = view({ folders: ["terminus"], agent: "ada", group: "status" });
   saveSidebarView(key, chosen);
   assert.deepEqual(loadSidebarView(key), chosen);
   store.set("harness.layout.sidebar.view.w.s1", "{broken");
   assert.deepEqual(loadSidebarView(key), DEFAULT_SIDEBAR_VIEW);
+  // Una vista guardada con la densidad que ya no existe la pierde sin perder lo demás.
   store.set("harness.layout.sidebar.view.w.s1", JSON.stringify({ folders: ["a", 3, "a"], agent: 7, group: "size", density: "compact" }));
-  assert.deepEqual(loadSidebarView(key), view({ folders: ["a"], density: "compact" }));
+  assert.deepEqual(loadSidebarView(key), view({ folders: ["a"] }));
+});
+
+test("a change from the Customize button reaches the rail on screen without a restart", () => {
+  store.clear();
+  const key = sidebarViewKey("w", "s1");
+  // El riel lee la vista viva; el botón la cambia con el filtro que tenga, aunque sea de otro riel.
+  const visto = createRoot(() => createMemo(() => sidebarView(key).group));
+  assert.equal(visto(), DEFAULT_SIDEBAR_VIEW.group);
+  setSidebarView(key, view({ group: "status" }));
+  assert.equal(visto(), "status");
+  assert.deepEqual(loadSidebarView(key), view({ group: "status" }), "y se guarda para el próximo arranque");
+  setSidebarView(sidebarViewKey("w", "s2"), view({ group: "none" }));
+  assert.equal(visto(), "status", "otro espacio no la toca");
 });
 
 test("each workspace and space keeps its own view; the old global one is ignored", () => {
@@ -142,19 +142,23 @@ test("each workspace and space keeps its own view; the old global one is ignored
 });
 
 test("the badge counts each setting away from its default", () => {
+  assert.equal(DEFAULT_SIDEBAR_VIEW.group, "folder", "grouping by folder is the default");
   assert.equal(nonDefaultCount(DEFAULT_SIDEBAR_VIEW), 0);
+  assert.equal(nonDefaultCount(view({ group: "folder" })), 0);
+  assert.equal(nonDefaultCount(view({ group: "none" })), 1);
   assert.equal(nonDefaultCount(view({ folders: ["a", "b"] })), 1);
-  assert.equal(nonDefaultCount(view({ folders: ["a"], agent: "ada", group: "agent", density: "compact" })), 4);
+  assert.equal(nonDefaultCount(view({ folders: ["a"], agent: "ada", group: "agent" })), 3);
 });
 
 test("the scope line says what is shown, in the app language", () => {
   const name = (id: string) => ({ f1: "terminus", f2: "web" })[id] ?? id;
   elegirLengua("es");
-  assert.equal(scopeLabel(DEFAULT_SIDEBAR_VIEW, name), "Todas las carpetas");
+  assert.equal(scopeLabel(DEFAULT_SIDEBAR_VIEW, name), "Todas las carpetas · por carpeta");
+  assert.equal(scopeLabel(view({ group: "none" }), name), "Todas las carpetas");
   assert.equal(scopeLabel(view({ folders: ["f1"], group: "status" }), name), "terminus · por estado");
-  assert.equal(scopeLabel(view({ folders: ["f1", "f2"], agent: "ada" }), name), "terminus, web · ada");
+  assert.equal(scopeLabel(view({ folders: ["f1", "f2"], agent: "ada", group: "none" }), name), "terminus, web · ada");
   assert.equal(groupLabel({ kind: "folder", key: "", tasks: [] }, name), "Sin carpeta");
-  assert.equal(groupLabel({ kind: "section", key: "needs_you", tasks: [] }, name), "Te necesitan");
+  assert.equal(groupLabel({ kind: "section", key: "active", tasks: [] }, name), "Tareas");
   elegirLengua("en");
   assert.equal(scopeLabel(view({ group: "agent" }), name), "All folders · by agent");
   elegirLengua("es");

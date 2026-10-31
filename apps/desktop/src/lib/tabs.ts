@@ -1,4 +1,4 @@
-import { createSignal } from "solid-js";
+import { batch, createSignal } from "solid-js";
 // Node con strip-types necesita la extensión para resolver este import.
 import { borrarPref, escribirPref, hayPref, leerPref, prefsQueEmpiezan } from "./prefs.ts";
 import { esProvisional } from "./taskDraft.ts";
@@ -43,8 +43,22 @@ export type SiteTab = CommonTab & {
   navegador?: true;
 };
 
+export type InboxTab = CommonTab & {
+  clase: "inbox";
+  titulo: string;
+};
+
+export type BroadcastsTab = CommonTab & { clase: "broadcasts"; titulo: string };
+
 export type ObservabilityTab = CommonTab & {
   clase: "observabilidad";
+  titulo: string;
+};
+
+// Una por máquina: la pantalla es de la computadora, no de una tarea.
+export type ScreenTab = CommonTab & {
+  clase: "pantalla";
+  machine: string;
   titulo: string;
 };
 
@@ -53,7 +67,10 @@ export type Tab =
   | FileTab
   | ArtifactTab
   | SiteTab
-  | ObservabilityTab;
+  | ObservabilityTab
+  | InboxTab
+  | BroadcastsTab
+  | ScreenTab;
 export type ContentTab =
   | FileTab
   | ArtifactTab
@@ -80,7 +97,12 @@ export const siteTabId = (a: { session: string; url: string }) =>
 let browserSequence = 0;
 export const browserTabId = () => `navegador\u0000${Date.now()}\u0000${browserSequence++}`;
 
+export const INBOX_TAB_ID = "inbox";
+export const BROADCASTS_TAB_ID = "broadcasts";
+
 export const OBSERVABILITY_TAB_ID = "observabilidad";
+
+export const screenTabId = (machine: string) => `pantalla\u0000${machine}`;
 
 export const isTaskTab = (p: Tab): p is TaskTab => p.clase === "tarea";
 export const isContentTab = (p: Tab): p is ContentTab =>
@@ -127,7 +149,8 @@ function belongsToBlock(list: readonly Tab[], ids: readonly string[]): (p: Tab) 
   return (p) => requested.has(p.id) || tasks.has(p.session);
 }
 
-type StoredTabs = { abiertas: TaskTab[]; activa: string | null };
+// Las temporales vuelven temporales: el siguiente clic las sigue sustituyendo.
+type StoredTabs = { abiertas: TaskTab[]; activa: string | null; temporales?: string[] };
 
 // El índice es el de la tira al cerrar; reinsertar en orden ascendente la reconstruye.
 type ClosedBlock = { tabs: { tab: Tab; index: number }[]; active: string | null };
@@ -138,11 +161,14 @@ const key = (workspace: string, space: string | null) =>
   space ? `pestanas.${workspace}.${space}` : `pestanas.${workspace}`;
 
 const readStoredTabs = (k: string): StoredTabs => {
-  const g = leerPref<StoredTabs>(k, { abiertas: [], activa: null });
-  const openTabs = Array.isArray(g.abiertas)
+  const g = leerPref<StoredTabs | null>(k, null);
+  const openTabs = Array.isArray(g?.abiertas)
     ? g.abiertas.map(asTask).filter((p): p is TaskTab => p !== null)
     : [];
-  return { abiertas: openTabs, activa: openTabs.some((p) => p.id === g.activa) ? g.activa : null };
+  const temporales = Array.isArray(g?.temporales)
+    ? g.temporales.filter((id) => openTabs.some((p) => p.id === id))
+    : [];
+  return { abiertas: openTabs, activa: g && openTabs.some((p) => p.id === g.activa) ? g.activa : null, temporales };
 };
 
 // La clave anterior se conserva para que un build anterior pueda restaurar su tira.
@@ -182,7 +208,14 @@ function asTask(p: unknown): TaskTab | null {
   };
 }
 
-export function createTabs() {
+export function createTabs(options: { transient?: boolean } = {}) {
+  const [pinned, setPinned] = createSignal<ReadonlySet<string>>(new Set());
+  const isPinned = (id: string) => pinned().has(id);
+  const remapPinned = (pairs: [string, string][]) => {
+    const next = new Set(pinned());
+    for (const [from, to] of pairs) if (next.delete(from)) next.add(to);
+    setPinned(next);
+  };
   const [openTabs, setOpenTabs] = createSignal<Tab[]>([]);
   const [dirty, setDirtyTabs] = createSignal<ReadonlySet<string>>(new Set());
   const savers = new Map<string, () => Promise<boolean>>();
@@ -205,9 +238,11 @@ export function createTabs() {
     if (!workspace) return;
     // Los ids provisionales no existen en disco y no pueden restaurarse al arrancar.
     const activeTask = taskOf(active());
+    const abiertas = openTabs().filter(isTaskTab).filter((p) => !esProvisional(p.session));
     const g: StoredTabs = {
-      abiertas: openTabs().filter(isTaskTab).filter((p) => !esProvisional(p.session)),
-      activa: esProvisional(activeTask) ? null : activeTask,
+      abiertas,
+      activa: activeTask && !esProvisional(activeTask) ? activeTask : null,
+      temporales: abiertas.filter((p) => !isPinned(p.id)).map((p) => p.id),
     };
     escribirPref(key(workspace, space), g);
   };
@@ -246,6 +281,7 @@ export function createTabs() {
       }
     }
     const neighbor = after ?? before;
+    setPinned(new Set([...pinned()].filter((id) => remaining.some((p) => p.id === id))));
     setOpenTabs(remaining);
     if (currentTab !== null && !remaining.some((p) => p.id === currentTab)) {
       setActive(neighbor?.id ?? null);
@@ -259,7 +295,40 @@ export function createTabs() {
     save();
   };
 
+  const pin = (id: string) => {
+    const tab = openTabs().find((p) => p.id === id);
+    if (!tab || isPinned(id)) return;
+    batch(() => {
+      const next = new Set(pinned());
+      next.add(id);
+      if (tab.session) {
+        if (!openTabs().some((p) => isTaskTab(p) && p.id === tab.session)) {
+          setOpenTabs((list) => [...list, { clase: "tarea", id: tab.session, session: tab.session, project: tab.project, titulo: "" }]);
+        }
+        next.add(tab.session);
+      }
+      setPinned(next);
+      save();
+    });
+  };
+
   return {
+    pinned,
+    isPinned,
+    pin,
+    restorable: () => openTabs().filter((p) => isTaskTab(p) && !esProvisional(p.session)).map((p) => p.id),
+    // Sustituir una vista no cierra su tarea ni el bloque de documentos asociado.
+    replacePreviews(groups: readonly (readonly string[])[], visible: readonly (string | null)[]) {
+      const remove = new Set<string>();
+      groups.forEach((ids, i) => {
+        const active = visible[i];
+        if (!active) return;
+        for (const id of ids) if (id !== active && !isPinned(id)) remove.add(id);
+      });
+      if (remove.size === 0) return;
+      setOpenTabs((list) => list.filter((p) => !remove.has(p.id)));
+      save();
+    },
     open: openTabs,
     active: active,
     activeTab: () => openTabs().find((p) => p.id === active()) ?? null,
@@ -267,12 +336,15 @@ export function createTabs() {
       workspace = ws;
       space = desk;
       setActive(null);
+      setPinned(new Set<string>());
       setClosed(ws ? (closedByStrip.get(key(ws, desk)) ?? []) : []);
       if (!ws) {
         setOpenTabs([]);
         return null;
       }
       const g = readStoredTabs(key(ws, desk));
+      const temporales = new Set(g.temporales);
+      setPinned(new Set(g.abiertas.map((p) => p.id).filter((id) => !temporales.has(id))));
       setOpenTabs(g.abiertas);
       return g.activa;
     },
@@ -292,6 +364,7 @@ export function createTabs() {
         copy[i] = { ...next, titulo: p.titulo || (current as TaskTab).titulo };
         return copy;
       });
+      if (!options.transient || openTabs().some((x) => x.session === p.id && isPinned(x.id))) pin(p.id);
       save();
     },
     // Cerrar y reabrir la pestaña provisional la movería al final de la tira.
@@ -303,8 +376,19 @@ export function createTabs() {
         copy[i] = { ...p, clase: "tarea", session: p.id };
         return copy;
       });
+      remapPinned([[draft, p.id]]);
       if (active() === draft) setActive(p.id);
       save();
+    },
+    openBroadcasts(title: string) {
+      const next: BroadcastsTab = { clase: "broadcasts", id: BROADCASTS_TAB_ID, project: "", session: "", titulo: title };
+      setOpenTabs(list => list.some(tab => tab.id === next.id) ? list : [...list, next]);
+      activateAndPersist(next.id);
+    },
+    openInbox(title: string) {
+      const next: InboxTab = { clase: "inbox", id: INBOX_TAB_ID, project: "", session: "", titulo: title };
+      setOpenTabs(list => list.some(tab => tab.id === next.id) ? list : [...list, next]);
+      activateAndPersist(next.id);
     },
     openObservability(title: string) {
       const next: ObservabilityTab = {
@@ -317,6 +401,23 @@ export function createTabs() {
       setOpenTabs((list) =>
         list.some((p) => p.id === next.id) ? list : [...list, next],
       );
+      if (!options.transient) pin(next.id);
+      activateAndPersist(next.id);
+    },
+    openScreen(machine: string, title: string) {
+      const next: ScreenTab = {
+        clase: "pantalla",
+        id: screenTabId(machine),
+        project: "",
+        session: "",
+        machine,
+        titulo: title,
+      };
+      setOpenTabs((list) =>
+        list.some((p) => p.id === next.id) ? list : [...list, next],
+      );
+      // Provisional, sustituiría a la tarea provisional de su ventana antes de abrirse al lado.
+      pin(next.id);
       activateAndPersist(next.id);
     },
     openContent(p: ContentTab) {
@@ -341,6 +442,7 @@ export function createTabs() {
         if (end < 0) return [...list, p];
         return [...list.slice(0, end + 1), p, ...list.slice(end + 1)];
       });
+      if (!options.transient) pin(p.id);
       activateAndPersist(p.id);
     },
     activate: activateAndPersist,
@@ -363,6 +465,7 @@ export function createTabs() {
         const list = [...openTabs()];
         for (const { tab, index } of back) list.splice(Math.min(index, list.length), 0, tab);
         setOpenTabs(list);
+        setPinned(new Set([...pinned(), ...back.map(({ tab }) => tab.id)]));
         setClosedStack(stack);
         save();
         return back.find((x) => x.tab.id === block.active)?.tab ?? back[0].tab;
@@ -388,6 +491,7 @@ export function createTabs() {
           return next;
         }),
       );
+      remapPinned(changes);
       const move = new Map(changes);
       const currentTab = active();
       if (currentTab !== null && move.has(currentTab)) setActive(move.get(currentTab)!);
@@ -411,6 +515,7 @@ export function createTabs() {
           return next;
         }),
       );
+      remapPinned(changes);
       const move = new Map(changes);
       const currentTab = active();
       if (currentTab !== null && move.has(currentTab)) setActive(move.get(currentTab)!);
@@ -439,6 +544,7 @@ export function createTabs() {
     },
     dirty: dirty,
     setDirty(id: string, dirty: boolean) {
+      if (dirty && options.transient) pin(id);
       setDirtyTabs((current) => {
         if (current.has(id) === dirty) return current;
         const copy = new Set(current);
@@ -477,6 +583,7 @@ export function createTabs() {
         // Validarlas contra él cerraría sus pestañas durante la sincronización.
         if (
           p.clase === "observabilidad" ||
+          p.clase === "pantalla" ||
           p.session === "" ||
           esProvisional(p.session)
         ) {
@@ -502,6 +609,7 @@ export function createTabs() {
         } else next.push(p);
       }
       if (change) {
+        setPinned(new Set([...pinned()].filter((id) => next.some((p) => p.id === id))));
         setOpenTabs(next);
         if (active() !== null && !next.some((p) => p.id === active())) {
           setActive(null);

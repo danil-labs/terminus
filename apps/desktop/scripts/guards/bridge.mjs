@@ -31,11 +31,12 @@
  * legítima —el backend puede publicar algo que todavía nadie pinta— mientras que
  * escuchar lo que nadie emite es siempre esperar a Godot.
  */
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { relative } from "node:path";
-// Ver la nota de `paths.mjs`: `.pathname` en Windows da `/C:/…` y revienta.
+// `.pathname` en Windows da `/C:/…` y revienta.
 import { fileURLToPath } from "node:url";
 import { walkFiles } from "../git.mjs";
+import { EVENTOS_PENDIENTES } from "../engine-pending.mjs";
 
 const RUST = fileURLToPath(new URL("../../src-tauri/src", import.meta.url));
 
@@ -100,6 +101,13 @@ const CONTRATO = fileURLToPath(new URL("../../src-tauri/crates/engine-protocol/c
 for (const evento of JSON.parse(readFileSync(CONTRATO, "utf8")).events) {
   if (!emitidos.has(evento)) emitidos.set(evento, ["commands.json"]);
 }
+// Y los de sus extensiones (`engine-protocol/extensions/*.json`), fuera de la huella.
+const EXTENSIONES = fileURLToPath(new URL("../../src-tauri/crates/engine-protocol/extensions", import.meta.url));
+for (const f of existsSync(EXTENSIONES) ? readdirSync(EXTENSIONES).filter((n) => n.endsWith(".json")) : []) {
+  for (const evento of JSON.parse(readFileSync(`${EXTENSIONES}/${f}`, "utf8")).events ?? []) {
+    if (!emitidos.has(evento)) emitidos.set(evento, [`extensions/${f}`]);
+  }
+}
 const escuchados = nombres(WEB, [".ts", ".tsx"], ESCUCHA);
 
 /**
@@ -135,7 +143,20 @@ if (explicadas < escuchasTotales) {
   process.exit(1);
 }
 
-const huerfanos = [...escuchados].filter(([n]) => !emitidos.has(n));
+// Con el stream empujado los eventos del motor solo llegan a quien escucha con `lib/serviceEvents`.
+const CRUDO = /import\s*\{[^}]*\blisten\b[^}]*\}\s*from\s*"@tauri-apps\/api\/event"/;
+const crudos = WEB.flatMap((dir) =>
+  [...walkFiles(dir, [".ts", ".tsx"])]
+    .filter((f) => !f.replaceAll("\\", "/").endsWith("lib/serviceEvents.ts") && CRUDO.test(readFileSync(f, "utf8")))
+    .map((f) => relative(dir, f)),
+);
+for (const f of crudos) console.error(`${f} importa \`listen\` de @tauri-apps/api/event: usa el de lib/serviceEvents.`);
+if (crudos.length) process.exit(1);
+
+const llegados = Object.keys(EVENTOS_PENDIENTES).filter((n) => emitidos.has(n));
+for (const n of llegados) console.error(`«${n}» ya lo emite el motor: quítalo de scripts/engine-pending.mjs.`);
+if (llegados.length) process.exit(1);
+const huerfanos = [...escuchados].filter(([n]) => !emitidos.has(n) && !(n in EVENTOS_PENDIENTES));
 
 if (huerfanos.length === 0) {
   console.log(

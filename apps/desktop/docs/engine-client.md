@@ -40,6 +40,12 @@ sin él, la ventana abre `verification_uri_complete` y la persona aprueba en
 proxy y la sección lo dice. El campo editable del alta y de la página de
 aprobación es el nombre de **esta computadora**, no el de la cuenta.
 
+La web (`app.danil.ai/terminus`) no ofrece Radiant: ni la sección de
+Configuración, ni su gobierno en las pantallas, ni la elección «De mi
+organización» al crear el espacio (`capabilities().radiant`, solo en el
+escritorio). Radiant se conectará con Terminus Computers, no con cada ventana;
+el escritorio lo conserva por ahora (2026-10-21).
+
 La persona de la cuenta (nombre, correo, foto) sale del motor:
 `danil_connect_status` trae `account_name`, `avatar` (ruta de la foto guardada
 en la máquina, pintada con `preview_file`) y `avatar_source`;
@@ -49,21 +55,40 @@ de la barra lateral y la sección la muestran. La web no tiene la sesión de
 máquina (`danilAccount`); con `accountProfile` (`src/web/account.ts`) lee y
 cambia la misma persona en el plano de control con la sesión de Supabase.
 
-La sincronización sigue a la sesión de Danil de esta computadora, como una
-carpeta de Drive (seldon-host `feat/workspace-danil-link`): no hay otras
-cuentas ni miembros. Con la sesión iniciada, todos los workspaces de esta
-computadora se ven en la web y el teléfono; con la sesión cerrada, ninguno. El
-motor los liga solo, los que ya existen y los nuevos. No hay interruptor por
-workspace: la sección «Cuenta de Danil» tiene solo la tarjeta de la cuenta
-(foto, esta computadora, «Cerrar sesión»), y `danil_workspace_link`,
-`danil_workspace_unlink` y `danil_workspace_link_status` quedan en el contrato
-sin interfaz (`SIN_INTERFAZ` en `scripts/guards/commands.mjs`). La web, el teléfono y
+Una sesión de Danil por cuenta (decisión del 2026-10-21, seldon-host
+`feat/danil-session-per-account`): la computadora tiene una sesión por cuenta
+y cada workspace es de una sola cuenta, con la que se sincroniza y en ninguna
+otra. Configuración → Cuentas de Danil (`DanilAccount.tsx`) lista
+`danil_sessions` (foto, nombre, correo, esta computadora en esa cuenta, en
+línea, cuántos workspaces, «Principal») y sigue el evento `danil-sessions`;
+«Agregar otra cuenta» es `danil_connect_start {add: true}` con el mismo código
+del navegador, «Usar como principal» `danil_set_default_account` y «Cerrar
+sesión» `danil_disconnect {account}`. En Workspaces, la tarjeta del abierto
+tiene «Cuenta de este workspace» (`WorkspaceAccount.tsx`, chunk aparte):
+`danil_workspace_account` y `danil_workspace_set_account`, con
+`workspace_id_taken` y `danil.error.account_not_found` en castellano. El pie
+de la barra lateral muestra la cuenta del workspace abierto. El escritorio con
+cuenta (`features/machines/account.tsx`) pide el token de cliente de esa
+cuenta (`account_relay_token {account}` → `danil_client_token {account}`) y
+solo ve sus computadoras y su registro; cambiar a un workspace de otra cuenta
+reinstala el abanico. La lógica sin Solid vive en
+`features/settings/danil-sessions.ts`. Con un motor sin `danil_sessions`
+todo vuelve a la cuenta única: la tarjeta de siempre, sin sección por
+workspace, y el abanico con `danil_connect_status`. `danil_workspace_link`,
+`danil_workspace_unlink` y `danil_workspace_link_status` siguen sin interfaz
+(`SIN_INTERFAZ` en `scripts/guards/commands.mjs`). La web, el teléfono y
 las otras computadoras vistas desde aquí solo muestran los workspaces de
 `workspaces` en cada fila de `GET /v1/computers` (`@terminus/computers`,
 `linkedWorkspaces`); sin el campo (un plano de control anterior) no se filtra.
 El relay ya rechaza el resto con `workspace_not_linked`. La web vuelve a listar
 las computadoras cada diez minutos y al volver a la pestaña, así que un
 vínculo nuevo aparece sin recargar.
+
+Para probarlo contra el motor nuevo antes de su release: compila
+`seldon-runtime` en seldon-host (`cargo build --release -p seldon-runtime`),
+cópialo con `node scripts/engine.mjs download --from <ruta>` y abre el
+laboratorio con `node scripts/engine.mjs start`. Las pruebas de `pnpm verify`
+usan motores simulados y no lo necesitan.
 
 El fondo de los chats también es del workspace: `chat_background` se lee al
 abrirlo (`lib/chat-background-engine.ts`) y Estilo lo guarda con
@@ -84,8 +109,8 @@ cuyos argumentos nombran otro workspace que el suyo.
 
 ## Contract
 
-`src-tauri/crates/engine-protocol/commands.json` is the frozen contract: 334
-commands and the events the engine emits. Its SHA-256 is recorded in
+`src-tauri/crates/engine-protocol/commands.json` is the frozen contract: 354
+commands and the 32 events the engine emits. Its SHA-256 is recorded in
 [PROVENANCE](../src-tauri/crates/engine-protocol/PROVENANCE.md); the engine
 announces the same hash and the window refuses to connect to a different one
 (`version_mismatch`). `phrase-keys.json` lists the catalog keys the engine sends
@@ -101,8 +126,42 @@ ships with it: `seldon-runtime` next to the window executable, packaged as
 `bundle.externalBin` on every platform. Its `--resource-dir` is the
 installation's resource folder, the one Tauri's `resource_dir()` names (the
 executable's folder on Windows, `Contents/Resources` on macOS), where the
-bundled language packs (`lenguas/`) live. Inside an AppImage those resources
-are copied to `resources/` beside the window first.
+bundled language packs (`lenguas/`) and the bundled work tools (`work-tools/`)
+live. Inside an AppImage those resources are copied out of the mount first,
+because the engine outlives the window (see below).
+
+### Bundled work tools
+
+`work-tools/<target>/` holds the prepared tree the engine runs in place:
+`manifest.json` (schema 2, `layout: "tree"`), `inventory.json`,
+`browser-navigation.json` (Chrome metadata only), `licenses/` and
+`<tree>/{git,python,uv,ripgrep,agent-browser,computer-use}`. `inventory.json`
+is `{schema, files, symlinks}`; `inventory_sha256` is the sha256 of its exact
+bytes and `<tree>` is the first 12 hex of that digest. The tree is never rewritten: a new version
+is a new folder name. `scripts/work-tools.py` builds it from the pins in
+`resources/work-tools/<target>/pins.json`; see
+[development](development.md#bundled-work-tools).
+
+- **macOS:** two trees in the universal app, one per architecture, under
+  `Contents/Resources/work-tools/`. Their Mach-O files are signed in place
+  before the app is signed and notarized.
+- **Windows:** NSIS installs the tree per user in
+  `%LOCALAPPDATA%\Terminus\work-tools\<target>\<tree>\`. The build fails if a
+  path would pass `MAX_PATH` under a 32-character profile name. The engine
+  removes older sibling trees once nothing uses them; a real uninstall runs
+  `RMDir /r` on `work-tools`.
+- **Linux AppImage:** the resources travel in `usr/share/Terminus/` (with a
+  copy of `lenguas/`), where linuxdeploy neither deploys dependencies nor
+  patches an ELF. The mount changes on every start, so the window copies
+  every resource (`lenguas/` and `work-tools/`) to
+  `<root>/resource-versions/<key>/` and passes that as `--resource-dir`. `<key>`
+  is the sha256 of `resources-inventory.json`, the build-time inventory of all
+  resources. The copy checks every byte once, keeps relative symlinks and
+  executable bits, and ends by writing `ready` (its content is the key). Later
+  starts only read that marker. `selection.json` there keeps the current and
+  the previous key; any other copy is removed only when no engine holds a
+  shared lock on its `ready` file. Copies from 0.2.89 and earlier have no
+  `ready` and are left alone.
 
 A release build uses the identity `ai.danil.terminus` and passes
 `--production-identity`. Its data root is the one 0.2.74 used,
@@ -118,29 +177,105 @@ identity except `ai.danil.terminus`). Then everything lives under one root:
 | Path under `<local data>/ai.danil.seldon.dev/` (or `TERMINUS_LAB_ROOT`) | What it is |
 |---|---|
 | `engine/` | the engine's `--data-dir` (its log is `engine/host.log`) |
-| `resources/` | inside an AppImage, the copy of the bundled resources |
+| `resource-versions/` | inside an AppImage, one verified copy of the bundled resources per build (`resources/` for builds without `resources-inventory.json`) |
 | `window/` | the window's `window_data` (log and webview storage) |
 | `selection.json` | the selection the window builds |
 | `engine-launch.log` | the engine's stdout and stderr when the window starts it, plus one line per launch: on Windows, whether the window and the engine are in a Job Object and whether breakaway was accepted |
 | `launch.lock` | held while a window looks for or starts the engine |
+| `engine-mark.json` | size and times of the engine binary when its SHA-256 for `engine.json` was computed |
 
 `<local data>` is `%LOCALAPPDATA%` on Windows, `~/Library/Application Support`
 on macOS and `$XDG_DATA_HOME` (or `~/.local/share`) on Linux. The engine always
 gets that lab identity: it never reads the data or the keychain entries of
 `ai.danil.terminus`. Its keychain names derive from that identity.
 
-With the lock held, the window asks the engine named by
-`engine/seldon-endpoint.json` for its `status`. If it answers, the window reuses
-it; two windows share one engine. If not, the window starts the packaged
-engine, waits up to 5 minutes for a descriptor written by that process while
-it stays alive (a rejection or crash ends the wait at once; a startup that checks
-many account files can take more than 30 seconds on a loaded machine), ten
-minutes with `--adopt-existing`: adopting a real 0.2.74 root took about 25 s,
-and the handoff screen shows that step meanwhile), and writes
-`selection.json`. If the binary is missing, the error is
-`engine_missing`; if it exits or does not answer, `engine_start_failed`. The
-startup notice then names the folder with the logs and links the 0.2.74
-release, whose data the engine never touched.
+With `launch.lock` held, the window also takes the start lock it shares with
+the `terminus` CLI (below), so a window and a terminal never start two engines
+on one root. Then it asks the engine named by `engine/seldon-endpoint.json` for
+its `status`, whatever its contract (`request_any_contract`). If its
+`data_directory` is this root (both canonical) and it speaks the contract of
+the engine that travels with this window, the window connects to it, whoever
+started it: another window, the CLI or a previous session; two windows share
+one engine. That contract may differ from the window's own: contract changes
+are additive, so, as with remote machines, a different hash is not a reason to
+refuse an engine; only a real `version_mismatch` from a command is. The window
+learns the bundled engine's contract the first time it starts it and keeps it
+in `bundled-contract.json` beside the window data, with the size and times of
+the binary; when the binary changes it learns it again, and until then it
+compares with its own contract, as before. An engine that does not speak the
+bundled contract is from the previous version, and one whose binary was
+replaced is handled as in [Updating on Windows](#updating-on-windows): the
+window reopens the previous window or waits for its tasks; it never uses the
+engine's own handoff. The engine the window has just started is always taken,
+even if its contract differs from the window's.
+
+If nothing answers, the window does not trust a probe: the engine holds
+`seldon-runtime.lock` in the data root exclusively for as long as it lives, so
+the window opens it without creating it and tries to lock it, as the engine's
+`running()` does. Held means an engine is starting, closing or saturated: the
+window keeps probing every half second for up to 5 minutes and does not start
+another one; then it fails with `service_busy` (`reason: root_locked`). A
+descriptor that is not private (`invalid_token`) with the root held fails at
+once. Free means no engine: the window starts the packaged engine, waits up to
+5 minutes for a descriptor written by that process while it stays alive (a
+rejection or crash ends the wait at once; a startup that checks many account
+files can take more than 30 seconds on a loaded machine), ten minutes with
+`--adopt-existing`: adopting a real 0.2.74 root took about 25 s, and the
+handoff screen shows that step meanwhile), and writes `selection.json`. If the
+binary is missing, the error is `engine_missing`; if it exits or does not
+answer, `engine_start_failed`. The startup notice then names the folder with
+the logs and links the 0.2.74 release, whose data the engine never touched.
+
+### `engine.json` for the CLI
+
+Each time it selects an engine, the window writes its profile into the
+person's `engine.json`, so `terminus` in a terminal knows which binary and
+which root to use without a window:
+
+- Windows: `%APPDATA%\terminus\engine.json`; macOS and Linux:
+  `$XDG_CONFIG_HOME/terminus/engine.json` or `~/.config/terminus/engine.json`.
+- A release writes the profile `desktop`; the lab writes `desktop-lab`.
+- Other profiles (`host` from `install.sh`, `vm` from `remote-host`) and
+  unknown fields are kept. Only `desktop` takes `default`, and only when it is
+  missing or names a profile that does not exist.
+- A file of another `version` or that is not JSON is left as it is. Connecting
+  fails closed while its service authority cannot be resolved.
+- Any profile with `managed: true` or a service command string and the same canonical data root gives
+  process ownership to its supervisor, even when it is not `default`. The
+  window preserves that profile and does not overwrite an alias of its root.
+  Missing/null/false means unmanaged, as in the CLI; malformed profiles block
+  connection and publication while their authority cannot be resolved.
+- The write is atomic (temporary file and rename) under
+  `locks/engine.json.lock`, and only when the profile changed.
+
+```json
+{
+  "version": 1,
+  "default": "desktop",
+  "profiles": {
+    "desktop": {
+      "engine": "C:\\Users\\<user>\\AppData\\Local\\Terminus\\seldon-runtime.exe",
+      "sha256": "<SHA-256 of that binary>",
+      "data_dir": "C:\\Users\\<user>\\AppData\\Local\\ai.danil.terminus",
+      "resource_dir": "C:\\Users\\<user>\\AppData\\Local\\Terminus",
+      "identity": "ai.danil.terminus",
+      "production": true,
+      "managed": null
+    }
+  }
+}
+```
+
+`engine` is the binary the window starts (the stable copy inside an AppImage).
+Paths are canonical, without `\\?\` on Windows. The SHA-256 is computed again
+only when the binary's size or times change (`engine-mark.json`). The start
+lock is `<same folder>/locks/<sha256>.lock`, where `<sha256>` is the lowercase
+hex SHA-256 of the canonical data root in UTF-8; a root that does not exist
+yet is its deepest existing ancestor, canonical, plus the rest, as the CLI
+computes it. Both take it with the same primitive (`LockFileEx` over the whole
+range on Windows, `flock` on Unix). It is best effort: the window
+waits up to 5 minutes for it and, without it, the root lock still stops a
+second engine.
 
 ## Handoff from 0.2.74
 
@@ -223,14 +358,93 @@ failed poll. `service stream start/read/cancel`
 carries `clone_project`, `list_session_git` and `watch_task_tree`; the window
 rebuilds only the Tauri `Channel`.
 
-Closing the window leaves the engine running; it stops after five minutes
-without clients or turns. Restarting the engine requires a new selection. A
-window that started without arguments does that on its own: when `service_poll`
-finds no engine, it runs the same search-or-start as at startup (at most three
-times in ten minutes), swaps the client and answers `reset: true` so the front
-resynchronizes. A window whose selection changed under it, because another
-window already restarted the engine, takes the same path and adopts that engine.
-Reusing an engine leaves `selection.json` untouched when its content is the same. Otherwise it shows `shell.service.engine_down`.
+Closing the window hides it and keeps the client running in the background,
+including before the front mounts. A persistent tray icon opens the window,
+shows live tasks or an unknown status when the read fails, and offers explicit
+exit. macOS also handles Dock/Reopen. Repeated close requests never stop tasks;
+the saved `close.live_turns` preference is retained and ignored.
+
+Explicit exit uses the connected client's native transport, independently of
+the visible workspace or machine. With live turns it offers cancel, background,
+or stop and quit. Failed listing or cancellation leaves the client open and
+shows the error inside the dialog. Exit closes the client without stopping its
+engine. Before the front is ready, explicit exit only detaches the client.
+
+The engine retains its own lifecycle. A normal engine can stop after five
+minutes without clients or work; that timeout never cancels active turns. The
+resident mode implemented separately in seldon-host is opt-in and observable
+as `status.resident`; an absent field does not establish residency. A hidden
+window is not an installed or supervised service.
+
+For a root declared `managed`, the window waits up to five minutes for a
+compatible private descriptor. It never launches, stops, retires, force-updates
+or adopts that engine. Incompatibility and invalid service configuration are
+errors. After an external restart it validates the new descriptor, credential,
+contract and runtime, rebuilds its client selection and returns `reset: true`
+to resynchronize. It does not replay uncertain mutations. Reconnection does not
+consume the launch retry budget.
+
+For an unmanaged root, a window started without arguments uses the same
+search-or-start after engine loss, at most three times in ten minutes. Reusing
+an engine leaves `selection.json` untouched when its content is the same.
+External selections reconnect only when their exact data root is explicitly
+managed; otherwise their existing external lifecycle remains in charge.
+
+## Preparación del servicio de macOS sin ventana
+
+El mismo ejecutable firmado admite `--background-host` antes de inicializar
+Tauri o reenviar comandos al CLI. Es un wrapper en primer plano para launchd:
+lanza un solo hijo sin detach, entrega la maestra existente mediante un pipe
+privado y permanece hasta recogerlo. No consulta ni crea otra identidad.
+
+Este recorrido exige la instalación firmada en `/Applications` o
+`~/Applications`, la identidad `ai.danil.terminus` y su raíz de datos ya
+existente y privada. Resuelve el home por UID, sin usar `HOME`, `XDG_CONFIG_HOME`
+ni variables de laboratorio heredadas para elegir la raíz. La configuración
+activa `~/.config/terminus/engine.json` debe declarar `managed` para esa raíz y
+coincidir en identidad, binario, SHA-256 y recursos. Un motor ya vivo conserva
+su autoridad: el wrapper no lo detiene, adopta ni reemplaza.
+
+Antes de leer la maestra del llavero, verifica su propia firma, la firma del
+motor instalado, los metadatos estáticos de `agent-context --json` y la firma
+dinámica del PID realmente lanzado con el requisito completo del motor. El
+llavero se consulta sin interacción y solo para una maestra existente. El hijo
+exige `--resident --require-master-fd --expected-contract <hash>` y rechaza
+contratos distintos antes de leer el pipe o escribir datos. No hay fallback al
+llavero ni adopción en ese modo. El descriptor y `status` deben acreditar al
+hijo propio y la residencia dentro de cinco minutos; si no, el wrapper termina
+y recoge únicamente ese hijo. Las señales se reenvían al hijo, con plazo de
+cierre de treinta segundos antes de terminarlo.
+
+`--prepare-background-host <directorio-absoluto-nuevo>` valida estos requisitos
+y escribe **solo en ese directorio** un `engine.json` propuesto y
+`ai.danil.terminus.background-host.plist`. Conserva los otros perfiles y campos
+desconocidos; rechaza autoridades administradas en conflicto. No escribe la
+configuración real, no copia nada a `Library/LaunchAgents`, no cambia bundles y
+no ejecuta `launchctl`. Tampoco obtiene la maestra durante la preparación.
+
+El plist propuesto es un LaunchAgent de la sesión Aqua del usuario:
+`RunAtLoad=true`, `KeepAlive.SuccessfulExit=false`, `ThrottleInterval=30`,
+`ExitTimeOut=45` y `AbandonProcessGroup=false`. Una parada normal conserva
+salida cero; un fallo permite relanzamiento. El motor estricto anuncia
+`safe_maintenance_restart_v1`; `service stop` con `restart:true` solo se acepta
+sin trabajo activo y devuelve 75 después de la limpieza. El wrapper propaga ese
+código. No solicita mantenimiento automáticamente ni modifica el updater.
+
+La instalación y activación siguen fuera de este incremento. Requieren una
+composición con contratos compatibles, QA firmado nativo de llavero, pipes,
+launchd y continuidad sin ventana, y coordinación de actualización del bundle,
+su huella y supervisor. Este LaunchAgent no promete servicio antes de iniciar
+sesión ni después de cerrarla. La integración permanente mediante
+[SMAppService](https://developer.apple.com/documentation/servicemanagement/smappservice)
+queda pendiente; la semántica del plist sigue el
+[manual de launchd](https://github.com/apple-oss-distributions/launchd/blob/main/man/launchd.plist.5).
+
+This change does not install or activate services. Production macOS activation
+still requires the same existing root, identity, authority and vault; a signed
+launcher must deliver the master through a private pipe on every independent
+restart, without a new master or interactive fallback. Native signatures,
+keychain access, menu-bar status, CmdQ and reopen require macOS QA.
 
 ## Stream empujado
 
@@ -285,20 +499,51 @@ the plugin's signature check and runs the installer with `/S /UPDATE`.
 `terminus.exe` is already in its place, whether the app or a manual installer
 did it, and the front asks for a restart. A manual installer that finds
 Terminus open shows the same notice and ends there, instead of running a second
-window from its finish page. On the next start, an engine running from
-`old_seldon-runtime.exe` gets `service stop`; one that refuses keeps working
-and the new engine waits for the next start. Then the window deletes the
-`old_*` files no one holds, retrying for a few seconds while the window it
-replaces exits.
+window from its finish page. `restart_app` from a window running from `old_*`
+opens the installed `terminus.exe`, not itself.
 
-An open window does not wait for a restart either: every 15 s it checks
-whether the live engine was replaced and, once that engine has no turns,
-downloads or operations, asks it for `service stop`. The next `service_poll`
-starts the installed engine. The update notice says how many tasks the old
-engine is still running and offers to stop them and restart. A replaced engine
-is one running from `old_*` on Windows, from a deleted binary or an AppImage
-copy that differs from the bundled one on Linux, and from a path other than
-the bundled engine on macOS. The Linux and macOS checks have not been tried on
+The installer sets the window and the engine aside with one prefix
+(`old_`, or `old_<tick>_` when one of those names is still taken), and it
+and the window delete `old_*.exe` only when no set-aside engine is left: a
+window binary stays on disk while the engine of its contract runs.
+
+The old version keeps working whole until its tasks finish, and the new one
+comes in whole afterwards; a window and an engine of different versions are not
+mixed. On the next start, an engine running from `old_seldon-runtime.exe` gets
+`service stop`; one of this contract that refuses keeps working and the new
+window uses it. An update usually changes the contract, and an engine that does not speak the
+contract of the bundled engine is from the previous version: the window asks
+it for `status` and `service stop` (`request_any_contract`) and stops it as
+soon as it has no turns, downloads or operations. While it is working, the new window opens the window
+set aside with the same prefix as that engine, with no arguments (an older
+build rejects arguments it does not know), stops answering as the single
+instance so the old one does not show it instead, and exits. The old window
+connects to its own engine and shows its update notice. If that binary is
+missing or exits within 2 s, and on macOS and Linux, where the update replaces
+the bundle or the AppImage in place and nothing is set aside, the new window
+mounts and shows a notice: how many tasks the previous version is finishing,
+and «Detener y entrar ya», which says how many tasks will be cut off and, once
+confirmed, asks the previous engine for `service stop` with `{"force": true}`:
+an engine that knows it writes those tasks to `update-resume.json`, stops
+their turns like Stop, and exits; the new engine resumes each one in its own
+provider session with an `engine_updated` line. An engine older than that
+ignores `force` and refuses with `task_busy`; the window then terminates its
+process, as the uninstaller does, and those tasks do not resume on their own.
+Without a click the window keeps asking and comes in when the engine is free.
+Then the window deletes the `old_*` files no one holds, retrying for a few
+seconds while the window it replaces exits.
+
+A window that runs from `old_*` (Windows) keeps its engine: it does not stop
+it when it has no work, does not take an engine of another version and does
+not start the installed one (`window_replaced`); at startup that error opens
+the installed window instead. Any other open window checks every 15 s whether
+the live engine was replaced and, once that engine has no turns, downloads or
+operations, asks it for `service stop`. The next `service_poll` starts the
+installed engine. The update notice says how many tasks the old engine is
+still running and offers to stop them and restart. A replaced engine is one
+running from `old_*` on Windows, from a deleted binary or an AppImage copy
+that differs from the bundled one on Linux, and from a path other than the
+bundled engine on macOS. The Linux and macOS checks have not been tried on
 those systems.
 
 ## Not done yet
@@ -311,3 +556,41 @@ those systems.
   window runs its Tinymist. Settings stops every live view before touching the
   plugin (`typst_live_stop`); moving the plugin into the window is planned in
   seldon-host.
+
+## Handler policy and durable decisions
+
+The handler profile reads memory and requested access through the local
+`handler_action` facade (`src-tauri/src/extracted/handler_policy.rs`). Its
+closed request type permits only `handler list`, `handler requests`,
+`handler approve`, `handler revoke` and `handler release`. The RPC envelope
+captures workspace and folder, including an empty folder; the engine's
+private native credential supplies authority. These routes are not relayed.
+The machine router rejects web and other-machine destinations before calling
+the facade. Approval hints and quarantine release require explicit input.
+
+The facade checks the exact route in engine capabilities and follows a durable
+mutation receipt until completion or a bounded timeout. Errors retain their
+code and structured detail. A timeout retains the operation id when received;
+an uncertain initial delivery is not automatically retried. A pending receipt locks
+further mutations for the captured handler scope while the window remains open,
+including closing and reopening its panel. The resume action only reads
+`operation show`; it rejects receipts for other workspaces, folders or commands.
+
+Permission events trigger a reread of `pending_requests`. The window restores
+only the live permissions list, keeps durable id and revision, and sends both
+when answering. Question answers also reread the matching request. A stale
+permission response refreshes the pending state without automatically approving
+it. If a failed decision disappears from the live list, its durable record and
+transport error remain in the conversation diagnostic; absence is not delivery.
+The native window still authenticates as the legacy administrative client;
+this update does not register a new client principal.
+
+The desktop CLI forwards `task create --as peer|worker` arguments unchanged to
+the bundled engine executable. Rank semantics and negotiation of `peer_rank_v1`
+belong to that CLI and engine; the window does not derive rank from parent ids.
+The contract snapshot comes from seldon-host `b8e7fcd`. Its compatible engine
+release is not pinned yet: `MOTOR_PENDIENTE` preserves the publication block.
+
+`handler list` describes memory configuration, not effective turn availability.
+External slots are shown as declarations; grants come separately from requests.
+The window does not infer an effective memory store from either view.

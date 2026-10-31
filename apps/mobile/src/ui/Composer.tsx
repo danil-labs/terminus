@@ -1,10 +1,12 @@
+import { RADIUS, TEXT } from "@terminus/design";
+import { SendButton } from "./SendButton";
 import type { MentionList, PermissionModeOption, ProviderInfo, ProviderModels, SlashMenu } from "@terminus/protocol";
 import { modelName, previewLabel } from "@terminus/tasks";
 import * as DocumentPicker from "expo-document-picker";
 import { File } from "expo-file-system";
 import * as ImagePicker from "expo-image-picker";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, type TextInputKeyPressEvent, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   ATTACHMENT_MIMES,
@@ -18,9 +20,11 @@ import {
   usableProviders,
 } from "../lib/engine";
 import type { Host } from "../lib/hosts";
+import { effectiveMode, enterAction, hasSomethingToSend } from "../lib/composer";
 import { lang, phrase, t, w } from "../lib/i18n";
 import { BrandMark } from "./BrandMark";
 import { Icon } from "./Icon";
+import { matches, NoMatch } from "./Search";
 import { Sheet, SheetOption, SheetSection } from "./Sheet";
 import { useTheme } from "./theme";
 
@@ -33,6 +37,8 @@ type Queued = { id: string; text: string; attachments: string[] };
 const SLASH = /^\/([\w:-]*)$/;
 const MENTION = /(?:^|\s)@("?)([^\s"]*)$/;
 const EFFORT_LEVELS = ["minimal", "low", "medium", "high", "xhigh", "max"] as const;
+// Los modos de cada máquina y proveedor que ya se vieron: con la máquina apagada, el cuadro sigue sabiendo cuáles sostiene.
+const knownModes = new Map<string, PermissionModeOption[]>();
 
 function effortLabel(effort: string | null) {
   if (!effort) return w("chat.effort.agent_decides");
@@ -46,7 +52,8 @@ function effortLabel(effort: string | null) {
  * enviar, que con un turno corriendo es detener. `/` abre los comandos y las
  * skills del agente; `@`, los archivos y carpetas; `!` lo vuelve terminal
  * («Ejecutar»). Escribir mientras trabaja deja el mensaje en cola, con
- * «Mandar ahora». Los selectores son hojas desde abajo.
+ * «Mandar ahora». Los selectores son hojas desde abajo. La tecla de retorno
+ * manda; en la web, Shift+Enter hace salto de línea, como en el escritorio.
  */
 export function Composer({
   host,
@@ -56,6 +63,8 @@ export function Composer({
   providers,
   provider: initialProvider,
   model: initialModel,
+  permissionMode = null,
+  savedPermissionMode = null,
   providerLocked = false,
   running = false,
   disabled = false,
@@ -64,6 +73,7 @@ export function Composer({
   onSubmit,
   onInject,
   onStop,
+  onModeChange,
   bottomInset = true,
   testID = "composer",
 }: {
@@ -76,6 +86,10 @@ export function Composer({
   providers: ProviderInfo[];
   provider: string | null;
   model: string | null;
+  /** El modo de permisos del workspace para las tareas nuevas. Si el proveedor no lo sostiene, el suyo por omisión. */
+  permissionMode?: string | null;
+  /** El modo que guarda la tarea abierta: manda sobre el del workspace, como al reanudar en la ventana. */
+  savedPermissionMode?: string | null;
   /** Una tarea que ya contestó no cambia de proveedor, como en la ventana. */
   providerLocked?: boolean;
   running?: boolean;
@@ -86,6 +100,8 @@ export function Composer({
   onSubmit: (submission: Submission) => Promise<boolean>;
   onInject?: (text: string, attachments: string[]) => Promise<boolean>;
   onStop?: () => void;
+  /** Elegir modo con el turno en marcha: el turno vivo arrancó con el de entonces y no lo relee. */
+  onModeChange?: (mode: string) => void;
   /** Bajo una barra de pestañas, la barra ya deja el hueco del sistema. */
   bottomInset?: boolean;
   testID?: string;
@@ -111,6 +127,18 @@ export function Composer({
   const [sheet, setSheet] = useState<"model" | "mode" | "attach" | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const draining = useRef(false);
+  const claimedQueue = useRef(new Set<string>());
+  const [injecting, setInjecting] = useState<ReadonlySet<string>>(new Set());
+  useEffect(() => {
+    const ids = new Set(queue.map((item) => item.id));
+    for (const id of claimedQueue.current) if (!ids.has(id)) claimedQueue.current.delete(id);
+  }, [queue]);
+  // Dos retornos seguidos llegan antes de que el cuadro se vacíe: el segundo no manda ni encola el mismo texto.
+  const sending = useRef(false);
+  const taken = useRef<string | null>(null);
+  useEffect(() => {
+    if (text !== taken.current) taken.current = null;
+  }, [text]);
 
   useEffect(() => {
     const show = Keyboard.addListener(Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow", () => setKeyboard(true));
@@ -130,13 +158,17 @@ export function Composer({
 
   // Modelos y permisos del proveedor elegido; la barra de `/` se pide al usarla.
   useEffect(() => {
+    const key = `${host?.id}/${current}`;
     setModels(null);
-    setModes([]);
+    setModes(knownModes.get(key) ?? []);
     setSlash(null);
     if (!host || !workspace || !current || host.power() !== "on") return;
     let alive = true;
     void modelsOf(host, workspace, current).then((m) => alive && setModels(m));
-    void permissionModesOf(host, workspace, current).then((m) => alive && setModes(m));
+    void permissionModesOf(host, workspace, current).then((m) => {
+      if (m.length) knownModes.set(key, m);
+      if (alive) setModes(m.length ? m : (knownModes.get(key) ?? []));
+    });
     return () => {
       alive = false;
     };
@@ -160,19 +192,22 @@ export function Composer({
 
   // Termina el turno: sale el primero de la cola, como la ventana.
   useEffect(() => {
-    if (running || !queue.length || draining.current) return;
-    const [next, ...rest] = queue;
+    if (running || !queue.length || draining.current || claimedQueue.current.has(queue[0].id)) return;
+    const [next] = queue;
     draining.current = true;
+    claimedQueue.current.add(next.id);
     void submit(next.text, next.attachments).then((ok) => {
-      if (ok) setQueue(rest);
-      draining.current = false;
-    });
-  }, [running, queue]);
+      if (ok) setQueue((old) => old.filter((item) => item.id !== next.id));
+      else claimedQueue.current.delete(next.id);
+    }).finally(() => { draining.current = false; });
+  }, [running, queue, injecting]);
 
   const chosen = models?.models.find((m) => m.id === model) ?? null;
   const modelText = model ? modelName(model, models) : previewLabel(lang, "default_model");
   const efforts = chosen?.efforts ?? models?.models[0]?.efforts ?? [];
-  const modeOption = modes.find((m) => m.id === mode) ?? modes.find((m) => m.por_omision) ?? null;
+  // Lo que se ve es lo que se manda: el elegido, o el de la tarea o el workspace, o el del proveedor.
+  const sentMode = effectiveMode(modes, mode, { saved: savedPermissionMode, workspace: permissionMode });
+  const modeOption = modes.find((m) => m.id === sentMode) ?? null;
   const uploading = attachments.some((a) => !a.path && !a.error);
   const ready = Boolean(host && workspace !== null && folder !== null && current) && !disabled && !busy && !uploading;
   const hasText = Boolean(text.trim()) || attachments.some((a) => a.path);
@@ -180,32 +215,55 @@ export function Composer({
   async function submit(body: string, paths: string[]) {
     if (!current) return false;
     if (body.startsWith("!")) {
-      return onSubmit({ shell: true, command: body.slice(1).trim(), provider: current, model, effort, permissionMode: mode });
+      return onSubmit({ shell: true, command: body.slice(1).trim(), provider: current, model, effort, permissionMode: sentMode });
     }
-    return onSubmit({ shell: false, prompt: body, provider: current, model, effort, permissionMode: mode, attachments: paths });
+    return onSubmit({ shell: false, prompt: body, provider: current, model, effort, permissionMode: sentMode, attachments: paths });
+  }
+
+  async function injectQueued(item: Queued) {
+    if (!onInject || claimedQueue.current.has(item.id)) return;
+    // El ref cierra el paso antes del siguiente render, también entre toques rápidos.
+    claimedQueue.current.add(item.id);
+    setInjecting((old) => new Set(old).add(item.id));
+    let ok = false;
+    try {
+      ok = await onInject(item.text, item.attachments);
+      if (ok) setQueue((old) => old.filter((entry) => entry.id !== item.id));
+    } finally {
+      if (!ok) claimedQueue.current.delete(item.id);
+      setInjecting((old) => new Set([...old].filter((id) => id !== item.id)));
+    }
   }
 
   async function send() {
     const body = text.trim();
     const paths = attachments.flatMap((a) => (a.path ? [a.path] : []));
-    if (!ready || (!body && !paths.length)) return;
+    if (!ready || sending.current || taken.current === text || !hasSomethingToSend(body, paths.length)) return;
+    taken.current = text;
     if (running && !body.startsWith("!")) {
       setQueue((old) => [...old, { id: `${Date.now()}`, text: body, attachments: paths }]);
       setText("");
       setAttachments([]);
       return;
     }
+    sending.current = true;
     setBusy(true);
     setNote(null);
     setText("");
     const kept = attachments;
     setAttachments([]);
-    const ok = await submit(body, paths);
-    if (!ok) {
-      setText(body);
-      setAttachments(kept);
+    let ok = false;
+    try {
+      ok = await submit(body, paths);
+    } finally {
+      if (!ok) {
+        taken.current = null;
+        setText(body);
+        setAttachments(kept);
+      }
+      sending.current = false;
+      setBusy(false);
     }
-    setBusy(false);
   }
 
   async function addFiles(files: { name: string; mime: string; size: number | null; read: () => Promise<string> }[]) {
@@ -285,6 +343,14 @@ export function Composer({
     return mentions.fuentes.filter((f) => f.ruta.toLowerCase().includes(q)).slice(0, 40);
   }, [mentionQuery, mentions]);
 
+  // En la web, react-native-web deja pasar el evento del navegador: Shift+Enter sigue su curso.
+  function onWebKey(e: TextInputKeyPressEvent) {
+    const key = e as unknown as { key: string; shiftKey?: boolean; nativeEvent: { isComposing?: boolean; keyCode?: number }; preventDefault: () => void };
+    if (enterAction({ key: key.key, shiftKey: key.shiftKey, isComposing: key.nativeEvent.isComposing, keyCode: key.nativeEvent.keyCode }) !== "send") return;
+    key.preventDefault();
+    void send();
+  }
+
   const showStop = running && !hasText && Boolean(onStop);
   const sendLabel = shell ? w("chat.composer.run") : w("chat.composer.send");
 
@@ -318,15 +384,18 @@ export function Composer({
           {queue.map((q, i) => (
             <View key={q.id} style={[styles.queued, { borderColor: theme.border, backgroundColor: theme.surface }]} testID={`queued-${i}`}>
               <Text style={[styles.queueLabel, { color: theme.textMuted }]}>{w("chat.queue.label")}</Text>
-              <Text numberOfLines={2} style={{ flex: 1, color: theme.text, fontSize: 14 }}>
+              <Text numberOfLines={2} style={{ flex: 1, color: theme.text, fontSize: TEXT.body }}>
                 {q.text}
               </Text>
               {onInject ? (
                 <Pressable
                   hitSlop={6}
-                  onPress={() => void onInject(q.text, q.attachments).then((ok) => ok && setQueue((old) => old.filter((x) => x.id !== q.id)))}
+                  disabled={injecting.has(q.id)}
+                  accessibilityState={{ disabled: injecting.has(q.id), busy: injecting.has(q.id) }}
+                  style={{ opacity: injecting.has(q.id) ? 0.5 : 1 }}
+                  onPress={() => void injectQueued(q)}
                 >
-                  <Text style={{ color: theme.primary, fontWeight: "600", fontSize: 13 }}>{w("chat.queue.send_now")}</Text>
+                  <Text style={{ color: theme.primary, fontWeight: "600", fontSize: TEXT.ui }}>{w("chat.queue.send_now")}</Text>
                 </Pressable>
               ) : null}
               <Pressable hitSlop={6} accessibilityLabel={w("chat.queue.remove")} onPress={() => setQueue((old) => old.filter((x) => x.id !== q.id))}>
@@ -340,13 +409,13 @@ export function Composer({
 
       {header}
 
-      <View style={[styles.box, { borderColor: shell ? theme.text : theme.border, backgroundColor: theme.surface }]}>
+      <View style={[styles.box, { backgroundColor: theme.surface }]}>
         {attachments.length ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.files}>
             {attachments.map((a) => (
               <View key={a.key} style={[styles.file, { backgroundColor: theme.muted }]}>
                 <Icon name="image" size={13} color={theme.textMuted} />
-                <Text numberOfLines={1} style={{ color: theme.text, fontSize: 12, maxWidth: 140 }}>
+                <Text numberOfLines={1} style={{ color: theme.text, fontSize: TEXT.label, maxWidth: 140 }}>
                   {a.path ? a.name : t("composer.uploading", { name: a.name })}
                 </Text>
                 <Pressable hitSlop={8} accessibilityLabel={w("chat.attachments.remove", { name: a.name })} onPress={() => setAttachments((old) => old.filter((x) => x.key !== a.key))}>
@@ -368,15 +437,21 @@ export function Composer({
           }}
           placeholder={placeholder}
           placeholderTextColor={theme.textMuted}
-          editable={!disabled}
+          underlineColorAndroid="transparent"
           multiline
           textAlignVertical="top"
+          // El teclado dice «Enviar». En iOS y Android el retorno manda y no mete salto de línea.
+          returnKeyType="send"
+          enterKeyHint="send"
+          submitBehavior={Platform.OS === "web" ? undefined : "submit"}
+          onSubmitEditing={Platform.OS === "web" ? undefined : () => void send()}
+          onKeyPress={Platform.OS === "web" ? onWebKey : undefined}
         />
         <View style={styles.row}>
           {shell ? (
             <View style={[styles.pill, { backgroundColor: theme.text }]}>
               <Icon name="terminal" size={13} color={theme.bg} />
-              <Text style={{ color: theme.bg, fontSize: 12, fontWeight: "600" }}>{w("chat.composer.terminal")}</Text>
+              <Text style={{ color: theme.bg, fontSize: TEXT.label, fontWeight: "600" }}>{w("chat.composer.terminal")}</Text>
             </View>
           ) : (
             <>
@@ -393,7 +468,7 @@ export function Composer({
               {modes.length ? (
                 <Pressable testID="mode" onPress={() => setSheet("mode")} style={[styles.pill, { borderColor: theme.border, borderWidth: StyleSheet.hairlineWidth }]}>
                   <Icon name="shield" size={13} color={theme.textMuted} />
-                  <Text numberOfLines={1} style={{ color: theme.textMuted, fontSize: 12, maxWidth: 110 }}>
+                  <Text numberOfLines={1} style={{ color: theme.textMuted, fontSize: TEXT.label, maxWidth: 110 }}>
                     {modeOption ? phrase(modeOption.label) : w("chat.mode.placeholder")}
                   </Text>
                 </Pressable>
@@ -404,10 +479,10 @@ export function Composer({
           {!shell && current ? (
             <Pressable testID="model" onPress={() => setSheet("model")} style={[styles.pill, styles.modelPill, { borderColor: theme.border }]} accessibilityLabel={w("chat.model.title")}>
               <BrandMark id={current} size={13} color={theme.text} />
-              <Text numberOfLines={1} style={{ color: theme.text, fontSize: 12, maxWidth: 130 }}>
+              <Text numberOfLines={1} style={{ color: theme.text, fontSize: TEXT.label, maxWidth: 130 }}>
                 {modelText}
               </Text>
-              {efforts.length ? <Text style={{ color: theme.textMuted, fontSize: 12 }}>· {effortLabel(effort)}</Text> : null}
+              {efforts.length ? <Text style={{ color: theme.textMuted, fontSize: TEXT.label }}>· {effortLabel(effort)}</Text> : null}
               <Icon name="chevron-down" size={12} color={theme.textMuted} />
             </Pressable>
           ) : null}
@@ -418,25 +493,17 @@ export function Composer({
           ) : shell ? (
             <Pressable testID="send" disabled={!ready || !text.slice(1).trim()} onPress={send} style={[styles.run, { backgroundColor: theme.text, opacity: ready && text.slice(1).trim() ? 1 : 0.4 }]}>
               <Icon name="corner-down-left" size={14} color={theme.bg} />
-              <Text style={{ color: theme.bg, fontWeight: "700", fontSize: 13 }}>{sendLabel}</Text>
+              <Text style={{ color: theme.bg, fontWeight: "700", fontSize: TEXT.ui }}>{sendLabel}</Text>
             </Pressable>
           ) : (
-            <Pressable
-              testID="send"
-              disabled={!ready || !hasText}
-              onPress={send}
-              accessibilityLabel={sendLabel}
-              style={[styles.send, { backgroundColor: theme.primary, opacity: ready && hasText ? 1 : 0.4 }]}
-            >
-              <Icon name="arrow-up" size={17} color={theme.onPrimary} strokeWidth={2.5} />
-            </Pressable>
+            <SendButton disabled={!ready || !hasText} onPress={send} label={sendLabel} />
           )}
         </View>
       </View>
       {running && hasText && onStop ? (
         <Pressable onPress={onStop} style={styles.stopLine} testID="stop-inline">
           <Icon name="square" size={10} color={theme.textMuted} fill={theme.textMuted} />
-          <Text style={{ color: theme.textMuted, fontSize: 13 }}>{w("chat.turn.stop")}</Text>
+          <Text style={{ color: theme.textMuted, fontSize: TEXT.ui }}>{w("chat.turn.stop")}</Text>
         </Pressable>
       ) : null}
       {note ? <Text style={[styles.hint, { color: theme.textMuted, paddingHorizontal: 16 }]}>{note}</Text> : null}
@@ -457,63 +524,71 @@ export function Composer({
             disabled={Boolean(m.falta)}
             selected={(modeOption?.id ?? null) === m.id}
             onPress={() => {
-              setMode(m.por_omision ? null : m.id);
+              setMode(m.id);
               setSheet(null);
+              if (running) onModeChange?.(m.id);
             }}
           />
         ))}
       </Sheet>
 
-      <Sheet visible={sheet === "model"} title={w("chat.model.title")} onClose={() => setSheet(null)}>
-        <SheetSection>{w("chat.model.providers")}</SheetSection>
-        {providerLocked ? <Text style={[styles.hint, { color: theme.textMuted, paddingHorizontal: 18 }]}>{w("chat.model.locked")}</Text> : null}
-        {usable.map((p) => (
-          <SheetOption
-            key={p.id}
-            left={<BrandMark id={p.id} size={17} color={theme.text} />}
-            label={p.label}
-            selected={p.id === current}
-            disabled={providerLocked && p.id !== current}
-            onPress={() => {
-              if (p.id === current) return;
-              setProvider(p.id);
-              setModel(null);
-              setEffort(null);
-              setMode(null);
-            }}
-          />
-        ))}
-        <SheetSection>{w("chat.model.listbox")}</SheetSection>
-        {!models ? <Text style={[styles.hint, { color: theme.textMuted, paddingHorizontal: 18 }]}>{t("composer.loading")}</Text> : null}
-        {models && !models.models.length ? <Text style={[styles.hint, { color: theme.textMuted, paddingHorizontal: 18 }]}>{w("chat.model.empty")}</Text> : null}
-        {models?.models.map((m) => (
-          <SheetOption
-            key={m.id}
-            label={m.label || modelName(m.id, models)}
-            detail={m.note ? phrase(m.note) : null}
-            selected={model === m.id}
-            onPress={() => {
-              setModel(m.id);
-              if (effort && !m.efforts.includes(effort)) setEffort(null);
-            }}
-          />
-        ))}
-        {efforts.length ? (
-          <>
-            <SheetSection>{w("chat.effort.label")}</SheetSection>
-            <View style={styles.efforts}>
-              {[null, ...efforts].map((e) => (
-                <Pressable
-                  key={e ?? "auto"}
-                  onPress={() => setEffort(e)}
-                  style={[styles.effort, { borderColor: e === effort ? theme.primary : theme.border, backgroundColor: e === effort ? theme.primary : "transparent" }]}
-                >
-                  <Text style={{ color: e === effort ? theme.onPrimary : theme.text, fontWeight: e === effort ? "700" : "500" }}>{effortLabel(e)}</Text>
-                </Pressable>
+      <Sheet visible={sheet === "model"} title={w("chat.model.title")} search={t("search.models")} onClose={() => setSheet(null)}>
+        {(query) => {
+          const shownModels = models?.models.filter((m) => matches(query, m.label, m.id, modelName(m.id, models))) ?? [];
+          return (
+            <>
+              <SheetSection>{w("chat.model.providers")}</SheetSection>
+              {providerLocked ? <Text style={[styles.hint, { color: theme.textMuted, paddingHorizontal: 18 }]}>{w("chat.model.locked")}</Text> : null}
+              {usable.map((p) => (
+                <SheetOption
+                  key={p.id}
+                  left={<BrandMark id={p.id} size={17} color={theme.text} />}
+                  label={p.label}
+                  selected={p.id === current}
+                  disabled={providerLocked && p.id !== current}
+                  onPress={() => {
+                    if (p.id === current) return;
+                    setProvider(p.id);
+                    setModel(null);
+                    setEffort(null);
+                  }}
+                />
               ))}
-            </View>
-          </>
-        ) : null}
+              <SheetSection>{w("chat.model.listbox")}</SheetSection>
+              {!models ? <Text style={[styles.hint, { color: theme.textMuted, paddingHorizontal: 18 }]}>{t("composer.loading")}</Text> : null}
+              {models && !models.models.length ? <Text style={[styles.hint, { color: theme.textMuted, paddingHorizontal: 18 }]}>{w("chat.model.empty")}</Text> : null}
+              {models && models.models.length > 0 && !shownModels.length ? <NoMatch /> : null}
+              {shownModels.map((m) => (
+                <SheetOption
+                  key={m.id}
+                  label={m.label || modelName(m.id, models)}
+                  detail={m.note ? phrase(m.note) : null}
+                  selected={model === m.id}
+                  onPress={() => {
+                    setModel(m.id);
+                    if (effort && !m.efforts.includes(effort)) setEffort(null);
+                  }}
+                />
+              ))}
+              {efforts.length ? (
+                <>
+                  <SheetSection>{w("chat.effort.label")}</SheetSection>
+                  <View style={styles.efforts}>
+                    {[null, ...efforts].map((e) => (
+                      <Pressable
+                        key={e ?? "auto"}
+                        onPress={() => setEffort(e)}
+                        style={[styles.effort, { borderColor: e === effort ? theme.primary : theme.border, backgroundColor: e === effort ? theme.primary : "transparent" }]}
+                      >
+                        <Text style={{ color: e === effort ? theme.onPrimary : theme.text, fontWeight: e === effort ? "700" : "500" }}>{effortLabel(e)}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </>
+              ) : null}
+            </>
+          );
+        }}
       </Sheet>
     </View>
   );
@@ -539,8 +614,8 @@ export function SelectorChip({ icon, left, label, value, onPress, testID, muted 
       style={({ pressed }) => [styles.selector, { borderColor: theme.border, backgroundColor: pressed ? theme.muted : theme.surface }]}
     >
       {left ?? (icon ? <Icon name={icon} size={13} color={theme.textMuted} /> : null)}
-      {label ? <Text style={{ color: theme.textMuted, fontSize: 12 }}>{label}</Text> : null}
-      <Text numberOfLines={1} style={{ color: muted ? theme.textMuted : theme.text, fontSize: 13, fontWeight: "500", maxWidth: 150 }}>
+      {label ? <Text style={{ color: theme.textMuted, fontSize: TEXT.label }}>{label}</Text> : null}
+      <Text numberOfLines={1} style={{ color: muted ? theme.textMuted : theme.text, fontSize: TEXT.ui, fontWeight: "500", maxWidth: 150 }}>
         {value}
       </Text>
       {onPress ? <Icon name="chevron-down" size={12} color={theme.textMuted} /> : null}
@@ -550,8 +625,8 @@ export function SelectorChip({ icon, left, label, value, onPress, testID, muted 
 
 const styles = StyleSheet.create({
   wrap: { paddingHorizontal: 10, paddingTop: 6, gap: 6 },
-  box: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 20, paddingTop: 4, paddingBottom: 6, paddingHorizontal: 6 },
-  input: { fontSize: 16, lineHeight: 21, minHeight: 40, maxHeight: 21 * 6 + 16, paddingHorizontal: 8, paddingTop: 9, paddingBottom: 6 },
+  box: { borderWidth: 0, borderRadius: 20, paddingTop: 4, paddingBottom: 6, paddingHorizontal: 6, ...Platform.select({ web: { outlineStyle: "solid", outlineWidth: 0, boxShadow: "none" } }) },
+  input: { fontSize: 16, lineHeight: 21, minHeight: 40, maxHeight: 21 * 6 + 16, paddingHorizontal: 8, paddingTop: 9, paddingBottom: 6, borderWidth: 0, backgroundColor: "transparent", ...Platform.select({ web: { outlineStyle: "solid", outlineWidth: 0, boxShadow: "none" } }) },
   row: { flexDirection: "row", alignItems: "center", gap: 6 },
   round: { width: 34, height: 34, alignItems: "center", justifyContent: "center", borderRadius: 17 },
   pill: { flexDirection: "row", alignItems: "center", gap: 5, borderRadius: 14, paddingHorizontal: 9, height: 28 },
@@ -560,11 +635,11 @@ const styles = StyleSheet.create({
   run: { flexDirection: "row", alignItems: "center", gap: 6, height: 34, borderRadius: 17, paddingHorizontal: 14 },
   stopLine: { flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-end", paddingHorizontal: 8 },
   files: { gap: 6, paddingHorizontal: 4, paddingTop: 4 },
-  file: { flexDirection: "row", alignItems: "center", gap: 5, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5 },
+  file: { flexDirection: "row", alignItems: "center", gap: 5, borderRadius: RADIUS.lg, paddingHorizontal: 8, paddingVertical: 5 },
   queue: { gap: 6 },
   queued: { flexDirection: "row", alignItems: "center", gap: 10, borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
-  queueLabel: { fontSize: 11, fontWeight: "600" },
-  hint: { fontSize: 13, paddingVertical: 6, paddingHorizontal: 18 },
+  queueLabel: { fontSize: TEXT.caption, fontWeight: "600" },
+  hint: { fontSize: TEXT.ui, paddingVertical: 6, paddingHorizontal: 18 },
   suggestions: { maxHeight: 260, borderWidth: StyleSheet.hairlineWidth, borderRadius: 14, overflow: "hidden" },
   efforts: { flexDirection: "row", flexWrap: "wrap", gap: 8, paddingHorizontal: 18, paddingVertical: 8 },
   effort: { borderWidth: 1, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 8 },

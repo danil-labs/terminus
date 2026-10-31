@@ -1,13 +1,14 @@
-import { createSignal, For, lazy, Match, onMount, Show, Suspense, Switch } from "solid-js";
+import { createSignal, For, Match, onMount, Show, Switch } from "solid-js";
 import Check from "lucide-solid/icons/check";
 import { crearWorkspace } from "../features/onboarding/onboarding-store";
-import { Opcion, Pantalla } from "../features/onboarding/Screen";
+import { Pantalla } from "../features/onboarding/Screen";
 import { invoke } from "../lib/invoke.ts";
 import { t } from "../lib/i18n";
 import { capabilities } from "../lib/platform";
 import { cn } from "../lib/utils";
 import { HEADER_HEIGHT } from "../lib/window";
 import { Input } from "../ui/Input";
+import { Button } from "../ui/Button";
 import { OnboardingAccounts } from "./OnboardingAccounts";
 import "./phrases";
 
@@ -16,8 +17,6 @@ import "./phrases";
  * installed at provisioning, so the person only creates a space and connects
  * accounts. The desktop flow stays in `features/onboarding/Onboarding.tsx`.
  */
-
-const Radiant = lazy(() => import("../features/settings/Radiant"));
 
 type Step = "space" | "accounts";
 type Machine = { id: string; active: boolean };
@@ -86,11 +85,9 @@ function Steps(props: { current: number }) {
   );
 }
 
-/** A personal workspace, or one tied to the organization through Radiant once it exists. */
+/** The workspace only needs a name; organizations will come through Terminus Computers. */
 function Space(props: { nuevo: boolean; onCancelar?: () => void; onCreated: (name: string) => void }) {
-  const [kind, setKind] = createSignal<"personal" | "organization">("personal");
   const [name, setName] = createSignal(props.nuevo ? "" : t("onboarding.manual.default_name"));
-  const [created, setCreated] = createSignal<string | null>(null);
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal<unknown>(null);
 
@@ -101,8 +98,7 @@ function Space(props: { nuevo: boolean; onCancelar?: () => void; onCreated: (nam
     setError(null);
     try {
       await crearWorkspace(wanted);
-      setCreated(wanted);
-      if (kind() === "personal") props.onCreated(wanted);
+      props.onCreated(wanted);
     } catch (e) {
       setError(e);
     } finally {
@@ -110,58 +106,39 @@ function Space(props: { nuevo: boolean; onCancelar?: () => void; onCreated: (nam
     }
   }
 
-  const primary = () => {
-    const done = created();
-    if (done) return { rotulo: t("onboarding.continue"), onClick: () => props.onCreated(done) };
-    return {
-      rotulo: busy() ? t("onboarding.workspace.creating") : t("onboarding.workspace.create"),
-      onClick: () => void create(),
-      disabled: !name().trim() || busy(),
-    };
-  };
+  const primary = () => ({
+    rotulo: busy() ? t("onboarding.workspace.creating") : t("onboarding.workspace.create"),
+    onClick: () => void create(),
+    disabled: !name().trim() || busy(),
+  });
 
   return (
     <Pantalla
       titulo={t("web.onboarding.space.title")}
       lede={t("web.onboarding.space.lede")}
       pie={t("onboarding.workspace.footer")}
-      atras={props.nuevo && !created() ? props.onCancelar : undefined}
+      atras={props.nuevo ? props.onCancelar : undefined}
       atrasRotulo={t("onboarding.cancel")}
       primario={primary()}
       error={error()}
     >
-      <Show
-        when={!created()}
-        fallback={
-          <Suspense>
-            <Radiant />
-          </Suspense>
-        }
+      <form
+        class="grid gap-6"
+        onSubmit={(ev) => {
+          ev.preventDefault();
+          void create();
+        }}
       >
-        <form
-          class="grid gap-6"
-          onSubmit={(ev) => {
-            ev.preventDefault();
-            void create();
-          }}
-        >
-          <div class="flex flex-wrap gap-2" role="group">
-            <Opcion activa={kind() === "personal"} onClick={() => setKind("personal")}>
-              {t("web.onboarding.space.personal")}
-            </Opcion>
-            <Opcion activa={kind() === "organization"} onClick={() => setKind("organization")}>
-              {t("web.onboarding.space.organization")}
-            </Opcion>
-          </div>
-          <label class="grid gap-1.5">
-            <span class="text-[0.8125rem] font-semibold">{t("onboarding.workspace.name")}</span>
-            <Input value={name()} onInput={(ev) => setName(ev.currentTarget.value)} />
-          </label>
-          <Show when={kind() === "organization"}>
-            <p class="m-0 text-sm text-neutral-500">{t("web.onboarding.space.organization_hint")}</p>
-          </Show>
-        </form>
-      </Show>
+        <label class="grid gap-1.5">
+          <span class="text-ui font-semibold">{t("onboarding.workspace.name")}</span>
+          <Input value={name()} onInput={(ev) => setName(ev.currentTarget.value)} />
+        </label>
+        <Show when={props.nuevo && capabilities().webAccounts}>
+          <Button type="button" variant="ghost" class="justify-self-start" onClick={() => capabilities().webAccounts?.add()}>
+            {t("web.add_account.use_another")}
+          </Button>
+        </Show>
+      </form>
     </Pantalla>
   );
 }

@@ -17,7 +17,6 @@ import { Input } from "../../ui/Input";
 import { MarcaFuente, repoDe } from "../../ui/sources";
 import { SalidaDelAgente } from "./AgentOutput";
 import { CloseBehavior } from "./CloseBehavior";
-import { NotifyBehavior } from "./NotifyBehavior";
 import { DefaultPermissions } from "./DefaultPermissions";
 import { Governed } from "./Governed";
 import { Lengua } from "./Language";
@@ -120,7 +119,7 @@ function SourceRow(props: {
               {(o) => <span class="font-mono">{o()}</span>}
             </Show>
             <For each={props.f.projects}>
-              {(n) => <Badge forma="dato" class="text-[0.625rem]">{n}</Badge>}
+              {(n) => <Badge forma="dato" class="text-2xs">{n}</Badge>}
             </For>
             {/* El contexto principal se consume siempre; su lista de proyectos no mide ese uso. */}
             <Show when={!props.f.root}>
@@ -385,7 +384,6 @@ export default function General() {
         </SettingsRow>
         <DefaultPermissions />
         <CloseBehavior />
-        <NotifyBehavior />
       </SettingsSection>
 
       {/* Los temas de terminal aún no alcanzan el código ni el diff. Ofrecerlos aquí aparentaría un ajuste que apenas cambia la pantalla; docs/visual-system.md. */}

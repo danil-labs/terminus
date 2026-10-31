@@ -196,8 +196,8 @@ export function lenguasDisponibles(): Manifiesto[] {
 /**
  * Lo elegido en el alta, antes de que exista un workspace. No entra en la
  * cadena de resolución: si entrara, el maya probado en el alta iría a todos
- * los clientes creados después. La lengua es del workspace
- * (ARCHITECTURE.md § 9); `crearWorkspace` la fija al crear el workspace.
+ * los clientes creados después. La lengua es del workspace;
+ * `crearWorkspace` la fija al crear el workspace.
  */
 export function semillaDelAlta(): string {
   return almacen()?.getItem(CLAVE) ?? "sistema";
@@ -231,6 +231,7 @@ function resolver(pref: string): string {
   return BASE;
 }
 
+let requestedLanguage = semillaDelAlta();
 const [lengua, setLengua] = createSignal(
   // Lo último pintado, que es de un workspace o del alta: la ventana tiene que
   // poder pintarse antes de leer el disco. Sin nada, el sistema. Si ese código
@@ -254,6 +255,7 @@ export function manifiesto(): Manifiesto {
  * escribiendo en español bajo una interfaz en maya. Ver `lib/format.ts`.
  */
 export function elegirLengua(pref: string) {
+  requestedLanguage = pref;
   // Se recuerda para dársela al workspace que se está creando, no como
   // preferencia que gobierne después. Ver `semillaDelAlta`.
   if (pref === "sistema") almacen()?.removeItem(CLAVE);
@@ -267,13 +269,22 @@ export function elegirLengua(pref: string) {
 /**
  * `null` es seguir al sistema, el estado de un workspace recién creado. Que la
  * lengua cambie al cambiar de workspace es la función
- * (`workspaces::Workspace::lengua`, ARCHITECTURE.md § 9).
+ * (`workspaces::Workspace::lengua`).
  */
 export function aplicarLenguaDeWorkspace(codigo: string | null | undefined) {
+  requestedLanguage = codigo ?? "sistema";
   // Sin lengua declarada se sigue al sistema, no a la semilla del alta.
   const resuelto = resolver(codigo ?? "sistema");
   setLengua(resuelto);
   almacen()?.setItem(ULTIMA, resuelto);
+  aplicarLengua();
+}
+
+/** Un catálogo tardío vuelve a resolver la preferencia vigente, sin imponer la semilla del alta. */
+export function refreshLanguage() {
+  const resolved = resolver(requestedLanguage);
+  setLengua(resolved);
+  almacen()?.setItem(ULTIMA, resolved);
   aplicarLengua();
 }
 

@@ -23,7 +23,7 @@ Devuelve los incumplimientos a la tarea responsable.
 
 ## Implementación
 
-Trabaja desde `main` en una rama propia. Lee el código del área y mantén un
+Trabaja desde `dev` en una rama propia. Lee el código del área y mantén un
 cambio proporcional al encargo. Reporta los defectos adicionales sin ampliar
 el alcance por cuenta propia.
 
@@ -45,7 +45,7 @@ guardados o contratos. Encarga a `@qa` los recorridos afectados en la ventana
 real.
 
 Cambio local y commit firmado (`git commit -s`, Conventional Commits). Push y
-PR contra `main` solo por encargo. Reporta cambio, comprobaciones, plataforma
+PR contra `dev` solo por encargo. Reporta cambio, comprobaciones, plataforma
 y límites.
 
 ## Restricciones del área

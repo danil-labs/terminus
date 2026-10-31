@@ -6,7 +6,6 @@ import CircleAlert from "lucide-solid/icons/circle-alert";
 import FileDown from "lucide-solid/icons/file-down";
 import Maximize2 from "lucide-solid/icons/maximize-2";
 import Minimize2 from "lucide-solid/icons/minimize-2";
-import RefreshCw from "lucide-solid/icons/refresh-cw";
 import RotateCcw from "lucide-solid/icons/rotate-ccw";
 import TriangleAlert from "lucide-solid/icons/triangle-alert";
 import ZoomIn from "lucide-solid/icons/zoom-in";
@@ -14,6 +13,7 @@ import ZoomOut from "lucide-solid/icons/zoom-out";
 import { For, Show, createEffect, createSignal, on, onCleanup, onMount } from "solid-js";
 import { t } from "../../lib/i18n";
 import { invoke } from "../../lib/invoke.ts";
+import { machineOf } from "../machines/store";
 import { seguirHueco, type Hueco } from "../../lib/sites";
 import { Button } from "../../ui/Button";
 import { FailureNote, asFailure, type Failure } from "../../ui/Failure";
@@ -44,6 +44,7 @@ import {
   vivaDe,
   zoomDe,
 } from "./typst";
+import { Spinner } from "../../ui/Spinner";
 
 /**
  * La vista en vivo de un documento Typst de la tarea: la página de Tinymist en
@@ -200,7 +201,7 @@ export default function VistaPreviaTypst(props: {
           tree: props.arbol,
           path: props.ruta,
           main: principalElegido(props.project),
-        }),
+        }, machineOf(props.session)),
       );
     } catch (e) {
       setFallo(asFailure(e));
@@ -248,7 +249,7 @@ export default function VistaPreviaTypst(props: {
           <IconButton label={t("code.file.image.zoom_out")} onClick={() => fijarZoom(props.session, props.arbol, clampZoom(zoom() / ZOOM_STEP))}>
             <ZoomOut size={13} />
           </IconButton>
-          <span class="min-w-11 text-center font-mono text-[0.6875rem] tabular-nums text-neutral-500">
+          <span class="min-w-11 text-center font-mono text-caption tabular-nums text-neutral-500">
             {Math.round(zoom() * 100)}%
           </span>
           <IconButton label={t("code.file.image.zoom_in")} onClick={() => fijarZoom(props.session, props.arbol, clampZoom(zoom() * ZOOM_STEP))}>
@@ -268,13 +269,13 @@ export default function VistaPreviaTypst(props: {
             fallback={
               <Show when={compilando()}>
                 <span role="status" title={t("code.typst.compiling")} aria-label={t("code.typst.compiling")} class="grid size-6 place-items-center">
-                  <RefreshCw size={13} class="animate-spin-fluido text-primary" aria-hidden="true" />
+                  <Spinner size={13} class="text-primary" />
                 </span>
               </Show>
             }
           >
             <Show
-              when={compilado()?.status === "compileSuccess"}
+              when={compilado()?.status === "compileSuccess" && errores().length === 0}
               fallback={
                 <span role="status" title={t("code.typst.stale")} aria-label={t("code.typst.stale")} class="grid size-6 place-items-center">
                   <CircleAlert size={13} class="text-error-strong" aria-hidden="true" />
@@ -286,7 +287,7 @@ export default function VistaPreviaTypst(props: {
               </span>
             </Show>
           </Show>
-          <span class="ml-auto flex min-w-0 items-center gap-1.5 overflow-hidden font-mono text-[0.6875rem] text-neutral-500">
+          <span class="ml-auto flex min-w-0 items-center gap-1.5 overflow-hidden font-mono text-caption text-neutral-500">
             <Show when={compilado()?.pages}>
               {(n) => <span class="shrink-0">{t("code.file.pdf.pages", { count: n(), n: n() })}</span>}
             </Show>
@@ -314,40 +315,48 @@ export default function VistaPreviaTypst(props: {
 
         <Show when={exportado()}>
           {(x) => (
-            <div aria-live="polite" class="flex shrink-0 items-center gap-2 border-b border-border bg-surface-raised px-3 py-1 text-[0.6875rem]">
-              <Show
-                when={x().pdf}
-                fallback={
-                  <span class="text-error-strong">
-                    {t("code.typst.export.failed", {
-                      count: x().diagnostics.filter((d) => d.severity === "error").length,
-                    })}
-                  </span>
-                }
-              >
-                {(pdf) => (
-                  <>
-                    <span class="text-neutral-500">{t("code.typst.exported")}</span>
-                    <button
-                      type="button"
-                      class="font-mono text-primary underline-offset-2 outline-none hover:underline focus-visible:outline-2 focus-visible:outline-primary"
-                      title={t("code.typst.exported.open")}
-                      onClick={() => void abrirFuera(pdf())}
-                    >
-                      {pdf()}
-                    </button>
-                  </>
-                )}
+            <div aria-live="polite" class="shrink-0 border-b border-border bg-surface-raised text-caption">
+              <div class="flex items-center gap-2 px-3 py-1">
+                <Show
+                  when={x().pdf}
+                  fallback={
+                    <span class="text-error-strong">
+                      {t("code.typst.export.failed", {
+                        count: x().diagnostics.filter((d) => d.severity === "error").length,
+                      })}
+                    </span>
+                  }
+                >
+                  {(pdf) => (
+                    <>
+                      <span class="text-neutral-500">{t("code.typst.exported")}</span>
+                      <button
+                        type="button"
+                        class="font-mono text-primary underline-offset-2 outline-none hover:underline focus-visible:outline-2 focus-visible:outline-primary"
+                        title={t("code.typst.exported.open")}
+                        onClick={() => void abrirFuera(pdf())}
+                      >
+                        {pdf()}
+                      </button>
+                    </>
+                  )}
+                </Show>
+                <button
+                  type="button"
+                  class="ml-auto text-neutral-500 outline-none hover:text-neutral-950 focus-visible:outline-2 focus-visible:outline-primary"
+                  aria-label={t("code.typst.export.dismiss")}
+                  title={t("code.typst.export.dismiss")}
+                  onClick={() => setExportado(null)}
+                >
+                  ×
+                </button>
+              </div>
+              {/* La exportación compila aparte de la vista: sus errores pueden no estar en la lista de abajo. */}
+              <Show when={!x().pdf && x().diagnostics.length > 0}>
+                <ul class="m-0 max-h-48 list-none overflow-y-auto border-t border-border p-0">
+                  <For each={x().diagnostics}>{(d) => <FilaDiagnostico d={d} onIrA={props.onIrA} />}</For>
+                </ul>
               </Show>
-              <button
-                type="button"
-                class="ml-auto text-neutral-500 outline-none hover:text-neutral-950 focus-visible:outline-2 focus-visible:outline-primary"
-                aria-label={t("code.typst.export.dismiss")}
-                title={t("code.typst.export.dismiss")}
-                onClick={() => setExportado(null)}
-              >
-                ×
-              </button>
             </div>
           )}
         </Show>
@@ -373,7 +382,7 @@ export default function VistaPreviaTypst(props: {
         </div>
 
         <Show when={errores().length + avisos().length > 0}>
-          <div class="shrink-0 border-t border-border bg-surface-raised text-[0.6875rem]">
+          <div class="shrink-0 border-t border-border bg-surface-raised text-caption">
             <div class="flex items-center gap-2 py-1 pr-1.5 pl-3">
               <button
                 type="button"
@@ -412,33 +421,35 @@ export default function VistaPreviaTypst(props: {
             </div>
             <Show when={desplegada()}>
               <ul class="m-0 max-h-48 list-none overflow-y-auto border-t border-border p-0">
-                <For each={[...errores(), ...avisos()]}>
-                  {(d) => (
-                    <li>
-                      <button
-                        type="button"
-                        class="flex w-full items-start gap-2 px-3 py-1 text-left hover:bg-surface-muted disabled:cursor-default"
-                        disabled={d.line === null}
-                        onClick={() => props.onIrA(d)}
-                      >
-                        {d.severity === "error" ? (
-                          <CircleAlert size={12} class="mt-0.5 shrink-0 text-error-strong" aria-hidden="true" />
-                        ) : (
-                          <TriangleAlert size={12} class="mt-0.5 shrink-0 text-warning-strong" aria-hidden="true" />
-                        )}
-                        <Show when={lugarDe(d)}>
-                          <span class="shrink-0 font-mono text-neutral-500">{lugarDe(d)}</span>
-                        </Show>
-                        <span class="min-w-0 break-words text-neutral-950">{d.message}</span>
-                      </button>
-                    </li>
-                  )}
-                </For>
+                <For each={[...errores(), ...avisos()]}>{(d) => <FilaDiagnostico d={d} onIrA={props.onIrA} />}</For>
               </ul>
             </Show>
           </div>
         </Show>
       </Show>
     </div>
+  );
+}
+
+function FilaDiagnostico(props: { d: DiagnosticoTypst; onIrA: (d: DiagnosticoTypst) => void }) {
+  return (
+    <li>
+      <button
+        type="button"
+        class="flex w-full items-start gap-2 px-3 py-1 text-left hover:bg-surface-muted disabled:cursor-default"
+        disabled={props.d.line === null}
+        onClick={() => props.onIrA(props.d)}
+      >
+        {props.d.severity === "error" ? (
+          <CircleAlert size={12} class="mt-0.5 shrink-0 text-error-strong" aria-hidden="true" />
+        ) : (
+          <TriangleAlert size={12} class="mt-0.5 shrink-0 text-warning-strong" aria-hidden="true" />
+        )}
+        <Show when={lugarDe(props.d)}>
+          <span class="shrink-0 font-mono text-neutral-500">{lugarDe(props.d)}</span>
+        </Show>
+        <span class="min-w-0 break-words text-neutral-950">{props.d.message}</span>
+      </button>
+    </li>
   );
 }

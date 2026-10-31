@@ -50,7 +50,7 @@ async function abrir(shared_credential, accounts) {
     service_poll: { cursor: 0, gap: false, replay: false, runtime: "fixture", reset: false },
   });
   await click(app, "Configuración");
-  await click(app, "Proveedores de IA");
+  await click(app, "Cuentas de IA");
   // Con cuentas, la tarjeta del agente ya está abierta.
   await sleep(300);
   if (!button(app, "+ Agregar cuenta")) await click(app, "Antigravity");

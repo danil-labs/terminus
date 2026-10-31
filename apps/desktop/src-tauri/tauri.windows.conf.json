@@ -22,8 +22,12 @@
       "nsis"
     ],
     "windows": {
+      "webviewInstallMode": { "type": "embedBootstrapper" },
       "nsis": {
-        "installerHooks": "./windows/hooks.nsh"
+        "installerHooks": "./windows/hooks.nsh",
+        "installerIcon": "./windows/installer.ico",
+        "sidebarImage": "./windows/nsis-sidebar.bmp",
+        "headerImage": "./windows/nsis-header.bmp"
       }
     }
   }

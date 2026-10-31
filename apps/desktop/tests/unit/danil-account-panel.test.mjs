@@ -1,12 +1,14 @@
 /**
- * Configuración → Cuenta de Danil contra un motor simulado: entrar con el
- * navegador, cancelar y cerrar sesión. Monta `dist/`.
+ * Configuración → Cuentas de Danil contra un motor simulado: entrar con el
+ * navegador, cancelar y cerrar sesión con la cuenta única (un motor sin
+ * `danil_sessions`), y la lista de cuentas con una sesión por cuenta. Monta `dist/`.
  */
 import assert from "node:assert/strict";
 import test from "node:test";
 import { boot, sleep } from "../helpers/jsdom-app.mjs";
 
 const BASE = {
+  danil_sessions: Object.assign(new Error("command"), { detail: "command" }),
   window_ready: null,
   window_vitals: null,
   setup_required: false,
@@ -62,7 +64,7 @@ test("la cuenta de Danil entra con el navegador, muestra el código y cierra ses
 
   w.dispatchEvent(new w.CustomEvent("harness:open-settings", { detail: "cuenta-danil" }));
   await sleep(800);
-  assert.ok(w.document.getElementById("cfg-tab-cuenta-danil")?.textContent.includes("Cuenta de Danil"), "the rail shows the section");
+  assert.ok(w.document.getElementById("cfg-tab-account")?.textContent.includes("Cuenta"), "the rail shows the section");
   assert.equal(panel()?.dataset.danilAccount, "disconnected");
   assert.equal(panel().querySelector("input")?.value, "alberto-mbp", "the name defaults to the hostname the engine suggests");
   assert.ok(text().includes("Nombre de esta computadora"), "the field names the machine, not the account");
@@ -117,6 +119,48 @@ test("la cuenta de Danil entra con el navegador, muestra el código y cierra ses
   await settle();
   assert.equal(calls.at(-1)?.command, "danil_disconnect");
   assert.equal(panel()?.dataset.danilAccount, "disconnected");
+});
+
+test("sin licencia, la sección abre la prueba en el navegador y reintenta", async () => {
+  let licensed = false;
+  const calls = [];
+  const record = (command, reply) => (args) => {
+    calls.push({ command, args });
+    return reply(args);
+  };
+  const app = await boot("listo", "danil-account-license", {
+    ...BASE,
+    danil_connect_status: { state: "disconnected", name: "alberto-mbp" },
+    danil_connect_start: record("danil_connect_start", () => {
+      if (!licensed) throw Object.assign(new Error("license_required"), { what: { clave: "danil.error.license_required" }, detail: "license_required" });
+      return { state: "pending", user_code: "WDJB-MJHT", verification_uri_complete: "https://app.danil.ai/terminus/connect?code=WDJB-MJHT" };
+    }),
+    open_external: record("open_external", () => null),
+  });
+  const { w } = app;
+  const panel = () => w.document.querySelector("[data-danil-account]");
+  const text = () => panel()?.textContent ?? "";
+  const button = (label) => [...(panel()?.querySelectorAll("button") ?? [])].find((b) => b.textContent.trim() === label);
+  w.dispatchEvent(new w.CustomEvent("harness:open-settings", { detail: "cuenta-danil" }));
+  await sleep(800);
+
+  button("Iniciar sesión con Danil").click();
+  await sleep(300);
+  assert.ok(text().includes("Activa Danil"), text());
+  assert.ok(text().includes("7 días gratis, sin tarjeta; después, 99 MXN al mes con IVA incluido."), text());
+  assert.ok(!text().includes("no tiene licencia"), "the bare refusal is gone");
+
+  button("Empezar prueba gratis").click();
+  await sleep(100);
+  assert.equal(calls.find((c) => c.command === "open_external")?.args?.target, "https://app.danil.ai/modules/billing?modulo=terminus");
+
+  licensed = true;
+  button("Ya lo activé · Reintentar").click();
+  await sleep(300);
+  assert.equal(calls.filter((c) => c.command === "danil_connect_start").length, 2, "retrying signs in again");
+  assert.ok(!text().includes("Activa Danil"), text());
+  assert.ok(text().includes("Confirma en el navegador · código WDJB-MJHT"), text());
+  assert.deepEqual(app.fallos, []);
 });
 
 test("con un motor que no trae el flujo, la sección lo dice en vez de fallar", async () => {
@@ -197,5 +241,80 @@ test("la cuenta muestra nombre y foto, cambia la foto en la cuenta y la quita", 
   assert.equal(calls.at(-1)?.command, "danil_account_remove_photo");
   assert.equal(photo(), null);
   assert.equal(panel().querySelector("[data-account-avatar]")?.textContent, "AC", "back to the initials");
+  assert.deepEqual(app.fallos, []);
+});
+
+const session = (extra) => ({
+  account: "u_alberto",
+  email: "alberto@danil.ai",
+  name: "Alberto Ceballos",
+  photo: null,
+  computer_id: "cmp_a",
+  computer_name: "Mac de Alberto",
+  default: true,
+  workspaces: ["w"],
+  status: "connected",
+  online: true,
+  ...extra,
+});
+const FUNDACION = { account: "u_fdb", email: "alberto@dondebanco.org", name: "Alberto (FDB)", computer_id: "cmp_b", default: false, workspaces: ["w2", "w3"], online: false };
+
+test("el panel muestra solo la cuenta del workspace y revela los cambios de cuenta al pedirlos", async () => {
+  const sessions = [session(), session(FUNDACION)];
+  const calls = [];
+  let of = { account: "u_fdb", email: FUNDACION.email, signed_in: true, linked: true };
+  const app = await boot("listo", "danil-workspace-only-account", {
+    ...BASE,
+    danil_sessions: sessions,
+    danil_workspace_account: () => of,
+    danil_account_refresh: ({ account }) => {
+      calls.push({ command: "profile", account });
+      const s = sessions.find((x) => x.account === account);
+      return { state: "connected", account, email: s.email, account_name: s.name };
+    },
+    danil_disconnect: ({ account }) => {
+      calls.push({ command: "disconnect", account });
+      of = { ...of, signed_in: false, linked: false };
+      return { state: "disconnected" };
+    },
+  });
+  const { w } = app;
+  w.dispatchEvent(new w.CustomEvent("harness:open-settings", { detail: "cuenta-danil" }));
+  await sleep(900);
+  const panel = w.document.querySelector("[data-danil-account]");
+  assert.equal(panel.dataset.danilAccount, "workspace");
+  assert.deepEqual([...panel.querySelectorAll("[data-danil-session]")].map((el) => el.dataset.danilSession), ["u_fdb"]);
+  assert.ok(!panel.textContent.includes("alberto@danil.ai"), "the default account does not leak into this workspace");
+  assert.equal(panel.querySelector("[data-workspace-account-select]"), null, "account choices are progressive");
+  assert.deepEqual(calls, [{ command: "profile", account: "u_fdb" }]);
+  panel.querySelector("[data-danil-manage]").click();
+  await sleep(300);
+  assert.equal(panel.querySelector("[data-workspace-account-select]").value, "u_fdb");
+  panel.querySelector("[data-danil-sign-out]").click();
+  await sleep(100);
+  assert.equal(calls.filter((c) => c.command === "disconnect").length, 0);
+  panel.querySelector("[data-danil-sign-out-yes]").click();
+  await sleep(300);
+  assert.deepEqual(calls.at(-1), { command: "disconnect", account: "u_fdb" });
+  assert.equal(panel.querySelector("[data-danil-session]"), null, "a signed-out owner is not replaced by the default session");
+  assert.deepEqual(app.fallos, []);
+});
+
+test("con un motor anterior que no trae danil_sessions, la sección es la cuenta única de siempre", async () => {
+  const unknown = () => Object.assign(new Error("command"), { what: { clave: "shell.service.command" }, detail: "command" });
+  const app = await boot("listo", "danil-accounts-old-engine", {
+    ...BASE,
+    danil_sessions: unknown(),
+    danil_workspace_account: unknown(),
+    danil_connect_status: { state: "connected", computer_id: "cmp_1", name: "Mac", email: "alberto@danil.ai", online: true },
+    danil_account_refresh: { state: "connected", computer_id: "cmp_1", name: "Mac", email: "alberto@danil.ai", online: true },
+  });
+  const { w } = app;
+  w.dispatchEvent(new w.CustomEvent("harness:open-settings", { detail: "cuenta-danil" }));
+  await sleep(800);
+  const panel = w.document.querySelector("[data-danil-account]");
+  assert.equal(panel?.dataset.danilAccount, "connected");
+  assert.ok(panel.textContent.includes("Esta computadora: Mac"));
+  assert.ok(!panel.textContent.includes("Agregar otra cuenta"), "no second account without the engine's sessions");
   assert.deepEqual(app.fallos, []);
 });

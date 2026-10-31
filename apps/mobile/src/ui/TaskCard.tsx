@@ -1,13 +1,17 @@
-import { folderColor } from "@terminus/design";
-import { type SidebarDensity, type TaskCard as Card, taskTitle } from "@terminus/tasks";
+import { AgentAvatar } from "./AgentAvatar";
+import { folderColor, RADIUS, TEXT } from "@terminus/design";
+import { type CardPull, type TaskCard as Card, type PullTone, cardPull, canFinishTask, type TaskGit, taskTitle } from "@terminus/tasks";
 import * as Haptics from "expo-haptics";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { memo } from "react";
+import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { secondLine } from "../lib/cardLine";
+import { sameCard } from "../lib/reconcile";
 import type { Task } from "../lib/engine";
-import { lang, w } from "../lib/i18n";
-import { Avatar } from "./components";
-import { Icon } from "./Icon";
+import { lang, t, w } from "../lib/i18n";
+import { BrandMark } from "./BrandMark";
+import { Icon, type IconName } from "./Icon";
 import { TaskMark } from "./TaskStatus";
-import { useTheme } from "./theme";
+import { type Theme, useTheme } from "./theme";
 
 /** El cuadrado de color de una carpeta, que la identifica en la lista plana. */
 export function FolderSquare({ id, size = 8 }: { id: string; size?: number }) {
@@ -30,32 +34,90 @@ export function MachineChip({ name, on, size = 12 }: { name: string; on: boolean
   );
 }
 
-/**
- * La tarjeta de dos líneas del sidebar del escritorio (#151), en el teléfono.
- * Línea 1: la marca en su columna, el título y la chincheta. Línea 2: lo que te
- * piden si te necesita (y el cuadrado de su carpeta); si no, la carpeta, la
- * cara del agente y la máquina. «Compacta», una sola línea con el cuadrado.
- * Qué va en cada línea lo decide `taskCard` de `@terminus/tasks`. Mantenerla
- * pulsada abre la vista previa (la tarjeta flotante del escritorio).
- */
-export function TaskCard({
-  task,
-  card,
-  folderName,
-  density,
-  onPress,
-  onLongPress,
-}: {
+const PULL_ICONS: Record<CardPull["state"], IconName> = {
+  open: "git-pull-request",
+  draft: "git-pull-request-draft",
+  closed: "git-pull-request-closed",
+  merged: "git-merge",
+  merged_other_head: "git-branch",
+};
+
+const toneColor = (theme: Theme, tone: PullTone) =>
+  tone === "open" ? theme.unseenMark : tone === "closed" || tone === "failure" ? theme.failedMark : tone === "merged" ? theme.merged : theme.textMuted;
+
+/** El PR de la tarea, como `ChipDeGit` del riel: su icono y `#número`, rojo si el CI falló. */
+export function PullChip({ pull, git }: { pull: CardPull; git?: TaskGit | null }) {
+  const theme = useTheme();
+  const checks = git?.pull_known && git.head === git.pull?.head_sha ? git.pull?.checks : undefined;
+  const state = t(`task.git.${pull.state}`);
+  const checkLabel = !git?.stale && (pull.state === "open" || pull.state === "draft") && (checks === "pending" || checks === "failure") ? t(`task.git.checks.${checks}`) : state;
+  const label = git?.stale ? t("task.git.stale_short") : checkLabel;
+  return (
+    <View testID="task-pull" style={[styles.chip, { minWidth: 0, maxWidth: 200 }]} accessibilityLabel={`#${pull.number}, ${state}${label === state ? "" : `, ${label}`}`}>
+      <Icon name={PULL_ICONS[pull.state]} size={11} color={toneColor(theme, pull.tone)} />
+      <Text numberOfLines={1} style={[styles.meta, { flexShrink: 1, color: toneColor(theme, pull.numberTone) }]}>#{pull.number} · {label}</Text>
+    </View>
+  );
+}
+
+type TaskCardProps = {
   task: Task;
   card: Card;
+  git?: TaskGit | null;
   folderName: (id: string) => string | undefined;
-  density: SidebarDensity;
   onPress: () => void;
   onLongPress?: () => void;
-}) {
+  onFinish?: () => void;
+  online: boolean;
+  /** La hora corta a la derecha («2 min»); el menú queda en la pulsación larga. */
+  when?: string;
+  /** Una etiqueta al final de la segunda línea («Archivada» en Buscar). */
+  tag?: string;
+};
+
+/**
+ * Una tarjeta solo se repinta si cambia lo que enseña: su tarea (el mismo
+ * objeto mientras no cambie, `keepSame`), su tarjeta, su git o el nombre de su
+ * carpeta. `onPress` y `onLongPress` llegan nuevas en cada render
+ * pero solo abren la tarea, que es la misma: no cuentan.
+ */
+const sameProps = (a: TaskCardProps, b: TaskCardProps) =>
+  a.task === b.task &&
+  a.git === b.git &&
+  a.online === b.online &&
+  a.when === b.when &&
+  a.tag === b.tag &&
+  !a.onFinish === !b.onFinish &&
+  !a.onLongPress === !b.onLongPress &&
+  sameCard(a.card, b.card) &&
+  (a.card.folder ? a.folderName(a.card.folder) : null) === (b.card.folder ? b.folderName(b.card.folder) : null);
+
+/**
+ * La lista del teléfono: título, marca y acciones en la primera línea;
+ * proveedor, carpeta, máquina, agente y PR o rama en la segunda. La lista lee
+ * el Git por carpeta; pulsar el cohete confirma sin abrir la conversación.
+ */
+export const TaskCard = memo(TaskCardView, sameProps);
+
+function TaskCardView({
+  task,
+  card,
+  git: observed,
+  folderName,
+  onPress,
+  onLongPress,
+  onFinish,
+  online,
+  when,
+  tag,
+}: TaskCardProps) {
   const theme = useTheme();
-  const compact = density === "compact";
+  const git = observed && !online ? { ...observed, stale: true } : observed;
   const folder = card.folder ? { id: card.folder, name: folderName(card.folder) } : null;
+  const pull = cardPull(git);
+  const chips = secondLine(card, pull);
+  const ready = online && canFinishTask(task, git, card.activity.viva || card.activity.aprobando);
+  const branch = !git?.shared_with ? git?.branch : null;
   return (
     <Pressable
       testID={`task-${task.host}-${task.id}`}
@@ -69,7 +131,10 @@ export function TaskCard({
           : undefined
       }
       delayLongPress={350}
-      style={({ pressed }) => [styles.card, { backgroundColor: pressed ? theme.muted : "transparent" }]}
+      accessibilityActions={onLongPress ? [{ name: "longpress", label: t("task.actions.menu") }] : undefined}
+      onAccessibilityAction={(event) => { if (event.nativeEvent.actionName === "longpress") onLongPress?.(); }}
+      android_ripple={{ color: theme.border }}
+      style={({ pressed }) => [styles.card, { backgroundColor: pressed && Platform.OS !== "android" ? theme.border : "transparent" }]}
     >
       <View style={styles.line}>
         <View style={styles.mark}>
@@ -87,45 +152,56 @@ export function TaskCard({
             <Icon name="pin" size={13} color={theme.textMuted} />
           </View>
         ) : null}
-        {compact && folder ? <FolderSquare id={folder.id} /> : null}
+        {onFinish && pull?.state === "merged" && !git?.stale ? <Pressable testID={`finish-${task.host}-${task.id}`} accessibilityRole="button" accessibilityLabel={`${t("task.header.finish")}: ${taskTitle(lang, task)}`} accessibilityState={{ disabled: !ready }} disabled={!ready} hitSlop={8} onPress={(event) => { event.stopPropagation(); onFinish(); }} style={{ width: 40, height: 40, alignItems: "center", justifyContent: "center", marginVertical: -8, opacity: ready ? 1 : 0.3 }}>
+          <Icon name="rocket" size={18} color={theme.merged} />
+        </Pressable> : null}
+        {when ? <Text style={[styles.when, { color: theme.textMuted }]}>{when}</Text> : null}
       </View>
-      {compact ? null : (
-        <View style={[styles.line, styles.second]}>
-          {card.needsYou ? (
-            <>
-              <Text numberOfLines={1} style={[styles.request, { color: theme.text }]}>
-                {card.request ?? ""}
-              </Text>
-              {folder ? <FolderSquare id={folder.id} /> : null}
-            </>
-          ) : (
-            <>
-              {folder ? (
-                <View style={styles.chip}>
+      <View style={[styles.line, styles.second]}>
+        {chips.map((chip) => {
+          switch (chip) {
+            case "provider":
+              return (
+                <View key={chip} testID="task-provider" accessibilityRole="image" accessibilityLabel={card.provider ?? ""}>
+                  <BrandMark id={card.provider} size={13} color={theme.text} />
+                </View>
+              );
+            case "folder":
+              return folder ? (
+                <View key={chip} style={styles.chip}>
                   <FolderSquare id={folder.id} />
                   <Text numberOfLines={1} style={[styles.meta, { color: theme.textMuted, maxWidth: 130 }]}>
                     {folder.name ?? folder.id}
                   </Text>
                 </View>
-              ) : null}
-              {card.agent ? <Avatar name={card.agent} size={14} round /> : null}
-              {card.machine ? <MachineChip name={card.machine.id} on={card.machine.on} /> : null}
-            </>
-          )}
-        </View>
-      )}
+              ) : null;
+            case "machine":
+              return card.machine ? <MachineChip key={chip} name={card.machine.id} on={card.machine.on} /> : null;
+            case "agent":
+              return card.agent ? <AgentAvatar key={chip} name={card.agent} size={14} host={task.host} folder={task.folder} /> : null;
+            case "pull":
+              return pull ? <PullChip key={chip} pull={pull} git={git} /> : null;
+          }
+        })}
+        {!pull && branch ? <View style={styles.chip} accessibilityLabel={branch}>
+          <Icon name="git-branch" size={11} color={theme.textMuted} />
+          <Text numberOfLines={1} style={[styles.meta, { color: theme.textMuted, maxWidth: 160 }]}>{branch}</Text>
+        </View> : null}
+        {tag ? <Text style={[styles.tag, { color: theme.textMuted, backgroundColor: theme.muted }]}>{tag}</Text> : null}
+      </View>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  card: { paddingHorizontal: 16, paddingVertical: 8, gap: 3 },
+  card: { paddingHorizontal: 16, paddingVertical: 10, gap: 4, minHeight: 60, justifyContent: "center" },
+  tag: { fontSize: TEXT.caption, fontWeight: "600", paddingHorizontal: 6, paddingVertical: 1, borderRadius: RADIUS.sm, overflow: "hidden" },
+  when: { fontSize: 12.5, fontVariant: ["tabular-nums"] },
   line: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 18 },
   second: { paddingLeft: 24, gap: 8 },
   mark: { width: 18, alignItems: "center" },
   hollow: { width: 9, height: 9, borderRadius: 5, borderWidth: 1.5 },
-  title: { flex: 1, fontSize: 15, fontWeight: "500" },
-  request: { flex: 1, fontSize: 13 },
+  title: { flex: 1, fontSize: 16, fontWeight: "500" },
   chip: { flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 1 },
-  meta: { fontSize: 12 },
+  meta: { fontSize: TEXT.label },
 });

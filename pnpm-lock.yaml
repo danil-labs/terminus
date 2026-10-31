@@ -58,6 +58,9 @@ importers:
       '@modelcontextprotocol/ext-apps':
         specifier: ^2.0.3
         version: 2.0.3(@modelcontextprotocol/client@2.3.1)(@modelcontextprotocol/core@2.3.1)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)(zod@4.6.5)
+      '@novnc/novnc':
+        specifier: 1.7.0
+        version: 1.7.0
       '@supabase/supabase-js':
         specifier: ^2.118.0
         version: 2.118.0
@@ -76,6 +79,9 @@ importers:
       '@tauri-apps/plugin-updater':
         specifier: ^2.10.1
         version: 2.10.1
+      '@terminus/carry':
+        specifier: workspace:*
+        version: link:../../packages/carry
       '@terminus/chat':
         specifier: workspace:*
         version: link:../../packages/chat
@@ -85,6 +91,9 @@ importers:
       '@terminus/design':
         specifier: workspace:*
         version: link:../../packages/design
+      '@terminus/fleet':
+        specifier: workspace:*
+        version: link:../../packages/fleet
       '@terminus/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
@@ -189,11 +198,17 @@ importers:
         specifier: ^2.11.14
         version: 2.11.14(solid-js@1.9.17)(vite@6.4.4(@types/node@26.4.0)(jiti@2.7.0)(lightningcss@1.32.0))
 
+  packages/attention: {}
+
+  packages/carry: {}
+
   packages/chat: {}
 
   packages/computers: {}
 
   packages/design: {}
+
+  packages/fleet: {}
 
   packages/protocol: {}
 
@@ -933,6 +948,9 @@ packages:
     cpu: [x64]
     os: [linux]
     libc: [glibc]
+
+  '@novnc/novnc@1.7.0':
+    resolution: {integrity: sha512-ucEJOx4T2avIRCleodk7YobZj5O2Ga2AeLfQ69A/yjG9HHba2+PDgwSkN3FttrmG+70ZGx21sElNFouK13RzyA==}
 
   '@radix-ui/primitive@1.0.0':
     resolution: {integrity: sha512-3e7rn8FDMin4CgeL7Z/49smCA3rFYY3Ha2rUQ7HRWFadS5iCRw08ZgVT1LaNTCNqgvrUiyczLflrVrF0SRQtNA==}
@@ -3971,6 +3989,8 @@ snapshots:
 
   '@napi-rs/lzma-linux-x64-gnu@1.5.1':
     optional: true
+
+  '@novnc/novnc@1.7.0': {}
 
   '@radix-ui/primitive@1.0.0':
     dependencies:

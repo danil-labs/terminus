@@ -68,8 +68,32 @@ function makePrivate(path, folder = false) {
   if (result.status !== 0) fail(`icacls ${path}: ${result.stdout}${result.stderr}`);
 }
 
+/** Loopback only: a lab may point at a local fake control plane, never at the real one. */
+const loopback = (value) => {
+  try {
+    return ["localhost", "127.0.0.1", "[::1]"].includes(new URL(value).hostname);
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Engine and Terminus variables of the calling shell never reach the lab. On an agent
+ * host they carry the real Danil machine credential (`SELDON_DANIL_MACHINE_FILE`) and
+ * the calling task's connection: inherited, the throwaway lab signs in to the real
+ * account and links its workspace there.
+ */
+function inherited() {
+  const env = {};
+  for (const [name, value] of Object.entries(process.env)) {
+    if (/^(SELDON|TERMINUS|DANIL)_/i.test(name) && !(/^DANIL_COMPUTERS_URL$/i.test(name) && loopback(value))) continue;
+    env[name] = value;
+  }
+  return env;
+}
+
 function labEnvironment(extra = {}) {
-  const env = { ...process.env, HOME, TMPDIR: TMP, TEMP: TMP, TMP, HARNESS_IGNORE_SYSTEM_AGENTS: "1", ...extra };
+  const env = { ...inherited(), HOME, TMPDIR: TMP, TEMP: TMP, TMP, HARNESS_IGNORE_SYSTEM_AGENTS: "1", ...extra };
   if (WINDOWS) {
     Object.assign(env, {
       USERPROFILE: HOME,
@@ -241,7 +265,9 @@ async function startEngine() {
     if (existsSync(join(DATA, "seldon-endpoint.json")) && endpoint().pid === child.pid) {
       const ep = endpoint();
       console.log(JSON.stringify({ pid: child.pid, runtime: ep.runtime, contract: ep.contract }));
-      if (ep.contract !== LOCK.contract) console.warn(`Warning: the engine speaks contract ${ep.contract}; this window expects ${LOCK.contract}.`);
+      // The window speaks the vendored commands.json, which may be ahead of the lock (MOTOR_PENDIENTE).
+      const vendored = sha256(join(ROOT, "src-tauri", "crates", "engine-protocol", "commands.json"));
+      if (ep.contract !== vendored) console.warn(`Warning: the engine speaks contract ${ep.contract}; this window expects ${vendored}.`);
       return;
     }
     await new Promise((r) => setTimeout(r, 100));

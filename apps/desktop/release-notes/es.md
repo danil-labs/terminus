@@ -1,8 +1,13 @@
-Terminus 0.2.84 sincroniza todos tus workspaces con tu cuenta de Danil y te deja elegir en qué máquina corre cada tarea.
+Terminus 0.2.89 es una pre-release del instalador con herramientas de trabajo incluidas. También carga el trabajo disponible sin esperar a una VM que no responde y dirige el composer a la máquina elegida.
 
-- **Tus workspaces en todas tus máquinas.** Con la sesión de Danil iniciada, todos los workspaces de esta computadora se ven en la web, en el teléfono y en tus otras máquinas, también los que crees después. Al cerrar sesión deja de sincronizarse. Ya no hay que vincular cada workspace a mano.
-- **«Ejecutar en» decide dónde corre la tarea.** Si eliges tu VM, la tarea nace ahí: el workspace es el mismo en todas tus máquinas y el proyecto se clona en la VM la primera vez que hace falta.
-- **Clonar y crear carpetas en otra máquina** desde la web, el escritorio y el teléfono, con su avance y la opción de cancelar.
-- **Nuevo arranque.** Conecta tu IA y personaliza Terminus desde el primer inicio, con una preparación más clara.
-- **Fórmulas en el chat.** Las fórmulas LaTeX se pintan con KaTeX.
-- **Arreglos.** El fondo del chat ya no se borra ni pasa de un workspace a otro, se ve por qué no se puede agregar otra cuenta, y en Windows ya se puede quitar una cuenta de Antigravity.
+- **Herramientas incluidas.** Git portable, Python privado con uv y bibliotecas para hojas de cálculo, documentos, presentaciones, PDF e imágenes; ripgrep, agent-browser nativo, visor draw.io y Cua Driver.
+- **Navegación explícita.** Chrome for Testing se descarga al activar la navegación, con progreso, cancelación y reintento. No forma parte de los recursos base.
+- **Preparación ligera.** Node/npm y los gestores del proyecto se instalan por decisión de la persona. Bun deja de recomendarse en la preparación; una instalación existente se conserva.
+- **Activaciones.** Cua comienza desactivado. Se conservan las activaciones existentes y las decisiones de desactivar draw.io.
+- **Actualización recuperable.** El motor importa las herramientas en versiones separadas y conserva la anterior para recuperación.
+- **Carga por máquina.** La web muestra las tareas disponibles y las copias guardadas mientras consulta las demás máquinas. Las respuestas tardías actualizan la lista sin duplicarla, y abrir una tarea conserva las filas que ya estaban visibles.
+- **Crear y adjuntar donde elegiste.** El composer consulta los proyectos y las ramas de la máquina seleccionada, y crea o adjunta el trabajo allí. Llevar trabajo desde otra máquina conserva su flujo explícito.
+- **VM apagada desde el teléfono.** Enviar un mensaje usa el encendido de la VM aunque la copia guardada tenga un turno que parecía seguir activo. Consumos muestra la copia y su fecha sin encender la máquina.
+- **Permisos entre ventanas.** Una decisión retira el aviso de permiso en las demás ventanas. Vincular un workspace desde el escritorio actualiza el contexto de la web sin recargar la página.
+
+El motor y los recursos se fijan por versión y SHA-256. En Linux, si AppArmor impide iniciar Chrome con sandbox, la navegación permite autorizar una regla limitada a ese navegador mediante el diálogo del sistema. La creación de archivos Office no incluye recálculo ni renderizado de Office sin LibreOffice, que permanece opcional.

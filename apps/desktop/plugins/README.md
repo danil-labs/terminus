@@ -35,5 +35,5 @@ cobertura sin exigir que el paquete traduzca todo el catálogo. No corre en
 paquete de lengua. Córrelo a mano al tocar un paquete.
 
 Los plugins binarios (descarga, hash, instalación y activación) los gestiona el
-motor de Terminus; la ventana solo los muestra en Configuración → Plugins
-(`src/features/settings/Plugins.tsx`).
+motor de Terminus; la ventana solo los muestra en Configuración → Conexiones
+(`src/features/settings/ConnectionsOperation.tsx`).

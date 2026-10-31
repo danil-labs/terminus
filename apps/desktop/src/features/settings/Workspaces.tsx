@@ -1,8 +1,6 @@
-import { For, Show, createSignal, onMount, splitProps, type JSX } from "solid-js";
+import { For, Show, Suspense, createResource, createSignal, lazy, onMount, splitProps, type JSX } from "solid-js";
 import { invoke } from "../../lib/invoke.ts";
 import { open } from "@tauri-apps/plugin-dialog";
-import Check from "lucide-solid/icons/check";
-import ChevronsUpDown from "lucide-solid/icons/chevrons-up-down";
 import Cloud from "lucide-solid/icons/cloud";
 import ImagePlus from "lucide-solid/icons/image-plus";
 import Laptop from "lucide-solid/icons/laptop";
@@ -14,9 +12,7 @@ import { Input } from "../../ui/Input";
 import type { Project } from "../../lib/model";
 import { PROJECT_NAME_MAX_LENGTH } from "../../lib/projectNames";
 import { FailureNote, asFailure, type Failure } from "../../ui/Failure";
-import { SidebarMenuButton } from "../../ui/sidebar";
 import { SettingsRow } from "./layout";
-import { Popover, PopoverContent, PopoverTrigger } from "../../ui/Popover";
 import { Skeleton } from "../../ui/Skeleton";
 import { enfocar, enfocarYSeleccionar } from "../../lib/focus";
 import { t } from "../../lib/i18n";
@@ -27,10 +23,15 @@ import { imagenInerte } from "../../lib/links";
 import {
   anunciarMudanza,
   anunciarRenombrado,
-  cerrarConEscape,
   createWorkspaces,
   type Workspace,
 } from "./workspaces-store";
+import { capabilities } from "../../lib/platform";
+import { elegirArchivoDeImagen } from "../../lib/pick-image";
+import { blobToDataUrl } from "./account-profile";
+
+// Chunk aparte: la cuenta de Danil del workspace solo pesa al abrir esta pantalla.
+const WorkspaceAccount = lazy(() => import("./WorkspaceAccount"));
 
 // ------------------------------------------------ la fila de la lista
 
@@ -90,134 +91,6 @@ export function NavigationListRow(props: NavigationListRowProps) {
       })}
       {...resto}
     />
-  );
-}
-
-/**
- * El menú de workspace: el control del pie del riel que despliega dónde estás y
- * a dónde puedes ir.
- *
- * Va en dos sitios y es el mismo componente: el pie del riel, que es de donde se
- * cambia a diario, y la cabecera de Configuración, que es donde el workspace ya
- * encabeza el sidebar por ser el alcance de todo lo de abajo.
- *
- * Lo que el menú NO hace es administrar: renombrar, apuntar a otra carpeta y
- * borrar viven en su panel. Cambiar es de todos los días y administrar es de una
- * vez, así que uno está a un clic y el otro detrás de la puerta que le toca.
- *
- * **Y no abre Configuración**, que tiene su propio ícono al lado de éste en el
- * pie del riel — es la forma de Palette: cuenta y ajustes son dos botones al
- * mismo nivel, no uno escondido dentro del
- * otro.
- */
-export function WorkspaceMenu(props: {
-  /** `top` en el pie del riel, `bottom` en la cabecera de Configuración. */
-  lado?: "top" | "bottom";
-  /** En el riel colapsado solo cabe el ícono. */
-  compact?: boolean;
-  /** Abre el panel donde se administran. */
-  onManage?: () => void;
-}) {
-  const ws = createWorkspaces();
-  const [abierto, setAbierto] = createSignal(false);
-
-  cerrarConEscape(abierto, () => setAbierto(false));
-
-  function elegir(accion: () => void) {
-    setAbierto(false);
-    accion();
-  }
-
-  const item = `grid w-full grid-cols-[16px_minmax(0,1fr)_auto] items-center gap-2
-    rounded-sm px-2 py-1.5 text-left text-[0.8125rem] hover:bg-surface-muted
-    disabled:pointer-events-none disabled:opacity-60`;
-
-  return (
-    <Popover
-      open={abierto()}
-      onOpenChange={setAbierto}
-      // Radix llevaba `side` + `align` + `sideOffset`; Kobalte compone los dos
-      // primeros en `placement` y llama `gutter` al tercero.
-      placement={props.lado === "bottom" ? "bottom-start" : "top-start"}
-      gutter={4}
-    >
-      <PopoverTrigger
-        as={(p: object) => (
-          <SidebarMenuButton
-            {...p}
-            class="grid-cols-[auto_minmax(0,1fr)_auto]"
-            aria-haspopup="menu"
-            aria-label={t("settings.workspaces.menu_label", {
-              name: ws.actual()?.name ?? t("settings.workspaces.none"),
-            })}
-            title={props.compact ? ws.actual()?.name : undefined}
-          >
-            <Show when={ws.actual()?.git_host} fallback={<Laptop size={15} />}>
-              <Cloud size={15} />
-            </Show>
-            <Show when={!props.compact}>
-              <span class="truncate text-left">
-                {ws.actual()?.name ?? "…"}
-              </span>
-              <ChevronsUpDown size={14} class="text-neutral-500" />
-            </Show>
-          </SidebarMenuButton>
-        )}
-      />
-
-      <PopoverContent
-        role="menu"
-        class="grid w-[260px] gap-0.5 p-1"
-        // **Al abrir no se enfoca nada.** Kobalte le daba el foco a la primera
-        // entrada, así que el anillo salía rodeando al primer workspace de la
-        // lista —siempre el mismo, porque van por fecha de creación— y no al que
-        // está puesto: se lee como si ése fuera el actual, y Enter cambiaría de
-        // cliente sin querer.
-        //
-        // Se quita en vez de moverlo al actual: quien abre este menú con el
-        // ratón no necesita que nada esté enfocado, y la marca ✓ ya dice cuál
-        // es. El teclado sigue entrando con Tab.
-        onOpenAutoFocus={(e: Event) => e.preventDefault()}
-      >
-        {/* Sale por el portal del átomo, fuera del recorte deliberado del
-            sidebar. Su z-[70] queda por encima del asa z-40 y del shell. */}
-        <For each={ws.lista() ?? []}>
-          {(w) => (
-            <button
-              role="menuitem"
-              class={item}
-              onClick={() => elegir(() => void ws.cambiarA(w.id))}
-            >
-              {/* La marca ocupa sitio siempre, esté o no: sin eso los nombres se
-                  desalinean y el activo se distingue por estar corrido. */}
-              <span class="text-primary">
-                <Show when={w.id === ws.activo()}>
-                  <Check size={14} />
-                </Show>
-              </span>
-              <span class="truncate">{w.name}</span>
-            </button>
-          )}
-        </For>
-
-        <Show when={props.onManage}>
-          {(abrir) => (
-            <>
-              <span class="my-1 h-px bg-border" />
-              <button
-                role="menuitem"
-                class={item}
-                onClick={() => elegir(abrir())}
-              >
-                <span />
-                <span>{t("settings.workspaces.manage")}</span>
-                <span />
-              </button>
-            </>
-          )}
-        </Show>
-      </PopoverContent>
-    </Popover>
   );
 }
 
@@ -297,10 +170,14 @@ function CarpetaDeCopias(props: { workspace: Workspace; onCambio: () => void }) 
 
 const IMAGENES_DE_LOGO = ["png", "jpg", "jpeg", "webp"];
 
+const pngDeBase64 = (base64: string) => new Blob([Uint8Array.from(atob(base64), (c) => c.charCodeAt(0))], { type: "image/png" });
+
 /**
  * El logo que pinta la columna y el menú del nombre. Se copia dentro del
  * workspace: la carpeta elegida puede no estar mañana. `fila` es la de Estilo;
- * sin ella va metida en la tarjeta del workspace.
+ * sin ella va metida en la tarjeta del workspace. En la web, el de un
+ * workspace de la cuenta se elige con el selector de la página y se guarda en
+ * la cuenta (`capabilities().accountAssets`).
  */
 export function LogoDelWorkspace(props: {
   workspace: Workspace;
@@ -310,14 +187,26 @@ export function LogoDelWorkspace(props: {
   const [guardando, setGuardando] = createSignal(false);
   const [fallo, setFallo] = createSignal<Failure | null>(null);
   const [recorte, setRecorte] = createSignal<string | null>(null);
+  const cuenta = capabilities().accountAssets;
+  const [version, setVersion] = createSignal(0);
+  const [logoDeLaCuenta] = createResource(
+    () => (cuenta ? { id: props.workspace.id, v: version() } : null),
+    ({ id }) => cuenta?.read(id, "logo").catch(() => undefined) ?? undefined,
+  );
+  const tieneLogo = () => !!props.workspace.logo || !!logoDeLaCuenta();
+  const cambiado = () => {
+    setVersion((n) => n + 1);
+    anunciarRenombrado();
+    props.onCambio();
+  };
 
   async function quitar() {
     setGuardando(true);
     setFallo(null);
     try {
-      await invoke("set_workspace_logo", { id: props.workspace.id, source: null });
-      anunciarRenombrado();
-      props.onCambio();
+      if (!(cuenta && (await cuenta.remove(props.workspace.id, "logo"))))
+          await invoke("set_workspace_logo", { id: props.workspace.id, source: null });
+      cambiado();
     } catch (e) {
       setFallo(asFailure(e));
     } finally {
@@ -329,10 +218,10 @@ export function LogoDelWorkspace(props: {
     setGuardando(true);
     setFallo(null);
     try {
-      await invoke("set_workspace_logo_png", { id: props.workspace.id, pngBase64 });
+      if (!(cuenta && (await cuenta.put(props.workspace.id, "logo", pngDeBase64(pngBase64)))))
+        await invoke("set_workspace_logo_png", { id: props.workspace.id, pngBase64 });
       setRecorte(null);
-      anunciarRenombrado();
-      props.onCambio();
+      cambiado();
     } catch (e) {
       setFallo(asFailure(e));
     } finally {
@@ -341,6 +230,15 @@ export function LogoDelWorkspace(props: {
   }
 
   async function elegir() {
+    if (cuenta) {
+      const file = await elegirArchivoDeImagen(IMAGENES_DE_LOGO);
+      if (!file) return;
+      setFallo(null);
+      const src = imagenInerte(await blobToDataUrl(file).catch(() => null));
+      if (!src) return setFallo({ what: "settings.workspaces.logo.unreadable", detail: "" });
+      setRecorte(src);
+      return;
+    }
     const chosen = await open({
       multiple: false,
       directory: false,
@@ -373,18 +271,18 @@ export function LogoDelWorkspace(props: {
       aria-hidden="true"
       class={`relative grid shrink-0 place-items-center overflow-hidden rounded-lg border border-border bg-surface font-semibold text-neutral-700 ${tamano}`}
     >
-      <MarcaDeWorkspace name={props.workspace.name} logo={props.workspace.logo} />
+      <MarcaDeWorkspace id={props.workspace.id} name={props.workspace.name} logo={props.workspace.logo} />
     </span>
   );
   const acciones = (
     <>
       <Button size="sm" variant="outline" disabled={guardando()} onClick={() => void elegir()}>
         <ImagePlus size={14} />
-        {props.workspace.logo
+        {tieneLogo()
           ? t("settings.workspaces.logo.change")
           : t("settings.workspaces.logo.pick")}
       </Button>
-      <Show when={props.workspace.logo}>
+      <Show when={tieneLogo()}>
         <Button size="sm" variant="ghost" disabled={guardando()} onClick={() => void quitar()}>
           {t("settings.workspaces.logo.clear")}
         </Button>
@@ -407,7 +305,7 @@ export function LogoDelWorkspace(props: {
         <div class="grid gap-1 pl-[27px] text-xs">
           <span class="text-neutral-500">{t("settings.workspaces.logo.title")}</span>
           <div class="flex items-center gap-2">
-            {marca("size-10 text-[0.875rem]")}
+            {marca("size-10 text-body")}
             {acciones}
           </div>
           <p class="m-0 text-neutral-500">{t("settings.workspaces.logo.hint")}</p>
@@ -417,7 +315,7 @@ export function LogoDelWorkspace(props: {
       }
     >
       <SettingsRow
-        lead={marca("size-8 text-[0.75rem]")}
+        lead={marca("size-8 text-label")}
         label={t("settings.workspaces.logo.title")}
         description={t("settings.workspaces.logo.hint")}
       >
@@ -628,6 +526,12 @@ export default function Workspaces() {
                     <LogoDelWorkspace workspace={w} onCambio={() => void ws.cargar()} />
 
                     <CarpetaDeCopias workspace={w} onCambio={() => void ws.cargar()} />
+
+                    <Show when={capabilities().danilAccount}>
+                      <Suspense fallback={null}>
+                        <WorkspaceAccount workspace={w.id} name={w.name} />
+                      </Suspense>
+                    </Show>
 
                     {/* Sus proyectos. Aquí y no en el selector de la caja porque
                         son dos actos distintos: elegir con cuál trabajar es de

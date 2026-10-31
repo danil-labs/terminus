@@ -10,21 +10,24 @@
  * intente, permisos y avisos, y la lista cerrada de comandos. Y lo que se
  * agregó para parecerse al escritorio: fijar y archivar desde la vista previa
  * (encendiendo la VM), el cuadro de escribir (modelos, permisos, `/`, `@`,
- * ramas, `!`, imágenes adjuntas y la cola), y las cuentas de IA juntadas por
- * correo con su consumo, el inicio de sesión sin pantalla en otra máquina y
+ * ramas, `!`, imágenes adjuntas y la cola), y las credenciales de IA con su
+ * consumo propio, el inicio de sesión sin pantalla en otra máquina y
  * cerrar la sesión en una.
  */
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { groupAccounts, groupWorkspaces, listComputers, orderComputers, startComputer, windowLabel } from "@terminus/computers";
-import type { AiAccount, EngineEvent, LoginEvent } from "@terminus/protocol";
+import { groupAccounts, groupWorkspaces, listComputers, listWorkspaces, orderComputers, startComputer, windowLabel } from "@terminus/computers";
+import { readTaskGit, canFinishTask, type TaskGitStatus } from "@terminus/tasks";
+import type { AiAccount, ArchivedTasks, DeleteOutcome, DeletePreview, EngineEvent, KeepAwakeStatus, LoginEvent, OpenPorts, Space } from "@terminus/protocol";
 import {
   type Notice,
   accountsOf,
   addAccount,
   archiveTask,
+  finishTask,
+  stopTask,
   baseBranchesOf,
   beginLogin,
   cancelClone,
@@ -41,7 +44,9 @@ import {
   modelsOf,
   noticer,
   permissionModesOf,
+  switchLiveMode,
   projectDirectoryOf,
+  renameTask,
   respondPermission,
   runShell,
   sendToTask,
@@ -51,9 +56,11 @@ import {
   snapshotOf,
   submitLoginCode,
   uploadAttachment,
+  withAccountFolders,
+  workspaceEntries,
   workspacesOf,
 } from "../src/lib/engine.ts";
-import { type Host, HostError, relayHost } from "../src/lib/hosts.ts";
+import { type Host, HostError, accountFleet } from "../src/lib/hosts.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -76,13 +83,14 @@ async function hostsAt(endpoint: string) {
   const answer = await listComputers(endpoint, "fake-jwt");
   assert.equal(answer.kind, "ok");
   const computers = answer.kind === "ok" ? answer.value : [];
-  const hosts = orderComputers(computers).map((c) =>
-    relayHost(c, { endpoint, getToken: () => "fake-jwt", wake: async () => (await startComputer(endpoint, "fake-jwt", c.computer_id)).kind === "ok" }),
-  );
+  // Una sola flota para todas, como la app (`machines.tsx`).
+  const machines = accountFleet({ endpoint, getToken: () => "fake-jwt", wake: async (id) => (await startComputer(endpoint, "fake-jwt", id)).kind === "ok" });
+  const hosts = machines.set(computers);
+  const close = () => machines.close();
   const events = new Map<string, EngineEvent[]>();
   for (const h of hosts) h.onEvents((list) => events.set(h.id, [...(events.get(h.id) ?? []), ...list]));
   await sleep(200);
-  return { hosts, events, byId: (id: string) => hosts.find((h) => h.id === id) as Host };
+  return { hosts, events, close, byId: (id: string) => hosts.find((h) => h.id === id) as Host };
 }
 
 const steps: string[] = [];
@@ -98,7 +106,7 @@ const ok = (step: string) => {
   const endpoint = `http://127.0.0.1:${port}`;
   try {
     assert.equal((await listComputers(endpoint, "otro")).kind, "unauthorized");
-    const { hosts, events, byId } = await hostsAt(endpoint);
+    const { hosts, events, byId, close } = await hostsAt(endpoint);
     const vm = byId("cmp_vm");
     const mac = byId("cmp_mac");
     assert.equal(vm.managed, true);
@@ -114,7 +122,7 @@ const ok = (step: string) => {
     const [vmWs, macWs] = await Promise.all([workspacesOf(vm), workspacesOf(mac)]);
     assert.ok(vmWs.cachedAt !== null, "la VM contesta desde el espejo");
     assert.equal(macWs.cachedAt, null);
-    const groups = groupWorkspaces([{ machine: "cmp_vm", rows: vmWs.list }, { machine: "cmp_mac", rows: macWs.list }]);
+    const groups = groupWorkspaces([{ machine: "cmp_vm", rows: vmWs.list ?? [] }, { machine: "cmp_mac", rows: macWs.list ?? [] }]);
     assert.equal(groups.length, 1, "el mismo workspace, con el mismo id en cada motor, se ve una vez");
     const members = groups[0].members;
     assert.deepEqual([...members], [["cmp_vm", "w-prod"], ["cmp_mac", "w-prod"]]);
@@ -156,6 +164,7 @@ const ok = (step: string) => {
     const pid = await createTask(mac, "w-prod", { folder: "p-mac-api", prompt: "Pide permiso para borrar build", provider: "claude", model: null, agent: null, space: null });
     await until("pide permiso", () => (events.get("cmp_mac") ?? []).some((e) => e.name === "chat" && (e.payload as { kind: string }).kind === "permission"));
     const waiting = await loadTask(mac, "w-prod", "p-mac-api", pid);
+    assert.equal(typeof waiting.liveSince, "number", "el reloj del turno sale de list_live_turns");
     assert.equal(waiting.permissions.length, 1);
     assert.equal(waiting.running, true);
     await respondPermission(mac, "w-prod", pid, waiting.permissions[0].request_id, true);
@@ -166,7 +175,16 @@ const ok = (step: string) => {
     assert.equal((await loadTask(mac, "w-prod", "p-mac-api", pid)).permissions.length, 0);
     ok("en la Mac: la tarea pide permiso, se aprueba desde el teléfono y termina; avisos de aprobación y de terminada");
 
-    for (const h of hosts) h.close();
+    const aid = await createTask(mac, "w-prod", { folder: "p-mac-api", prompt: "Pide permiso para borrar build", provider: "claude", model: null, agent: null, space: null, permissionMode: "manual" });
+    const asking = () => (events.get("cmp_mac") ?? []).some((e) => e.name === "chat" && (e.payload as { kind: string; session: string }).kind === "permission" && (e.payload as { session: string }).session === aid);
+    await until("pide permiso en manual", asking);
+    assert.equal((await loadTask(mac, "w-prod", "p-mac-api", aid)).permissions.length, 1);
+    await switchLiveMode(mac, "w-prod", "p-mac-api", aid, "auto");
+    await until("termina al pasar a automático", () => (events.get("cmp_mac") ?? []).some((e) => e.name === "chat" && (e.payload as { kind: string; session: string }).kind === "done" && (e.payload as { session: string }).session === aid));
+    assert.equal((await loadTask(mac, "w-prod", "p-mac-api", aid)).permissions.length, 0);
+    ok("con el turno en marcha, pasar a automático lo cambia en el turno vivo y aprueba lo que ya pidió");
+
+    close();
   } finally {
     child.kill();
   }
@@ -178,12 +196,12 @@ const ok = (step: string) => {
   const child = await fake(port, "--mac-off");
   const endpoint = `http://127.0.0.1:${port}`;
   try {
-    const { hosts, byId } = await hostsAt(endpoint);
+    const { hosts, byId, close } = await hostsAt(endpoint);
     const mac = byId("cmp_mac");
     assert.equal(mac.power(), "off");
     assert.equal(mac.canAct(), "asleep");
     const ws = await workspacesOf(mac);
-    assert.deepEqual(ws.list, [], "sin copia, una lectura apagada es vacía, no un error");
+    assert.equal(ws.list, null, "sin copia, una lectura apagada no dice nada, y no es un error");
     await assert.rejects(
       createTask(mac, "w-prod", { folder: "p-mac-api", prompt: "hola", provider: "claude", model: null, agent: null, space: null }),
       (e: HostError) => e.code === "machine_asleep",
@@ -191,10 +209,20 @@ const ok = (step: string) => {
     assert.equal(mac.power(), "off");
     ok("una máquina propia apagada: lecturas vacías sin error y la acción no se manda (machine_asleep)");
     await assert.rejects(setPinned(mac, "w-prod", "p-mac-api", "t-mac-1", true), (e: HostError) => e.code === "machine_asleep");
-    await assert.rejects(addAccount(mac, "claude"), (e: HostError) => e.code === "machine_asleep");
+    await assert.rejects(addAccount(mac, "w-prod", "claude"), (e: HostError) => e.code === "machine_asleep");
     assert.equal(mac.power(), "off");
     ok("fijar o iniciar sesión en una máquina propia apagada tampoco se intenta");
-    for (const h of hosts) h.close();
+
+    const registry = await listWorkspaces(endpoint, "fake-jwt");
+    assert.equal(registry.kind, "ok");
+    const accountList = registry.kind === "ok" ? registry.value : null;
+    const vmWs = await workspacesOf(byId("cmp_vm"));
+    const entries = workspaceEntries(hosts, { cmp_vm: vmWs.list, cmp_mac: ws.list }, accountList);
+    assert.deepEqual(entries.map((e) => [e.id, e.hosts.includes("cmp_mac")]), [["w-prod", true]], "el workspace de la cuenta sigue en la Mac apagada");
+    const folders = withAccountFolders({ folders: [], spaces: [] }, accountList, "w-prod", ["cmp_mac"]).folders;
+    assert.deepEqual(folders.map((f) => f.key), ["cmp_mac/p-mac-api"], "con sus carpetas del registro");
+    ok("el registro de la cuenta (GET /v1/workspaces) trae el workspace y sus carpetas con la máquina apagada");
+    close();
   } finally {
     child.kill();
   }
@@ -206,19 +234,24 @@ const ok = (step: string) => {
   const child = await fake(port);
   const endpoint = `http://127.0.0.1:${port}`;
   try {
-    const { hosts, events, byId } = await hostsAt(endpoint);
+    const { hosts, events, byId, close } = await hostsAt(endpoint);
     const vm = byId("cmp_vm");
     const mac = byId("cmp_mac");
     const live = async (h: Host, ws: string) => (await snapshotOf(h, ws)).tasks;
 
-    // Fijar con la VM apagada: no es intención del relay, la enciende el plano de control antes.
+    // Fijar ya no enciende la VM (con ella apagada el relay lo aplaza, #307, y este falso no aplaza): se enciende antes.
     assert.equal(vm.power(), "off");
+    await vm.wake();
     await setPinned(vm, "w-prod", "p-vm-web", "t-vm-1", true);
     assert.equal(vm.power(), "on");
     assert.equal((await live(vm, "w-prod")).find((t) => t.id === "t-vm-1")?.pinned, true);
     await setPinned(vm, "w-prod", "p-vm-web", "t-vm-1", false);
     assert.equal((await live(vm, "w-prod")).find((t) => t.id === "t-vm-1")?.pinned, false);
-    ok("Fijar y Desfijar desde la vista previa (set_session_pinned); con la VM apagada, primero la enciende");
+    ok("Fijar y Desfijar desde la vista previa (set_session_pinned) en la VM encendida");
+
+    await renameTask(vm, "w-prod", "p-vm-web", "t-vm-1", "Revisar el pago");
+    assert.equal((await live(vm, "w-prod")).find((t) => t.id === "t-vm-1")?.title, "Revisar el pago");
+    ok("Cambiarle el nombre desde la vista previa (rename_session)");
 
     const blocked = await archiveTask(mac, "w-prod", "p-mac-web", "t-mac-2");
     assert.ok("blocked" in blocked && blocked.blocked[0].files.includes("src/home.tsx"));
@@ -254,34 +287,34 @@ const ok = (step: string) => {
     assert.equal(ran.session.turns.at(-1)?.text, "$ ls\nok");
     ok("«Mandar ahora» (inject_message) y `!` sin tarea crea una con el comando (run_shell_command)");
 
-    // Las cuentas: la misma persona en las dos máquinas se ve una vez, con el consumo leído de una.
-    const lists = await Promise.all(hosts.map(async (h) => ({ machine: h.id, on: h.power() === "on", accounts: ((await accountsOf(h, "claude"))?.accounts ?? []) as AiAccount[] })));
+    // El mismo correo no une credenciales: cada una conserva su máquina y consumo.
+    const lists = await Promise.all(hosts.map(async (h) => ({ machine: h.id, on: h.power() === "on", accounts: ((await accountsOf(h, "w-prod", "claude"))?.accounts ?? []) as AiAccount[] })));
     const groups = groupAccounts("claude", lists);
-    assert.equal(groups.length, 1);
-    assert.deepEqual(groups[0].members.map((m) => m.machine), ["cmp_vm", "cmp_mac"]);
-    const limits = await limitsOf(byId(groups[0].usageFrom.machine), "claude", groups[0].usageFrom.id);
+    assert.equal(groups.length, 2);
+    assert.deepEqual(groups.map((g) => g.members.map((m) => m.machine)), [["cmp_vm"], ["cmp_mac"]]);
+    const limits = await limitsOf(byId(groups[0].usageFrom.machine), "w-prod", "claude", groups[0].usageFrom.id);
     assert.equal(limits?.mode, "read");
     assert.match(windowLabel("es", limits?.mode === "read" ? limits.windows[0] : { used_pct: 0, resets_at: null }), /^resta 62% · reset en 3 h$/);
-    ok("cuentas: una tarjeta por proveedor y correo con sus dos máquinas, el consumo una vez («resta 62% · reset en 3 h»)");
+    ok("cuentas: cada credencial conserva su tarjeta y consumo aunque comparta correo («resta 62% · reset en 3 h»)");
 
     const accountEvents = (h: Host, id: string) => (events.get(h.id) ?? []).filter((e) => e.name === "account" && (e.payload as LoginEvent).account === id).map((e) => e.payload as LoginEvent);
-    const codexId = await addAccount(vm, "codex");
-    await beginLogin(vm, "codex", codexId);
+    const codexId = await addAccount(vm, "w-prod", "codex");
+    await beginLogin(vm, "w-prod", "codex", codexId);
     await until("codex termina solo", () => accountEvents(vm, codexId).some((e) => e.kind === "done"));
     assert.deepEqual(accountEvents(vm, codexId).map((e) => e.kind), ["url", "confirm", "done"]);
     assert.equal(accountEvents(vm, codexId).find((e) => e.kind === "confirm")?.text, "WXYZ-1234");
-    assert.equal((await accountsOf(vm, "codex"))?.accounts[0].identity, "ana@example.com");
-    const claudeId = await addAccount(mac, "claude");
-    await beginLogin(mac, "claude", claudeId);
+    assert.equal((await accountsOf(vm, "w-prod", "codex"))?.accounts[0].identity, "ana@example.com");
+    const claudeId = await addAccount(mac, "w-prod", "claude");
+    await beginLogin(mac, "w-prod", "claude", claudeId);
     await until("claude pide el código", () => accountEvents(mac, claudeId).some((e) => e.kind === "code"));
-    await submitLoginCode(mac, claudeId, "good-code");
+    await submitLoginCode(mac, "w-prod", claudeId, "good-code");
     await until("claude termina", () => accountEvents(mac, claudeId).some((e) => e.kind === "done"));
     assert.equal(accountEvents(mac, claudeId).at(-1)?.text, "");
     ok("iniciar sesión en otra máquina sin pantalla: Codex con enlace y código a comparar; Claude con enlace y código pegado");
 
-    await signOutAccount(mac, "claude", "a-mac-1");
-    assert.ok(!(await accountsOf(mac, "claude"))?.accounts.some((a) => a.id === "a-mac-1"));
-    assert.ok((await accountsOf(vm, "claude"))?.accounts.some((a) => a.id === "a-vm-1"), "en la otra máquina sigue");
+    await signOutAccount(mac, "w-prod", "claude", "a-mac-1");
+    assert.ok(!(await accountsOf(mac, "w-prod", "claude"))?.accounts.some((a) => a.id === "a-mac-1"));
+    assert.ok((await accountsOf(vm, "w-prod", "claude"))?.accounts.some((a) => a.id === "a-vm-1"), "en la otra máquina sigue");
     ok("cerrar la sesión en una máquina (remove_account) deja la de las demás");
 
     // Carpetas nuevas en la máquina elegida: vacía y clonada, con su avance por eventos.
@@ -303,7 +336,44 @@ const ok = (step: string) => {
     await assert.rejects(slow, (e: HostError) => (e.detail as { what?: { clave?: string } })?.what?.clave === "projects.error.clone_cancelled");
     ok("«Nueva carpeta» (create_project) y «Clonar repo» (start_project_clone + project_clone): avance, carpeta listada, URL rechazada y cancelar");
 
-    for (const h of hosts) h.close();
+    await stopTask(mac, "w-prod", "p-mac-api", "t-mac-1");
+    const { value: beforeGit } = await mac.call("list_session_git", "w-prod", { project: "p-mac-api", remote: true });
+    assert.deepEqual(beforeGit, {}, "el motor no descubre tareas solo con el refresco remoto");
+    const git = await readTaskGit(async remote => (await mac.call<Record<string, TaskGitStatus>>("list_session_git", "w-prod", { project: "p-mac-api", remote, priority: ["t-mac-1"] })).value);
+    assert.equal(canFinishTask({}, git["t-mac-1"], false), true);
+    assert.deepEqual(await finishTask(mac, "w-prod", "p-mac-api", "t-mac-1"), { finished: true });
+    assert.equal((await live(mac, "w-prod")).some(t => t.id === "t-mac-1"), false);
+    assert.ok("blocked" in await finishTask(mac, "w-prod", "p-mac-web", "t-mac-2"));
+    ok("Git y Finalizar: lectura local y PR por el mismo motor; el cierre valida bloqueos y retira la tarea");
+
+    // La UI nueva: espacios, Mantener despierta, puertos y archivadas.
+    const spaces = async () => (await vm.call<Space[]>("list_spaces", "w-prod", {})).value;
+    const made = (await vm.call<Space>("create_space", "w-prod", { name: "Pagos" })).value;
+    await vm.call("rename_space", "w-prod", { id: made.id, name: "Cobros" });
+    assert.equal((await spaces()).find((x) => x.id === made.id)?.name, "Cobros");
+    const preview = (await vm.call<DeletePreview>("space_delete_preview", "w-prod", { id: made.id })).value;
+    const gone = (await vm.call<DeleteOutcome>("delete_space", "w-prod", { id: made.id, seen: { tasks: preview.tasks, discard: false } })).value;
+    assert.equal(gone.deleted, true);
+    assert.ok(!(await spaces()).some((x) => x.id === made.id));
+    assert.equal(vm.available?.("spaces"), "yes");
+    ok("espacios: crear, renombrar, ver qué toca eliminar y eliminar (create_space, rename_space, space_delete_preview, delete_space)");
+
+    assert.equal((await vm.call<KeepAwakeStatus>("keep_awake_status", "w-prod", {})).value.mode, "agent");
+    assert.equal((await vm.call<KeepAwakeStatus>("set_keep_awake", "w-prod", { mode: "on" })).value.mode, "on");
+    assert.equal(vm.available?.("keep_awake"), "yes");
+    assert.equal((await vm.call<OpenPorts>("list_ports", "w-prod", {})).value.externos[0].url, "http://localhost:5173");
+    await assert.rejects(mac.call("keep_awake_status", "w-prod", {}), (e: HostError) => e.code === "command_unsupported");
+    await assert.rejects(mac.call("list_ports", "w-prod", {}), (e: HostError) => e.code === "command_unsupported");
+    assert.equal(mac.available?.("keep_awake"), "no");
+    assert.equal(mac.available?.("ports"), "no");
+    assert.equal(mac.canAct(), "now", "la Mac con su motor anterior sigue en servicio");
+    ok("Mantener despierta y puertos (keep_awake_status, set_keep_awake, list_ports); la Mac de motor anterior contesta command_unsupported y solo se apagan esas funciones");
+
+    const archived = (await vm.call<ArchivedTasks>("archived_tasks", "w-prod", {})).value;
+    assert.ok(archived.tasks.some((t) => t.id === "t-vm-2" && t.folder === "p-vm-web"), "la que se archivó arriba");
+    ok("archivadas de todas las carpetas (archived_tasks)");
+
+    close();
   } finally {
     child.kill();
   }

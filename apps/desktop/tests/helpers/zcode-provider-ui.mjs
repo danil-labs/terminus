@@ -50,7 +50,7 @@ async function settings(scenario) {
   });
   metadata = scenario === "delayed" ? () => pending : () => Promise.reject(new Error("provider unavailable"));
   await click(app, "Configuración");
-  await click(app, "Proveedores de IA");
+  await click(app, "Cuentas de IA");
   await click(app, "ZCode");
   const add = await waitFor(() => button(app, "+ Agregar cuenta"), "Missing account action");
   assert.equal(add.disabled, true, "Unknown provider metadata must prevent account creation");

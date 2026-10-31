@@ -44,16 +44,18 @@ registerHooks({
 });
 
 /**
- * El HTML de `dist`, **sin sus etiquetas de recurso**.
+ * El HTML de `dist`, **sin sus scripts ni sus precargas**.
  *
- * El `<script>` y el `<link>` se quitan porque el módulo lo carga este guarda a
- * mano; dejarlos puestos hace que jsdom los pida por HTTP a un servidor que no
- * existe y reporte **su** fallo como si fuera de la app. Lo único que hace
- * falta del documento es el `<div id="root">`, y ese se queda.
+ * El módulo lo carga este guarda a mano. La hoja de estilos se queda: jsdom no
+ * la pide y Vite, al ver su `<link>`, no espera un `load` que jsdom nunca da
+ * al abrir un trozo perezoso que comparte el CSS principal.
  */
 const HTML = indice
   .replace(/<script\b[^>]*><\/script>/g, "")
-  .replace(/<link\b[^>]*>/g, "");
+  .replace(/<link\b(?![^>]*\brel="stylesheet")[^>]*>/g, "");
+
+/** Los workspaces de la cuenta que contesta el plano de control simulado en esta pasada. */
+let registro;
 
 /** Lo que se copió a `globalThis` en la pasada anterior, para poder pisarlo. */
 let copiadas = [];
@@ -77,7 +79,9 @@ export const cause = new AsyncLocalStorage();
  *   normal sube por el `setEnv` de `Setup.revisar` y **la traga su propio
  *   `try`**, que es exactamente por qué este fallo no dejó ni un mensaje.
  */
-export async function boot(entorno, version, respuestas, userAgent, storage = {}, { web = false, antes } = {}) {
+export async function boot(entorno, version, respuestas, userAgent, storage = {}, { web = false, antes, workspaces } = {}) {
+  // El registro de workspaces de la cuenta (`GET /v1/workspaces`): sin `workspaces`, un plano de control que no lo tiene.
+  registro = workspaces;
   const dir = web ? distWeb : dist;
   const pagina = web ? readFileSync(join(distWeb, "index.html"), "utf8") : indice;
   const entrada = web ? /<script\b[^>]*\bsrc="\/?([^"?]*assets\/[^"?]+\.js)"/.exec(pagina)?.[1] : `assets/${bundle}`;
@@ -129,7 +133,7 @@ export async function boot(entorno, version, respuestas, userAgent, storage = {}
       currentWindow: { label: "main" },
       currentWebview: { windowLabel: "main", label: "main" },
     },
-    invoke: (cmd, args) => {
+    invoke: (cmd, args, options) => {
       comandos.push(cmd);
       if (cmd === "list_storage") {
         storageQueries.push(args.refrescar);
@@ -164,7 +168,8 @@ export async function boot(entorno, version, respuestas, userAgent, storage = {}
       if (cmd in respuestas) {
         const response = respuestas[cmd];
         if (response instanceof Error) return Promise.reject(response);
-        return Promise.resolve(typeof response === "function" ? response(args) : response);
+        // Con sus opciones: la cabecera `x-terminus-machine` dice a qué máquina va.
+        return Promise.resolve(typeof response === "function" ? response(args, options) : response);
       }
       return Promise.reject(new Error(`sin stub: ${cmd}`));
     },
@@ -288,7 +293,9 @@ export async function boot(entorno, version, respuestas, userAgent, storage = {}
     const local = (url, opts) =>
       /^(http:\/\/localhost\/|file:)/.test(String(url?.url ?? url))
         ? Promise.resolve(new Response(""))
-        : deNode(url, opts);
+        : /\/v1\/workspaces$/.test(String(url?.url ?? url))
+          ? Promise.resolve(registro === undefined ? new Response("{}", { status: 404 }) : Response.json({ workspaces: registro }))
+          : deNode(url, opts);
     local.__jsdomApp = true;
     globalThis.fetch = local;
   }

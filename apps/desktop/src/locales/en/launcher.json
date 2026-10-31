@@ -25,12 +25,29 @@
   "launcher.failed.reason.not_private": "An engine file is not private: another account on this computer can read it. The window does not connect like that.",
   "launcher.failed.reason.service_busy": "Another process holds the data and does not let it go.",
   "launcher.failed.reason.authority_incompatible": "The engine does not accept this data folder as it is.",
-  "launcher.failed.reason.other": "The engine closed while starting.",
+  "launcher.failed.reason.other": "Could not connect to the engine.",
+  "launcher.failed.incompatible.title": "The window and engine are incompatible",
+  "launcher.failed.reason.version_mismatch": "The window and engine use different contract versions. A compatible engine is required to connect.",
   "launcher.failed.log": "Its log is at:",
   "launcher.failed.code": "Code: {code}",
   "launcher.failed.back": "To go back to Terminus 0.2.74: close this window, install 0.2.74 from {url} and open it. Your data is still in this folder and 0.2.74 opens it:",
   "launcher.failed.retry": "Retry",
   "launcher.blank_0274": "Terminus 0.2.74 is open on this data and stays blank while this engine works: close it. To go back to 0.2.74, close this window and wait for the engine to finish its tasks and stop (5 minutes without clients).",
   "launcher.failed.reason.adoption_required": "The engine asks to adopt the data again and could not.",
-  "launcher.failed.reason.engine_start_failed": "The engine closed while starting or did not answer in time."
+  "launcher.failed.reason.engine_start_failed": "The engine closed while starting or did not answer in time.",
+  "launcher.previous.waiting": {
+    "one": "Waiting for {count} task of the previous version to finish…",
+    "other": "Waiting for {count} tasks of the previous version to finish…"
+  },
+  "launcher.previous.waiting_unknown": "Waiting for the previous version to finish what it is doing…",
+  "launcher.previous.body": "Danil was updated and comes in on its own as soon as it is done.",
+  "launcher.previous.stop_now": "Stop and enter now",
+  "launcher.previous.confirm": {
+    "one": "{count} task that is working will be cut off. With the new engine it continues on its own where it left off; what it was doing at this moment may be lost.",
+    "other": "{count} tasks that are working will be cut off. With the new engine they continue on their own where they left off; what they were doing at this moment may be lost."
+  },
+  "launcher.previous.confirm_unknown": "What the previous version is doing will be cut off. Tasks continue on their own with the new engine where they left off; what they were doing at this moment may be lost.",
+  "launcher.previous.stop": "Stop",
+  "launcher.previous.keep_waiting": "Keep waiting",
+  "launcher.previous.stopping": "Stopping the previous version…"
 }

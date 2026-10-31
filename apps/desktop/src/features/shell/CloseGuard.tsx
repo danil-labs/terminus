@@ -1,196 +1,171 @@
+import { invoke } from "@tauri-apps/api/core";
 import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
 import { listen } from "../../lib/serviceEvents";
-import { invoke } from "../../lib/invoke.ts";
-import { escribirPref, leerPref } from "../../lib/prefs";
+import { capabilities } from "../../lib/platform";
 import { t } from "../../lib/i18n";
 import { Button } from "../../ui/Button";
 import { Dialog, DialogContent, DialogTitle } from "../../ui/Dialog";
+import { FailureNote, asFailure, type Failure } from "../../ui/Failure";
 import { quietFinished } from "./TaskNotifier";
+import { setTurnTitles, stopTurns, titled, type LiveTurn, type ShownTurn } from "./liveTurns";
 
-/** Qué hacer al cerrar la ventana con agentes trabajando. */
-export type CloseChoice = "ask" | "background" | "stop";
-export const CLOSE_PREF = "close.live_turns";
-
-type LiveTurn = {
-  session: string;
-  workspace: string;
-  project: string;
-  started_at: number;
-  shell?: { id: string; command: string };
-};
-type Pending = { questions: unknown[]; permissions: unknown[] };
-type Shown = LiveTurn & { title: string; waiting: boolean };
-
-/** Los turnos viven en el workspace que los lanzó, no en el que mira la ventana. */
-const scope = (workspace: string) => ({ headers: { "x-terminus-workspace": workspace } });
-
-export async function stopTurns(turns: LiveTurn[]) {
-  await Promise.allSettled(
-    turns.map((turn) =>
-      turn.shell
-        ? invoke("stop_shell_command", { session: turn.session }, scope(turn.workspace))
-        : invoke("stop_turn", { project: turn.project, session: turn.session }, scope(turn.workspace)),
-    ),
-  );
-}
-
-/**
- * Rust detiene todo cierre de la ventana y emite `close-requested`. Sin agentes
- * trabajando se cierra en el acto; con ellos decide la preferencia o la persona.
- * En segundo plano la ventana se oculta y el icono junto al reloj la gobierna.
- */
+/** Cerrar oculta; salir pide una decisión sobre los turnos del motor conectado a este cliente. */
 export default function CloseGuard(props: { title: (session: string) => string | undefined }) {
-  const [shown, setShown] = createSignal<Shown[] | null>(null);
-  const [remember, setRemember] = createSignal(false);
+  const [shown, setShown] = createSignal(false);
+  const [rows, setRows] = createSignal<ShownTurn[]>([]);
   const [stopping, setStopping] = createSignal(false);
+  const [failure, setFailure] = createSignal<Failure | null>(null);
+  let acting = false;
+  let exiting = false;
+  let refreshing = false;
+  let disposed = false;
 
-  const close = () => void invoke("close_confirmed").catch(() => {});
-
-  async function titled(turns: LiveTurn[]): Promise<Shown[]> {
-    return Promise.all(
-      turns.map(async (turn) => {
-        const pending = await invoke<Pending>(
-          "pending_requests",
-          { session: turn.session },
-          scope(turn.workspace),
-        ).catch(() => null);
-        return {
-          ...turn,
-          title: props.title(turn.session) ?? turn.shell?.command ?? t("shell.close.untitled"),
-          waiting: !!pending && pending.questions.length + pending.permissions.length > 0,
-        };
-      }),
-    );
-  }
-
-  /** Lo que dice el icono junto al reloj; los textos van traducidos desde aquí. */
-  async function trayPayload(rows?: Shown[]) {
-    rows ??= await titled(await invoke<LiveTurn[]>("list_live_turns").catch(() => []));
-    const count = rows.length;
+  function payload(turns: ShownTurn[] | null) {
+    const header = turns === null ? t("shell.tray.unknown")
+      : turns.length ? t("shell.tray.header", { count: turns.length }) : t("shell.tray.idle");
     return {
       labels: {
-        tooltip: count ? t("shell.tray.header", { count }) : t("shell.tray.idle"),
-        header: count ? t("shell.tray.header", { count }) : t("shell.tray.idle"),
+        tooltip: header,
+        header,
         open: t("shell.tray.open"),
         stop_all: t("shell.tray.stop_all"),
         quit: t("shell.tray.quit"),
       },
-      items: rows.map((row) => ({
+      items: (turns ?? []).map((row) => ({
         title: row.waiting ? `${row.title} · ${t("shell.close.waiting")}` : row.title,
       })),
     };
   }
 
-  let refresh: ReturnType<typeof setInterval> | undefined;
   async function tick() {
-    const rows = await titled(await invoke<LiveTurn[]>("list_live_turns").catch(() => []));
-    await invoke("tray_update", await trayPayload(rows));
+    if (refreshing || disposed) return;
+    refreshing = true;
+    try {
+      const turns = await titled(await invoke<LiveTurn[]>("list_live_turns"));
+      if (!disposed) await invoke("tray_update", payload(turns));
+    } catch {
+      if (!disposed) await invoke("tray_update", payload(null)).catch(() => {});
+    } finally {
+      refreshing = false;
+    }
+  }
+
+  function failed(error: unknown) {
+    setFailure({ ...asFailure(error), what: t("shell.close.error") });
+    setShown(true);
   }
 
   async function toBackground() {
-    const rows = await titled(await invoke<LiveTurn[]>("list_live_turns").catch(() => []));
-    await invoke("window_to_background", await trayPayload(rows));
-    clearInterval(refresh);
-    refresh = setInterval(() => void tick().catch(() => {}), 5000);
-  }
-
-  async function onCloseRequested() {
-    const turns = await invoke<LiveTurn[]>("list_live_turns").catch(() => []);
-    if (turns.length === 0) return close();
-    const choice = leerPref<CloseChoice>(CLOSE_PREF, "ask");
-    if (choice === "background") return void toBackground();
-    if (choice === "stop") {
-      quietFinished();
-      await stopTurns(turns);
-      return close();
+    try {
+      await invoke("window_to_background", payload(null));
+      setShown(false);
+      void tick();
+    } catch (error) {
+      failed(error);
     }
-    setRemember(false);
-    setStopping(false);
-    setShown(await titled(turns));
   }
 
-  async function decide(choice: Exclude<CloseChoice, "ask">) {
-    const turns = shown() ?? [];
-    if (remember()) escribirPref(CLOSE_PREF, choice);
-    if (choice === "stop") {
-      setStopping(true);
+  async function requestQuit() {
+    if (exiting || acting || shown()) return;
+    acting = true;
+    setFailure(null);
+    setRows([]);
+    try {
+      const turns = await invoke<LiveTurn[]>("list_live_turns");
+      if (turns.length === 0) {
+        await invoke("quit_completely");
+        exiting = true;
+      }
+      else {
+        setRows(await titled(turns));
+        setShown(true);
+      }
+    } catch (error) {
+      failed(error);
+    } finally {
+      acting = false;
+    }
+  }
+
+  async function stopAndMaybeQuit(quit: boolean) {
+    if (exiting || acting) return;
+    acting = true;
+    setStopping(true);
+    setFailure(null);
+    try {
+      const turns = await invoke<LiveTurn[]>("list_live_turns");
       quietFinished();
-      await stopTurns(turns);
+      const results = await stopTurns(turns, invoke);
+      const rejected = results.find((result) => result.status === "rejected");
+      if (rejected?.status === "rejected") throw rejected.reason;
+      if (quit) {
+        await invoke("quit_completely");
+        exiting = true;
+      }
+      else {
+        setShown(false);
+        void tick();
+      }
+    } catch (error) {
+      failed(error);
+    } finally {
+      acting = false;
       setStopping(false);
     }
-    setShown(null);
-    if (choice === "background") return void toBackground();
-    close();
+  }
+
+  function quitWhenDone() {
+    const shown = rows();
+    setShown(false);
+    void import("./restartWait").then((m) => m.waitThen("quit", shown));
   }
 
   onMount(() => {
-    // Volver a la ventana (desde el icono o abriendo Terminus otra vez) quita el icono.
-    const back = () => clearInterval(refresh);
-    window.addEventListener("focus", back);
+    setTurnTitles(props.title);
+    if (!capabilities().nativeWindow) return;
     const unlisten = [
-      listen("close-requested", () => void onCloseRequested()),
-      listen("tray-stop-all", async () => {
-        quietFinished();
-        await stopTurns(await invoke<LiveTurn[]>("list_live_turns").catch(() => []));
-        void trayPayload().then((payload) => invoke("tray_update", payload)).catch(() => {});
-      }),
-      listen("tray-quit", async () => {
-        quietFinished();
-        await stopTurns(await invoke<LiveTurn[]>("list_live_turns").catch(() => []));
-        void invoke("quit_completely").catch(() => {});
-      }),
+      listen("close-requested", () => { if (!acting) void toBackground(); }),
+      listen("tray-stop-all", () => void stopAndMaybeQuit(false)),
+      listen("tray-quit", () => void requestQuit()),
     ];
+    void tick();
+    const refresh = setInterval(() => void tick(), 5000);
     onCleanup(() => {
+      disposed = true;
       clearInterval(refresh);
-      window.removeEventListener("focus", back);
       for (const u of unlisten) void u.then((off) => off());
     });
   });
 
   return (
     <Show when={shown()}>
-      {(rows) => (
-        <Dialog open onOpenChange={(open) => { if (!open && !stopping()) setShown(null); }}>
-          <DialogContent class="flex flex-col gap-3" data-close-guard>
-            <DialogTitle class="text-sm font-semibold">
-              {t("shell.close.title", { count: rows().length })}
-            </DialogTitle>
-            <p class="m-0 text-[13px] text-neutral-700">{t("shell.close.body")}</p>
+      <Dialog open onOpenChange={(open) => { if (!open && !stopping()) setShown(false); }}>
+        <DialogContent class="flex flex-col gap-3" data-close-guard>
+          <DialogTitle class="text-sm font-semibold">{t("shell.close.title", { count: rows().length })}</DialogTitle>
+          <p class="m-0 text-ui text-neutral-700">{t("shell.close.body")}</p>
+          <Show when={failure()}>{(f) => <FailureNote f={f()} />}</Show>
+          <Show when={rows().length > 0}>
             <ul class="m-0 grid list-none gap-0 rounded-md border border-neutral-200 p-0">
-              <For each={rows()}>
-                {(row) => (
-                  <li class="flex items-center gap-2 border-b border-neutral-200 px-3 py-2 text-[13px] last:border-b-0">
-                    <span class="min-w-0 flex-1 truncate">{row.title}</span>
-                    <span class={row.waiting ? "shrink-0 font-semibold text-warning-strong" : "shrink-0 text-neutral-500"}>
-                      {row.waiting ? t("shell.close.waiting") : t("shell.close.working")}
-                    </span>
-                  </li>
-                )}
-              </For>
+              <For each={rows()}>{(row) => (
+                <li class="flex items-center gap-2 border-b border-neutral-200 px-3 py-2 text-ui last:border-b-0">
+                  <span class="min-w-0 flex-1 truncate">{row.title}</span>
+                  <span class={row.waiting ? "shrink-0 font-semibold text-warning-strong" : "shrink-0 text-neutral-500"}>
+                    {row.waiting ? t("shell.close.waiting") : t("shell.close.working")}
+                  </span>
+                </li>
+              )}</For>
             </ul>
-            <label class="flex items-center gap-2 text-[13px] text-neutral-700">
-              <input
-                type="checkbox"
-                checked={remember()}
-                onChange={(e) => setRemember(e.currentTarget.checked)}
-              />
-              {t("shell.close.remember")}
-            </label>
-            {/* Cancelar primero: toma el foco y Enter no detiene a nadie. */}
-            <div class="flex justify-end gap-2">
-              <Button variant="outline" size="sm" disabled={stopping()} onClick={() => setShown(null)}>
-                {t("shell.close.cancel")}
-              </Button>
-              <Button variant="secondary" size="sm" disabled={stopping()} onClick={() => void decide("stop")}>
-                {stopping() ? t("shell.close.stopping") : t("shell.close.stop")}
-              </Button>
-              <Button size="sm" disabled={stopping()} onClick={() => void decide("background")}>
-                {t("shell.close.background")}
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
+          </Show>
+          <div class="flex flex-wrap justify-end gap-2">
+            <Button variant="outline" size="sm" disabled={stopping()} onClick={() => setShown(false)}>{t("shell.close.cancel")}</Button>
+            <Button variant="secondary" size="sm" disabled={stopping()} onClick={() => void stopAndMaybeQuit(true)}>
+              {stopping() ? t("shell.close.stopping") : t("shell.close.stop")}
+            </Button>
+            <Button variant="secondary" size="sm" disabled={stopping()} onClick={quitWhenDone}>{t("shell.close.when_done")}</Button>
+            <Button size="sm" disabled={stopping()} onClick={() => void toBackground()}>{t("shell.close.background")}</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Show>
   );
 }

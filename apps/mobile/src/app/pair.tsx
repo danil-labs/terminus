@@ -1,3 +1,4 @@
+import { TEXT } from "@terminus/design";
 import { Stack, router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
@@ -83,9 +84,9 @@ export default function Pair() {
 
 const styles = StyleSheet.create({
   page: { flex: 1, padding: 20, gap: 8 },
-  hint: { fontSize: 14, lineHeight: 20, marginBottom: 8 },
-  label: { fontSize: 13, fontWeight: "600", marginTop: 8 },
-  input: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15 },
+  hint: { fontSize: TEXT.body, lineHeight: 20, marginBottom: 8 },
+  label: { fontSize: TEXT.ui, fontWeight: "600", marginTop: 8 },
+  input: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: TEXT.lead },
   button: { marginTop: 16, borderRadius: 10, paddingVertical: 12, alignItems: "center" },
   buttonText: { fontSize: 16, fontWeight: "600" },
 });

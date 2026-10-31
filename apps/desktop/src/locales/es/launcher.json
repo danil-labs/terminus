@@ -25,12 +25,29 @@
   "launcher.failed.reason.not_private": "Un archivo del motor no es privado: otra cuenta del equipo puede leerlo. La ventana no se conecta así.",
   "launcher.failed.reason.service_busy": "Otro proceso tiene tomados los datos y no los suelta.",
   "launcher.failed.reason.authority_incompatible": "El motor no acepta esta carpeta de datos tal como está.",
-  "launcher.failed.reason.other": "El motor se cerró al arrancar.",
+  "launcher.failed.reason.other": "No se pudo conectar con el motor.",
+  "launcher.failed.incompatible.title": "La ventana y el motor son incompatibles",
+  "launcher.failed.reason.version_mismatch": "La ventana y el motor usan contratos de versiones distintas. Se necesita un motor compatible para conectar.",
   "launcher.failed.log": "Su registro está en:",
   "launcher.failed.code": "Código: {code}",
   "launcher.failed.back": "Para volver a Terminus 0.2.74: cierra esta ventana, instala 0.2.74 desde {url} y ábrelo. Tus datos siguen en esta carpeta y 0.2.74 la abre:",
   "launcher.failed.retry": "Reintentar",
   "launcher.blank_0274": "Terminus 0.2.74 está abierto sobre estos datos y se queda en blanco mientras este motor trabaja: ciérralo. Para volver a 0.2.74, cierra esta ventana y espera a que el motor termine sus tareas y se apague (5 minutos sin clientes).",
   "launcher.failed.reason.adoption_required": "El motor pide adoptar los datos otra vez y no se pudo.",
-  "launcher.failed.reason.engine_start_failed": "El motor se cerró al arrancar o no contestó a tiempo."
+  "launcher.failed.reason.engine_start_failed": "El motor se cerró al arrancar o no contestó a tiempo.",
+  "launcher.previous.waiting": {
+    "one": "Esperando a que termine {count} tarea de la versión anterior…",
+    "other": "Esperando a que terminen {count} tareas de la versión anterior…"
+  },
+  "launcher.previous.waiting_unknown": "Esperando a que la versión anterior termine lo que tiene en curso…",
+  "launcher.previous.body": "Danil se actualizó y entra solo en cuanto termine.",
+  "launcher.previous.stop_now": "Detener y entrar ya",
+  "launcher.previous.confirm": {
+    "one": "Se va a cortar {count} tarea que está trabajando. Con el motor nuevo sigue sola donde se quedó; lo que hacía en este instante se puede perder.",
+    "other": "Se van a cortar {count} tareas que están trabajando. Con el motor nuevo siguen solas donde se quedaron; lo que hacían en este instante se puede perder."
+  },
+  "launcher.previous.confirm_unknown": "Se va a cortar lo que la versión anterior está haciendo. Las tareas siguen solas con el motor nuevo donde se quedaron; lo que hacían en este instante se puede perder.",
+  "launcher.previous.stop": "Detener",
+  "launcher.previous.keep_waiting": "Seguir esperando",
+  "launcher.previous.stopping": "Deteniendo la versión anterior…"
 }

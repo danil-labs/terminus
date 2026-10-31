@@ -48,7 +48,7 @@ export default function VentanaDeContexto(props: {
                     ? "stroke-warning"
                     : "stroke-neutral-500"}
               />
-              <span class="text-[0.6875rem] tabular-nums" aria-hidden="true">
+              <span class="text-caption tabular-nums" aria-hidden="true">
                 {percent(v().limite > 0 ? Math.min(100, Math.round((v().usado / v().limite) * 100)) : 0)}
               </span>
               </>
@@ -56,7 +56,7 @@ export default function VentanaDeContexto(props: {
           </Show>
           <Show when={props.ventana?.modo === "sin-limite" ? props.ventana : null}>
             {(v) => (
-              <span class="text-[0.6875rem] tabular-nums" aria-hidden="true">
+              <span class="text-caption tabular-nums" aria-hidden="true">
                 {formatTokens(v().usado)}
               </span>
             )}

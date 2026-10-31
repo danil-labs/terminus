@@ -72,14 +72,13 @@ incluso al combinarlo con banderas, para impedir que una tarea pierda su caller
 y se ejecute como persona. Una carpeta vacía es distinta de una variable ausente.
 El entorno de los procesos nuevos debe filtrar también los nombres antiguos.
 
-**El motor fijado por este cliente sigue siendo `9bd80c15`.** Los launchers
-ya funcionan con él, pero ese pin todavía no acredita la interfaz exclusiva de
-entorno, ayuda ni launchers de agentes del motor en desarrollo. La integración
-requiere revisar el commit del motor y disponer de manifiesto y checksums de
-las cuatro plataformas, además de comprobar la compatibilidad con el contrato
-congelado del cliente. El dev del motor ya tenía un hash de manifiesto distinto
-(`5f59d603`) al del cliente (`593c6503`) antes de esta implementación; esta rama
-no modifica ninguno de esos contratos, publica artefactos ni cambia el pin.
+**La reconciliación conserva el motor de `dev`, `4e10efc24a9be6f8dbf15559f767a50fb109a0a7`.**
+El contrato, sus extensiones y el manifiesto se conservan byte por byte respecto
+de `dev` (`6352210830af16e1973b836a3cc222d90f2aed00`). Los launchers
+no acreditan por sí solos la interfaz exclusiva `DANIL_*` del motor del PR
+seldon-host #276, que permanece como integración separada. Su adopción requiere
+revisión de contrato y artefactos con manifiesto y checksums para las cuatro
+plataformas. Esta reconciliación no publica artefactos ni sustituye ese pin.
 
 ## Evidencia y límites
 

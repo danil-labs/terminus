@@ -1,14 +1,27 @@
 /**
- * The approval page's control-plane client, the account's name and photo, and
- * the contract check the machine list uses, against a fake `fetch`.
+ * The approval page's control-plane client and the account's name and photo,
+ * against a fake `fetch`; and that no client takes a machine out by its contract.
  */
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { test } from "node:test";
-import { machineCompatibility } from "../../src/web/compatibility.ts";
+import { fileURLToPath } from "node:url";
 import { webAccountProfile } from "../../src/web/account.ts";
 import { approveDevice, denyDevice, lookupDevice, normalizeCode } from "../../src/web/connect/devices.ts";
 
 const API = "https://computers.danil.ai";
+
+// Como el teléfono: un motor con otro contrato sigue en servicio y solo falla la
+// orden que no conoce. Ni la ventana ni la web lo marcan desactualizado por su hash.
+test("neither the window nor the web gates a machine by its engine contract", () => {
+  const root = join(dirname(fileURLToPath(import.meta.url)), "../..");
+  for (const file of ["src/features/machines/account.tsx", "src/web/main.tsx", "src/web/Gate.tsx", "src/features/machines/ConnectMachine.tsx", "src/features/machines/AccountComputers.tsx"]) {
+    const source = readFileSync(join(root, file), "utf8");
+    assert.doesNotMatch(source, /machineCompatibility|machineContracts|__TERMINUS_CONTRACT__/, file);
+    assert.doesNotMatch(source, /^\s*(contracts|compatible):/m, file);
+  }
+});
 
 function fake(handler: (url: string, init: RequestInit) => { status: number; body?: unknown }) {
   const seen: { url: string; init: RequestInit }[] = [];
@@ -75,15 +88,6 @@ test("deny posts only the code", async () => {
 test("the code from the link is normalized", () => {
   assert.equal(normalizeCode(" wdjb-mjht "), "WDJB-MJHT");
   assert.equal(normalizeCode(null), "");
-});
-
-test("a machine on another contract needs an update", () => {
-  const own = "b64b514f9dfcda0f027dc60b2eb604e29526a8c19b2d77f7aaec3bc3991796bc";
-  assert.equal(machineCompatibility(own, own), "ok");
-  assert.equal(machineCompatibility(own.toUpperCase(), own), "ok");
-  assert.equal(machineCompatibility("2ae5ba8e263252c80622f0706d3a5a3a534b48ab9364c724d1fea96bebab029b", own), "outdated");
-  assert.equal(machineCompatibility(null, own), "unknown", "an engine that never reported");
-  assert.equal(machineCompatibility(own, ""), "unknown", "a build without its own contract");
 });
 
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 7]);

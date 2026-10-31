@@ -1,6 +1,6 @@
 /**
  * Qué hay instalado, según Rust. Espeja `src-tauri/src/environment/env.rs`; el tipo lo
- * consumen `Setup.tsx`, `Environment.tsx` y `RequirementRow.tsx`.
+ * consumen `Setup.tsx` y `Environment.tsx`.
  */
 
 export type Requirement = {
@@ -23,6 +23,8 @@ export type Requirement = {
   manager: "agent" | "github" | "tool" | null;
   /** Está puesto y su `--version` no contestó a tiempo. Un servicio anterior no lo manda. */
   timed_out?: boolean;
+  /** Lo incluido que no pasó la comprobación: `missing`, `version_mismatch`, `import_failed`, `timed_out` o `damaged`. */
+  reason?: string | null;
 };
 
 /**

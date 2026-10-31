@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Terminus",
-  "version": "0.2.84",
+  "version": "0.3.0-rc.1",
   "identifier": "ai.danil.terminus",
   "build": {
     "frontendDist": "../dist",
@@ -26,7 +26,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self'; script-src-elem 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: terminus-image: http://terminus-image.localhost; font-src 'self' data:; media-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost https://computers.danil.ai wss://computers.danil.ai; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'"
+      "csp": "default-src 'self'; script-src 'self'; script-src-elem 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: terminus-image: http://terminus-image.localhost; font-src 'self' data:; media-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost https://computers.danil.ai wss://computers.danil.ai; frame-src 'self' terminus-page: http://terminus-page.localhost; object-src 'none'; base-uri 'none'; form-action 'none'"
     }
   },
   "bundle": {
@@ -46,7 +46,13 @@
       "icons/icon.ico"
     ],
     "macOS": {
-      "signingIdentity": "-"
+      "signingIdentity": "-",
+      "dmg": {
+        "background": "macos/dmg-background.png",
+        "windowSize": { "width": 660, "height": 400 },
+        "appPosition": { "x": 180, "y": 190 },
+        "applicationFolderPosition": { "x": 480, "y": 190 }
+      }
     },
     "android": {
       "debugApplicationIdSuffix": ".debug"

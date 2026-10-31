@@ -13,6 +13,7 @@ import {
   type JSX,
 } from "solid-js";
 import { invoke } from "../../lib/invoke.ts";
+import { machineOf } from "../machines/store";
 import Navegador from "lucide-solid/icons/external-link";
 import IconoCodigo from "lucide-solid/icons/code";
 import IconoLado from "lucide-solid/icons/columns-2";
@@ -31,7 +32,7 @@ import { ariaDeAtajo, textoDeAtajo } from "../../lib/shortcuts";
 import { peso } from "../../lib/format";
 import { comoDiff, parsearDiff, type ArchivoDiff } from "./diff";
 import { CuerpoDeArchivo, SelectorDeDisposicion } from "./Changes";
-import { alMoverseElArbol, comoEntra } from "./refresh";
+import { IDOS, alMoverseElArbol, comoEntra, esBorrado, type DetalleDeIdos } from "./refresh";
 import { setMoviendoHueco } from "../../lib/sites";
 import { cargarEditor } from "./editorLoad";
 import { alternarAjuste, esAtajoDeAjuste } from "../../lib/wrap";
@@ -39,6 +40,7 @@ import { gramaticaDe, nombreDeLenguaje } from "./languages";
 import { sangriaDe } from "./indent";
 import { IconoDeArchivo } from "./FileIcon";
 import { esArbolDeCodigo } from "./treeKind";
+import PaginaEnVivo, { direccionDePagina } from "./PagePreview";
 import { delimiterFor } from "../viewers/csv";
 import {
   type DiagnosticoTypst,
@@ -50,14 +52,16 @@ import {
   diagnosticosDelArchivo,
   esTypst,
   pedirArreglo,
-  principalElegido,
   revelarEnElArbol,
   seguirPluginTypst,
   salto,
   saltarA,
   pedirReapertura,
   vivaDe,
+  mirarEditorTypst,
+  dejarDeMirarEditorTypst,
 } from "./typst";
+import { llevaVistaTypst } from "./typstScope";
 
 const EditorDeCodigo = lazy(cargarEditor);
 const VistaPreviaTypst = lazy(() => import("./TypstPreview"));
@@ -109,6 +113,9 @@ const PAUSA_DE_LA_PREVIA = 250;
 /** Cuánto espera, sin teclear, el guardado de un `.typ` en vivo: pone al día el disco, el índice y los cambios. */
 const PAUSA_DEL_INDICE = 1500;
 
+/** Cuánto se espera a releer un archivo que no está: reescribirlo puede ser borrarlo y crearlo. */
+const ESPERA_DEL_BORRADO = 600;
+
 /** Qué extensiones pinta `remark-gfm` como documento y no como código. */
 const MARKDOWN = ["md", "markdown"];
 
@@ -129,9 +136,6 @@ export function esHtml(ruta: string) {
 }
 
 const IMAGES = ["png", "jpg", "jpeg", "gif", "webp", "svg", "ico"];
-
-/** Lo que tiene su propio visor: con el ojo puesto se sigue abriendo así, sin el PDF de Typst al lado. */
-const CON_VISOR_PROPIO = [...IMAGES, "pdf", "bmp", "tif", "tiff", "heic", "zip", "mp3", "mp4", "wav", "mov"];
 
 /** Las que el visor pinta como imagen; un PDF tiene su propio visor. */
 export function isImage(path: string) {
@@ -154,6 +158,8 @@ export default function VisorDeArchivo(props: {
   suelto?: boolean;
   /** Si el agente lo cambió al abrirlo: es el valor de partida de [`hayCambios`]. */
   cambiado: boolean;
+  /** Opens straight in the changes view. */
+  enCambios?: boolean;
   /** Si esta pestaña es la que se está mirando. Las de detrás siguen montadas: ver `refresh.ts`. */
   visible: boolean;
   /** Guardar lo convierte en un archivo cambiado, y eso lo tiene que saber el panel. */
@@ -162,6 +168,8 @@ export default function VisorDeArchivo(props: {
   onAbrirOtro?: (ruta: string) => void;
   /** Si hay algo escrito que no está en disco: lo pinta la pestaña. */
   onSucio: (sucio: boolean) => void;
+  /** El archivo se borró y no había nada escrito, o se eligió cerrar: la pestaña se va sin preguntar. */
+  onBorrado?: () => void;
   /** Cómo guardar desde fuera, para cerrar la pestaña guardando. `null` al desmontarse. */
   onGuardador: (guardar: (() => Promise<boolean>) | null) => void;
 }) {
@@ -180,6 +188,8 @@ export default function VisorDeArchivo(props: {
   const [guardando, setGuardando] = createSignal(false);
   /** El archivo cambió en disco con algo escrito sin guardar. Guardar o descartar lo resuelven. */
   const [desincronizado, setDesincronizado] = createSignal(false);
+  /** Se borró con algo escrito: se avisa y se deja guardarlo de nuevo o cerrar. */
+  const [borrado, setBorrado] = createSignal(false);
   /** Aparte de `fallo`, que tapa el archivo entero. */
   const [falloAfuera, setFalloAfuera] = createSignal<Failure | null>(null);
 
@@ -219,21 +229,17 @@ export default function VisorDeArchivo(props: {
   seguirPluginTypst();
   const typst = () => esTypst(props.ruta) && !previa();
   /**
-   * El ojo es el interruptor: con un principal elegido, todo archivo de la tarea se ve junto
-   * al PDF, en un panel que no depende de la pestaña. Sin ojo, un `.typ` es solo código.
+   * Un `.typ` se ve junto al PDF de su documento: el principal del ojo o, sin él, el `main.typ`
+   * más cercano. Otro archivo abierto en la misma pestaña usa su propia previa o se queda en código.
    */
-  const vistaTypst = () =>
-    conVistaTypst() &&
-    !previa() &&
-    principalElegido(props.project) !== null &&
-    !CON_VISOR_PROPIO.includes(extension(props.ruta)) &&
-    !OFFICE.includes(extension(props.ruta));
+  const vistaTypst = () => conVistaTypst() && !previa() && llevaVistaTypst(props.ruta);
   /** El tiempo real, las marcas y el guardado solo: un `.typ` con la vista encendida. */
   const typstVivo = () => typst() && vistaTypst();
   const conPrevia = () =>
     vistaTypst() ||
     (esTexto() && !typst() && (esMarkdown(props.ruta) || esHtml(props.ruta) || delimiterFor(props.ruta) !== null));
-  const [elegida, setElegida] = createSignal<Disposicion | null>(null);
+  // The diff covers the code side, so a tab opened for its changes starts there whatever layout is remembered.
+  const [elegida, setElegida] = createSignal<Disposicion | null>(props.enCambios ? "codigo" : null);
   const disposicion = (): Disposicion => {
     if (!conPrevia()) return "codigo";
     // Con Typst, «Vista previa» es el ampliar de la tarea: lo comparten sus archivos y Esc lo deshace.
@@ -296,8 +302,16 @@ export default function VisorDeArchivo(props: {
   let fila: HTMLDivElement | undefined;
   const partida = () => ladoCodigo() && ladoPrevia();
 
+  /** Un `.html` de la tarea se ve servido de su carpeta, y se recarga con cada lectura del disco. */
+  const [lecturas, setLecturas] = createSignal(0);
+  createEffect(on(contenido, () => setLecturas((n) => n + 1), { defer: true }));
+  const pagina = () =>
+    esHtml(props.ruta) && !previa() && props.arbol !== "terminus-chat-visuals"
+      ? direccionDePagina(props.project, props.session, props.arbol, props.ruta, lecturas())
+      : null;
+
   /** Los cambios se piden al mirarlos y tapan el lado del código; la vista previa sigue a su lado. */
-  const [verCambios, setVerCambios] = createSignal(false);
+  const [verCambios, setVerCambios] = createSignal(Boolean(props.enCambios));
   const mostrarCambios = () => verCambios() && hayCambios() && !previa();
   function alternarCambios() {
     const ver = !verCambios();
@@ -337,12 +351,13 @@ export default function VisorDeArchivo(props: {
         tree: props.arbol,
         path: props.ruta,
         text: texto,
-      });
+      }, machineOf(props.session));
       // Sin tirar el diff cacheado, la vista de cambios seguiría enseñando el de antes de escribir.
       setContenido({ ...contenido()!, text: texto });
       setDiff(null);
       setHayCambios(true);
       setDesincronizado(false);
+      setBorrado(false);
       // Lo tecleado mientras viajaba el guardado no está en disco: soltarlo lo borraría del editor.
       if (borrador() === texto) setBorrador(null);
       escrituras++;
@@ -364,7 +379,7 @@ export default function VisorDeArchivo(props: {
   });
 
   /** La salida usa lo que hay en disco, no lo escrito sin guardar. */
-  const canOpenExternal = () => !conGuardadoManual() && (props.suelto || props.session !== "");
+  const canOpenExternal = () => !conGuardadoManual() && (props.suelto || props.session !== "") && !machineOf(props.session);
 
   async function openExternal() {
     setFalloAfuera(null);
@@ -392,19 +407,19 @@ export default function VisorDeArchivo(props: {
 
   // El PDF de un documento de Office; sin archivo en disco (una rama base) no hay.
   function pedirOffice(): Promise<Preview> | null {
-    if (props.suelto) return invoke<Preview>("office_preview", { path: props.ruta });
+    if (props.suelto) return invoke<Preview>("office_preview", { path: props.ruta }, machineOf(props.session));
     if (props.session === "") return null;
     return invoke<Preview>("tree_office_preview", {
       project: props.project,
       session: props.session,
       tree: props.arbol,
       path: props.ruta,
-    });
+    }, machineOf(props.session));
   }
 
   const pedirContenido = async (): Promise<Contenido> => {
     if (props.suelto) {
-      const p = await invoke<Preview>("preview_file", { path: props.ruta, rel: props.ruta });
+      const p = await invoke<Preview>("preview_file", { path: props.ruta, rel: props.ruta }, machineOf(props.session));
       return {
         kind: p.kind === "html" ? "text" : p.kind,
         text: p.text ?? "",
@@ -425,7 +440,7 @@ export default function VisorDeArchivo(props: {
           session: props.session,
           tree: props.arbol,
           path: props.ruta,
-        });
+        }, machineOf(props.session));
   };
 
   /** Su diff con el archivo entero de contexto (`tree_patch`, `-U100000`). Vacío = no cambió. */
@@ -437,7 +452,7 @@ export default function VisorDeArchivo(props: {
           session: props.session,
           tree: props.arbol,
           path: props.ruta,
-        }).then((patch) => parsearDiff(patch)[0] ?? null);
+        }, machineOf(props.session)).then((patch) => parsearDiff(patch)[0] ?? null);
 
   // Siempre y no solo al mirarlo: sin saber si es texto no se sabe si se puede escribir.
   createEffect(
@@ -446,7 +461,8 @@ export default function VisorDeArchivo(props: {
       try {
         setContenido(await pedirContenido());
       } catch (e) {
-        setFallo(asFailure(e));
+        if (esBorrado(e)) void alBorrarse();
+        else setFallo(asFailure(e));
       } finally {
         setLeyendo(false);
       }
@@ -485,7 +501,8 @@ export default function VisorDeArchivo(props: {
       setHayCambios(d !== null);
       // El disco dice lo que ya se sabía: lo guardó esta pestaña o cambió otro archivo de la tarea.
       // Tocar el editor ahí borraría lo tecleado desde entonces.
-      if (c.kind === contenido()?.kind && c.text === contenido()?.text) return;
+      // Con el peso: de un archivo recortado solo cruzan sus primeros 400 KB.
+      if (c.kind === contenido()?.kind && c.text === contenido()?.text && c.bytes === contenido()?.bytes) return;
       const entrada = comoEntra(borrador() !== null, sucio());
       if (entrada === "avisa") {
         setDesincronizado(true);
@@ -494,7 +511,8 @@ export default function VisorDeArchivo(props: {
       setContenido(c);
       if (entrada === "arrastra") setBorrador(c.text);
     } catch (e) {
-      setFallo(asFailure(e));
+      if (esBorrado(e)) void alBorrarse();
+      else setFallo(asFailure(e));
     }
   }
 
@@ -503,6 +521,36 @@ export default function VisorDeArchivo(props: {
     () => props.visible,
     () => void refrescar(),
   );
+
+  /**
+   * El archivo ya no está en el disco. Se mira otra vez tras una pausa: quien lo reescribe
+   * borrándolo y creándolo no cierra la pestaña. Sin nada escrito se cierra; con algo, avisa.
+   */
+  let confirmando = false;
+  async function alBorrarse() {
+    if (confirmando || props.suelto || previa()) return;
+    confirmando = true;
+    try {
+      await new Promise((listo) => setTimeout(listo, ESPERA_DEL_BORRADO));
+      await pedirContenido();
+      setBorrado(false);
+      void refrescar();
+    } catch (e) {
+      if (!esBorrado(e)) return void setFallo(asFailure(e));
+      if (sucio()) setBorrado(true);
+      else props.onBorrado?.();
+    } finally {
+      confirmando = false;
+    }
+  }
+
+  // Escondida también: el árbol avisa de lo que dejó de listar y solo esa pestaña lee.
+  const alIrse = (e: Event) => {
+    const d = (e as CustomEvent<DetalleDeIdos>).detail;
+    if (d.session === props.session && d.arbol === props.arbol && d.rutas.includes(props.ruta)) void alBorrarse();
+  };
+  window.addEventListener(IDOS, alIrse);
+  onCleanup(() => window.removeEventListener(IDOS, alIrse));
 
   function descartar() {
     // Con el archivo movido por debajo, lo que está en la mano es lo de antes: hay que traer lo del agente.
@@ -557,6 +605,24 @@ export default function VisorDeArchivo(props: {
     if (abiertoEn) void invoke("typst_live_close_doc", abiertoEn).catch(() => {});
   });
 
+  // El panel de «@» y las rutas pide a la vista de este árbol; sin ella, el editor no propone nada.
+  const dondeTypst = () => {
+    const viva = vivaDelArbol();
+    return {
+      project: props.project,
+      session: props.session,
+      arbol: props.arbol,
+      ruta: props.ruta,
+      key: viva?.estado === "lista" ? viva.key : null,
+    };
+  };
+  createEffect(() => {
+    if (!props.visible || !typst() || !editable()) return;
+    const editor = { session: props.session, arbol: props.arbol, ruta: props.ruta };
+    mirarEditorTypst(editor);
+    onCleanup(() => dejarDeMirarEditorTypst(editor));
+  });
+
   function mostrarEnLaVista(linea: number, columna: number) {
     const viva = vivaDelArbol();
     if (viva?.estado !== "lista") return;
@@ -568,9 +634,9 @@ export default function VisorDeArchivo(props: {
   createEffect(
     on(borrador, () => {
       clearTimeout(guardadoEnEspera);
-      if (!typstVivo() || !editable() || !sucio() || desincronizado()) return;
+      if (!typstVivo() || !editable() || !sucio() || desincronizado() || borrado()) return;
       guardadoEnEspera = setTimeout(() => {
-        if (sucio() && !desincronizado()) void guardar();
+        if (sucio() && !desincronizado() && !borrado()) void guardar();
       }, PAUSA_DEL_INDICE);
     }),
   );
@@ -593,7 +659,7 @@ export default function VisorDeArchivo(props: {
         e.preventDefault();
         alternarAjuste();
       }}
-      class="flex h-full min-h-0 flex-col"
+      class="@container flex h-full min-h-0 flex-col"
     >
       {/* Los controles de escritura van en esta fila: es la única que está siempre. */}
       <div class="flex h-8.5 shrink-0 items-center gap-2 border-b border-border pr-1.5 pl-2.5">
@@ -607,7 +673,7 @@ export default function VisorDeArchivo(props: {
                     ? t("code.typst.autosave.title")
                     : t("code.file.save.title")
               }
-              class="shrink-0 text-[0.6875rem] text-warning-strong"
+              class="shrink-0 text-caption text-warning-strong"
             >
               ●
             </span>
@@ -653,26 +719,26 @@ export default function VisorDeArchivo(props: {
             onClick={alternarCambios}
           >
             <IconoCambios size={13} aria-hidden="true" />
-            {t("code.file.view.changes")}
+            <span class="sr-only">{t("code.file.view.changes")}</span>
           </BotonDeBarra>
         </Show>
         <Show when={mostrarCambios()}>
-          <SelectorDeDisposicion />
+          <div class="flex @max-[560px]:hidden"><SelectorDeDisposicion /></div>
         </Show>
 
         <Show when={conPrevia()}>
           <div role="group" aria-label={t("code.file.layout.label")} class="flex shrink-0 gap-0.5">
             <BotonDeBarra pulsado={disposicion() === "codigo"} onClick={() => elegir("codigo")} titulo={t("code.file.layout.code")}>
               <IconoCodigo size={13} aria-hidden="true" />
-              {t("code.file.layout.code")}
+              <span class="sr-only">{t("code.file.layout.code")}</span>
             </BotonDeBarra>
-            <BotonDeBarra pulsado={disposicion() === "lado"} onClick={() => elegir("lado")} titulo={t("code.file.layout.split.title")}>
+            <BotonDeBarra pulsado={disposicion() === "lado"} onClick={() => elegir("lado")} titulo={t("code.file.layout.split.title")} class="@max-[560px]:hidden">
               <IconoLado size={13} aria-hidden="true" />
-              {t("code.file.layout.split")}
+              <span class="sr-only">{t("code.file.layout.split")}</span>
             </BotonDeBarra>
             <BotonDeBarra pulsado={disposicion() === "previa"} onClick={() => elegir("previa")} titulo={t("code.file.view.preview")}>
               <IconoPrevia size={13} aria-hidden="true" />
-              {t("code.file.view.preview")}
+              <span class="sr-only">{t("code.file.view.preview")}</span>
             </BotonDeBarra>
           </div>
         </Show>
@@ -687,14 +753,26 @@ export default function VisorDeArchivo(props: {
             onClick={() => void openExternal()}
           >
             <Navegador size={13} aria-hidden="true" />
-            {CON_SU_APP.includes(extension(props.ruta)) ? t("code.file.open_with_app") : t("code.file.open_external")}
+            <span class="sr-only">{CON_SU_APP.includes(extension(props.ruta)) ? t("code.file.open_with_app") : t("code.file.open_external")}</span>
           </Button>
         </Show>
       </div>
 
+      <Show when={borrado()}>
+        <div class="flex shrink-0 items-center gap-2 border-b border-border bg-surface-raised px-3 py-1.5">
+          <p class="m-0 min-w-0 flex-1 text-caption text-warning-strong">{t("code.file.deleted")}</p>
+          <Button variant="ghost" size="compact" class="shrink-0" disabled={guardando()} onClick={() => props.onBorrado?.()}>
+            {t("code.file.deleted.close")}
+          </Button>
+          <Button variant="secondary" size="compact" class="shrink-0" disabled={guardando()} onClick={() => void guardar()}>
+            {t("code.file.deleted.save")}
+          </Button>
+        </div>
+      </Show>
+
       {/* Sin este aviso, guardar pisaba el turno del agente en silencio. */}
       <Show when={desincronizado()}>
-        <p class="m-0 border-b border-border bg-surface-raised px-3 py-2 text-[0.6875rem] text-warning-strong">
+        <p class="m-0 border-b border-border bg-surface-raised px-3 py-2 text-caption text-warning-strong">
           {t("code.file.raced")}
         </p>
       </Show>
@@ -743,7 +821,7 @@ export default function VisorDeArchivo(props: {
                     }
                   >
                     {(d) => (
-                      <div class="min-h-0 min-w-0 flex-1 overflow-hidden bg-surface-muted">
+                      <div data-select-scope class="min-h-0 min-w-0 flex-1 overflow-hidden bg-surface-muted">
                         {/* Ya llega con el archivo entero de contexto: no hay tramo que traer. */}
                         <CuerpoDeArchivo archivo={d()} onDesplegar={() => {}} llena />
                       </div>
@@ -752,7 +830,7 @@ export default function VisorDeArchivo(props: {
                 </Show>
 
                 <Show when={!mostrarCambios() && !editable()}>
-                  <div class="min-h-0 min-w-0 flex-1 overflow-y-auto bg-surface-muted">
+                  <div data-select-scope class="min-h-0 min-w-0 flex-1 overflow-y-auto bg-surface-muted">
                     <Cuerpo contenido={c()} ruta={props.ruta} onOpenExternal={() => void openExternal()} pedirOffice={pedirOffice} />
                   </div>
                 </Show>
@@ -773,6 +851,7 @@ export default function VisorDeArchivo(props: {
                         marcas={marcas()}
                         irA={irA()}
                         onIdoA={consumirSalto}
+                        typst={typst() && editable() ? dondeTypst : undefined}
                       />
                     </Suspense>
                   </div>
@@ -789,6 +868,7 @@ export default function VisorDeArchivo(props: {
         {/* Con «Código» la vista de Typst se esconde sin desmontarse: soltarla apagaría Tinymist y sus marcas. */}
         <Show when={ladoPrevia() || vistaTypst()}>
           <div
+            data-select-scope
             class={cn(
               "min-h-0 min-w-0 flex-1 flex-col",
               ladoPrevia() ? "flex" : "hidden",
@@ -798,7 +878,14 @@ export default function VisorDeArchivo(props: {
           >
             <Show
               when={vistaTypst()}
-              fallback={<Previa texto={textoDeLaPrevia()} ruta={props.ruta} aSangre={deCodigo() !== false} />}
+              fallback={
+                <Show
+                  when={pagina()}
+                  fallback={<Previa texto={textoDeLaPrevia()} ruta={props.ruta} aSangre={deCodigo() !== false} />}
+                >
+                  {(url) => <PaginaEnVivo url={url()} nombre={props.ruta} />}
+                </Show>
+              }
             >
               <Suspense fallback={<p class="m-0 p-3 text-xs text-neutral-500">{t("code.file.opening")}</p>}>
                 <VistaPreviaTypst
@@ -966,7 +1053,7 @@ function BarraDeEstado(props: {
     <div
       role="group"
       aria-label={t("code.status.label")}
-      class="flex h-6 shrink-0 items-center justify-end gap-3 border-t border-border px-3 text-[0.6875rem] text-neutral-500"
+      class="flex h-6 shrink-0 items-center justify-end gap-3 border-t border-border px-3 text-caption text-neutral-500"
     >
       <Show when={props.cursor}>
         {(c) => <span class="font-mono tabular-nums">{t("code.status.position", { linea: c().linea, columna: c().columna })}</span>}
@@ -1025,7 +1112,7 @@ function Cuerpo(props: {
   return (
     <>
       <Show when={props.contenido.truncated}>
-        <p class="m-0 border-b border-border bg-surface-raised px-3 py-2 text-[0.6875rem] text-neutral-500">
+        <p class="m-0 border-b border-border bg-surface-raised px-3 py-2 text-caption text-neutral-500">
           {truncatedNotice()}
         </p>
       </Show>

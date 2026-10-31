@@ -17,9 +17,9 @@ import { Toast, ToastPortal } from "../../ui/Toast";
 import ControlesDeVentana from "./WindowControls";
 
 /**
- * Lo que la ventana enseña antes de tener motor: el traspaso desde 0.2.74 y la
- * salida si el motor no arranca. Rust decide la fase (`launcher.rs`). Mientras
- * conecta se monta la app: lo que pide al motor espera (`lib/invoke.ts`).
+ * Lo que la ventana enseña antes de tener motor: el traspaso desde 0.2.74, el
+ * aviso mientras la versión anterior termina sus turnos (o «Detener y entrar ya») y la salida si el motor no arranca. Rust decide la fase (`launcher.rs`). Mientras
+ * conecta o espera se monta la app: lo que pide al motor espera (`lib/invoke.ts`).
  */
 
 type Paso = "pending" | "active" | "done";
@@ -38,6 +38,7 @@ type Fase =
   | { phase: "connecting" }
   | { phase: "ready"; blank_0274?: boolean }
   | Traspaso
+  | { phase: "previous"; tasks: number | null; stopping: boolean }
   | { phase: "failed"; code: string; log: string; data: string };
 
 const RELEASE_0274 = "https://github.com/danil-labs/terminus/releases/tag/v0.2.74";
@@ -46,6 +47,9 @@ const TEXTOS = {
   readopt: () => [t("launcher.handoff.readopt.title"), t("launcher.handoff.readopt.body")],
 };
 const MOTIVOS: Record<string, () => string> = {
+  version_mismatch: () => t("launcher.failed.reason.version_mismatch"),
+  managed_service_unavailable: () => t("shell.service.managed"),
+  managed_profile_invalid: () => t("shell.service.managed"),
   engine_missing: () => t("launcher.failed.reason.engine_missing"),
   invalid_token: () => t("launcher.failed.reason.not_private"),
   service_busy: () => t("launcher.failed.reason.service_busy"),
@@ -70,12 +74,19 @@ export default function Lanzador(props: { children: JSX.Element }) {
   createEffect(() => {
     if (fase()?.phase === "ready") markConnected();
   });
-  const montada = () => fase()?.phase === "ready" || fase()?.phase === "connecting";
+  // Esperar a la versión anterior no tapa la ventana: es un aviso sobre la app que conecta.
+  const montada = () => ["ready", "connecting", "previous"].includes(fase()?.phase ?? "");
 
   const seguir = () => void invoke("launcher_continue");
+  // «Detener y entrar ya» corta turnos: se confirma diciendo cuántos.
+  const [confirmando, setConfirmando] = createSignal(false);
   const traspaso = () => {
     const f = fase();
     return f?.phase === "handoff" ? f : null;
+  };
+  const anterior = () => {
+    const f = fase();
+    return f?.phase === "previous" ? f : null;
   };
   const fallo = () => {
     const f = fase();
@@ -125,6 +136,57 @@ export default function Lanzador(props: { children: JSX.Element }) {
               <p class="m-0 break-words text-xs text-neutral-950">{t("launcher.blank_0274")}</p>
             </Toast>
           </ToastPortal>
+        </Show>
+        <Show when={anterior()}>
+          {(a) => (
+            // Fuera de la pila de avisos: sin motor, la app que la monta todavía no pintó.
+            <div class="pointer-events-none fixed bottom-4 right-4 z-50 grid justify-items-end gap-2">
+              <Toast tone="status" data-launcher-previous="">
+                <p class="m-0 break-words text-xs text-neutral-950" aria-live="polite">
+                  {a().stopping
+                    ? t("launcher.previous.stopping")
+                    : a().tasks
+                      ? t("launcher.previous.waiting", { count: a().tasks ?? 0 })
+                      : t("launcher.previous.waiting_unknown")}
+                </p>
+                <Show when={!a().stopping}>
+                  <Show
+                    when={confirmando()}
+                    fallback={
+                      <>
+                        <p class="m-0 break-words text-xs text-neutral-500">{t("launcher.previous.body")}</p>
+                        <div class="flex gap-2">
+                          <Button size="compact" variant="secondary" onClick={() => setConfirmando(true)}>
+                            {t("launcher.previous.stop_now")}
+                          </Button>
+                        </div>
+                      </>
+                    }
+                  >
+                    <p class="m-0 break-words text-xs text-neutral-500">
+                      {a().tasks
+                        ? t("launcher.previous.confirm", { count: a().tasks ?? 0 })
+                        : t("launcher.previous.confirm_unknown")}
+                    </p>
+                    <div class="flex gap-2">
+                      <Button
+                        size="compact"
+                        onClick={() => {
+                          setConfirmando(false);
+                          seguir();
+                        }}
+                      >
+                        {t("launcher.previous.stop")}
+                      </Button>
+                      <Button size="compact" variant="secondary" onClick={() => setConfirmando(false)}>
+                        {t("launcher.previous.keep_waiting")}
+                      </Button>
+                    </div>
+                  </Show>
+                </Show>
+              </Toast>
+            </div>
+          )}
         </Show>
       </Match>
       <Match when={fase() === null}>
@@ -182,7 +244,7 @@ export default function Lanzador(props: { children: JSX.Element }) {
               {(f) => (
                 <>
                   <h1 class="m-0 mb-5 max-w-[22ch] text-3xl leading-tight font-display font-bold tracking-[-0.03em] text-neutral-950">
-                    {t("launcher.failed.title")}
+                    {f().code === "version_mismatch" ? t("launcher.failed.incompatible.title") : t("launcher.failed.title")}
                   </h1>
                   <p class="m-0 max-w-[60ch] text-sm text-neutral-950">
                     {(MOTIVOS[f().code] ?? (() => t("launcher.failed.reason.other")))()}

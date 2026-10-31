@@ -55,6 +55,15 @@ test("cambiar de workspace descarta el resultado del anterior", async () => {
   assert.deepEqual(s.values, [300]);
 });
 
+test("cambiar de workspace puede leer lo guardado sin barrer", async () => {
+  const s = setup();
+  const done = s.refresh.reset(false);
+  s.requests[0].result.resolve(77);
+  await done;
+  assert.deepEqual(s.requests.map((r) => r.fresh), [false]);
+  assert.deepEqual(s.values, [77]);
+});
+
 test("un error se informa y la siguiente medición puede recuperarse", async () => {
   const s = setup();
   const first = s.refresh.refresh();

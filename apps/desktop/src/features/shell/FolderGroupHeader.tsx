@@ -1,6 +1,6 @@
 import ChevronRight from "lucide-solid/icons/chevron-right";
 import MoreVertical from "lucide-solid/icons/more-vertical";
-import SquarePen from "lucide-solid/icons/square-pen";
+import Plus from "lucide-solid/icons/plus";
 import { createSignal, Show } from "solid-js";
 import { destinoEnVuelo } from "../../lib/drag";
 import { enfocarYSeleccionar } from "../../lib/focus";
@@ -8,6 +8,7 @@ import { t } from "../../lib/i18n";
 import type { Project } from "../../lib/model";
 import { PROJECT_NAME_MAX_LENGTH } from "../../lib/projectNames";
 import { cn } from "../../lib/utils";
+import { rolledOutcome } from "@terminus/design";
 import { Button } from "../../ui/Button";
 import { Input } from "../../ui/Input";
 import { ITEM_DE_MENU, Popover, PopoverContent, PopoverTrigger } from "../../ui/Popover";
@@ -20,14 +21,21 @@ import EstadoDeTarea from "../projects/TaskStatus";
 const RECIBE_LA_TAREA = ["ring-2", "ring-primary"];
 
 /**
- * La cabecera de un grupo por carpeta. Solo existe si la carpeta tiene
- * tareas; es además el destino del arrastre y la puerta a lo que se hace
+ * La cabecera de un grupo por carpeta, también de una sin tareas; es además
+ * el destino del arrastre y la puerta a lo que se hace
  * con la carpeta mientras eso no viva en Ajustes.
  */
 export default function FolderGroupHeader(pp: {
   p: Project;
+  dragFolder?: string | null;
+  /**
+   * El rótulo cuando la carpeta se parte por máquina («Terminus · vm-principal»);
+   * sin él, el nombre de la carpeta. Renombrar y borrar siguen nombrando la carpeta.
+   */
+  rotulo?: string;
+  /** La máquina del grupo partido; `""` es esta. */
+  maquina?: string;
   abierto: boolean;
-  cuenta: number;
   tareas: SessionRow[];
   vivas: string[];
   aprobando: string[];
@@ -41,9 +49,12 @@ export default function FolderGroupHeader(pp: {
   onQuitarDelEspacio?: () => void;
   onNuevaTarea: () => void;
   onNuevoAgente: () => void;
+  /** «Llevar a otra máquina…»: con más de una máquina y una carpeta de git. */
+  onLlevar?: () => void;
 }) {
   const p = () => pp.p;
-  const recibiendo = () => destinoEnVuelo() === p().id;
+  const rotulo = () => pp.rotulo ?? p().name;
+  const recibiendo = () => (pp.dragFolder ?? destinoEnVuelo()) === p().id;
   const [nombre, setNombre] = createSignal("");
   // El menú tiene dos vistas, las acciones o la confirmación de borrado, en
   // un solo Popover: uno anidado se cerraría con el primero.
@@ -53,8 +64,11 @@ export default function FolderGroupHeader(pp: {
   return (
     <div
       data-folder-group={p().id}
+      data-folder-machine={pp.maquina}
       class={cn(
-        "group grid min-w-0 grid-cols-[20px_minmax(0,1fr)_auto_auto] items-center rounded-[var(--radius-sm)]",
+        "group grid min-w-0 grid-cols-[20px_minmax(0,1fr)_auto_auto] items-center rounded-sm",
+        // Abierta, un respiro entre la cabecera y su primera tarea.
+        pp.abierto && "mb-1",
         recibiendo() && RECIBE_LA_TAREA,
       )}
       data-destino={p().id}
@@ -64,8 +78,8 @@ export default function FolderGroupHeader(pp: {
         aria-expanded={pp.abierto}
         aria-label={
           pp.abierto
-            ? t("shell.sidebar.collapse_group", { name: p().name })
-            : t("shell.sidebar.expand_group", { name: p().name })
+            ? t("shell.sidebar.collapse_group", { name: rotulo() })
+            : t("shell.sidebar.expand_group", { name: rotulo() })
         }
         onClick={() => pp.onToggle()}
       >
@@ -80,24 +94,21 @@ export default function FolderGroupHeader(pp: {
         fallback={
           <SidebarMenuButton
             data-folder-open=""
-            class="h-7 min-h-7 grid-cols-[minmax(0,1fr)_auto] text-[0.75rem] font-semibold"
+            class="h-[34px] min-h-[34px] grid-cols-[minmax(0,1fr)_auto] text-label font-semibold"
             isActive={pp.proyectoAbierto === p().id}
             selectionMark={false}
             onDblClick={() => { setNombre(p().name); setRenombrando(true); }}
             onKeyDown={(e) => { if (e.key === "F2") { e.preventDefault(); setNombre(p().name); setRenombrando(true); } }}
             onClick={() => pp.onAbrir()}
           >
-            <span class="truncate">{p().name}</span>
-            <Show
-              when={!pp.abierto}
-              fallback={<span class="tabular-nums text-[0.6875rem] font-medium text-neutral-500">{pp.cuenta}</span>}
-            >
+            <span class="truncate">{rotulo()}</span>
+            <Show when={!pp.abierto}>
               <EstadoDeTarea
                 ambito="plegadas"
                 aprobando={pp.tareas.some((x) => pp.aprobando.includes(x.id))}
                 viva={pp.tareas.some((x) => pp.vivas.includes(x.id))}
                 esperando={pp.tareas.some((x) => x.esperando)}
-                outcome={pp.tareas.some((x) => x.sin_ver && x.outcome === "failed") ? "failed" : null}
+                outcome={rolledOutcome(pp.tareas.filter((x) => x.sin_ver))}
                 sinVer={pp.tareas.some((x) => x.sin_ver)}
               />
             </Show>
@@ -105,7 +116,7 @@ export default function FolderGroupHeader(pp: {
         }
       >
         <form
-          class="grid h-7 min-w-0 grid-cols-[minmax(0,1fr)] items-center gap-0.5 rounded-[var(--radius-sm)] bg-neutral-200 px-2 text-[0.75rem] font-semibold"
+          class="grid h-[34px] min-w-0 grid-cols-[minmax(0,1fr)] items-center gap-0.5 rounded-sm bg-neutral-200 px-2 text-label font-semibold"
           onSubmit={(e) => {
             e.preventDefault();
             const n = nombre().trim();
@@ -117,7 +128,7 @@ export default function FolderGroupHeader(pp: {
           <Input
             ref={enfocarYSeleccionar}
             variant="ghost"
-            class="block h-auto min-h-0 rounded-none border-0 p-0 font-sans text-[0.75rem] leading-[1.25] text-inherit [font-weight:inherit]"
+            class="block h-auto min-h-0 rounded-none border-0 p-0 font-sans text-label leading-[1.25] text-inherit [font-weight:inherit]"
             maxlength={PROJECT_NAME_MAX_LENGTH}
             value={nombre()}
             aria-label={t("shell.sidebar.rename_label", { name: p().name })}
@@ -148,7 +159,7 @@ export default function FolderGroupHeader(pp: {
             <button
               {...disparador}
               class="mr-1 grid size-6 shrink-0 place-items-center rounded-sm text-neutral-500 opacity-0 outline-none hover:bg-surface-muted hover:text-neutral-950 focus-visible:opacity-100 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary group-hover:opacity-100 group-focus-within:opacity-100 data-[expanded]:opacity-100"
-              aria-label={t("shell.sidebar.project_actions", { name: p().name })}
+              aria-label={t("shell.sidebar.project_actions", { name: rotulo() })}
               aria-haspopup="menu"
               title={t("shell.sidebar.actions")}
             >
@@ -170,6 +181,14 @@ export default function FolderGroupHeader(pp: {
                   setMenu(false);
                   pp.onNuevoAgente();
                 }}>{t("projects.agents.new_open")}</button>
+                <Show when={pp.onLlevar}>
+                  {(llevar) => (
+                    <button role="menuitem" class={ITEM_DE_MENU} data-carry-folder onClick={() => {
+                      setMenu(false);
+                      llevar()();
+                    }}>{t("shell.machines.carry_to")}</button>
+                  )}
+                </Show>
                 <button
                   role="menuitem"
                   class={ITEM_DE_MENU}
@@ -247,14 +266,14 @@ export default function FolderGroupHeader(pp: {
 
       <button
         class="mr-1 grid size-6 shrink-0 place-items-center rounded-sm text-neutral-500 opacity-0 outline-none hover:bg-surface-muted hover:text-neutral-950 focus-visible:opacity-100 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary group-hover:opacity-100 group-focus-within:opacity-100"
-        aria-label={t("shell.sidebar.new_task_in", { name: p().name })}
-        title={t("shell.sidebar.new_task_in", { name: p().name })}
+        aria-label={t("shell.sidebar.new_task_in", { name: rotulo() })}
+        title={t("shell.sidebar.new_task_in", { name: rotulo() })}
         onClick={(e) => {
           e.stopPropagation();
           pp.onNuevaTarea();
         }}
       >
-        <SquarePen size={15} />
+        <Plus size={15} />
       </button>
     </div>
   );

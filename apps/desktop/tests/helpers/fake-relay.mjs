@@ -39,8 +39,13 @@ const INTENT = new Set(["send_message", "inject_message", "create_project", "cre
  * `cachedAt`: with the computer off, the relay answers every known read from its copy of that time.
  * `table`: this computer's engine replies; `outdated`: its engine speaks another contract;
  * `notStartable`: the person's own machine, which the relay refuses to start.
+ * `delay`: milliseconds before an online computer answers.
+ * `contract`: the engine's, from its last `hello`; a session that sent other `contracts` gets `version_mismatch`.
  */
-export function relay({ state: initial = "online", wakeAfter = 300, cachedAt = null, table = engine, outdated = false, notStartable = false } = {}) {
+export function relay({ state: initial = "online", wakeAfter = 300, cachedAt = null, table = engine, outdated = false, notStartable = false, delay: initialDelay = 0, contract: initialContract = null } = {}) {
+  let delay = initialDelay;
+  let contract = initialContract;
+  const auths = [];
   const sockets = [];
   const calls = [];
   const subscriptions = [];
@@ -56,26 +61,42 @@ export function relay({ state: initial = "online", wakeAfter = 300, cachedAt = n
         this.readyState = 1;
         this.onopen?.({});
         push({ type: "state", state });
+        if (contract) this.onmessage?.({ data: JSON.stringify({ type: "engine", contract, host_version: null }) });
       }, 0);
     }
     send(data) {
       const m = JSON.parse(data);
       if (m.type === "subscribe") subscriptions.push(m.after);
+      if (m.type === "auth") {
+        auths.push(m.token);
+        return void setTimeout(() => this.onmessage?.({ data: JSON.stringify({ type: "auth", expires_at: new Date(Date.now() + 600_000).toISOString() }) }), 0);
+      }
       if (m.type !== "call") return;
       calls.push(m);
+      const spoken = new URL(this.url.replace(/^ws/, "http")).searchParams.get("contracts");
+      if (spoken && contract && !spoken.split(",").includes(contract)) {
+        const refused = { type: "result", id: m.id, error: { code: "version_mismatch", detail: { engine: contract, supported: spoken.split(",") } } };
+        return void setTimeout(() => this.readyState === 1 && this.onmessage?.({ data: JSON.stringify(refused) }), 0);
+      }
       const respond = () => {
         const answer = table[m.command];
         const reply = outdated
           ? { type: "result", id: m.id, error: { code: "version_mismatch" } }
           : answer === undefined
           ? { type: "result", id: m.id, error: { code: "command" } }
-          : { type: "result", id: m.id, value: typeof answer === "function" ? answer(m.args) : answer };
+          : { type: "result", id: m.id, value: typeof answer === "function" ? answer(m.args, m) : answer };
+        if (reply.value instanceof Promise) {
+          void reply.value.then((value) => {
+            if (this.readyState === 1) this.onmessage?.({ data: JSON.stringify({ ...reply, value }) });
+          });
+          return;
+        }
         if (this.readyState === 1) this.onmessage?.({ data: JSON.stringify(reply) });
       };
-      if (state === "online") return void setTimeout(respond, 0);
+      if (state === "online") return void setTimeout(respond, delay);
       if (!INTENT.has(m.command) && cachedAt && table[m.command] !== undefined) {
         const answer = table[m.command];
-        const value = typeof answer === "function" ? answer(m.args) : answer;
+        const value = typeof answer === "function" ? answer(m.args, m) : answer;
         const reply = { type: "result", id: m.id, value, cached: { updated_at: cachedAt } };
         return void setTimeout(() => this.readyState === 1 && this.onmessage?.({ data: JSON.stringify(reply) }), 0);
       }
@@ -94,19 +115,28 @@ export function relay({ state: initial = "online", wakeAfter = 300, cachedAt = n
         respond();
       }, wakeAfter);
     }
-    close(code = 1000) {
+    close(code = 1000, reason = "") {
       this.readyState = 3;
-      setTimeout(() => this.onclose?.({ code }), 0);
+      setTimeout(() => this.onclose?.({ code, reason }), 0);
     }
   }
   function setState(next) {
     state = next;
     push({ type: "state", state });
   }
-  const drop = (code) => {
-    for (const s of sockets) if (s.readyState === 1) s.close(code);
+  const drop = (code, reason = "") => {
+    for (const s of sockets) if (s.readyState === 1) s.close(code, reason);
   };
-  return { Socket, sockets, calls, subscriptions, push, drop, setState };
+  /** `delay`: how long an online computer takes to answer; a long one is a machine that does not answer. */
+  const setDelay = (ms) => {
+    delay = ms;
+  };
+  /** A new `hello` of the engine with `next`: every session hears `engine`. */
+  const hello = (next) => {
+    contract = next;
+    push({ type: "engine", contract, host_version: null });
+  };
+  return { Socket, sockets, calls, subscriptions, auths, push, drop, setState, setDelay, hello };
 }
 
 

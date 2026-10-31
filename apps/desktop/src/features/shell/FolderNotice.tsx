@@ -1,5 +1,6 @@
 import { Show, createEffect, createSignal, on, onCleanup, onMount } from "solid-js";
 import { invoke } from "../../lib/invoke.ts";
+import { machineOf } from "../machines/store";
 import { Button } from "../../ui/Button";
 import { Toast } from "../../ui/Toast";
 import { t } from "../../lib/i18n";
@@ -34,7 +35,7 @@ export default function AvisoDeCarpeta(props: {
       const r = await invoke<Resumen>("kn_pending", {
         project: props.project,
         session: id,
-      });
+      }, machineOf(id));
       setAtrasada(r.folder_updated);
     } catch {
       setAtrasada(false);
@@ -61,7 +62,7 @@ export default function AvisoDeCarpeta(props: {
     if (!id || actualizando()) return;
     setActualizando(true);
     try {
-      await invoke("kn_update", { project: props.project, session: id });
+      await invoke("kn_update", { project: props.project, session: id }, machineOf(id));
       setAtrasada(false);
     } catch {
       await mirar();
@@ -73,7 +74,7 @@ export default function AvisoDeCarpeta(props: {
   return (
     <Show when={atrasada() && descartada() !== clave()}>
       <Toast onDismiss={() => setDescartada(clave())}>
-        <p class="m-0 text-[0.8125rem] font-semibold">{t("kn.stale.title")}</p>
+        <p class="m-0 text-ui font-semibold">{t("kn.stale.title")}</p>
         <p class="m-0 text-xs text-neutral-500">{t("kn.stale.body")}</p>
         <div class="flex gap-1.5">
           <Button size="sm" disabled={actualizando()} onClick={() => void actualizar()}>

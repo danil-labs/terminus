@@ -1,14 +1,17 @@
+import { AgentAvatar } from "../../../ui/AgentAvatar";
 import { agentFolder, dockStatusText } from "@terminus/tasks";
 import { Stack, useLocalSearchParams } from "expo-router";
-import { useMemo, useState } from "react";
-import { FlatList, StyleSheet, Text, View } from "react-native";
+import { useMemo, useRef, useState } from "react";
+import { FlatList, type FlatListProps, StyleSheet, Text, View } from "react-native";
 import { cardOf, marksOf } from "../../../lib/cards";
-import { createTask, runShell, suggestedDefaults, taskKey } from "../../../lib/engine";
+import { createTask, runShell, suggestedDefaults, type Task, taskKey } from "../../../lib/engine";
 import { HostError } from "../../../lib/hosts";
 import { lang, t, w } from "../../../lib/i18n";
 import { useMachines } from "../../../lib/machines";
+import { effectiveGit } from "../../../lib/taskGit";
+import { useTaskGit } from "../../../lib/useTaskGit";
 import { useWorkspaces } from "../../../lib/workspaces";
-import { Avatar, openPreview, openTask } from "../../../ui/components";
+import { openPreview, openTask } from "../../../ui/components";
 import { Composer, type Submission } from "../../../ui/Composer";
 import { TaskCard } from "../../../ui/TaskCard";
 import { useTheme } from "../../../ui/theme";
@@ -18,12 +21,16 @@ import { KeyboardScreen } from "../../../ui/KeyboardScreen";
 export default function AgentScreen() {
   const theme = useTheme();
   const { workspace, name } = useLocalSearchParams<{ workspace: string; name: string }>();
-  const { attention, preferred, rememberMachine } = useMachines();
-  const { snapshot, hostsOfCurrent, view, current } = useWorkspaces();
+  const { attention, hostOf, preferred, rememberMachine } = useMachines();
+  const { snapshot, hostsOfCurrent, current } = useWorkspaces();
   const agent = snapshot?.agents.find((a) => a.name === name);
   const [note, setNote] = useState<string | null>(null);
   const marks = useMemo(() => marksOf(attention, current?.members, snapshot?.live ?? new Set()), [attention, current?.members, snapshot?.live]);
   const tasks = (snapshot?.tasks ?? []).filter((task) => task.agent === name);
+  // El PR de la línea 2: git solo de las filas que la lista dice que se ven.
+  const [seen, setSeen] = useState<ReadonlySet<string>>(new Set());
+  const onSeen = useRef<FlatListProps<Task>["onViewableItemsChanged"]>(({ viewableItems }) => setSeen(new Set(viewableItems.map((v) => v.key)))).current;
+  const git = useTaskGit(hostOf, tasks.filter((task) => seen.has(taskKey(task))));
   const folderName = (id: string) => snapshot?.folders.find((f) => f.id === id)?.name;
   // En qué máquina se habla con él: la preferida entre las que lo tienen.
   const host = preferred(hostsOfCurrent.filter((h) => agent?.places.some((p) => p.host === h.id)));
@@ -58,9 +65,10 @@ export default function AgentScreen() {
       <FlatList
         data={tasks}
         keyExtractor={taskKey}
+        onViewableItemsChanged={onSeen}
         ListHeaderComponent={
           <View style={[styles.profile, { borderColor: theme.border }]}>
-            <Avatar name={name} size={56} round />
+            <AgentAvatar name={name} size={56} />
             <View style={{ flex: 1, gap: 2 }}>
               <Text style={{ color: theme.text, fontSize: 18, fontWeight: "700" }}>{name}</Text>
               {agent ? <Text style={{ color: theme.textMuted }}>{dockStatusText(lang, agent)}</Text> : null}
@@ -72,10 +80,12 @@ export default function AgentScreen() {
           <TaskCard
             task={item}
             card={cardOf(item, marks)}
+            git={effectiveGit(git, item, snapshot?.tasks ?? [])}
             folderName={folderName}
-            density={view.density}
             onPress={() => openTask(item.host, item.workspace, item.folder, item.id)}
             onLongPress={() => openPreview(item.host, item.id)}
+            onFinish={() => openPreview(item.host, item.id, "finish")}
+            online={hostOf(item.host)?.power() === "on" && hostOf(item.host)?.canAct() === "now"}
           />
         )}
         ListEmptyComponent={<Text style={[styles.empty, { color: theme.textMuted }]}>{t("agent.empty")}</Text>}
@@ -90,6 +100,7 @@ export default function AgentScreen() {
         providers={host ? (snapshot?.providers[host.id] ?? []) : []}
         provider={defaults.provider}
         model={defaults.model}
+        permissionMode={current?.defaultPermissionMode ?? null}
         placeholder={t("agent.message", { name })}
         onSubmit={message}
       />

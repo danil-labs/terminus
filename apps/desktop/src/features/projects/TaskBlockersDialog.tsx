@@ -18,21 +18,21 @@ export default function TaskBlockersDialog(props: {
           {props.aviso.finish ? t("projects.sessions.blockers_finish_title") : t("projects.sessions.blockers_archive_title")}
         </DialogTitle>
         <Show when={props.aviso.blockers.unsaved.length > 0}>
-          <p class="m-0 text-[13px] text-neutral-700">
+          <p class="m-0 text-ui text-neutral-700">
             {t("projects.sessions.blockers_unsaved")}
           </p>
           <ul class="m-0 flex max-h-[40vh] list-none flex-col gap-2 overflow-y-auto p-0">
             <For each={props.aviso.blockers.unsaved}>{(work) => (
               <li class="min-w-0">
-                <span class="flex min-w-0 items-baseline gap-2 text-[13px] font-medium text-neutral-950">
+                <span class="flex min-w-0 items-baseline gap-2 text-ui font-medium text-neutral-950">
                   <span class="min-w-0 truncate">{readableSessionTitle(work.title)}</span>
-                  <span class="shrink-0 text-[11px] font-normal text-neutral-500">
+                  <span class="shrink-0 text-caption font-normal text-neutral-500">
                     {t("projects.sessions.blockers_files", { count: work.files.length })}
                   </span>
                 </span>
                 <ul class="m-0 list-none p-0">
                   <For each={work.files}>{(file) => (
-                    <li class="font-mono text-[11px] break-all text-neutral-500">{file}</li>
+                    <li class="font-mono text-caption break-all text-neutral-500">{file}</li>
                   )}</For>
                 </ul>
               </li>
@@ -40,7 +40,7 @@ export default function TaskBlockersDialog(props: {
           </ul>
         </Show>
         <Show when={props.aviso.blockers.not_finished}>
-          <p class="m-0 text-[13px] text-neutral-700">
+          <p class="m-0 text-ui text-neutral-700">
             {t("projects.sessions.blockers_not_finished")}
           </p>
         </Show>

@@ -1,7 +1,8 @@
 /**
  * Una tarea que corre en otra máquina, apagada: abre con lo último que se leyó, dice que
  * la máquina está apagada y lleva su chip; mandarle un mensaje la enciende, sale una vez y
- * la tarea se vuelve a leer. El proxy (`fleet.rs`) se simula con sus respuestas. Monta `dist/`.
+ * la tarea se vuelve a leer. Un archivo que nombra su chat se lee en esa máquina. El proxy
+ * (`features/machines/router.ts`) se simula con sus respuestas. Monta `dist/`.
  */
 import assert from "node:assert/strict";
 import test from "node:test";
@@ -91,7 +92,8 @@ test("una tarea de una máquina apagada abre sin fallo y mandarle algo la encien
   await sleep(600);
   const doc = app.w.document;
   assert.ok(doc.querySelector('[data-sesion="r1"]'), "la tarea de la máquina apagada no sale en el sidebar");
-  assert.equal(doc.querySelector("[data-sesion] [data-machine]"), null, "la fila del sidebar lleva el chip de la máquina; lo dice su tarjeta");
+  // La tarjeta del riel ya no lleva la máquina: la dice su tarjeta flotante.
+  assert.equal(doc.querySelector('[data-sesion="r1"] [data-machine]'), null, "la tarjeta del sidebar no lleva chip de máquina");
 
   await openTask(app, "r1");
   assert.ok(text(app).includes("Respuesta guardada"), "no enseña la copia guardada");
@@ -125,5 +127,165 @@ test("la ventana de una tarea local dice su máquina, su proyecto y su rama", as
   assert.match(location.querySelector("[data-task-location-machine]")?.textContent ?? "", /^Esta (Mac|computadora)$/);
   assert.equal(location.querySelector("[data-task-location-project]")?.textContent, "P1");
   assert.equal(location.querySelector("[data-task-location-branch]")?.textContent, "feat/task-location");
+  assert.deepEqual(app.fallos, []);
+});
+
+test("la tarea nueva lleva la barra de una tarea: ubicación, herramientas apagadas con su porqué y carpeta encendida", async () => {
+  const app = await boot("listo", "machine-task-draft-bar", responses({
+    list_live_sessions: ({ project }) => (project === "p1" ? [row("t1")] : []),
+    load_session: ({ id }) => session(id, [turn(0, "Hola local"), turn(1, "Respuesta local")]),
+  }));
+  await sleep(600);
+  const doc = app.w.document;
+  const boton = (label) => doc.querySelector(`button[aria-label="${label}"]`);
+  boton("Nueva tarea en P1").click();
+  await sleep(400);
+  assert.equal(doc.querySelector("[data-task-location-project]")?.textContent, "P1");
+  const buscar = doc.querySelector('button[aria-label="Buscar en esta tarea"][aria-keyshortcuts]');
+  assert.equal(buscar?.getAttribute("aria-disabled"), "true");
+  assert.equal(buscar.title, "Buscar estará disponible cuando la tarea tenga mensajes");
+  buscar.click();
+  await sleep(50);
+  assert.equal(doc.querySelector('[role="search"]'), null, "la búsqueda se abrió sin nada que buscar");
+  const delegadas = doc.querySelector('[data-delegated-trigger="toolbar"]');
+  assert.equal(delegadas?.getAttribute("aria-disabled"), "true");
+  assert.equal(delegadas.title, "Aún no hay tareas delegadas");
+  boton("Cerrar el árbol de trabajo").click();
+  await sleep(100);
+  assert.equal(boton("Ver el árbol de trabajo")?.disabled, false, "la carpeta existe: su icono no se apaga");
+  // Una tarea real sin delegadas conserva el hueco, y su búsqueda sí funciona.
+  await openTask(app, "t1");
+  assert.equal(doc.querySelector('[data-delegated-trigger="toolbar"]')?.getAttribute("aria-disabled"), "true");
+  assert.equal(doc.querySelector('button[aria-label="Buscar en esta tarea"][aria-keyshortcuts]')?.getAttribute("aria-disabled"), null);
+  assert.deepEqual(app.fallos, []);
+});
+
+test("el PDF que nombra el chat de una tarea de otra máquina se lee en esa máquina", async () => {
+  const PDF = "/Users/alberto/exchange/Propuesta%20Chemara.pdf";
+  const reads = [];
+  // El motor de la ventana no tiene el archivo: solo contesta la máquina de la tarea.
+  const there = (command, value) => (args, options) => {
+    const machine = options?.headers?.["x-terminus-machine"] ?? null;
+    reads.push({ command, path: args.path, machine });
+    if (machine !== "vm") throw new Error("not_found");
+    return value;
+  };
+  const app = await boot("listo", "machine-task-file", responses({
+    list_live_sessions: ({ project }) => (project === "p1" ? [row("r1", { machine: "vm", machine_on: true })] : []),
+    load_session: ({ id }) => session(id, [turn(0, "hazme la propuesta"), turn(1, `Lista:
+
+![Propuesta Danil para Chemara](${PDF})`)]),
+    file_size: there("file_size", 2048),
+    preview_file: there("preview_file", { kind: "pdf", text: null, data_url: null, pdf: null, bytes: 2048, truncated: false }),
+  }), undefined, {}, {
+    antes: (w) => {
+      globalThis.IntersectionObserver = w.IntersectionObserver = class {
+        constructor(callback) { this.callback = callback; }
+        observe(target) { setTimeout(() => this.callback([{ isIntersecting: true, target }], this), 0); }
+        unobserve() {}
+        disconnect() {}
+        takeRecords() { return []; }
+      };
+    },
+  });
+  await sleep(600);
+  await openTask(app, "r1");
+  await sleep(300);
+  const path = decodeURIComponent(PDF);
+  assert.ok(text(app).includes("PDF · 2 KB"), "la tarjeta no tiene el tamaño del archivo");
+  for (const command of ["file_size", "preview_file"]) {
+    const asked = reads.filter((r) => r.command === command && r.path === path);
+    assert.ok(asked.length > 0, `no pidió ${command}`);
+    assert.deepEqual(asked.map((r) => r.machine), asked.map(() => "vm"), `${command} fue al motor de la ventana`);
+  }
+});
+
+test("el composer consulta la máquina elegida y descarta respuestas tardías", async () => {
+  const app = await boot("listo", "machine-composer-accounts", responses({
+    list_live_sessions: ({ project }) => project === "p1" ? [row("r1", { machine: "vm", machine_on: true })] : [],
+    load_session: ({ id }) => session(id, [turn(0, "Hola"), turn(1, "Respuesta")]),
+  }));
+  await sleep(600);
+  const doc = app.w.document;
+  const original = app.w.__TAURI_INTERNALS__.invoke;
+  const calls = [];
+  let finishVm;
+  app.w.__TAURI_INTERNALS__.invoke = (command, args, options) => {
+    const machine = options?.headers?.["x-terminus-machine"];
+    calls.push({ command, machine });
+    if (command === "list_surfaces") {
+      if (machine === "vm") return new Promise((resolve) => { finishVm = resolve; });
+      return Promise.resolve([{ id: "codex", provider: "codex", label: "Codex", catalogo: "todo", usable: true, marca: null, porque: null }]);
+    }
+    if (command === "list_models") return Promise.resolve({ provider: args.provider, models: [{ id: machine === "vm" ? "vm-model" : "local-model", label: machine === "vm" ? "VM model" : "Local model", efforts: [], default_effort: null }], fallback: false });
+    return original(command, args, options);
+  };
+  const pick = async (id) => {
+    doc.querySelector('[aria-label="Ejecutar en"]').click();
+    await sleep(100);
+    doc.querySelector(`[data-machine-option="${id}"]`).click();
+    await sleep(150);
+  };
+  await pick("vm");
+  assert.ok(calls.some((c) => c.command === "list_surfaces" && c.machine === "vm"), "no consulta las credenciales de la máquina elegida");
+  await pick("local");
+  assert.ok(calls.some((c) => c.command === "list_models" && c.machine === undefined), "no relee el catálogo al volver a la máquina local");
+  finishVm([{ id: "claude", provider: "claude", label: "Claude Code", catalogo: "todo", usable: true, marca: null, porque: null }]);
+  await sleep(150);
+  assert.ok(doc.querySelector('[aria-label*="Local model"]'), "la respuesta tardía de la VM reemplazó el catálogo local");
+  await openTask(app, "r1");
+  assert.equal(calls.filter((c) => c.command === "list_surfaces").at(-1).machine, "vm", "abrir la tarea no sigue la máquina donde corre");
+  finishVm([{ id: "codex", provider: "codex", label: "Codex", catalogo: "todo", usable: true, marca: null, porque: null }]);
+  await sleep(150);
+  assert.ok(doc.querySelector('[aria-label*="VM model"]'), "la tarea remota conserva los modelos locales");
+  assert.deepEqual(app.fallos, []);
+});
+
+test("reopening a live permission sends the observed durable id and revision", async () => {
+  let waiting = true;
+  const decisions = [];
+  const pending = { id: "durable-7", request_id: "provider-1", revision: 7, tool: "Bash", target: "echo permission-proof" };
+  const app = await boot("listo", "durable-permission", responses({
+    list_live_sessions: () => [row("t1")],
+    list_active_turns: ["t1"],
+    load_session: ({ id }) => session(id, [turn(0, "Waiting for approval")]),
+    pending_requests: () => ({ permissions: waiting ? [pending] : [], questions: [], records: { permissions: [{ ...pending, id: "old-delivery", state: "delivery_unknown" }] } }),
+    respond_permission: args => {
+      decisions.push(args);
+      waiting = false;
+      return { id: "decision", role: "user", text: "", permission: { request_id: "provider-1", tool: "Bash", target: pending.target, allow: args.allow, when: 1 } };
+    },
+  }));
+  await sleep(600);
+  await openTask(app, "t1");
+  const approve = [...app.w.document.querySelectorAll("button")].find(button => button.textContent?.trim() === "Aprobar y ejecutar");
+  assert.ok(approve, "pending permission must be restored without a live event");
+  approve.click();
+  await sleep(200);
+  assert.deepEqual(decisions, [{ session: "t1", requestId: "durable-7", revision: 7, allow: true }]);
+  assert.equal([...app.w.document.querySelectorAll("button")].some(button => button.textContent?.trim() === "Aprobar y ejecutar"), false);
+  assert.deepEqual(app.fallos, []);
+});
+
+for (const state of ["delivery_unknown", "owner_lost"]) test(`a missing live permission retains its durable ${state} outcome without resending`, async () => {
+  let waiting = true;
+  let sent = 0;
+  const pending = { id: "durable-lost", request_id: "provider-lost", revision: 7, tool: "Bash", target: "echo proof" };
+  const app = await boot("listo", `permission-${state}`, responses({
+    list_live_sessions: () => [row("t1")], list_active_turns: ["t1"],
+    load_session: ({ id }) => session(id, [turn(0, "Waiting")]),
+    pending_requests: () => ({ permissions: waiting ? [pending] : [], questions: [], records: { permissions: [{ ...pending, state: waiting ? "waiting" : state === "owner_lost" ? "closed" : state, closed: !waiting && state === "owner_lost" ? "owner_lost" : null }] } }),
+    respond_permission: () => { sent++; waiting = false; throw { what: "Transport failed", detail: "io" }; },
+  }));
+  await sleep(600);
+  await openTask(app, "t1");
+  const approve = [...app.w.document.querySelectorAll("button")].find(b => b.textContent?.trim() === "Aprobar y ejecutar");
+  assert.ok(approve);
+  approve.click();
+  await sleep(300);
+  assert.equal(sent, 1);
+  assert.ok(app.w.document.body.textContent.includes(state), "durable outcome remains in the conversation diagnostic");
+  if (state === "owner_lost") assert.ok(app.w.document.body.textContent.includes("El proceso que esperaba la respuesta"));
+  assert.equal([...app.w.document.querySelectorAll("button")].some(b => b.textContent?.trim() === "Aprobar y ejecutar"), false);
   assert.deepEqual(app.fallos, []);
 });

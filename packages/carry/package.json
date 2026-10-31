@@ -1,0 +1,13 @@
+{
+  "name": "@terminus/carry",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Carry work between machines from any client: what travels, how it is copied in parts and how the task starts on top of it.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "node --test 'test/*.test.ts'"
+  }
+}

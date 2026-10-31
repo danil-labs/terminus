@@ -35,13 +35,13 @@ export function SettingsSection(props: SettingsSectionProps) {
   return (
     <section class={cn("grid min-w-0 gap-0.5", own.class)} {...rest}>
       <Show when={title() || aside()}>
-        <header class="flex min-h-7 items-center gap-2">
+        <header class="flex min-h-7 min-w-0 flex-wrap items-center gap-2">
           <h3 class="m-0 min-w-0 flex-1 text-base font-semibold">{title()}</h3>
           {aside()}
         </header>
       </Show>
       <Show when={description()}>
-        <p class="m-0 text-[0.8125rem] leading-[19px] text-neutral-500">{description()}</p>
+        <p class="m-0 text-ui leading-[19px] text-neutral-500">{description()}</p>
       </Show>
       <div class="grid min-w-0">{own.children}</div>
     </section>
@@ -73,7 +73,7 @@ export function SettingsRow(props: SettingsRowProps) {
   return (
     <div
       class={cn(
-        "flex min-w-0 items-center gap-8 border-b border-border py-3.5 last:border-b-0",
+        "flex min-w-0 flex-col items-stretch gap-3 border-b border-border py-3.5 last:border-b-0 sm:flex-row sm:items-center sm:gap-8",
         own.class,
       )}
       {...rest}
@@ -85,14 +85,14 @@ export function SettingsRow(props: SettingsRowProps) {
             <div class="min-w-0 text-sm">{own.label}</div>
           </Show>
           <Show when={description()}>
-            <div class="min-w-0 text-[0.8125rem] leading-[19px] text-neutral-500">
+            <div class="min-w-0 text-ui leading-[19px] text-neutral-500">
               {description()}
             </div>
           </Show>
         </div>
       </div>
       <Show when={control()}>
-        <div class="flex shrink-0 items-center gap-2">{control()}</div>
+        <div class="flex min-w-0 flex-wrap items-center gap-2 sm:shrink-0">{control()}</div>
       </Show>
     </div>
   );

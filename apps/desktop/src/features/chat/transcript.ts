@@ -5,6 +5,8 @@
  * dominio y se prueba desde Node.
  */
 
+import { isQuestionFile } from "@terminus/chat/steps";
+import type { HistoryRef } from "@terminus/protocol";
 import type { CodeRange } from "../../lib/model.ts";
 import type { Recipient, ReplyTo, SenderTask } from "../../lib/recipients.ts";
 import { type Detalle, pasoDe } from "../../lib/steps.ts";
@@ -38,8 +40,15 @@ export type ChatEvent = {
     | "tool"
     | "tool_done"
     | "permission"
+    /**
+     * Alguien —esta ventana u otra— ya decidió el pedido `request_id`: `ok` es
+     * lo decidido, `id` el turno que lo guarda y `text`/`target`, sobre qué.
+     */
+    | "permission_resolved"
     | "notice"
     | "task_launched"
+    /** El motor guardó lo dicho hasta aquí en el turno `id` (un tramo); ver `tramoGuardado`. */
+    | "segment_saved"
     | "model"
     | "effort"
     /** El CLI está reintentando contra su proveedor: `meta` trae `"3/5"`. */
@@ -157,7 +166,7 @@ export function anexarDelta(
   if (d.startsMessage) return nuevo(d.text.replace(/^\n+/, ""));
   if (d.messageId) {
     for (let i = msgs.length - 1; i >= 0; i--) {
-      if (msgs[i].meta === "task_launched") break;
+      if (msgs[i].meta === "task_launched" || msgs[i].tramo) break;
       if (msgs[i].role === "agent" && msgs[i].nativeMessageId === d.messageId) {
         const copia = [...msgs];
         copia[i] = { ...msgs[i], text: msgs[i].text + d.text };
@@ -182,7 +191,8 @@ export function anexarDelta(
     return nuevo(d.text);
   }
   const ultimo = msgs[msgs.length - 1];
-  if (ultimo?.role === "agent") {
+  // Lo que ya está en un tramo guardado no crece: lo que sigue es del tramo siguiente.
+  if (ultimo?.role === "agent" && !ultimo.tramo) {
     return [...msgs.slice(0, -1), { ...ultimo, text: ultimo.text + d.text }];
   }
   return nuevo(d.text);
@@ -235,6 +245,62 @@ export function anexarImagen(msgs: Msg[], images: string[]): Msg[] {
     return copia;
   }
   return [...msgs, { role: "agent", text: "", images: images.slice() }];
+}
+
+/** Marca lo vivo que el motor guardó en el tramo `turno`; no lo quita: un `tool_done` tardío busca su fila. */
+export function tramoGuardado(msgs: Msg[], turno: string): Msg[] {
+  const suyo = (m: Msg) => !m.turno && !m.tramo && (m.role === "agent" || m.meta === "usó");
+  return msgs.some(suyo) ? msgs.map((m) => (suyo(m) ? { ...m, tramo: turno } : m)) : msgs;
+}
+
+/** Lo guardado y, detrás, lo vivo que el disco no trae: releer con el turno corriendo no repite sus tramos. */
+export function mensajesDelHilo(h: { base: Msg[]; vivo: Msg[]; guardados?: ReadonlySet<string> }): Msg[] {
+  const guardados = h.guardados;
+  const enDisco = (id?: string) => id !== undefined && guardados!.has(id);
+  const vivo = sinInyectadosGuardados(
+    h.base,
+    guardados?.size ? h.vivo.filter((m) => !enDisco(m.turno) && !enDisco(m.tramo)) : h.vivo,
+  );
+  return vivo.length ? [...h.base, ...vivo] : h.base;
+}
+
+/**
+ * Un mensaje metido sin id (`Msg.inyectado`) que el disco ya trae: el primer turno
+ * de la persona con su texto guardado después de `tras`. Cada guardado cuenta
+ * una vez, para que dos «sí» seguidos sigan siendo dos.
+ */
+function sinInyectadosGuardados(base: Msg[], vivo: Msg[]): Msg[] {
+  if (!vivo.some((m) => m.inyectado && !m.turno)) return vivo;
+  const usados = new Set<number>();
+  return vivo.filter((m) => {
+    if (!m.inyectado || m.turno) return true;
+    const tras = m.inyectado.tras;
+    const desde = tras === null ? 0 : base.findIndex((b) => b.turno === tras) + 1;
+    if (desde === 0 && tras !== null) return true;
+    for (let i = desde; i < base.length; i++) {
+      const b = base[i];
+      if (usados.has(i) || b.role !== "user" || !b.turno || b.text !== m.text) continue;
+      usados.add(i);
+      return false;
+    }
+    return true;
+  });
+}
+
+/**
+ * Lo escrito en una subtarea que el motor pasó a su padre envuelto en el encargo
+ * de retomarla (`subagents::relay_prompt`, `launch::relevo_de`): el encargo es del CLI.
+ */
+const RELEVOS = [
+  /^\[Mensaje para tu subagente «(.+)»\]\nRetómalo con SendMessage usando to: "[^"\n]*" y pásale esto tal cual:\n\n([\s\S]*?)\n\nNo hagas tú su trabajo\. Cuando conteste, resume en una línea qué dijo\.$/,
+  /^\[Mensaje para tu subagente «(.+)»\]\nRetómalo con resume_agent si hace falta y usa send_input con id: "[^"\n]*"\. Pásale esto tal cual y espera su resultado:\n\n([\s\S]*)$/,
+];
+export function relevoDe(text: string): { titulo: string; texto: string } | null {
+  for (const forma of RELEVOS) {
+    const m = forma.exec(text);
+    if (m) return { titulo: m[1], texto: m[2] };
+  }
+  return null;
 }
 
 /** Una herramienta que el agente usó, tal como quedó **guardada** en el turno. */
@@ -341,6 +407,7 @@ export type Turn = {
   hops?: number | null;
   /** Las tareas que despertaron a la Bandeja (`Turn::woke_by`). */
   woke_by?: string[] | null;
+  history_refs?: HistoryRef[];
   tools?: Tool[];
   /**
    * El turno en su orden: el texto partido en los mensajes que el agente
@@ -408,7 +475,7 @@ export type Session = {
   observed_model?: string | null;
   /** Solo de `load_history`: qué tramo de la transcripción entera son estos `turns`. */
   history?: HistoryPage | null;
-  /** Su máquina está apagada: esto es lo último que se leyó de ella (`fleet.rs`). */
+  /** Su máquina está apagada: esto es lo último que se leyó de ella (su rebanada, `@terminus/fleet`). */
   offline?: { machine: string } | null;
 };
 
@@ -443,6 +510,7 @@ const LINEAS_SIN_PROSA = new Set([
   "task_chain_limit",
   "woke_by_tasks",
   "respondido",
+  "delivery_pending",
   "shell_reply",
 ]);
 
@@ -490,7 +558,7 @@ export function transcripcion(turns: Turn[]): Msg[] {
       paso: pasoDe(h.name, h.target, { ok: h.ok ?? null, mcpApp: h.mcp_app ?? mcpCallFromName(h.name) }),
     });
     const visible = (h: Tool | undefined) =>
-      h !== undefined && !h.target?.includes(".preguntas.json");
+      h !== undefined && !isQuestionFile(h.target);
     const pasos: Msg[] = (t.tools ?? []).filter(visible).map(paso);
     if (t.shell) {
       return [
@@ -522,9 +590,14 @@ export function transcripcion(turns: Turn[]): Msg[] {
     // Lo que el turno preguntó y lo que se contestó vuelve con él: una pregunta
     // que no sobrevive a cerrar la app deja la sesión esperando para siempre,
     // sin nadie que sepa que espera.
+    const relevo = t.role === "user" ? relevoDe(t.text) : null;
     const propio: Msg = {
       role: t.role as Msg["role"],
-      text: t.text,
+      text: relevo ? relevo.texto : t.text,
+      // El JSON crudo de las herramientas no se lee en el chat: solo se ofrece
+      // lo que le falta a la conversación, como un texto demasiado largo.
+      historyRefs: t.history_refs?.filter((ref) => ref.pointer !== "/tools"),
+      ...(relevo ? { relevo: { titulo: relevo.titulo } } : {}),
       task_mentions: t.task_mentions,
       // Un aviso de cierre —una interrupción— vive en el turno, no en el evento
       // de la ventana. Sin esto desaparecía al reabrir la tarea y una respuesta
@@ -598,7 +671,8 @@ export function transcripcion(turns: Turn[]): Msg[] {
       !propio.attachments &&
       !propio.preguntas &&
       !propio.respuestas &&
-      !propio.permission
+      !propio.permission &&
+      !propio.historyRefs?.length
     )
       return [...cambio, ...pasos, ...entrega];
     // Con el orden registrado se pinta el orden. Lo que el turno arrastra

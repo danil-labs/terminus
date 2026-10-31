@@ -1,3 +1,5 @@
+import { machineOf } from "../machines/store";
+import type { InvokeOptions } from "@tauri-apps/api/core";
 import { invoke } from "../../lib/invoke.ts";
 import { manifiesto, t } from "../../lib/i18n.ts";
 
@@ -30,13 +32,14 @@ export type History = {
   versions: Version[];
 };
 
-export const historiaDe = (path: string) => invoke<History>("artifact_history", { path });
+/** `en`: la máquina donde está el archivo, si no es la de la ventana (`ui/fileMachine.ts`). */
+export const historiaDe = (path: string, en?: InvokeOptions) => invoke<History>("artifact_history", { path }, en);
 
-export const leerVersion = (referencia: VersionRef) =>
-  invoke<string>("read_version", { referencia });
+export const leerVersion = (referencia: VersionRef, en?: InvokeOptions) =>
+  invoke<string>("read_version", { referencia }, en);
 
-export const restaurarVersion = (referencia: VersionRef) =>
-  invoke<History>("restore_version", { referencia });
+export const restaurarVersion = (referencia: VersionRef, en?: InvokeOptions) =>
+  invoke<History>("restore_version", { referencia }, en);
 
 export function mismaVersion(
   a: VersionRef | null | undefined,
@@ -129,14 +132,15 @@ export const NOMBRE_VIA: Record<string, string> = {
 };
 
 export const publicacionesDe = (project: string, session: string) =>
-  invoke<Publicacion[]>("publications_of", { project, session });
+  invoke<Publicacion[]>("publications_of", { project, session }, machineOf(session));
 
 export const registrarSalida = (
   referencia: VersionRef,
   via: Via,
   destino: string,
   bytes: number,
-) => invoke<void>("record_export", { referencia, via, destino, bytes });
+  en?: InvokeOptions,
+) => invoke<void>("record_export", { referencia, via, destino, bytes }, en);
 
 export const descargarArtefacto = (
   path: string,

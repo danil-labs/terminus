@@ -31,28 +31,6 @@ export const needsTrafficLightPadding = (
   fullscreen: Accessor<boolean>,
 ) => () => isMac() && capabilities().nativeWindow && !fullscreen() && ownsCorner();
 
-// El título nativo con Overlay se superpone a los controles; hiddenTitle deja pintarlo aquí.
-export function createWindowTitle(): Accessor<string> {
-  const [title, setTitle] = createSignal("");
-
-  const read = () => {
-    // getCurrentWindow() puede lanzar sin metadata; un catch de la promesa no lo captura.
-    try {
-      void getCurrentWindow()
-        .title()
-        .then(setTitle)
-        .catch(() => {});
-    } catch {
-    }
-  };
-  onMount(read);
-  // Un motor relanzado cambia el título nativo; el reenganche avisa con este evento.
-  window.addEventListener("harness:service-resync", read);
-  onCleanup(() => window.removeEventListener("harness:service-resync", read));
-
-  return title;
-}
-
 // Tauri no emite cambios de pantalla completa; el cambio de tamaño permite consultarla.
 export function createFullscreen(): Accessor<boolean> {
   const [fullscreen, setFullscreen] = createSignal(false);

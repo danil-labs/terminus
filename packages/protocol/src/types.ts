@@ -7,12 +7,86 @@ export type EngineError = { code: string; message_key?: string; detail?: unknown
 
 /** La cuenta de Danil vinculada a un workspace (`danil` de `list_workspaces`). */
 export type WorkspaceDanil = { user_id: string; email?: string | null; name?: string | null };
-/** Un workspace tiene el mismo id en cada máquina que lo tiene (`groupWorkspaces`). */
-export type Workspace = { id: string; name: string; provider?: string | null; remote?: string | null; danil?: WorkspaceDanil | null };
+/**
+ * Un workspace tiene el mismo id en cada máquina que lo tiene (`groupWorkspaces`).
+ * `default_permission_mode`, el modo con que arranca una tarea nueva si la
+ * persona eligió uno (`workspaces::Workspace::default_permission_mode`).
+ */
+export type Workspace = { id: string; name: string; provider?: string | null; remote?: string | null; danil?: WorkspaceDanil | null; default_permission_mode?: string | null };
 /** `list_workspaces`. */
-export type Startup = { workspaces: Workspace[]; active: string | null };
+/**
+ * `list_workspaces` → `machine_resources`. Lo de `memory` en adelante es aditivo
+ * y llega con la característica de servicio `machine_usage_v1` (seldon-host
+ * `docs/proposals/2026-10-29-machine-resources.md` §3.3): un host anterior solo
+ * trae `storage`, y la interfaz lo muestra como «Solo disco», nunca como viejo.
+ */
+export type MachineResources = {
+  measured_at: number;
+  error?: "measurement_failed" | "unsupported";
+  storage: { id: string; label: string; total_bytes: number; free_bytes: number; available_bytes: number; terminus_bytes: null; attribution: "unknown" }[];
+  memory?: { total_bytes: number; available_bytes: number; swap_total_bytes: number; swap_used_bytes: number };
+  /** `load` es la carga promedio de 1, 5 y 15 min; `usage_percent`, el uso de 0 a 100, desde la segunda lectura. */
+  cpu?: { cores: number; load: [number, number, number]; usage_percent?: number };
+  /** PSI `some avg60`, en %. `memory_history`: el de memoria por minuto, el más viejo primero (Linux; vacío el primer minuto). */
+  pressure?: { cpu: number; memory: number; io: number; memory_history?: number[] };
+  /** `rss_bytes` y `threads` llegan con `machine_usage_v1`; lo demás, ver `EngineUpdate`. */
+  engine?: { rss_bytes?: number; threads?: number } & EngineUpdate;
+  /** `cgroup` cuenta exacto; `best_effort` (macOS) reparte por proceso; `none`, sin reparto por tarea. */
+  attribution?: "cgroup" | "best_effort" | "none";
+  tasks?: MachineTaskUsage[];
+  other?: { memory_bytes: number; processes: number };
+  /** El aviso de presión activo del motor (memoria `some avg60` sostenida), con lo que más usa. */
+  pressure_alert?: { since: number; memory: number; tasks: { workspace: string; session: string; title: string; memory_bytes: number }[] };
+  /** Cuánto tardó la lectura, en µs. */
+  measure_us?: number;
+};
+/**
+ * `engine_update_status` y el bloque `engine` de `machine_resources` (seldon-host
+ * `engine_update.rs`): `version` y `build` siempre; el resto, con `engine_update_v1`.
+ */
+export type EngineUpdate = {
+  version?: string;
+  build?: string;
+  available?: boolean;
+  channel?: string;
+  /** La última release firmada del canal; `null` si no se conoce. */
+  latest?: { release: string; version?: string; commit?: string; sha256?: string; published_at?: string } | null;
+  update_available?: boolean;
+  /** `current` ya apunta a otra release: se cambia al quedar sin turnos. */
+  handover_pending?: boolean;
+  download?: { request_id: string; release: string; state: "downloading" | "staged" | "rejected"; error?: string } | null;
+  pending?: { request_id?: string; release?: string; mode?: "now" | "when_idle" } | null;
+  last?: { request_id?: string; state?: string; error?: string | null } | null;
+};
+export type MachineTaskUsage = {
+  workspace: string;
+  session: string;
+  /** De la tarea, no del proceso: `finished` (también archivada con turno vivo) con procesos es «Quedó corriendo». */
+  state: "running" | "idle" | "finished";
+  memory_bytes: number;
+  memory_peak_bytes: number;
+  /** % de un núcleo, como en `top`: puede pasar de 100. Promedio de los últimos 10 s. */
+  cpu_percent: number;
+  processes: number;
+  pressure_memory: number;
+  browsers: { session: string; since: number }[];
+  /** Hasta 5. */
+  top: { pid: number; command: string; rss_bytes: number }[];
+  title?: string;
+  project?: string | null;
+  archived?: boolean;
+  /** En ms, solo si terminó o se archivó. */
+  ended_at?: number;
+};
+export type WorkspaceStorage = {
+  bytes: number; recuperable: number; medido_en: number; aviso: string | null;
+  tareas: { session: string; project: string; tarea: string; proyecto: string | null; bytes: number }[];
+  compartido: { bytes: number }[]; sueltos: { bytes: number }[];
+};
+/** `cached_at`: la ventana lo agrega cuando la máquina está apagada y la respuesta salió de su última copia. */
+export type Startup = { workspaces: Workspace[]; active: string | null; machine_resources?: MachineResources; cached_at?: number | null };
 /** `list_projects`: una carpeta del workspace. */
-export type Project = { id: string; name: string; working_directory?: string | null };
+export type Project = { id: string; name: string; working_directory?: string | null; kind?: "git" | "folder"; remote_url?: string | null };
 /**
  * Evento `project_clone` y respuesta de `project_clone_status`: el clon que pidió
  * `start_project_clone`. Termina con `done` y `project`, o con `error` (un
@@ -27,8 +101,59 @@ export type ProjectCloneEvent = {
   project?: Project;
   error?: { what?: Frase; detail?: string } | string;
 };
-/** `list_spaces`. */
-export type Space = { id: string; name: string | null; folders: string[] };
+/**
+ * `list_spaces`, y lo que devuelven `create_space` y `rename_space`. `name`
+ * `null` es el nombre por omisión del catálogo; `account`, que es de la cuenta
+ * (el mismo id en todas las máquinas del workspace).
+ */
+export type Space = { id: string; name: string | null; folders: string[]; created_at?: number; updated_at?: number; account?: boolean };
+/** Un espacio nombrado desde otra respuesta; `deleted` si ya no existe. */
+export type SpaceRef = { id: string; name: string | null; deleted?: boolean };
+/** Una tarea que eliminar el espacio va a tocar, como la vio la persona. */
+export type TaskSeen = {
+  folder: string;
+  task: string;
+  root: string;
+  title: string;
+  working: boolean;
+  /** Lo que tiene sin commitear, con su hash: si cambia, el motor no borra. */
+  files: { path: string; hash: string }[];
+  kn_pending: string[];
+};
+/** `space_delete_preview`: lo que se detiene, descarta o deja sin guardar. `last`, si es el único espacio. */
+export type DeletePreview = { space: SpaceRef; last: boolean; tasks: TaskSeen[] };
+/** `delete_space({ id, seen })`: `seen` es exactamente lo de la previa; `discard` si hay archivos sin commitear. */
+export type DeleteConsent = { tasks: TaskSeen[]; discard: boolean };
+/** `delete_space`: sin `deleted`, `changed` trae la previa nueva (algo cambió) y `failures` lo que no se pudo archivar. */
+export type DeleteOutcome = { deleted: boolean; changed: DeletePreview | null; failures: { folder: string; task: string; error: unknown }[] };
+/** `archived_tasks`: las archivadas de todas las carpetas, con los espacios que nombran (aunque ya no existan). */
+export type ArchivedTasks = { tasks: (SessionRow & { folder: string })[]; spaces: SpaceRef[] };
+
+/** Mantener despierta: Siempre, Con agentes, Apagado. */
+export type KeepAwakeMode = "on" | "agent" | "off";
+/** `keep_awake_status` y `set_keep_awake`: `active`, si ahora la mantiene despierta; `supported`, si su sistema sabe hacerlo. */
+export type KeepAwakeStatus = { mode: KeepAwakeMode; active: boolean; supported: boolean };
+
+/** Un puerto que escucha en la máquina. */
+export type OpenPort = {
+  /** Estable mientras el puerto sea el mismo. */
+  id: string;
+  pid: number;
+  puerto: number;
+  /** Como la reporta el sistema: `127.0.0.1:3000`, `*:5173`. */
+  direccion: string;
+  /** La que abre un navegador en esa máquina: `http://localhost:5173`. */
+  url: string;
+  comando: string;
+};
+/** Lo que una tarea dejó corriendo fuera del grupo de su agente; `orphan`, si nadie lo va a recoger. */
+export type TaskProcess = { id: string; pid: number; command: string; cpu_percent: number; elapsed_seconds: number; orphan: boolean };
+/** `list_ports`: por tarea y los de fuera; `aviso` dice por qué puede venir vacía. */
+export type OpenPorts = {
+  tareas: { session: string; project: string; tarea: string; proyecto: string | null; puertos: OpenPort[]; processes: TaskProcess[] }[];
+  externos: OpenPort[];
+  aviso: string | null;
+};
 
 /** `list_live_sessions`: una tarea abierta de una carpeta. */
 export type SessionRow = {
@@ -39,20 +164,32 @@ export type SessionRow = {
   last_message?: string | null;
   created_at: number;
   updated_at: number;
+  /**
+   * Cuándo cerró el último turno, o cuándo empezó el que corre. Mismas unidades
+   * que `updated_at`; un motor viejo no lo manda y la tarjeta usa `updated_at`.
+   */
+  last_turn_at?: number | null;
   esperando: boolean;
-  outcome?: "delivered" | "failed" | null;
+  /** `interrupted`: la persona detuvo el turno, distinto de `failed`. */
+  outcome?: "delivered" | "failed" | "interrupted" | null;
   /** El agente con nombre que la lleva. */
   agent: string | null;
+  /** El agente que la llevaba antes del último traspaso; `null` si nunca pasó de mano. */
+  previous_agent?: string | null;
   space?: string | null;
   pinned?: boolean | null;
   archived?: boolean | null;
   chat_de_agente?: boolean;
   /** Un hilo nuevo del agente (no su chat de siempre). */
   agent_thread?: boolean;
+  /** El título es solo el comando con que nació; un motor viejo no lo manda. */
+  command_title?: boolean;
   inbox?: boolean;
   parent?: string | null;
   launched_by?: string | null;
   launcher_available?: boolean;
+  /** Hija de una delegación entre máquinas; un motor viejo no lo manda (`@terminus/tasks` `remote.ts`). */
+  remote_parent?: { machine: string; workspace?: string | null; task: string; request_id?: string | null } | null;
   stage?: "in_progress" | "review" | "done" | null;
 };
 
@@ -72,19 +209,41 @@ export type Answer = { turn: string; question: string; chosen: string[]; free_te
 
 /** Un turno de `load_session`. */
 export type Turn = {
+  history_refs?: HistoryRef[];
   id?: string;
   role: string;
   text: string;
   at?: number;
   meta?: string | null;
   model?: string | null;
+  /** Tiempo de trabajo activo del tramo del agente; falta en tareas antiguas. */
+  duration_ms?: number | null;
+  /** Una decisión de permiso: va firmada por la persona, con el texto vacío. */
+  permission?: PermissionDecision | null;
   tools?: TurnTool[];
   questions?: Question[] | null;
+  answers?: Answer[] | null;
   /** Rutas en la máquina de lo que la persona adjuntó (las viejas, `entradas/…`). */
   attachments?: string[] | null;
+  /** El turno en su orden: lo que el agente dijo, con las herramientas (`tool` indexa `tools`) donde las usó. */
+  pieces?: TurnPiece[] | null;
+  /** Un `!`: el comando va en `text`. */
+  shell?: { cwd: string; output: string; exit_code: number | null; duration_ms: number; truncated: boolean } | null;
+  /** El encargado que escribió este input, si no fue la persona (`Turn::agent`). */
+  agent?: string | null;
+  /** La tarea que lo escribió por el CLI (`Turn::from_task`). */
+  from_task?: SenderTask | null;
 };
-/** Un paso del turno; `images` son data URLs que produjo la herramienta. */
-export type TurnTool = { name?: string; target?: string | null; images?: string[] };
+/** `sessions::PermissionDecision`. */
+export type PermissionDecision = { tool: string; target?: string | null; allow: boolean };
+/** Un turno que sigue contestando (`turn::list_live_turns`); `started_at` en ms de la máquina. */
+export type LiveTurn = { session: string; started_at: number };
+/** La tarea que escribió un input, como era al escribirlo (`sessions::SenderTask`). */
+export type SenderTask = { folder: string; task: string; title: string; provider: string; model?: string | null; machine?: string | null };
+/** Un paso del turno; `images` son data URLs que produjo la herramienta. `ok: false` si falló. */
+export type TurnTool = { name?: string; target?: string | null; images?: string[]; ok?: boolean | null };
+/** Un trozo de `Turn.pieces`. */
+export type TurnPiece = { text: string } | { tool: number };
 /** `preview_file` y `attachment_preview`. */
 export type FilePreview = {
   rel: string;
@@ -99,7 +258,7 @@ export type FilePreview = {
 /** `tree_show`: un archivo de un árbol de la tarea. */
 export type TreeContent = { kind: string; text: string; bytes: number; truncated: boolean };
 /** `load_session`. */
-export type OpenedSession = { id: string; provider: string; model: string | null; agent?: string | null; turns: Turn[] };
+export type OpenedSession = { id: string; provider: string; model: string | null; agent?: string | null; permission_mode?: string | null; turns: Turn[] };
 
 /** `pending_requests`. */
 export type PendingRequests = {
@@ -149,7 +308,15 @@ export type TaskBlockers = { unsaved: { session: string; title: string; files: s
 // --- Cuentas de IA ---------------------------------------------------------------
 
 /** Una cuenta de `list_accounts`; `identity` es el correo, si el CLI lo dice. */
-export type AiAccount = { id: string; label: string; created_at?: number | null; identity: string | null; authenticated_at: number | null };
+export type AiAccount = {
+  id: string;
+  label: string;
+  created_at?: number | null;
+  identity: string | null;
+  authenticated_at: number | null;
+  /** Identidad estable de la suscripción o workspace; no se muestra. */
+  credential_group?: string | null;
+};
 /** `list_accounts(provider)`. */
 export type AccountList = { provider: string; active: string | null; accounts: AiAccount[] };
 /** `account_status`. */
@@ -165,3 +332,7 @@ export type AccountLimits =
 export type ShellRun = { session: string; turn: string };
 /** El evento `account` de un inicio de sesión por tubería (enlace y código); `account` es el id de la cuenta. */
 export type LoginEvent = { account: string; kind: "url" | "confirm" | "code" | "notice" | "done"; text: string };
+
+/** Referencia de sólo lectura a un campo original; cada fragmento vuelve autorizado por tarea. */
+export type HistoryRef = { version: 1; turn: number; pointer: string; revision: string; bytes: number; project?: string; session?: string };
+export type HistoryChunk = { version: 1; revision: string; offset: number; next: number; total: number; done: boolean; text: string };

@@ -16,8 +16,8 @@ pub mod push;
 mod windows;
 use link::{Failure, Link, Pushes};
 use terminus_engine_protocol::{
-    Endpoint, Error, Request, Response, Result, Selection, MAX_FRAME, PRODUCT,
-    PUSH_STREAM_FEATURE, VERSION,
+    Endpoint, Error, Request, Response, Result, Selection, MAX_FRAME, PRODUCT, PUSH_STREAM_FEATURE,
+    VERSION,
 };
 
 // Una conexión con más peticiones en vuelo que esto abre otra: pasadas 32 el
@@ -237,11 +237,46 @@ pub fn request_endpoint(
     command: &str,
     timeout: Duration,
 ) -> Result<(Endpoint, Value)> {
+    request(endpoint_path, command, json!({}), timeout, true)
+}
+
+/// Lo mismo a un motor de otro contrato, el de la versión anterior tras actualizar:
+/// solo para `status` y `service stop`, que no cambian entre contratos.
+pub fn request_any_contract(
+    endpoint_path: &Path,
+    command: &str,
+    timeout: Duration,
+) -> Result<(Endpoint, Value)> {
+    request(endpoint_path, command, json!({}), timeout, false)
+}
+
+/// «Actualizar ya»: `service stop` con `force` corta los turnos del motor anterior.
+/// Uno anterior a la orden ignora el argumento y se niega con `task_busy`.
+pub fn force_stop_any_contract(
+    endpoint_path: &Path,
+    timeout: Duration,
+) -> Result<(Endpoint, Value)> {
+    request(
+        endpoint_path,
+        "service stop",
+        json!({"force": true}),
+        timeout,
+        false,
+    )
+}
+
+fn request(
+    endpoint_path: &Path,
+    command: &str,
+    args: Value,
+    timeout: Duration,
+    same_contract: bool,
+) -> Result<(Endpoint, Value)> {
     let descriptor = private_file(endpoint_path)?;
     let endpoint: Endpoint = serde_json::from_slice(&descriptor.bytes)?;
     if endpoint.version != VERSION
         || endpoint.product != PRODUCT
-        || endpoint.contract != contract()
+        || (same_contract && endpoint.contract != contract())
         || !endpoint.address.ip().is_loopback()
     {
         return Err(Error::new("version_mismatch"));
@@ -257,7 +292,7 @@ pub fn request_endpoint(
         workspace: None,
         folder: None,
         command: command.into(),
-        args: json!({}),
+        args,
         request_id: uuid::Uuid::new_v4().to_string(),
     };
     let value = reply(exchange(&endpoint.address, &request, timeout)?)?;
@@ -294,7 +329,8 @@ impl Backoff {
         if self.failures == 0 {
             return Duration::ZERO;
         }
-        Duration::from_millis(100 << self.failures.min(5).saturating_sub(1)).min(Duration::from_secs(2))
+        Duration::from_millis(100 << self.failures.min(5).saturating_sub(1))
+            .min(Duration::from_secs(2))
     }
     fn waiting(&self) -> bool {
         self.until.is_some_and(|until| Instant::now() < until)
@@ -309,7 +345,13 @@ impl Backoff {
 }
 impl Drop for Client {
     fn drop(&mut self) {
-        for link in self.links.lock().unwrap_or_else(|p| p.into_inner()).pool.drain(..) {
+        for link in self
+            .links
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .pool
+            .drain(..)
+        {
             link.close();
         }
     }
@@ -323,7 +365,7 @@ impl Client {
         if selection.version != VERSION
             || endpoint.version != VERSION
             || endpoint.product != PRODUCT
-            || selection.contract != contract()
+            // El contrato del motor puede ser otro que el de la ventana: los cambios son aditivos.
             || endpoint.contract != selection.contract
             || endpoint.runtime != selection.runtime
             || endpoint.data_directory != selection.data_directory
@@ -399,11 +441,21 @@ impl Client {
         args: Value,
         timeout: Duration,
     ) -> Result<Value> {
+        self.request_scoped(command, workspace, None, args, timeout)
+    }
+    pub fn request_scoped(
+        &self,
+        command: &str,
+        workspace: Option<String>,
+        folder: Option<String>,
+        args: Value,
+        timeout: Duration,
+    ) -> Result<Value> {
         let request = Request {
             version: VERSION,
             token: self.token.clone(),
             workspace,
-            folder: None,
+            folder,
             command: command.to_owned(),
             args,
             request_id: uuid::Uuid::new_v4().to_string(),

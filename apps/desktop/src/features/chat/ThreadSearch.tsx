@@ -65,6 +65,8 @@ export function ThreadSearch(props: {
   messages: SearchMessage[];
   thread: () => HTMLElement | undefined;
   onJump: (block: number) => void;
+  /** Sin mensajes todavía (la tarea nueva): el botón queda, apagado y con su porqué. */
+  disabled?: boolean;
   leadingTools?: JSX.Element;
   tools?: JSX.Element;
 }) {
@@ -173,7 +175,7 @@ export function ThreadSearch(props: {
       if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "f") {
         if ((event.target as Element | null)?.closest(".cm-editor, [role='dialog']")) return;
         event.preventDefault();
-        show();
+        if (!props.disabled) show();
       } else if (open() && event.key === "Escape") {
         event.preventDefault();
         event.stopImmediatePropagation();
@@ -185,9 +187,10 @@ export function ThreadSearch(props: {
   });
   onCleanup(() => cancelAnimationFrame(frame));
   return <>
-    <div class="relative flex max-w-full items-start gap-1">
+    <div class="relative flex max-w-full items-center gap-1">
+      {/* Cae bajo los botones: en la cabecera no cabe la fila de búsqueda. */}
       <Show when={open()}>
-        <div class="flex min-w-0 flex-wrap items-center gap-1 rounded-md border border-border-strong bg-surface-raised p-1 shadow-sm" role="search" aria-label={t("chat.search.label")}>
+        <div class="absolute top-full right-0 z-50 mt-1 flex min-w-0 flex-wrap items-center gap-1 rounded-md border border-border-strong bg-surface-raised p-1 shadow-sm" role="search" aria-label={t("chat.search.label")}>
           <Input ref={input} class="w-44 min-w-0" value={query()} placeholder={t("chat.search.placeholder")}
             aria-label={t("chat.search.label")} onInput={event => setQuery(event.currentTarget.value)}
             onKeyDown={event => {
@@ -202,11 +205,13 @@ export function ThreadSearch(props: {
           <Button variant="chrome" size="iconCompact" title={t("chat.search.close")} aria-label={t("chat.search.close")} onClick={close}><X size={14} /></Button>
         </div>
       </Show>
-      <div class="flex shrink-0 flex-col gap-1">
+      <div class="flex shrink-0 items-center gap-1.5">
         {props.leadingTools}
-        <Button variant="chrome" size="iconCompact" class="size-7 text-neutral-500" onClick={show}
-          title={t("chat.search.open", { key: textoDeAtajo("findInTask") })} aria-label={t("chat.search.label")}
-          aria-keyshortcuts={ariaDeAtajo("findInTask")} aria-expanded={open()}><Search size={14} /></Button>
+        {/* `aria-disabled` y no `disabled`: el botón apagado no recibe el puntero y perdería el porqué. */}
+        <Button variant="chrome" size="iconCompact" class="size-6 text-neutral-500 aria-disabled:cursor-default aria-disabled:opacity-60 aria-disabled:hover:bg-transparent"
+          onClick={() => { if (!props.disabled) show(); }} aria-disabled={props.disabled || undefined}
+          title={props.disabled ? t("chat.search.unavailable") : t("chat.search.open", { key: textoDeAtajo("findInTask") })} aria-label={t("chat.search.label")}
+          aria-keyshortcuts={ariaDeAtajo("findInTask")} aria-expanded={open()}><Search size={13} /></Button>
         {props.tools}
       </div>
     </div>

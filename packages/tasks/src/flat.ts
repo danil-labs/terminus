@@ -8,16 +8,25 @@ export type LauncherRow = {
   launched_by?: string | null;
   parent?: string | null;
   launcher_available?: boolean;
+  /** El coordinador en otra máquina, ya con el id de la lista (`withRemoteLaunchers`). */
+  remote_launcher?: string | null;
 };
 
 /**
- * Si la lista esconde una tarea para mostrarla bajo su lanzador. Solo cuenta un
- * lanzador de la misma lista: el de otra carpeta no la muestra en esta.
+ * La tarea que lanzó a esta (`parent` de un subagente, `launched_by` de una
+ * delegada, `remote_launcher` de una hija remota), o `null`.
  */
-export function shownUnderLauncher(session: LauncherRow, rows: readonly { id: string }[]): boolean {
-  const launcher = session.parent ?? session.launched_by;
-  return !!launcher && session.launcher_available !== false
-    && rows.some((row) => row.id === launcher);
+export function launcherOf(session: LauncherRow): string | null {
+  return session.parent ?? session.launched_by ?? session.remote_launcher ?? null;
+}
+
+/**
+ * Si la tarea es subtarea de otra: el riel solo enseña las que abrió la persona.
+ * No depende de que el lanzador esté en la lista: archivado, en otra carpeta o
+ * sin cargar todavía, la subtarea sigue siendo suya y no sube al riel.
+ */
+export function isSubtask(session: LauncherRow): boolean {
+  return launcherOf(session) !== null;
 }
 
 /** Lo mínimo de una tarea para juntarla con las de las demás carpetas. */
@@ -37,8 +46,8 @@ export type FlatTask<R extends FlatRow = FlatRow> = { project: string; row: R };
 
 /**
  * Todas las tareas vivas de todas las carpetas en una sola lista, de la más
- * nueva a la más vieja. Una tarea que su lanzador ya enseña no se repite,
- * salvo fijada o buscando: es la misma regla que la lista por carpeta.
+ * nueva a la más vieja. Una subtarea no sale, salvo fijada o buscando: es la
+ * misma regla que la lista por carpeta.
  */
 export function flattenTasks<R extends FlatRow>(
   byProject: Record<string, R[]>,
@@ -52,11 +61,20 @@ export function flattenTasks<R extends FlatRow>(
     for (const row of rows) {
       if (row.archived || vistas.has(row.id)) continue;
       vistas.add(row.id);
-      if (!searching && !row.pinned && shownUnderLauncher(row, rows)) continue;
+      if (!searching && !row.pinned && isSubtask(row)) continue;
       out.push({ project, row });
     }
   }
   return out.sort((a, b) => b.row.created_at - a.row.created_at);
+}
+
+/**
+ * Las tareas vivas que `launcher` lanzó, de la más nueva a la más vieja: las que
+ * la lista esconde bajo él (el panel «N tareas delegadas» del escritorio).
+ */
+export function delegatedOf<R extends FlatRow>(rows: readonly R[], launcher: string): R[] {
+  return rows.filter((row) => !row.archived && row.id !== launcher && launcherOf(row) === launcher)
+    .sort((a, b) => b.created_at - a.created_at);
 }
 
 /** Cuántas tareas tiene cada carpeta, antes de filtrar: el filtro solo ofrece carpetas con tareas. */

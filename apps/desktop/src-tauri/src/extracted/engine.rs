@@ -24,7 +24,7 @@ pub struct Paths {
     pub identity: String,
     pub root: PathBuf,
     pub data: PathBuf,
-    resources: PathBuf,
+    pub resources: PathBuf,
     pub window: PathBuf,
     selection: PathBuf,
     pub launch_log: PathBuf,
@@ -74,8 +74,8 @@ fn lab(base: &Path) -> Option<(String, PathBuf)> {
     Some((identity, root))
 }
 
-/// Los recursos de la instalación (`lenguas/`), los mismos que `resource_dir()` de Tauri.
-/// Dentro de un AppImage el montaje desaparece con la ventana: se copian a `<root>/resources`.
+/// Los recursos de la instalación (`lenguas/`, `work-tools/`), los mismos que `resource_dir()` de Tauri.
+/// Dentro de un AppImage el montaje desaparece con la ventana: se copian a `<root>/resource-versions/<clave>`.
 fn installed_resources(root: &Path) -> Result<PathBuf> {
     let exe = std::env::current_exe()?;
     let dir = exe.parent().ok_or_else(|| Error::new("invalid_request"))?;
@@ -86,8 +86,14 @@ fn installed_resources(root: &Path) -> Result<PathBuf> {
     if let Some(appdir) =
         std::env::var_os("APPDIR").filter(|_| std::env::var_os("APPIMAGE").is_some())
     {
+        let appdir = PathBuf::from(appdir);
+        // `work-tools.py` deja ahí los recursos con su inventario, fuera del alcance de linuxdeploy.
+        let prepared = appdir.join("usr/share/Terminus");
+        if prepared.join(super::resources::INVENTORY).is_file() {
+            return Ok(super::resources::materialize(&prepared, root)?);
+        }
         // productName de tauri.conf.json: el bundle de Linux pone ahí los recursos.
-        let mounted = PathBuf::from(appdir).join("usr/lib/Terminus");
+        let mounted = appdir.join("usr/lib/Terminus");
         let copy = root.join("resources");
         super::legacy::mirror(&mounted, &copy)?;
         return Ok(copy);
@@ -107,6 +113,12 @@ pub fn prepare(paths: &Paths) -> Result<()> {
 /// La selección del motor de esta ventana: el vivo sobre la raíz o uno recién lanzado.
 /// `adopt` pasa `--adopt-existing`: solo tras el traspaso que la persona aceptó.
 pub fn ensure(paths: &Paths, adopt: bool) -> Result<PathBuf> {
+    if super::engine_profile::managed(&paths.data)? {
+        if adopt {
+            return Err(Error::new("managed_service_unavailable"));
+        }
+        return attach_managed(paths, START_TIMEOUT);
+    }
     prepare(paths)?;
     // La raíz de 0.2.74 ya existe y es del motor validarla; una nueva la crea él.
     if paths.identity != PRODUCTION {
@@ -114,12 +126,61 @@ pub fn ensure(paths: &Paths, adopt: bool) -> Result<PathBuf> {
     }
     let lock = File::create(paths.root.join("launch.lock"))?;
     lock.lock()?;
+    // El CLI arranca bajo este mismo candado; sin él, el de la raíz evita igual un segundo motor.
+    let _starting = super::engine_profile::start_lock(&paths.data, START_TIMEOUT);
     let endpoint = paths.data.join("seldon-endpoint.json");
-    if let Ok((found, status)) = terminus_engine_client::probe(&endpoint) {
-        // Uno que trabaja sigue con su versión; la nueva entra cuando lo dejen parar.
-        if !super::legacy::engine_replaced(found.pid, true) || !retire(&endpoint, found.pid) {
-            return write_selection(paths, &endpoint, &found, &status);
+    let patience = Instant::now() + START_TIMEOUT;
+    let mut waited = false;
+    // Una ventana apartada por el instalador sigue con el motor de su versión y nunca toma el nuevo.
+    let aside = super::legacy::set_aside(std::process::id());
+    loop {
+        // Cualquier contrato: la ventana tolera un motor que hable otro, como con las máquinas remotas.
+        let probed = previous(&endpoint);
+        if let Some((found, status)) = probed.as_ref().ok().filter(|(found, _)| ours(paths, found))
+        {
+            if other_version(paths, &found.contract) {
+                if aside {
+                    return Err(Error::new("window_replaced"));
+                }
+                // Tras actualizar el motor es de la versión anterior: se para en cuanto quede libre.
+                if working(&status["busy"]) || !retire(&endpoint, found.pid) {
+                    return Err(Error {
+                        detail: serde_json::json!({"turns": status["busy"]["turns"], "pid": found.pid}),
+                        ..Error::new("previous_engine_busy")
+                    });
+                }
+            } else if aside
+                // Uno que trabaja sigue con su versión; la nueva entra cuando lo dejen parar.
+                || !super::legacy::engine_replaced(found.pid, true)
+                || !retire(&endpoint, found.pid)
+            {
+                if waited {
+                    log::info!("[engine] answered after waiting: pid={}", found.pid);
+                }
+                return selected(paths, &endpoint, found, status);
+            }
         }
+        // El candado de la raíz es la prueba de vida: un motor que arranca, se cierra o está saturado lo retiene.
+        if !root_held(&paths.data) {
+            break;
+        }
+        match &probed {
+            // Un descriptor que no es privado no se arregla esperando.
+            Err(error) if error.code == "invalid_token" => return Err(error.clone()),
+            Err(error) if !waited => log::info!("[engine] root held, {}: waiting", error.code),
+            _ => {}
+        }
+        if Instant::now() >= patience {
+            return Err(Error {
+                detail: serde_json::json!({"reason": "root_locked"}),
+                ..Error::new("service_busy")
+            });
+        }
+        waited = true;
+        std::thread::sleep(Duration::from_millis(500));
+    }
+    if aside {
+        return Err(Error::new("window_replaced"));
     }
     let offset = std::fs::metadata(&paths.launch_log).map_or(0, |m| m.len());
     let mut child = spawn(paths, adopt)?;
@@ -128,14 +189,125 @@ pub fn ensure(paths: &Paths, adopt: bool) -> Result<PathBuf> {
         if child.try_wait()?.is_some() {
             return Err(failed(paths, offset));
         }
-        if let Ok((found, status)) = terminus_engine_client::probe(&endpoint) {
+        // El que acaba de lanzar es el motor empaquetado, hable el contrato que hable.
+        if let Ok((found, status)) = previous(&endpoint) {
             if found.pid == child.id() {
-                return write_selection(paths, &endpoint, &found, &status);
+                remember_bundled_contract(paths, &found.contract);
+                return selected(paths, &endpoint, &found, &status);
             }
         }
         std::thread::sleep(Duration::from_millis(200));
     }
     Err(failed(paths, offset))
+}
+
+/// Un supervisor administra esta raíz: se espera su descriptor, sin arrancar ni adoptar.
+fn attach_managed(paths: &Paths, within: Duration) -> Result<PathBuf> {
+    prepare(paths)?;
+    let deadline = Instant::now() + within;
+    loop {
+        match managed_endpoint(&paths.data) {
+            Ok((found, status)) => {
+                return write_selection(
+                    paths,
+                    &paths.data.join("seldon-endpoint.json"),
+                    &found,
+                    &status,
+                )
+            }
+            Err(error)
+                if error.code == "managed_service_unavailable" && Instant::now() < deadline =>
+            {
+                std::thread::sleep(Duration::from_millis(500));
+            }
+            Err(error) => return Err(error),
+        }
+    }
+}
+
+fn managed_endpoint(
+    data: &Path,
+) -> Result<(terminus_engine_protocol::Endpoint, serde_json::Value)> {
+    let (found, status) = terminus_engine_client::probe(&data.join("seldon-endpoint.json"))
+        .map_err(|error| match error.code.as_str() {
+            "io" | "app_unavailable" => Error::new("managed_service_unavailable"),
+            _ => error,
+        })?;
+    if super::engine_profile::canonical(&found.data_directory)
+        != super::engine_profile::canonical(data)
+    {
+        return Err(Error::new("invalid_token"));
+    }
+    Ok((found, status))
+}
+
+/// Recupera sólo el cliente del servicio; cada nuevo descriptor y token se validan de nuevo.
+pub fn reconnect_managed(
+    current: &terminus_engine_client::Client,
+) -> Result<terminus_engine_client::Client> {
+    let previous = current.selection();
+    let (found, status) = managed_endpoint(&previous.data_directory)?;
+    let file = previous.window_data.join("managed-selection.json");
+    write_selection_at(
+        &previous.window_data,
+        &file,
+        &previous.data_directory.join("seldon-endpoint.json"),
+        &found,
+        &status,
+    )?;
+    terminus_engine_client::Client::select(&file)
+}
+
+/// Un descriptor dentro de la raíz que nombra otra (una raíz copiada) no es de esta ventana.
+fn ours(paths: &Paths, found: &terminus_engine_protocol::Endpoint) -> bool {
+    use super::engine_profile::canonical;
+    canonical(&found.data_directory) == canonical(&paths.data)
+}
+
+/// Como `running()` del motor: abre `seldon-runtime.lock` sin crearlo y prueba a tomarlo.
+fn root_held(data: &Path) -> bool {
+    let Ok(file) = File::open(data.join("seldon-runtime.lock")) else {
+        return false;
+    };
+    matches!(file.try_lock(), Err(std::fs::TryLockError::WouldBlock))
+}
+
+/// La selección, y `engine.json` para el CLI; un fallo de este no impide abrir la ventana.
+fn selected(
+    paths: &Paths,
+    endpoint: &Path,
+    found: &terminus_engine_protocol::Endpoint,
+    status: &serde_json::Value,
+) -> Result<PathBuf> {
+    let selection = write_selection(paths, endpoint, found, status)?;
+    let engine = match bundled_engine() {
+        Ok(bundled) => installed_engine(paths, bundled),
+        Err(error) => {
+            log::warn!("[engine] engine.json not written: {}", error.code);
+            return Ok(selection);
+        }
+    };
+    let production = paths.identity == PRODUCTION;
+    let profile = super::engine_profile::Profile {
+        name: if production {
+            super::engine_profile::DESKTOP
+        } else {
+            super::engine_profile::LAB
+        },
+        engine: &engine,
+        data: &paths.data,
+        resources: &paths.resources,
+        identity: &paths.identity,
+        production,
+    };
+    match super::engine_profile::publish(&profile, &paths.root.join("engine-mark.json")) {
+        Ok(written) => log::info!(
+            "[engine] engine.json profile={} written={written}",
+            profile.name
+        ),
+        Err(error) => log::warn!("[engine] engine.json not written: {error}"),
+    }
+    Ok(selection)
 }
 
 pub enum Stopped {
@@ -152,11 +324,14 @@ pub fn stop() -> Stopped {
     let Ok(paths) = paths() else {
         return Stopped::Unanswered;
     };
+    if !matches!(super::engine_profile::managed(&paths.data), Ok(false)) {
+        return Stopped::Busy;
+    }
     let endpoint = paths.data.join("seldon-endpoint.json");
     // Una orden de una ventana que se acaba de cerrar termina sola; un turno o una descarga, no.
     let settle = Instant::now() + Duration::from_secs(20);
     loop {
-        match terminus_engine_client::request_endpoint(
+        match terminus_engine_client::request_any_contract(
             &endpoint,
             "service stop",
             Duration::from_secs(5),
@@ -184,9 +359,15 @@ pub fn stop() -> Stopped {
 
 /// Con otra versión instalada, el motor viejo se para en cuanto queda sin trabajo;
 /// la ventana arranca el nuevo en su siguiente sondeo, como tras cualquier caída.
+/// Una ventana apartada no lo para: sigue con él hasta que se reinicie.
 pub fn retire_if_replaced(paths: &Paths) {
+    if !matches!(super::engine_profile::managed(&paths.data), Ok(false))
+        || super::legacy::set_aside(std::process::id())
+    {
+        return;
+    }
     let endpoint = paths.data.join("seldon-endpoint.json");
-    let Ok((found, status)) = terminus_engine_client::probe(&endpoint) else {
+    let Ok((found, status)) = previous(&endpoint) else {
         return;
     };
     if super::legacy::engine_replaced(found.pid, false) && !working(&status["busy"]) {
@@ -194,10 +375,119 @@ pub fn retire_if_replaced(paths: &Paths) {
     }
 }
 
+/// «Detener y entrar ya» con el motor anterior trabajando: corta sus turnos y apunta sus
+/// tareas para que el nuevo las retome. Uno sin esa orden se niega y se termina su proceso.
+pub fn force_previous(paths: &Paths) -> Result<()> {
+    if super::engine_profile::managed(&paths.data)? {
+        return Err(Error::new("managed_service_unavailable"));
+    }
+    let endpoint = paths.data.join("seldon-endpoint.json");
+    let (found, _) = previous(&endpoint)?;
+    let asked = terminus_engine_client::force_stop_any_contract(&endpoint, Duration::from_secs(5));
+    log::info!(
+        "[engine] update now: previous pid={} force_stop={}",
+        found.pid,
+        asked.is_ok()
+    );
+    if asked.is_err() {
+        super::legacy::terminate(found.pid);
+    }
+    // El motor corta los turnos con hasta 10 s para guardar cada transcripción.
+    let deadline = Instant::now() + Duration::from_secs(60);
+    while Instant::now() < deadline {
+        if !super::legacy::alive(found.pid) {
+            return Ok(());
+        }
+        std::thread::sleep(Duration::from_millis(200));
+    }
+    super::legacy::terminate(found.pid);
+    Err(Error::new("service_busy"))
+}
+
+/// El motor vivo sobre la raíz aunque sea de otro contrato, con su `status`.
+fn previous(endpoint: &Path) -> Result<(terminus_engine_protocol::Endpoint, serde_json::Value)> {
+    let (found, status) =
+        terminus_engine_client::request_any_contract(endpoint, "status", Duration::from_secs(3))?;
+    if status["runtime"] != found.runtime.as_str() || status["service"] != true {
+        return Err(Error::new("version_mismatch"));
+    }
+    Ok((found, status))
+}
+
+/// Otra versión del motor: no habla el contrato del que viaja con la ventana. Hasta que la
+/// ventana lo lance una vez no lo sabe y compara con el suyo, como antes de tolerar otros.
+fn other_version(paths: &Paths, contract: &str) -> bool {
+    differs(
+        contract,
+        bundled_contract(paths).as_deref(),
+        &terminus_engine_client::contract(),
+    )
+}
+
+fn differs(running: &str, bundled: Option<&str>, window: &str) -> bool {
+    running != bundled.unwrap_or(window)
+}
+
+fn bundled_contract_file(paths: &Paths) -> PathBuf {
+    paths.root.join("bundled-contract.json")
+}
+
+/// Tamaño y fechas del binario: si cambian, se instaló otro y su contrato se aprende de nuevo.
+fn engine_stamp() -> Option<serde_json::Value> {
+    let engine = bundled_engine().ok()?;
+    let meta = std::fs::metadata(&engine).ok()?;
+    let nanos = |time: std::io::Result<std::time::SystemTime>| {
+        time.ok()
+            .and_then(|time| time.duration_since(std::time::SystemTime::UNIX_EPOCH).ok())
+            .map(|elapsed| elapsed.as_nanos().to_string())
+    };
+    Some(serde_json::json!({
+        "engine": engine,
+        "len": meta.len(),
+        "modified": nanos(meta.modified()),
+        "created": nanos(meta.created()),
+    }))
+}
+
+/// El contrato del motor empaquetado, el que contestó la última vez que esta ventana lo lanzó.
+fn bundled_contract(paths: &Paths) -> Option<String> {
+    let saved: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(bundled_contract_file(paths)).ok()?).ok()?;
+    if saved["stamp"] != engine_stamp()? {
+        return None;
+    }
+    saved["contract"].as_str().map(str::to_owned)
+}
+
+fn remember_bundled_contract(paths: &Paths, contract: &str) {
+    let window = terminus_engine_client::contract();
+    if contract != window {
+        log::warn!(
+            "[engine] bundled engine speaks contract {contract}, window {window}: tolerated"
+        );
+    }
+    let Some(stamp) = engine_stamp() else {
+        return;
+    };
+    let bytes = serde_json::json!({"stamp": stamp, "contract": contract}).to_string();
+    let file = bundled_contract_file(paths);
+    let temporary = file.with_extension("json.tmp");
+    let _ = std::fs::remove_file(&temporary);
+    let written = private_file(&temporary)
+        .and_then(|mut output| Ok(output.write_all(bytes.as_bytes())?))
+        .and_then(|()| Ok(std::fs::rename(&temporary, &file)?));
+    if let Err(error) = written {
+        log::warn!("[engine] bundled contract not saved: {}", error.code);
+    }
+}
+
 /// Una sola petición: al abrir la ventana no se espera a que acaben las órdenes.
 fn retire(endpoint: &Path, pid: u32) -> bool {
-    let stopped =
-        terminus_engine_client::request_endpoint(endpoint, "service stop", Duration::from_secs(5));
+    let stopped = terminus_engine_client::request_any_contract(
+        endpoint,
+        "service stop",
+        Duration::from_secs(5),
+    );
     log::info!(
         "[engine] replaced engine pid={pid} stop={}",
         stopped.is_ok()
@@ -234,7 +524,8 @@ fn working(busy: &serde_json::Value) -> bool {
         })
 }
 
-fn spawn(paths: &Paths, adopt: bool) -> Result<Child> {
+/// `seldon-runtime` junto al ejecutable de la ventana.
+fn bundled_engine() -> Result<PathBuf> {
     let exe = std::env::current_exe()?
         .with_file_name(format!("seldon-runtime{}", std::env::consts::EXE_SUFFIX));
     if !exe.is_file() {
@@ -243,7 +534,31 @@ fn spawn(paths: &Paths, adopt: bool) -> Result<Child> {
             ..Error::new("engine_missing")
         });
     }
-    let exe = super::legacy::stable_engine(&exe, &paths.root)?;
+    Ok(exe)
+}
+
+/// El binario que arranca la ventana: en un AppImage, la copia estable que deja `stable_engine`.
+fn engine_root(paths: &Paths) -> PathBuf {
+    if paths.data == paths.root.join("engine") {
+        paths.root.join("sidecar")
+    } else {
+        paths.root.clone()
+    }
+}
+
+fn installed_engine(paths: &Paths, bundled: PathBuf) -> PathBuf {
+    let copy = engine_root(paths).join("engine").join("seldon-runtime");
+    if cfg!(target_os = "linux") && std::env::var_os("APPIMAGE").is_some() && copy.is_file() {
+        return copy;
+    }
+    bundled
+}
+
+fn spawn(paths: &Paths, adopt: bool) -> Result<Child> {
+    if super::engine_profile::managed(&paths.data)? {
+        return Err(Error::new("managed_service_unavailable"));
+    }
+    let exe = super::legacy::stable_engine(&bundled_engine()?, &engine_root(paths))?;
     let mut log = OpenOptions::new()
         .create(true)
         .append(true)
@@ -288,7 +603,7 @@ fn spawn(paths: &Paths, adopt: bool) -> Result<Child> {
 
 // Sale del job de quien lanzó la ventana para sobrevivirla; si ese job no lo permite, queda dentro.
 #[cfg(windows)]
-fn spawn_detached(command: &mut Command) -> std::io::Result<(Child, bool)> {
+pub(super) fn spawn_detached(command: &mut Command) -> std::io::Result<(Child, bool)> {
     use std::os::windows::process::CommandExt;
     const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
     const CREATE_BREAKAWAY_FROM_JOB: u32 = 0x0100_0000;
@@ -337,7 +652,7 @@ fn launch_note(_child: &Child, _outside: bool) -> String {
 }
 
 #[cfg(unix)]
-fn spawn_detached(command: &mut Command) -> std::io::Result<(Child, bool)> {
+pub(super) fn spawn_detached(command: &mut Command) -> std::io::Result<(Child, bool)> {
     use std::os::unix::process::CommandExt;
     command.process_group(0);
     Ok((command.spawn()?, true))
@@ -373,6 +688,16 @@ fn write_selection(
     found: &terminus_engine_protocol::Endpoint,
     status: &serde_json::Value,
 ) -> Result<PathBuf> {
+    write_selection_at(&paths.window, &paths.selection, endpoint, found, status)
+}
+
+fn write_selection_at(
+    window: &Path,
+    file: &Path,
+    endpoint: &Path,
+    found: &terminus_engine_protocol::Endpoint,
+    status: &serde_json::Value,
+) -> Result<PathBuf> {
     let selection = Selection {
         version: VERSION,
         endpoint: endpoint.to_path_buf(),
@@ -384,21 +709,21 @@ fn write_selection(
             .as_str()
             .unwrap_or_default()
             .to_owned(),
-        window_data: paths.window.clone(),
+        window_data: window.to_path_buf(),
     };
     let bytes = serde_json::to_vec(&selection)?;
     // Reescribirla igual invalidaría el cliente de las otras ventanas sobre el mismo motor.
-    if std::fs::read(&paths.selection).is_ok_and(|current| current == bytes) {
-        return Ok(paths.selection.clone());
+    if std::fs::read(file).is_ok_and(|current| current == bytes) {
+        return Ok(file.to_path_buf());
     }
-    let temporary = paths.selection.with_extension("json.tmp");
+    let temporary = file.with_extension("json.tmp");
     let _ = std::fs::remove_file(&temporary);
-    let mut file = private_file(&temporary)?;
-    file.write_all(&bytes)?;
-    file.sync_all()?;
-    drop(file);
-    std::fs::rename(&temporary, &paths.selection)?;
-    Ok(paths.selection.clone())
+    let mut output = private_file(&temporary)?;
+    output.write_all(&bytes)?;
+    output.sync_all()?;
+    drop(output);
+    std::fs::rename(&temporary, file)?;
+    Ok(file.to_path_buf())
 }
 
 fn private_dir(dir: &Path) -> Result<()> {
@@ -418,8 +743,19 @@ fn private_file(path: &Path) -> Result<File> {
 
 #[cfg(test)]
 mod tests {
-    use super::{only_operations, working};
+    use super::{differs, only_operations, working};
     use serde_json::json;
+
+    #[test]
+    fn an_engine_of_another_contract_is_old_only_against_the_bundled_one() {
+        // El empaquetado habla otro contrato que la ventana: es el suyo, no uno viejo.
+        assert!(!differs("old", Some("old"), "new"));
+        // Tras actualizar, el que sigue vivo no habla el del empaquetado: es de la versión anterior.
+        assert!(differs("old", Some("new"), "new"));
+        // Sin haberlo lanzado nunca, se compara con el de la ventana, como antes.
+        assert!(differs("old", None, "new"));
+        assert!(!differs("new", None, "new"));
+    }
 
     #[test]
     fn only_turns_downloads_and_real_operations_keep_the_installer_out() {

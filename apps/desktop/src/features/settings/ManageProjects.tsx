@@ -1,7 +1,6 @@
 import Ellipsis from "lucide-solid/icons/ellipsis";
 import Plus from "lucide-solid/icons/plus";
 import { createSignal, Show } from "solid-js";
-import { folderColor } from "../../lib/folderColor";
 import { enfocarYSeleccionar } from "../../lib/focus";
 import { t } from "../../lib/i18n";
 import { invoke } from "../../lib/invoke.ts";
@@ -62,11 +61,6 @@ export default function ManageProjects(props: { contexto: ContextoDeProyectos })
       <TableRow class="group" data-settings-project={p().id}>
         <TableCell>
           <span class="flex min-w-0 items-center gap-2">
-            <span
-              class="size-2 shrink-0 rounded-[2.5px]"
-              style={{ background: folderColor(p().id) }}
-              aria-hidden="true"
-            />
             <Show
               when={renombrando() === p().id}
               fallback={<span class="truncate">{p().name}</span>}
@@ -82,7 +76,7 @@ export default function ManageProjects(props: { contexto: ContextoDeProyectos })
               >
                 <Input
                   ref={enfocarYSeleccionar}
-                  class="h-7 min-h-7 px-1.5 text-[0.8125rem]"
+                  class="h-7 min-h-7 px-1.5 text-ui"
                   maxlength={PROJECT_NAME_MAX_LENGTH}
                   value={nombre()}
                   data-owns-escape
@@ -260,7 +254,7 @@ export default function ManageProjects(props: { contexto: ContextoDeProyectos })
         <SettingsBlock>
           <Show
             when={props.contexto.projects.length > 0}
-            fallback={<p class="m-0 text-[0.8125rem] text-neutral-500">{t("settings.projects.empty")}</p>}
+            fallback={<p class="m-0 text-ui text-neutral-500">{t("settings.projects.empty")}</p>}
           >
             <div class="overflow-x-auto rounded-lg border border-border">
               <Table class="table-fixed">

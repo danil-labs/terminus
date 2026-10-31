@@ -1,5 +1,5 @@
 import { Match, Show, Suspense, Switch, createResource, createSignal, lazy, onCleanup, onMount } from "solid-js";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../lib/invoke";
 import FileIcon from "lucide-solid/icons/file";
 import FileText from "lucide-solid/icons/file-text";
 import FileSpreadsheet from "lucide-solid/icons/file-spreadsheet";
@@ -13,6 +13,7 @@ import PanelRight from "lucide-solid/icons/panel-right";
 import { Button } from "./Button";
 import { Dialog, DialogContent, DialogTitle } from "./Dialog";
 import { envolver, SANDBOX_ARTEFACTO } from "../features/artifacts/sandbox";
+import { useFileMachine } from "./fileMachine";
 
 // El visor entero baja solo al abrir la vista previa: `pdfjs-dist` no entra en el arranque.
 const PdfDocument = lazy(() => import("../features/viewers/Pdf"));
@@ -71,8 +72,12 @@ export function FilePreview(props: { path: string; alt?: string }) {
   const [pdf, setPdf] = createSignal<string | null>(null);
   const [abierta, setAbierta] = createSignal(false);
   const [enPantalla, setEnPantalla] = createSignal(false);
+  // El archivo de una tarea de otra máquina está en el disco de esa máquina.
+  const enSuMaquina = useFileMachine();
 
-  const [bytes] = createResource(() => invoke<number>("file_size", { path: props.path }).catch(() => null));
+  const [bytes] = createResource(() =>
+    invoke<number>("file_size", { path: props.path }, enSuMaquina()).catch(() => null),
+  );
 
   onMount(() => {
     if ((!conPagina && !esHtml) || !caja) return;
@@ -90,10 +95,11 @@ export function FilePreview(props: { path: string; alt?: string }) {
   const [html] = createResource(
     () => esHtml && visible(),
     async () => {
-      const p = await invoke<{ kind: string; text: string | null; truncated: boolean }>("preview_file", {
-        path: props.path,
-        rel: props.path,
-      }).catch(() => null);
+      const p = await invoke<{ kind: string; text: string | null; truncated: boolean }>(
+        "preview_file",
+        { path: props.path, rel: props.path },
+        enSuMaquina(),
+      ).catch(() => null);
       return p && p.kind === "html" && !p.truncated && p.text ? p.text : null;
     },
   );
@@ -106,8 +112,8 @@ export function FilePreview(props: { path: string; alt?: string }) {
     try {
       const preview =
         ext === "pdf"
-          ? await invoke<{ pdf: string | null }>("preview_file", { path: props.path, rel: props.path })
-          : await invoke<{ pdf: string | null }>("office_preview", { path: props.path });
+          ? await invoke<{ pdf: string | null }>("preview_file", { path: props.path, rel: props.path }, enSuMaquina())
+          : await invoke<{ pdf: string | null }>("office_preview", { path: props.path }, enSuMaquina());
       if (!preview.pdf || !lienzo) throw new Error("sin_pdf");
       setPdf(preview.pdf);
       const { renderFirstPage } = await import("../features/viewers/pdfThumb");
@@ -198,7 +204,7 @@ export function FilePreview(props: { path: string; alt?: string }) {
           <span class="block truncate text-xs font-semibold text-neutral-950">
             {props.alt?.trim() || nombreDe(props.path)}
           </span>
-          <span class="block truncate font-mono text-[0.6875rem] text-neutral-500">
+          <span class="block truncate font-mono text-caption text-neutral-500">
             {ext.toUpperCase() || t("chat.file.kind")}
             <Show when={bytes()}>{(n) => ` · ${tamano(n())}`}</Show>
           </span>

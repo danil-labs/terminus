@@ -1,3 +1,5 @@
+import { getVersion } from "@tauri-apps/api/app";
+import BrowserNavigation from "./BrowserNavigation";
 import Actualizacion from "./Update";
 import {
   For,
@@ -23,6 +25,8 @@ import {
 } from "./environment-store";
 import { MarcaAgente } from "../../ui/icons";
 import { FailureNote, asFailure, type Failure } from "../../ui/Failure";
+import { esIncluida, fallasIncluidas } from "../onboarding/bundled";
+import { FuncionesAfectadas } from "../onboarding/Repair";
 import { peso } from "../../lib/format";
 import { Skeleton } from "../../ui/Skeleton";
 import { RETARDO_TOOLTIP, TooltipContent, TooltipRoot, TooltipTrigger } from "../../ui/Tooltip";
@@ -58,22 +62,27 @@ function tituloDe(id: Columna): string {
 }
 
 const COLUMNAS: { id: Columna; alinear?: "right"; ancho: string }[] = [
-  { id: "label", ancho: "w-[20%]" },
-  { id: "version", ancho: "w-[13%]" },
-  { id: "location", ancho: "w-[26%]" },
-  { id: "bytes", alinear: "right", ancho: "w-[9%]" },
-  { id: "source", ancho: "w-[20%]" },
+  { id: "label", ancho: "w-[24%]" },
+  { id: "version", ancho: "w-[14%]" },
+  { id: "location", ancho: "w-[30%]" },
+  { id: "bytes", alinear: "right", ancho: "w-[10%]" },
+  { id: "source", ancho: "w-[22%]" },
 ];
 
-const BASE = ["git", "node", "npm", "pnpm", "bun", "agent-browser"];
+/** Lenguajes y gestores de paquetes: son de quien usa la computadora y aquí no se listan. */
+const AJENAS = new Set(["node", "npm", "pnpm", "bun", "cargo", "rust", "rustc"]);
+// La navegación tiene su propia sección.
+const esExtra = (id: string) => !esIncluida(id) && !AJENAS.has(id) && id !== "browser-navigation";
 type Fila = Requirement & { dependency?: Dependency };
 
 export default function Environment() {
+  const [appVersion, setAppVersion] = createSignal<string | null>(null);
   const [filas, setFilas] = createSignal<Dependency[]>([]);
   const [reporte, setReporte] = createSignal<EnvReport | null>(null);
   const [cargando, setCargando] = createSignal(true);
   const [fallo, setFallo] = createSignal<Failure | null>(null);
-  const [preparando, setPreparando] = createSignal<string | null>(null);
+  const [reparando, setReparando] = createSignal(false);
+  const [falloDeReparar, setFalloDeReparar] = createSignal<Failure | null>(null);
   const [orden, setOrden] = createSignal<{ columna: Columna; direccion: "asc" | "desc" }>({
     columna: "bytes",
     direccion: "desc",
@@ -97,6 +106,7 @@ export default function Environment() {
   }
 
   onMount(() => {
+    void getVersion().then(setAppVersion).catch(() => {});
     void cargar();
 
     const cambios = listen("providers", () => void cargar(true));
@@ -119,7 +129,7 @@ export default function Environment() {
     const { columna, direccion } = orden();
     const signo = direccion === "asc" ? 1 : -1;
     const dependencies = new Map(filas().map((fila) => [fila.id, fila]));
-    const rows: Fila[] = (reporte()?.items ?? []).map((fila) => ({
+    const rows: Fila[] = (reporte()?.items ?? []).filter((fila) => esExtra(fila.id)).map((fila) => ({
       ...fila,
       dependency: dependencies.get(fila.id),
     }));
@@ -150,30 +160,37 @@ export default function Environment() {
     return t("settings.environment.origin.missing");
   }
 
-  const pending = (fila: Fila) => reporte()?.bootstrap.includes(fila.id) === true;
-  const canPrepare = (fila: Fila) => BASE.includes(fila.id) && pending(fila);
   const status = (fila: Fila) => {
     if (fila.timed_out) return t("settings.environment.status.timed_out");
     if (!fila.ok) return t("settings.environment.status.missing");
-    if (pending(fila)) return t("settings.environment.status.update");
     return t("settings.environment.status.ready");
   };
+  const fallas = () => fallasIncluidas(reporte());
 
-  async function preparar(fila: Fila) {
-    setPreparando(fila.id);
-    setFallo(null);
+  /** Lo incluido se repara entero: el motor lo verifica todo y vuelve a comprobar. */
+  async function reparar() {
+    setReparando(true);
+    setFalloDeReparar(null);
     try {
-      await invoke("install_base_tool", { tool: fila.id });
-      await cargar(true);
+      await invoke("install_tool", { tool: "bundled-work-tools" });
     } catch (e) {
-      setFallo({ ...asFailure(e), what: t("settings.environment.error_prepare") });
+      setFalloDeReparar({ ...asFailure(e), what: t("setup.functions.repair_failed") });
     } finally {
-      setPreparando(null);
+      setReparando(false);
     }
+    await cargar(true);
   }
 
   return (
     <SettingsPanel>
+      <Show when={appVersion()}>
+        {(version) => <SettingsSection title={t("settings.environment.release")}>
+          <p class="m-0 font-mono text-body text-neutral-950" data-app-release="">{version()}</p>
+          <Show when={version().split("-")[1]?.split(".")[0]}>
+            {(channel) => <p class="m-0 text-body text-neutral-500">{t("settings.environment.release_channel", { channel: channel() })}</p>}
+          </Show>
+        </SettingsSection>}
+      </Show>
       <Show
         when={capabilities().updater}
         fallback={<SettingsSection title={t("settings.update.title")} description={t("settings.update.web")} />}
@@ -183,6 +200,8 @@ export default function Environment() {
       <Show when={reporte()?.engineBuild}>
         {(build) => <p class="text-sm text-neutral-500">{t("settings.environment.engine_build", { build: build() })}</p>}
       </Show>
+
+      <BrowserNavigation requirement={reporte()?.items.find((r) => r.id === "browser-navigation")} onPrepared={() => cargar(true)} />
 
       <SettingsSection
         title={t("settings.environment.title")}
@@ -218,14 +237,33 @@ export default function Environment() {
         <Show when={reporte()?.reason}>
           {(razon) => (
             <SettingsBlock>
-              <p class="m-0 border-l-2 border-warning px-2.5 py-1.5 text-[0.8125rem] text-neutral-500">
+              <p class="m-0 border-l-2 border-warning px-2.5 py-1.5 text-ui text-neutral-500">
                 {razon()}
               </p>
             </SettingsBlock>
           )}
         </Show>
 
-        <Show when={(reporte()?.items.length ?? 0) > 0}>
+        <Show when={reporte()}>
+          <SettingsBlock>
+            <div class="grid gap-2.5" data-environment-bundled="">
+              <p class="m-0 text-sm text-neutral-950">
+                {fallas().length ? t("settings.environment.bundled.attention") : t("settings.environment.bundled.ready")}
+              </p>
+              <Show when={fallas().length > 0}>
+                <FuncionesAfectadas
+                  fallas={fallas()}
+                  reparando={reparando()}
+                  error={falloDeReparar()}
+                  onReparar={() => void reparar()}
+                  onReiniciar={() => void invoke("restart_app")}
+                />
+              </Show>
+            </div>
+          </SettingsBlock>
+        </Show>
+
+        <Show when={ordenadas().length > 0}>
           <SettingsBlock>
             <div
               class={cn(
@@ -271,9 +309,6 @@ export default function Environment() {
                         </TableHeaderCell>
                       )}
                     </For>
-                    <TableHeaderCell class="w-[12%] text-right">
-                      <span class="sr-only">{t("settings.environment.column.action")}</span>
-                    </TableHeaderCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -298,7 +333,7 @@ export default function Environment() {
                           </TooltipRoot>
                           <Show when={d.source !== ORIGEN_SISTEMA && reporte()?.runtimeVersions[d.id]}>
                             {(version) => (
-                              <span class="block truncate text-[0.6875rem] text-neutral-500">
+                              <span class="block truncate text-caption text-neutral-500">
                                 {t("settings.environment.required_version", { version: version() })}
                               </span>
                             )}
@@ -331,25 +366,9 @@ export default function Environment() {
                         </TableCell>
                         <TableCell class="text-xs text-neutral-500">
                           <span class="block truncate">{origin(d.source)}</span>
-                          <span class={cn("block truncate text-[0.6875rem]", pending(d) && "text-warning")}>
+                          <span class="block truncate text-caption">
                             {status(d)}
                           </span>
-                        </TableCell>
-                        <TableCell class="text-right">
-                          <Show when={canPrepare(d)}>
-                            <Button
-                              size="compact"
-                              variant="secondary"
-                              disabled={preparando() !== null}
-                              onClick={() => void preparar(d)}
-                            >
-                              {preparando() === d.id
-                                ? t("settings.environment.preparing")
-                                : d.ok
-                                  ? t("settings.environment.update")
-                                  : t("settings.environment.repair")}
-                            </Button>
-                          </Show>
                         </TableCell>
                       </TableRow>
                     )}

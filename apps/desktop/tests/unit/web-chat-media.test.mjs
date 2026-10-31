@@ -52,7 +52,7 @@ async function open(name) {
   });
   await sleep(2500);
   const doc = app.w.document;
-  const row = doc.querySelector('[data-sesion="t1"]');
+  const row = doc.querySelector('[data-sesion="cmp_mac~t1"]');
   assert.ok(row, "no está la fila de t1");
   row.click();
   await sleep(1500);

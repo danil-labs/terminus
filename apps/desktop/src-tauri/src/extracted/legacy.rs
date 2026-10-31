@@ -157,6 +157,32 @@ pub fn alive(pid: u32) -> bool {
         && i32::try_from(pid).is_ok_and(|pid| unsafe { libc::kill(pid, 0) } == 0 || std::io::Error::last_os_error().raw_os_error() == Some(libc::EPERM))
 }
 
+/// Termina un motor que no aceptó pararse; sus turnos mueren con él, como en el instalador.
+#[cfg(windows)]
+pub fn terminate(pid: u32) {
+    windows::terminate(pid);
+}
+#[cfg(unix)]
+pub fn terminate(pid: u32) {
+    let Ok(pid) = i32::try_from(pid) else {
+        return;
+    };
+    if pid <= 0 {
+        return;
+    }
+    // SAFETY: solo envía una señal a un pid concreto.
+    unsafe { libc::kill(pid, libc::SIGTERM) };
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+    while std::time::Instant::now() < deadline {
+        if !alive(pid as u32) {
+            return;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(200));
+    }
+    // SAFETY: igual que arriba.
+    unsafe { libc::kill(pid, libc::SIGKILL) };
+}
+
 /// La ventana de 0.2.74 es la madre de su servicio: viva y con su mismo ejecutable, sigue abierta.
 #[cfg(windows)]
 pub fn window_open(service: u32) -> Option<bool> {
@@ -196,6 +222,16 @@ pub fn set_aside(pid: u32) -> bool {
 #[cfg(not(windows))]
 pub fn set_aside(_pid: u32) -> bool {
     false
+}
+
+/// La ruta de hoy del ejecutable de un proceso, en minúsculas: la que dejó el instalador.
+#[cfg(windows)]
+pub fn image_path(pid: u32) -> Option<PathBuf> {
+    windows::image(pid).map(|(image, _)| PathBuf::from(image))
+}
+#[cfg(not(windows))]
+pub fn image_path(_pid: u32) -> Option<PathBuf> {
+    None
 }
 
 /// El motor vivo corre de un binario que ya no es el instalado. `deep` compara
@@ -318,7 +354,7 @@ mod windows {
             },
             Threading::{
                 GetExitCodeProcess, GetProcessTimes, OpenProcess, QueryFullProcessImageNameW,
-                PROCESS_QUERY_LIMITED_INFORMATION,
+                TerminateProcess, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_TERMINATE,
             },
         },
     };
@@ -333,6 +369,17 @@ mod windows {
         let read = unsafe { GetExitCodeProcess(process, &mut code) } != 0;
         unsafe { CloseHandle(process) };
         read && code == STILL_ACTIVE
+    }
+
+    pub fn terminate(pid: u32) {
+        let process = unsafe { OpenProcess(PROCESS_TERMINATE, 0, pid) };
+        if pid == 0 || process.is_null() {
+            return;
+        }
+        unsafe {
+            TerminateProcess(process, 1);
+            CloseHandle(process);
+        }
     }
 
     pub fn parent(pid: u32) -> Option<u32> {

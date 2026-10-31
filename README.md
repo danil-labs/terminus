@@ -122,9 +122,13 @@ apps/desktop/             the window (this is what the installers ship)
   scripts/                guards, tests and dev tooling (pnpm verify)
   npx/                    the npx installer
 apps/mobile/              the iOS and Android app (Expo) and its dev bridge
-packages/design           task states, marks, words, folder colors and theme colors both apps share
+packages/design           task states, marks, words, colors and the type scale both apps share
 packages/tasks            the task list both apps derive: flat list, filter, two-line card, agents dock
+packages/chat             how every client reads an agent message: links, visuals, next steps, tool steps
+packages/attention        Inbox, channels, customization and support access from any client
 packages/computers        Danil Computers client: control-plane API, relay session, wake rules
+packages/fleet            several machines behind one panel: envelope, per-machine slices, merge
+packages/carry            carrying work between machines: what travels, parts, base of the new task
 packages/protocol         the commands the mobile app may send to a machine, and their answers
 ```
 

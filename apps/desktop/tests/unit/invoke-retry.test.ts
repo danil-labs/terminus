@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { canRepeat, retrying, untilConnected, WAITS } from "../../src/lib/invoke.ts";
+import { canRepeat, neverRan, retrying, untilConnected, WAITS } from "../../src/lib/invoke.ts";
 
 function service(failures: number, code = "app_unavailable") {
   const waits: number[] = [];
@@ -49,6 +49,12 @@ test("a read is repeated after io, a write is not", () => {
   assert.equal(canRepeat("delete_workspace", io), false);
 });
 
+test("the disk sweep is not repeated after io: it is still running in the engine", () => {
+  const io = { detail: "io" };
+  assert.equal(canRepeat("list_storage", io), false);
+  assert.equal(canRepeat("list_storage", { detail: "service_busy" }), true);
+});
+
 test("antes del motor la orden espera a que conecte y se repite una vez", async () => {
   let up = false;
   let attempts = 0;
@@ -71,4 +77,10 @@ test("con el motor ya conectado, engine_down llega a la pantalla", async () => {
   };
   await assert.rejects(untilConnected(call, () => true, async () => void (waited = true)));
   assert.equal(waited, false);
+});
+
+test("a proxy failure with engine detail keeps its code inside detail", () => {
+  const busy = { what: { clave: "shell.service.busy" }, detail: { code: "service_busy", message_key: "cli.error.service_busy", detail: { task: "t1" } } };
+  assert.equal(neverRan(busy), true);
+  assert.equal(neverRan({ what: { clave: "shell.service.failed" }, detail: { code: "forbidden", detail: {} } }), false);
 });

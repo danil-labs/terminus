@@ -1,33 +1,44 @@
-import { type Answer, type Computer, listComputers, orderComputers, startComputer } from "@terminus/computers";
+import { ALPHA_DEMO, demoDenied } from "./alpha-mode";
+import { type AccountWorkspace, type Answer, type Computer, listComputers, listWorkspaces, startComputer } from "@terminus/computers";
 import { type EngineEvent, type WorkspaceAttention, mergeAttention } from "@terminus/protocol";
 import { store } from "./store";
+import { sliceStorage } from "./sliceStorage";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AppState, Platform } from "react-native";
 import { useAccount } from "./account";
 import { BRIDGE_ENABLED, BRIDGE_WITHOUT_ACCOUNT, loadPairing, savePairing } from "./bridge";
 import { type Notice, attentionOf, noticer } from "./engine";
-import { type Host, type Pairing, bridgeHost, relayHost } from "./hosts";
+import { type AccountFleet, type Host, type Pairing, accountFleet, bridgeHost } from "./hosts";
 import { t } from "./i18n";
 import { Notifications } from "./notifications";
 import { COMPUTERS } from "./supabase";
 
 type Listener = (host: string, events: EngineEvent[], gap: boolean) => void;
 
-/** Lo que dijo `/v1/computers`: la licencia y el error no se confunden con «no tienes máquinas». */
-export type Fleet = "loading" | "ok" | "license" | "error" | "signed_out";
+/**
+ * Lo que dijo `/v1/computers`, o que el relay detuvo las sesiones por la licencia
+ * (`license`: Terminus de pago; la lista ya no la pide). La licencia y el error no se
+ * confunden con «no tienes máquinas».
+ */
+export type Fleet = "loading" | "ok" | "license" | "no_account" | "error" | "signed_out";
 
 type Machines = {
   ready: boolean;
+  contextReady: boolean;
   fleet: Fleet;
   /** Las máquinas de la persona y, si está emparejado, el Terminus de la red. */
   hosts: Host[];
   hostOf: (id: string) => Host | undefined;
+  /** Los workspaces de la cuenta (`GET /v1/workspaces`), con sus máquinas apagadas o no; `null` si el plano de control no los dice. */
+  registry: AccountWorkspace[] | null;
   /** La máquina por omisión para tareas nuevas: la última usada, la VM administrada o la primera. */
   preferred: (eligible: Host[]) => Host | null;
   rememberMachine: (id: string) => void;
   pairing: Pairing | null;
   pair: (pairing: Pairing | null) => Promise<void>;
   reloadComputers: () => Promise<void>;
+  /** «Reintentar» del aviso de licencia: reabre las sesiones detenidas y relee la lista. */
+  retryLicense: () => void;
   /** Atención por máquina: `hostId → workspaces`. */
   attention: Record<string, WorkspaceAttention[]>;
   activity: { notice: Notice; at: number }[];
@@ -70,10 +81,23 @@ async function computersOf(getToken: () => Promise<string>, unauthorized: () => 
   return listComputers(COMPUTERS, await getToken());
 }
 
-export function MachinesProvider({ children }: { children: ReactNode }) {
+const demoHost: Host = {
+  id: "demo-host", label: t("alpha.machine_demo"), kind: "computer", managed: false,
+  linked: new Set(["demo-workspace"]), power: () => "off", canAct: () => "asleep",
+  onChange: () => () => {}, onEvents: () => () => {},
+  call: async () => { throw demoDenied(); }, wake: async () => { throw demoDenied(); }, close: () => {},
+};
+
+export function MachinesProvider({ children, active = true }: { children: ReactNode; active?: boolean }) {
+  if (ALPHA_DEMO) return <Context.Provider value={{ ready: true, contextReady: true, fleet: "ok", hosts: [demoHost], hostOf: id => id === demoHost.id ? demoHost : undefined, registry: null, preferred: () => demoHost, rememberMachine: () => {}, pairing: null, pair: async () => { throw demoDenied(); }, reloadComputers: async () => {}, retryLicense: () => {}, attention: {}, activity: [], titleOf: () => undefined, rememberTitles: () => {}, setOpenTask: () => {}, subscribe: () => () => {}, tick: 0 }}>{children}</Context.Provider>;
+  return <LiveMachinesProvider active={active}>{children}</LiveMachinesProvider>;
+}
+
+function LiveMachinesProvider({ children, active }: { children: ReactNode; active: boolean }) {
   const account = useAccount();
-  const signedIn = Boolean(account.session);
+  const signedIn = active && Boolean(account.session);
   const [computers, setComputers] = useState<Computer[]>([]);
+  const [registry, setRegistry] = useState<AccountWorkspace[] | null>(null);
   const [fleet, setFleet] = useState<Fleet>("loading");
   const [pairing, setPairing] = useState<Pairing | null>(null);
   const [pairingLoaded, setPairingLoaded] = useState(false);
@@ -83,10 +107,12 @@ export function MachinesProvider({ children }: { children: ReactNode }) {
   const [activity, setActivity] = useState<{ notice: Notice; at: number }[]>([]);
   const [last, setLast] = useState<string | null>(null);
   const listeners = useRef(new Set<Listener>());
+  const reloadGeneration = useRef(0);
   const openTask = useRef<string | null>(null);
   const titles = useRef(new Map<string, string>());
 
   useEffect(() => {
+    if (!active) { setPairing(null); setPairingLoaded(true); return; }
     void loadPairing().then((saved) => {
       setPairing(BRIDGE_ENABLED ? saved : null);
       setPairingLoaded(true);
@@ -95,15 +121,23 @@ export function MachinesProvider({ children }: { children: ReactNode }) {
     if (Platform.OS === "android" && Notifications) {
       void Notifications.setNotificationChannelAsync(CHANNEL, { name: t("notify.channel"), importance: Notifications.AndroidImportance.HIGH });
     }
-  }, []);
+  }, [active]);
 
   const reloadComputers = useCallback(async () => {
+    const request = ++reloadGeneration.current;
     if (!signedIn) {
       setComputers([]);
+      setRegistry(null);
       setFleet("signed_out");
       return;
     }
-    const answer = await computersOf(account.getToken, account.unauthorized).catch((): Answer<Computer[]> => ({ kind: "error", status: null }));
+    const [answer, workspaces] = await Promise.all([
+      computersOf(account.getToken, account.unauthorized).catch((): Answer<Computer[]> => ({ kind: "error", status: null })),
+      account.getToken().then((token) => listWorkspaces(COMPUTERS, token)).catch(() => null),
+    ]);
+    if (request !== reloadGeneration.current) return;
+    // Un plano de control sin el registro, o un fallo de red, deja la lista de antes.
+    if (workspaces?.kind === "ok") setRegistry((old) => (JSON.stringify(old) === JSON.stringify(workspaces.value) ? old : workspaces.value));
     if (answer.kind === "ok") {
       setFleet("ok");
       // Solo cambia la lista si cambian las máquinas o sus workspaces vinculados: cada cambio vuelve a abrir sus sesiones.
@@ -114,7 +148,7 @@ export function MachinesProvider({ children }: { children: ReactNode }) {
           old.every((c, i) => c.computer_id === answer.value[i].computer_id && c.provider === answer.value[i].provider && c.name === answer.value[i].name && linked(c) === linked(answer.value[i]));
         return same ? old : answer.value;
       });
-    } else if (answer.kind === "license") setFleet("license");
+    } else if (answer.kind === "license" || answer.kind === "no_account") setFleet(answer.kind);
     else if (answer.kind !== "unauthorized") setFleet("error");
   }, [signedIn, account.getToken, account.unauthorized]);
 
@@ -122,29 +156,48 @@ export function MachinesProvider({ children }: { children: ReactNode }) {
     void reloadComputers();
     // Al volver al frente, la lista (y su estado) puede haber cambiado. Nunca enciende nada.
     const sub = AppState.addEventListener("change", (state) => state === "active" && void reloadComputers());
-    return () => sub.remove();
+    return () => { sub.remove(); reloadGeneration.current++; };
   }, [reloadComputers]);
 
-  // Una sesión de relay por computadora y el bridge si está emparejado.
+  // Una sola flota por sesión de Danil (`@terminus/fleet`), como el escritorio y la web: una sesión de relay por computadora.
+  const [machinesFleet, setMachinesFleet] = useState<AccountFleet | null>(null);
   useEffect(() => {
-    // En el orden de la web: las administradas primero; la primera encabeza un workspace compartido.
-    const next: Host[] = orderComputers(computers).map((computer) =>
-      relayHost(computer, {
+    if (!signedIn) return setMachinesFleet(null);
+    let made: AccountFleet | null = null;
+    let gone = false;
+    void sliceStorage().then((storage) => {
+      if (gone) return;
+      made = accountFleet({
         endpoint: COMPUTERS,
         getToken: account.getToken,
         onUnauthorized: () => void account.unauthorized(),
         // Fijar, archivar o cerrar una sesión no son intenciones del relay: la VM se enciende por aquí.
-        wake: async () => (await startComputer(COMPUTERS, await account.getToken(), computer.computer_id)).kind === "ok",
-        beforeReconnect: async () => {
+        wake: async (computer) => (await startComputer(COMPUTERS, await account.getToken(), computer)).kind === "ok",
+        beforeReconnect: (computer) => async () => {
           const answer = await computersOf(account.getToken, account.unauthorized);
-          if (answer.kind === "license") setFleet("license");
-          if (answer.kind === "ok" && !answer.value.some((c) => c.computer_id === computer.computer_id)) return false;
-          return answer.kind !== "license" && answer.kind !== "unauthorized";
+          if (answer.kind === "license" || answer.kind === "no_account") setFleet(answer.kind);
+          if (answer.kind === "ok" && !answer.value.some((c) => c.computer_id === computer)) return false;
+          return answer.kind !== "license" && answer.kind !== "no_account" && answer.kind !== "unauthorized";
         },
-      }),
-    );
+        storage,
+      });
+      setMachinesFleet(made);
+    });
+    // Al irse al fondo se guarda lo último de cada máquina.
+    const sub = AppState.addEventListener("change", (state) => state !== "active" && made?.flush());
+    return () => {
+      gone = true;
+      sub.remove();
+      made?.close();
+    };
+  }, [signedIn, account.getToken, account.unauthorized]);
+
+  // Las computadoras de la cuenta en la flota (altas y bajas en vivo) y el bridge si está emparejado.
+  useEffect(() => {
+    // En el orden de la web: las administradas primero; la primera encabeza un workspace compartido.
+    const next: Host[] = active && machinesFleet ? machinesFleet.set(computers) : [];
     // Sin la sesión de Danil no se sincroniza: el bridge también la pide, salvo el lab sin cuenta.
-    if (pairing && (signedIn || BRIDGE_WITHOUT_ACCOUNT)) next.push(bridgeHost(pairing, t("machines.network")));
+    if (active && pairing && (signedIn || BRIDGE_WITHOUT_ACCOUNT)) next.push(bridgeHost(pairing, t("machines.network")));
     setHosts(next);
     const unsubscribe = next.flatMap((host) => {
       const notices = noticer(host.id);
@@ -178,9 +231,10 @@ export function MachinesProvider({ children }: { children: ReactNode }) {
     });
     return () => {
       for (const off of unsubscribe) off();
-      for (const host of next) host.close();
+      // Las computadoras las cierra la flota cuando dejan la cuenta; el bridge, aquí.
+      for (const host of next) if (host.kind === "bridge") host.close();
     };
-  }, [computers, pairing, signedIn, account.getToken, account.unauthorized]);
+  }, [active, machinesFleet, computers, pairing, signedIn]);
 
   const pair = useCallback(async (next: Pairing | null) => {
     await savePairing(next);
@@ -215,17 +269,28 @@ export function MachinesProvider({ children }: { children: ReactNode }) {
   const titleOf = useCallback((key: string) => titles.current.get(key), []);
   const hostOf = useCallback((id: string) => hosts.find((h) => h.id === id), [hosts]);
 
+  const retryLicense = useCallback(() => {
+    machinesFleet?.retry();
+    void reloadComputers();
+  }, [machinesFleet, reloadComputers]);
+  // El relay detiene la sesión (`license_required`) aunque `/v1/computers` conteste: el
+  // aviso sale de la flota. `tick` cambia cuando una sesión se detiene o vuelve.
+  const fleetState: Fleet = fleet === "ok" && machinesFleet?.license() ? "license" : fleet;
+
   const value = useMemo<Machines>(
     () => ({
       ready: account.ready && pairingLoaded,
-      fleet,
+      contextReady: !signedIn || (fleet !== "loading" && fleet !== "signed_out" && computers.every(computer => hosts.some(host => host.id === computer.computer_id))),
+      fleet: fleetState,
       hosts,
       hostOf,
+      registry,
       preferred,
       rememberMachine,
       pairing,
       pair,
       reloadComputers,
+      retryLicense,
       attention,
       activity,
       titleOf,
@@ -234,7 +299,7 @@ export function MachinesProvider({ children }: { children: ReactNode }) {
       subscribe,
       tick,
     }),
-    [account.ready, pairingLoaded, fleet, hosts, hostOf, preferred, rememberMachine, pairing, pair, reloadComputers, attention, activity, titleOf, rememberTitles, setOpenTask, subscribe, tick],
+    [account.ready, pairingLoaded, signedIn, fleet, computers, fleetState, retryLicense, hosts, hostOf, registry, preferred, rememberMachine, pairing, pair, reloadComputers, attention, activity, titleOf, rememberTitles, setOpenTask, subscribe, tick],
   );
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }

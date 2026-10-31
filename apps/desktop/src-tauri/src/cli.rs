@@ -2,15 +2,17 @@ use std::ffi::OsStr;
 #[cfg(unix)]
 use std::os::unix::process::CommandExt;
 
-// Catálogo de args.rs del motor fijado en seldon-runtime.lock, más help y kn.
+// Catálogo de args.rs del motor, más help y kn.
 const COMMANDS: &[&str] = &[
     "account",
+    "activity",
     "agent",
     "agent-context",
     "auth",
     "chat",
     "config",
     "context",
+    "engine",
     "folder",
     "github",
     "guide",
@@ -24,6 +26,7 @@ const COMMANDS: &[&str] = &[
     "operation",
     "plugin",
     "portfolio",
+    "run",
     "service",
     "skill",
     "space",
@@ -38,6 +41,7 @@ const GLOBAL_FLAGS: &[&str] = &[
     "--engine",
     "--profile",
     "--workspace",
+    "--machine",
     "--folder",
     "--instance",
     "--request-id",

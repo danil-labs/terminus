@@ -37,14 +37,18 @@
  * Si un comando se registra a propósito antes de tener interfaz que lo use, va en
  * `SIN_INTERFAZ` con el motivo escrito al lado. Que cueste una línea es el punto.
  */
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { relative } from "node:path";
-// Ver la nota de `paths.mjs`: `.pathname` en Windows da `/C:/…` y revienta.
+// `.pathname` en Windows da `/C:/…` y revienta.
 import { fileURLToPath } from "node:url";
 import { walkFiles } from "../git.mjs";
+import { COMANDOS_PENDIENTES } from "../engine-pending.mjs";
 
 const LIB = fileURLToPath(new URL("../../src-tauri/src/extracted/mod.rs", import.meta.url));
 const CONTRACT = fileURLToPath(new URL("../../src-tauri/crates/engine-protocol/commands.json", import.meta.url));
+// Extensiones del motor fuera de la huella (`engine-protocol` `EXTENSIONS`): las despacha
+// la ventana igual que el contrato.
+const EXTENSIONS = fileURLToPath(new URL("../../src-tauri/crates/engine-protocol/extensions", import.meta.url));
 const WEB = fileURLToPath(new URL("../../src", import.meta.url));
 /**
  * **Todos los árboles de interfaz, no uno.**
@@ -65,20 +69,40 @@ const ARBOLES = [WEB].filter((d) => existsSync(d));
  * normal: el registro es la lista de lo que la app hace, no de lo que podría.
  */
 const SIN_INTERFAZ = {
+  // Extensión de orquestadores: las pide el relay de Danil Computers (MCP remoto), no una pantalla.
+  connect_external: "la pide el MCP remoto de Danil Computers por el relay",
+  connection_call: "la pide el MCP remoto de Danil Computers por el relay",
+  disconnect_external: "la pide Danil Computers al revocar una conexión",
+  run_activity_command: "el CLI ejecuta mantenimiento; los clientes solo consultan sus registros",
+  import_chat_background: "la ventana manda el fondo reducido como `data:` (`set_chat_background`); queda en el contrato congelado para motores anteriores",
   git_host_pending_setup: "el CLI del motor lo usa para completar la conexión; permanece en el contrato congelado",
   finish_git_host_setup: "el CLI del motor espera la instalación; la ventana actualiza al regresar",
   set_session_pinned: "el gesto de fijar lo implementa la tarea de frontend en paralelo",
+  // Lo pide el conector del motor al recibir `memory.changed` del relay (seldon-host #108).
+  sync_workspace_memory: "la sincronización de la memoria la programa el conector; ninguna pantalla la pide",
+  // Los pide el conector al recibir `credentials.changed` y `credentials.reseal` del relay (seldon-host #144, #145).
+  sync_account_credentials: "la reconciliación de las credenciales la programa el conector; ninguna pantalla la pide",
+  reseal_account_credential: "sellar para otra máquina lo pide el relay al conector; ninguna pantalla lo hace",
+  github_account_changed: "tirar la caché del token de GitHub lo pide el conector con `credentials.changed`; ninguna pantalla lo hace",
   // El backend prepara los árboles; esta lectura aún no tiene pantalla.
   session_worktree: "el árbol y sus notas aún no se pintan en ninguna pantalla",
   // El renombre lo hace hoy el agente con `git branch -m`; la app lo reconcilia.
   worktree_rename_branch: "el renombre al entregar aún no tiene gesto en pantalla",
-  install_tool: "pnpm y Bun los instala bootstrap::prepare_runtime desde Rust; ninguna pantalla lo invoca",
+  // Lo incluido se repara entero con `install_tool {"tool":"bundled-work-tools"}`.
+  set_workspace_terminal_theme: "el selector de terminal no se ofrece hoy (docs/visual-system.md); el comando es del motor",
+  install_base_tool: "lo usa bootstrap::prepare_runtime; la ventana repara lo incluido con install_tool",
+  remove_tool: "lo incluido con Terminus no se desinstala; queda en el contrato congelado",
+  remove_google_drive: "quitar el binario de Drive es de Configuración; el onboarding solo desconecta",
+  // Del contrato de seldon-host dev; la ventana los llama en terminus#243.
+  google_drive_desktop_status: "lo llama el alta de Drive con la app oficial (terminus#243)",
+  install_google_drive_desktop: "lo llama el alta de Drive con la app oficial (terminus#243)",
+  open_google_drive_desktop: "lo llama el alta de Drive con la app oficial (terminus#243)",
+  start_local_model: "elegir el modelo no lo carga: lo levanta el turno que lo usa (models::ensure_serving)",
   tree_typst_target: "lo pide typst_live::typst_live_open desde el Rust de la ventana: el webview nunca da la ruta de arranque",
   danil_client_token: "lo pide proxy::account_relay_token desde el Rust de la ventana: la credencial de máquina no sale del motor",
   import_chat_background_data: "lo usaba «Usar este workspace aquí», ya borrado; el fondo llegará desde la cuenta de Danil en la fase 2 (docs/account-workspace.md)",
   remove_provider: "sin forma confiable de saber qué instaló Terminus, se quitó el botón",
   remove_gh: "sin forma confiable de saber qué instaló Terminus, se quitó el botón",
-  remove_tool: "sin forma confiable de saber qué instaló Terminus, se quitó el botón",
   // Sin pantalla hasta el metabuscador del workspace: una archivada no se
   // desarchiva ni tiene historial por carpeta.
   list_archived: "el índice de archivadas por carpeta espera al metabuscador del workspace",
@@ -86,15 +110,17 @@ const SIN_INTERFAZ = {
   restore_task_work: "restaurar vivía en el Historial de tareas, que salió de la ventana",
   create_agent_thread: "los temas antiguos se conservan para lectura; las conversaciones nuevas nacen como tareas",
   sources_in_use: "traer material ya no espera a que acabe el turno que lo lee; el motor lo usa para no cambiar de rama bajo un turno",
-  materialize_workspace: "lo pide la web por el relay a la máquina elegida (web/transport.ts); la ventana local abre sus propios workspaces",
+  materialize_workspace: "lo pide la web por el relay a la máquina elegida (features/machines/router.ts); la ventana local abre sus propios workspaces",
   ensure_project: "lo pide la web por el relay antes de crear una tarea en otra máquina; el motor lo llama solo en send_message y run_shell_command",
   sync_workspace: "lo llama el conector del motor al recibir workspace.changed del relay",
+  share_space: "lo pide el router de máquinas (features/machines/router.ts, `native`) antes de crear algo en otra máquina desde un space de esta",
   danil_workspace_link:
     "la sincronización sigue a la sesión de Danil: el motor vincula todos los workspaces; sin interruptor por workspace",
   danil_workspace_unlink:
     "la sincronización sigue a la sesión de Danil: el motor vincula todos los workspaces; sin interruptor por workspace",
   danil_workspace_link_status:
     "la sincronización sigue a la sesión de Danil: el motor vincula todos los workspaces; sin interruptor por workspace",
+  tree_diff: "el diff de un turno se pintaba bajo cada turno del chat; ahora «Editó N archivos» abre el panel de la tarea en «Cambios» (tree_changes)",
   // `docs/agents.md` § Estado observable: el comando de agregación existe
   // para que el riel deje de sondear; el riel mismo no está construido.
 };
@@ -141,7 +167,14 @@ for (const l of bloque[1].split("\n")) {
 // manda el contrato congelado (`commands.json`).
 const manifest = JSON.parse(readFileSync(CONTRACT, "utf8"));
 for (const command of manifest.commands) {
+  if (!["invoke", "stream", "desktop"].includes(command.kind)) continue;
   if (!registrados.has(command.name)) registrados.set(command.name, `contrato (${command.path})`);
+}
+for (const file of existsSync(EXTENSIONS) ? readdirSync(EXTENSIONS).filter((f) => f.endsWith(".json")) : []) {
+  for (const command of JSON.parse(readFileSync(`${EXTENSIONS}/${file}`, "utf8")).commands ?? []) {
+    if (!["invoke", "stream"].includes(command.kind)) continue;
+    if (!registrados.has(command.name)) registrados.set(command.name, `extensión ${file} (${command.path})`);
+  }
 }
 
 // ------------------------------------------------- lo que el frontend invoca
@@ -170,7 +203,8 @@ for (const { dir, f } of ARBOLES.flatMap((dir) =>
 
 // ------------------------------------------------------------------ el fallo
 
-const fantasmas = [...invocados].filter(([n]) => !registrados.has(n));
+const fantasmas = [...invocados].filter(([n]) => !registrados.has(n) && !(n in COMANDOS_PENDIENTES));
+const llegados = Object.keys(COMANDOS_PENDIENTES).filter((n) => registrados.has(n));
 const muertos = [...registrados.keys()]
   .filter((n) => !invocados.has(n) && !(n in SIN_INTERFAZ))
   .sort();
@@ -186,11 +220,14 @@ if (dinamicos.length) {
 for (const [n, donde] of fantasmas) {
   console.error(`Nadie registra «${n}» — lo invoca ${donde.join(", ")}`);
 }
+for (const n of llegados) {
+  console.error(`«${n}» ya está en el contrato: quítalo de scripts/engine-pending.mjs.`);
+}
 for (const n of muertos) {
   console.error(`Nadie invoca «${n}» — lo registra ${registrados.get(n)}`);
 }
 
-if (!fantasmas.length && !muertos.length && !dinamicos.length) {
+if (!fantasmas.length && !muertos.length && !dinamicos.length && !llegados.length) {
   console.log(
     `Los ${registrados.size} comandos registrados los invoca alguien` +
       (Object.keys(SIN_INTERFAZ).length

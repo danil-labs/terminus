@@ -202,3 +202,75 @@ test("releer un mensaje que cambió conserva lo que no cambió de dentro", () =>
   const conCampo = reutilizar<Record<string, unknown>>({ a: 1 }, { a: 1, b: undefined });
   assert.ok("b" in conCampo);
 });
+
+test("una carpeta que no contesta no congela la barra: vence, se queda lo que había y las demás se pintan", async () => {
+  let lists: SessionLists<string> = { app: ["vieja"] };
+  const timers: { run: () => void; ms: number }[] = [];
+  const refresh = sessionRefresh<string>({
+    // `app` no vuelve nunca; `otra` contesta.
+    read: (project) => (project === "app" ? new Promise<string[]>(() => {}) : Promise.resolve(["nueva"])),
+    apply: (update) => { lists = update(lists); },
+    projects: () => ["app", "otra"],
+    key: (row) => row,
+    schedule: (run, ms) => { timers.push({ run, ms }); return timers.length; },
+    cancel: () => {},
+    timeout: 5,
+  });
+  await refresh.refresh(["app", "otra"]);
+  assert.deepEqual(lists, { app: ["vieja"], otra: ["nueva"] });
+  assert.equal(timers.at(-1)?.ms, 1000, "la carpeta vencida se reintenta");
+});
+
+test("cada carpeta se pinta en cuanto vuelve, sin esperar a la más lenta", async () => {
+  const s = setup(["app", "lenta"]);
+  const pending = s.refresh.refresh(["app", "lenta"]);
+  s.reads.find((r) => r.project === "app")?.result.resolve(["a"]);
+  await settle();
+  assert.deepEqual(s.lists(), { app: ["a"] }, "la rápida ya está pintada");
+  s.reads.find((r) => r.project === "lenta")?.result.resolve(["l"]);
+  await pending;
+  assert.deepEqual(s.lists(), { app: ["a"], lenta: ["l"] });
+});
+
+test("releer una sola carpeta deja las demás como estaban", async () => {
+  const s = setup(["app", "otra"]);
+  const first = s.refresh.refresh(["app", "otra"]);
+  for (const r of s.reads) r.result.resolve([`${r.project}-1`]);
+  await first;
+  const second = s.refresh.refresh(["app"]);
+  s.reads[2].result.resolve(["app-2"]);
+  await second;
+  assert.deepEqual(s.lists(), { app: ["app-2"], otra: ["otra-1"] });
+});
+
+test("una carpeta que ya no está en el riel se suelta al pintar otra", async () => {
+  let projects = ["app", "vieja"];
+  let lists: SessionLists<string> = {};
+  const refresh = sessionRefresh<string>({
+    read: async (project) => [project],
+    apply: (update) => { lists = update(lists); },
+    projects: () => projects,
+    key: (row) => row,
+    schedule: () => 0,
+    cancel: () => {},
+  });
+  await refresh.refresh(["app", "vieja"]);
+  projects = ["app"];
+  await refresh.refresh(["app"]);
+  assert.deepEqual(lists, { app: ["app"] });
+});
+
+test("un aviso de una carpeta que el riel no enseña no la mete", async () => {
+  let lists: SessionLists<string> = {};
+  const refresh = sessionRefresh<string>({
+    read: async (project) => [project],
+    apply: (update) => { lists = update(lists); },
+    projects: () => ["app"],
+    key: (row) => row,
+    schedule: () => 0,
+    cancel: () => {},
+  });
+  await refresh.refresh(["app"]);
+  await refresh.refresh(["ajena"]);
+  assert.deepEqual(lists, { app: ["app"] });
+});

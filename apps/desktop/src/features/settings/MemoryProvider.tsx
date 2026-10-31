@@ -30,7 +30,7 @@ export default function ProveedorDeMemoria() {
       if (activo.memoria.tipo === "mcp_externo") {
         setReadWrite(activo.memoria.lectura_escritura);
       }
-    });
+    }).catch(() => {});
   }
   onMount(cargar);
 
@@ -81,7 +81,7 @@ export default function ProveedorDeMemoria() {
 
   return (
     <section class="grid grid-cols-[minmax(0,1fr)] gap-2">
-      <h3 class="m-0 text-[0.8125rem] font-semibold">{t("settings.memory.title")}</h3>
+      <h3 class="m-0 text-ui font-semibold">{t("settings.memory.title")}</h3>
       <p class="m-0 text-xs text-neutral-500">{t("settings.memory.hint")}</p>
 
       <Show
@@ -90,7 +90,7 @@ export default function ProveedorDeMemoria() {
           <div class="grid gap-2 rounded-md border border-border bg-surface-raised p-3">
             <Textarea
               rows={4}
-              class="font-mono text-[0.6875rem]"
+              class="font-mono text-caption"
               placeholder={t("settings.memory.paste_hint")}
               value={block()}
               onInput={(e) => setBlock(e.currentTarget.value)}

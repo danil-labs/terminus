@@ -1,6 +1,7 @@
 /**
- * The preparation of a managed computer in the browser: only its progress,
- * never the installer, and the app once it is done. Mounts `dist-web/`.
+ * The browser never waits for a computer to prepare: no installer, no
+ * «preparing» or «connecting» screen, the app at once, even when a machine
+ * would say it is still preparing. Mounts `dist-web/`.
  */
 import assert from "node:assert/strict";
 import test from "node:test";
@@ -18,7 +19,7 @@ const session = JSON.stringify({
   user: { id: "u1", aud: "authenticated", role: "authenticated", email: "persona@example.com", app_metadata: {}, user_metadata: {}, created_at: "2026-01-01T00:00:00Z" },
 });
 
-test("a pending preparation shows its progress, never the installer, then the app", async () => {
+test("the app opens at once, never the installer nor a preparation screen", async () => {
   const fake = relay();
   const own = globalThis.fetch;
   globalThis.fetch = async (input, init) => {
@@ -26,18 +27,8 @@ test("a pending preparation shows its progress, never the installer, then the ap
     if (!url.startsWith(API)) return own(input, init);
     return new Response(JSON.stringify([{ computer_id: "cmp_a", name: "Casa", state: "online" }]), { status: 200 });
   };
-  let prepared = 0;
-  engine.setup_required = () => prepared < 2;
-  engine.prepare_runtime = () => {
-    prepared += 1;
-    return {
-      running: prepared < 2,
-      stages: [
-        { name: "git", essential: true, state: "succeeded" },
-        { name: "node", essential: true, state: prepared < 2 ? "running" : "succeeded" },
-      ],
-    };
-  };
+  engine.setup_required = true;
+  engine.prepare_runtime = { running: true, stages: [{ name: "platform", essential: true, state: "succeeded" }, { name: "work-tools", essential: true, state: "running" }] };
 
   let w;
   const app = await boot("listo", "web-setup", {}, undefined, { "sb-supabase-auth-token": session }, {
@@ -52,14 +43,14 @@ test("a pending preparation shows its progress, never the installer, then the ap
   try {
     await sleep(1000);
     assert.equal(fake.sockets.length, 1, "the only computer opens");
-    assert.ok(text().includes("Preparando tu computadora… 50 %"), "a pending preparation shows only its progress");
-    assert.ok(!text().includes("Preparemos tu entorno"), "never the installer");
-    assert.ok(!fake.calls.some((c) => c.command === "check_environment"), "nor its environment check");
-
-    await sleep(3500);
-    assert.ok(fake.calls.some((c) => c.command === "list_projects"), "the app mounts when preparation is done");
+    assert.ok(text().includes("Tarea t1"), "the app is already there");
+    assert.ok(!/Preparando tu computadora|Conectando con tu computadora|Connecting to your computer/.test(text()), "no waiting screen");
+    assert.ok(!text().includes("Preparando Danil"), "never the installer");
+    assert.ok(!fake.calls.some((c) => ["check_environment", "prepare_runtime", "setup_required"].includes(c.command)), "nor its checks");
     assert.deepEqual(app.fallos, []);
   } finally {
     globalThis.fetch = own;
+    engine.setup_required = false;
+    delete engine.prepare_runtime;
   }
 });

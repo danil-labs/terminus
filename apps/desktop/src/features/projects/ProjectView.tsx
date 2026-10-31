@@ -1,12 +1,15 @@
 import { open } from "@tauri-apps/plugin-dialog";
+import Check from "lucide-solid/icons/check";
+import Copy from "lucide-solid/icons/copy";
 import Eye from "lucide-solid/icons/eye";
 import FolderOpen from "lucide-solid/icons/folder-open";
 import GitBranch from "lucide-solid/icons/git-branch";
 import Plus from "lucide-solid/icons/plus";
 import SquarePen from "lucide-solid/icons/square-pen";
 import X from "lucide-solid/icons/x";
-import { createEffect, createMemo, createSignal, For, on, onCleanup, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, lazy, on, onCleanup, Show, Suspense } from "solid-js";
 import { rememberRoster } from "../../lib/handlerRoster";
+import { createCopied } from "../../lib/clipboard";
 import { t } from "../../lib/i18n";
 import { invoke } from "../../lib/invoke.ts";
 import {
@@ -33,11 +36,17 @@ import MaterialPicker from "../settings/MaterialPicker";
 import { AstroAvatar } from "./AstroAvatar";
 import BaseBranchPicker from "./BaseBranchPicker";
 import { watchHandlerStatuses } from "./handlerPresence";
-import Memoria from "./Memoria";
-import NewAgent, { type ModelChoices } from "./NewAgent";
+import type { ModelChoices } from "./NewAgent";
 import { displayName, notifyProfiles, watchProfiles } from "./profiles";
 import Sessions, { type SessionRow } from "./Sessions";
 import type { Etapa } from "./TaskStage";
+// Solo al crear un encargado: fuera de la carga inicial.
+import { LazyPart, retryableLazy } from "../../ui/LazyPart";
+import { SectionLabel } from "../../ui/SectionLabel";
+const NewAgent = retryableLazy(() => import("./NewAgent"));
+
+// Fuera de la carga inicial: la memoria se pinta abajo de la vista y trae el cliente de la cuenta.
+const Memoria = lazy(() => import("./Memoria"));
 
 function SelectorDeRama(props: { project: string; source: Source }) {
   const [abierto, setAbierto] = createSignal(false);
@@ -92,7 +101,7 @@ function SelectorDeRama(props: { project: string; source: Source }) {
           gutter={4}
         >
           <PopoverTrigger
-            class="flex max-w-40 items-center gap-1 rounded-sm px-1.5 py-1 font-mono text-[0.625rem] text-neutral-500 outline-none hover:bg-surface-muted hover:text-neutral-950 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-wait disabled:opacity-60"
+            class="flex max-w-40 items-center gap-1 rounded-sm px-1.5 py-1 font-mono text-2xs text-neutral-500 outline-none hover:bg-surface-muted hover:text-neutral-950 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-wait disabled:opacity-60"
             disabled={actualizando()}
             aria-label={t("projects.view.source_branch_change", {
               name: props.source.name,
@@ -109,7 +118,7 @@ function SelectorDeRama(props: { project: string; source: Source }) {
             </span>
           </PopoverTrigger>
           <PopoverContent class="w-72 p-2">
-            <p class="m-0 px-1 pb-2 text-[0.6875rem] text-neutral-500">
+            <p class="m-0 px-1 pb-2 text-caption text-neutral-500">
               {t("projects.view.source_branch_shared")}
             </p>
             <Show
@@ -127,13 +136,13 @@ function SelectorDeRama(props: { project: string; source: Source }) {
                       <li>
                         <button
                           type="button"
-                          class="flex w-full items-center gap-2 rounded-sm px-2 py-1 text-left font-mono text-[0.6875rem] hover:bg-surface-muted hover:text-neutral-950 disabled:cursor-default disabled:opacity-60"
+                          class="flex w-full items-center gap-2 rounded-sm px-2 py-1 text-left font-mono text-caption hover:bg-surface-muted hover:text-neutral-950 disabled:cursor-default disabled:opacity-60"
                           disabled={item === props.source.branch || actualizando()}
                           onClick={() => void cambiar(item)}
                         >
                           <span class="min-w-0 flex-1 truncate">{item}</span>
                           <Show when={item === props.source.branch}>
-                            <span class="font-sans text-[0.625rem]">
+                            <span class="font-sans text-2xs">
                               {t("projects.view.source_branch_current")}
                             </span>
                           </Show>
@@ -170,6 +179,8 @@ function SelectorDeRama(props: { project: string; source: Source }) {
  * aquí: la leen todos los proyectos y se cambia en Configuración.
  */
 export default function VistaDeProyecto(props: {
+  /** El workspace abierto: la memoria de la cuenta y su historial son suyos. */
+  workspace?: string | null;
   proyecto: Project;
   /** El catálogo del workspace: es quien sabe nombrar y ubicar cada fuente. */
   sources: Source[];
@@ -286,6 +297,7 @@ export default function VistaDeProyecto(props: {
   }
 
   const carpeta = () => carpetaDeTrabajo(props.proyecto);
+  const { copied: rutaCopiada, copy: copiarRuta } = createCopied();
 
   const fijo = () =>
     props.proyecto.sources
@@ -356,9 +368,9 @@ export default function VistaDeProyecto(props: {
 
         <section class="grid gap-2">
           <div class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-            <h2 class="m-0 text-[0.6875rem] font-medium tracking-wide text-neutral-500 uppercase">
+            <SectionLabel>
               {t("projects.view.work_title")}
-            </h2>
+            </SectionLabel>
             <Button variant="ghost" size="sm" onClick={() => void elegirCarpeta()}>
               <FolderOpen size={14} />
               {t("projects.view.work_pick")}
@@ -371,13 +383,37 @@ export default function VistaDeProyecto(props: {
             }
           >
             {(dir) => (
-              <div class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2 gap-y-1 rounded-md border border-border px-3 py-2">
+              <div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1 rounded-md border border-border px-3 py-2">
                 <WorkdirIcon
                   kind={props.proyecto.kind} cloud={props.proyecto.cloud}
                   class="text-neutral-500"
                 />
-                <span class="min-w-0 truncate font-mono text-[0.6875rem] text-neutral-950">
+                <span class="min-w-0 truncate font-mono text-caption text-neutral-950" title={dir()}>
                   {dir()}
+                </span>
+                <span class="row-span-2 flex items-center gap-0.5">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    class="size-7 text-neutral-500"
+                    onClick={() => void invoke("open_external", { target: dir() }).catch(() => {})}
+                    aria-label={t("shell.folder.open")}
+                    title={t("shell.folder.open")}
+                  >
+                    <FolderOpen size={15} />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    class="size-7 text-neutral-500"
+                    onClick={() => copiarRuta(dir())}
+                    aria-label={rutaCopiada() ? t("shell.folder.copied") : t("shell.folder.copy")}
+                    title={rutaCopiada() ? t("shell.folder.copied") : t("shell.folder.copy")}
+                  >
+                    <Show when={rutaCopiada()} fallback={<Copy size={15} />}>
+                      <Check size={15} />
+                    </Show>
+                  </Button>
                 </span>
                 <span class="col-start-2 text-xs text-neutral-500">
                   {props.proyecto.kind === "git"
@@ -398,7 +434,7 @@ export default function VistaDeProyecto(props: {
                 {t("projects.view.setup_title")}
               </span>
               <Input
-                class="font-mono text-[0.6875rem]"
+                class="font-mono text-caption"
                 placeholder={t("projects.view.setup_placeholder")}
                 value={preparacion()}
                 onInput={(e) => setPreparacion(e.currentTarget.value)}
@@ -416,9 +452,9 @@ export default function VistaDeProyecto(props: {
 
         <section class="grid gap-2">
           <div class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-            <h2 class="m-0 text-[0.6875rem] font-medium tracking-wide text-neutral-500 uppercase">
+            <SectionLabel>
               {t("projects.view.sources_title")}
-            </h2>
+            </SectionLabel>
             <Popover
               open={anadiendo()}
               onOpenChange={(abre) => {
@@ -471,7 +507,7 @@ export default function VistaDeProyecto(props: {
                             <Show when={distingueCuenta(s)}>
                               <Badge forma="dato" class="shrink-0">{cuenta(s)}</Badge>
                             </Show>
-                            <span class="shrink-0 font-mono text-[0.625rem] text-neutral-500">
+                            <span class="shrink-0 font-mono text-2xs text-neutral-500">
                               {s.kind === "git"
                                 ? t("projects.view.source_git")
                                 : t("projects.view.source_folder")}
@@ -509,11 +545,11 @@ export default function VistaDeProyecto(props: {
                 {(r) => (
                   <li class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-md border border-border px-3 py-2">
                     <span class="min-w-0">
-                      <span class="block truncate text-[0.8125rem] text-neutral-950">
+                      <span class="block truncate text-ui text-neutral-950">
                         {r().name}
                       </span>
                       <span
-                        class="block truncate font-mono text-[0.625rem] text-neutral-500"
+                        class="block truncate font-mono text-2xs text-neutral-500"
                         title={r().location}
                       >
                         {origen(r())}
@@ -526,7 +562,7 @@ export default function VistaDeProyecto(props: {
                         project={props.proyecto.id}
                         source={r()}
                       />
-                      <span class="text-[0.6875rem] text-neutral-500">
+                      <span class="text-caption text-neutral-500">
                         {t("projects.view.from_workspace")}
                       </span>
                     </span>
@@ -537,11 +573,11 @@ export default function VistaDeProyecto(props: {
                 {(s) => (
                   <li class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-md border border-border px-3 py-2">
                     <span class="min-w-0">
-                      <span class="block truncate text-[0.8125rem] text-neutral-950">
+                      <span class="block truncate text-ui text-neutral-950">
                         {s.name}
                       </span>
                       <span
-                        class={`block truncate font-mono text-[0.625rem] ${
+                        class={`block truncate font-mono text-2xs ${
                           s.missing ? "text-error-strong" : "text-neutral-500"
                         }`}
                         title={s.location}
@@ -576,21 +612,25 @@ export default function VistaDeProyecto(props: {
 
         <section class="grid gap-2">
           <header class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-            <h2 class="m-0 text-[0.6875rem] font-medium tracking-wide text-neutral-500 uppercase">
+            <SectionLabel>
               {t("projects.view.agents_title")}
-            </h2>
+            </SectionLabel>
             <Button size="sm" variant="ghost" onClick={() => setCreando(true)}>
               <Plus size={14} />
               {t("projects.agents.new_open")}
             </Button>
           </header>
-          <NewAgent
-            abierto={creando()}
-            onAbrir={setCreando}
-            project={props.proyecto.id}
-            modelos={props.modelos}
-            onCreado={releerEncargados}
-          />
+          <Show when={creando()}>
+            <LazyPart>
+              <NewAgent
+                abierto
+                onAbrir={setCreando}
+                project={props.proyecto.id}
+                modelos={props.modelos}
+                onCreado={releerEncargados}
+              />
+            </LazyPart>
+          </Show>
           <Show
             when={visibles().length > 0}
             fallback={
@@ -618,7 +658,7 @@ export default function VistaDeProyecto(props: {
                     <span class="col-start-2 text-xs text-neutral-500">
                       {uno.description}
                     </span>
-                    <span class="col-start-2 text-[0.625rem] text-neutral-500">
+                    <span class="col-start-2 text-2xs text-neutral-500">
                       {t("projects.view.agents_read_by", {
                         agents: uno.providers.join(", "),
                       })}
@@ -633,9 +673,9 @@ export default function VistaDeProyecto(props: {
               del proyecto, y el único camino de vuelta para uno del
               repositorio al que se le quitó la fila del riel. */}
           <Show when={ocultos().length > 0}>
-            <h3 class="m-0 text-[0.6875rem] font-medium tracking-wide text-neutral-500 uppercase">
+            <SectionLabel as="h3">
               {t("projects.view.agents_hidden")}
-            </h3>
+            </SectionLabel>
             <ul class="m-0 grid list-none gap-1 p-0">
               <For each={ocultos()}>
                 {(uno) => (
@@ -667,9 +707,9 @@ export default function VistaDeProyecto(props: {
         </section>
 
         <section class="grid gap-2">
-          <h2 class="m-0 text-[0.6875rem] font-medium tracking-wide text-neutral-500 uppercase">
+          <SectionLabel>
             {t("projects.view.tasks_title")}
-          </h2>
+          </SectionLabel>
           {/* La misma lista que el historial del sidebar, y a propósito: sus
               filas ya llevan el estado de cada tarea —trabajando, preguntó,
               espera aprobación— y su menú de mover y borrar. Dos listas de lo
@@ -698,11 +738,14 @@ export default function VistaDeProyecto(props: {
           </Show>
         </section>
 
-        <Memoria
-          project={props.proyecto.id}
-          agents={props.agents}
-          encargados={encargados().agents.map((e) => e.name)}
-        />
+        <Suspense>
+          <Memoria
+            project={props.proyecto.id}
+            workspace={props.workspace}
+            agents={props.agents}
+            encargados={encargados().agents.map((e) => e.name)}
+          />
+        </Suspense>
       </div>
     </div>
   );

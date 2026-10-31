@@ -1,4 +1,5 @@
 import { invoke } from "../../lib/invoke.ts";
+import { machineOf } from "../machines/store";
 import ChevronDown from "lucide-solid/icons/chevron-down";
 import ChevronRight from "lucide-solid/icons/chevron-right";
 import Cloud from "lucide-solid/icons/cloud";
@@ -15,6 +16,7 @@ import {
   createSignal,
   For,
   type JSX,
+  on,
   onCleanup,
   onMount,
   Show,
@@ -27,8 +29,20 @@ import { asFailure, type Failure, FailureNote } from "../../ui/Failure";
 import { ITEM_DE_MENU, Popover, PopoverContent } from "../../ui/Popover";
 import { IconoDeArchivo } from "./FileIcon";
 import { colorDeMarca, describirEstado, publicarLocales } from "./localStatus";
-import { alMoverseElArbol, avisarDeLosArboles } from "./refresh";
-import { conVistaTypst, elegirPrincipal, esTypst, principalElegido, seguirPluginTypst } from "./typst";
+import { alMoverseElArbol, avisarDeIdos, avisarDeLosArboles, idos } from "./refresh";
+import { crearLector, esTransitorio } from "./treeLoader";
+import {
+  arrastrarRuta,
+  conVistaTypst,
+  editorTypst,
+  elegirPrincipal,
+  esTypst,
+  fueArrastreDeRuta,
+  pedirInsercionDeRuta,
+  principalElegido,
+  rutaEnVuelo,
+  seguirPluginTypst,
+} from "./typst";
 import {
   type CambioKn,
   type Carpeta,
@@ -50,7 +64,11 @@ const HuecoDeChevron = () => (
   <span class="shrink-0" style={{ width: `${CHEVRON}px` }} aria-hidden="true" />
 );
 
-type Tipo = "archivo" | "carpeta";
+export type Tipo = "archivo" | "carpeta";
+
+/** Una página de una carpeta plegada. `development::PaginaDeCarpeta`. */
+type Pagina = { paths: string[]; folders: Carpeta[]; next: number | null; total: number };
+type Plegada = Pagina & { cargando: boolean; fallo: Failure | null };
 
 const padreDe = (ruta: string) => ruta.slice(0, Math.max(0, ruta.lastIndexOf("/")));
 const nombreDe = (ruta: string) => ruta.slice(ruta.lastIndexOf("/") + 1);
@@ -65,7 +83,14 @@ export default function ArbolDeArchivos(props: {
   visible: boolean;
   /** Sin tarea aún, lee el commit de la rama base en lugar de una copia. */
   preview?: { baseRef?: string };
+  /**
+   * En la vista previa, crear lo nuevo en una tarea que nace vacía para eso.
+   * Sin él, la vista previa no ofrece crear.
+   */
+  crearSinTarea?: (tipo: Tipo, ruta: string) => Promise<void>;
   onAbrir: (ruta: string, cambiado: boolean) => void;
+  /** Double click: the file stays open instead of being the preview. */
+  onAbrirFijo?: (ruta: string, cambiado: boolean) => void;
   /** Un archivo o una carpeta cambió de ruta desde aquí: sus pestañas la siguen. */
   onMovido?: (desde: string, hasta: string) => void;
   /** Se borró desde aquí: sus pestañas ya no tienen qué enseñar. */
@@ -88,12 +113,23 @@ export default function ArbolDeArchivos(props: {
   const [fallo, setFallo] = createSignal<Failure | null>(null);
   const [abiertas, setAbiertas] = createSignal<Set<string>>(new Set());
   const [busca, setBusca] = createSignal("");
+  // Lo cargado de cada carpeta plegada que se abrió, por su ruta.
+  const [plegadas, setPlegadas] = createSignal<Map<string, Plegada>>(new Map());
+  const cargadas = createMemo(() => {
+    const rutas: string[] = [];
+    const subcarpetas: Carpeta[] = [];
+    for (const p of plegadas().values()) {
+      for (const r of p.paths) rutas.push(r);
+      for (const c of p.folders) subcarpetas.push(c);
+    }
+    return { rutas, subcarpetas };
+  });
 
   const nodos = createMemo(() =>
     construir(
-      paths(),
+      [...paths(), ...cargadas().rutas],
       cambios()?.files ?? [],
-      carpetas(),
+      [...carpetas(), ...cargadas().subcarpetas],
       locales(),
       nube(),
     ),
@@ -103,83 +139,172 @@ export default function ArbolDeArchivos(props: {
     busca().trim() ? rutasDeCarpetas(visibles()) : abiertas(),
   );
 
-  async function cargar() {
+  type Archivos = {
+    paths: string[];
+    folders: Carpeta[];
+    truncated: boolean;
+    cloud_only?: string[];
+  };
+
+  // La lista de archivos va por `crearLector` (`treeLoader.ts`): una a la vez,
+  // reintentos solos tras un fallo del transporte y lo último bueno en pantalla
+  // mientras tanto. El estado local y el resumen salen detrás de cada lista buena.
+  function leerArchivos() {
+    if (props.preview) {
+      return invoke<Archivos>("preview_tree_files", { project: props.project, baseRef: props.preview.baseRef });
+    }
+    return invoke<Archivos>("tree_files", { project: props.project, session: props.session, tree: props.arbol }, machineOf(props.session));
+  }
+
+  async function aplicarArchivos(f: Archivos) {
     const turno = ++lectura;
     const vigente = () => turno === lectura;
-    setLeyendoEstado(props.kind === "git");
-    try {
-      type Archivos = {
-        paths: string[];
-        folders: Carpeta[];
-        truncated: boolean;
-        cloud_only?: string[];
-      };
-      const f: Archivos = props.preview
-        ? await invoke<Archivos>("preview_tree_files", { project: props.project, baseRef: props.preview.baseRef })
-        : await invoke<Archivos>("tree_files", { project: props.project, session: props.session, tree: props.arbol });
-      if (!vigente()) return;
-      setPaths(f.paths);
-      setCarpetas(f.folders);
-      setNube(f.cloud_only ?? []);
-      setRecortado(f.truncated);
-      setCargando(false);
-      if (props.kind === "folder" || props.preview) {
-        fijarLocales(new Map());
-        setCambios(null);
-        setFalloEstado(null);
-        setFallo(null);
-        return;
-      }
+    if (!props.preview && !recortado() && !f.truncated) {
+      const fuera = idos(paths(), f.paths);
+      if (fuera.length > 0) avisarDeIdos(props.session, props.arbol, fuera);
+    }
+    setPaths(f.paths);
+    setCarpetas(f.folders);
+    setNube(f.cloud_only ?? []);
+    setRecortado(f.truncated);
+    setCargando(false);
+    setFallo(null);
+    void refrescarPlegadas();
+    if (props.kind === "folder" || props.preview) {
+      fijarLocales(new Map());
+      setCambios(null);
+      setFalloEstado(null);
+      return;
+    }
 
-      setLeyendoEstado(true);
-      try {
-        const leidos = props.kind === "kn"
-          ? localesDeKn(await invoke<CambioKn[]>("kn_status", {
-            project: props.project,
-            session: props.session,
-          }))
-          : localesDeGit(await invoke<EstadoGit[]>("tree_git_status", {
-            project: props.project,
-            session: props.session,
-            tree: props.arbol,
-          }));
-        if (!vigente()) return;
-        fijarLocales(leidos);
-        setFalloEstado(null);
-      } catch (e) {
-        if (!vigente()) return;
-        fijarLocales(new Map());
-        setFalloEstado(asFailure(e));
-      } finally {
-        if (vigente()) setLeyendoEstado(false);
-      }
+    setLeyendoEstado(true);
+    try {
+      const leidos = props.kind === "kn"
+        ? localesDeKn(await invoke<CambioKn[]>("kn_status", {
+          project: props.project,
+          session: props.session,
+        }, machineOf(props.session)))
+        : localesDeGit(await invoke<EstadoGit[]>("tree_git_status", {
+          project: props.project,
+          session: props.session,
+          tree: props.arbol,
+        }, machineOf(props.session)));
+      if (!vigente()) return;
+      fijarLocales(leidos);
+      setFalloEstado(null);
       if (props.kind !== "kn") {
         const c = await invoke<Resumen>("tree_summary", {
           project: props.project,
           session: props.session,
           tree: props.arbol,
-        });
+        }, machineOf(props.session));
         if (!vigente()) return;
         setCambios(c);
       } else {
         setCambios(null);
       }
-
-      setFallo(null);
     } catch (e) {
+      // Los archivos ya están en pantalla: lo que falló es el estado, y se dice
+      // en su sitio, con su «Reintentar», sin tapar el árbol.
       if (!vigente()) return;
-      setFallo(asFailure(e));
+      setFalloEstado(asFailure(e));
     } finally {
-      if (vigente()) {
-        setCargando(false);
-        setLeyendoEstado(false);
-      }
+      if (vigente()) setLeyendoEstado(false);
     }
   }
 
+  const [falloTransitorio, setFalloTransitorio] = createSignal(false);
+  const lector = crearLector<Archivos>({
+    leer: leerArchivos,
+    aplicar: (f) => void aplicarArchivos(f),
+    fallar: (e) => {
+      setFallo(asFailure(e));
+      setFalloTransitorio(esTransitorio(e));
+      setCargando(false);
+    },
+  });
+  const cargar = () => lector.pedir();
+
   onCleanup(() => {
     lectura++;
+    lector.soltar();
   });
+
+  // Volver a la ventana o a esta pestaña con un fallo a medias pide otra vez.
+  onMount(() => {
+    const alVolver = () => {
+      if (props.visible && document.visibilityState === "visible" && lector.pendiente()) lector.pedir();
+    };
+    window.addEventListener("focus", alVolver);
+    document.addEventListener("visibilitychange", alVolver);
+    onCleanup(() => {
+      window.removeEventListener("focus", alVolver);
+      document.removeEventListener("visibilitychange", alVolver);
+    });
+  });
+  createEffect(on(() => props.visible, (visible) => {
+    if (visible && lector.pendiente()) lector.pedir();
+  }, { defer: true }));
+
+  const pedirPagina = (ruta: string, desde: number): Promise<Pagina> =>
+    props.preview
+      ? invoke("preview_tree_folder", { project: props.project, path: ruta, offset: desde })
+      : invoke("tree_folder", { ...ids(), path: ruta, offset: desde }, machineOf(props.session));
+
+  function fijarPlegada(ruta: string, cambio: (antes: Plegada) => Plegada | null) {
+    setPlegadas((prev) => {
+      const m = new Map(prev);
+      const antes = m.get(ruta) ?? { paths: [], folders: [], next: null, total: 0, cargando: false, fallo: null };
+      const despues = cambio(antes);
+      if (despues) m.set(ruta, despues);
+      else m.delete(ruta);
+      return m;
+    });
+  }
+
+  /** La primera página al abrir una carpeta plegada; con `desde`, la siguiente. */
+  async function cargarPlegada(ruta: string, desde = 0) {
+    fijarPlegada(ruta, (p) => ({ ...p, cargando: true, fallo: null }));
+    try {
+      const pagina = await pedirPagina(ruta, desde);
+      fijarPlegada(ruta, (p) => ({
+        paths: desde === 0 ? pagina.paths : [...p.paths, ...pagina.paths],
+        folders: desde === 0 ? pagina.folders : [...p.folders, ...pagina.folders],
+        next: pagina.next,
+        total: pagina.total,
+        cargando: false,
+        fallo: null,
+      }));
+    } catch (e) {
+      fijarPlegada(ruta, (p) => ({ ...p, cargando: false, fallo: asFailure(e) }));
+    }
+  }
+
+  // Al moverse el árbol, lo abierto se vuelve a leer hasta donde se había
+  // llegado; lo cerrado se suelta y se pide de nuevo al abrirlo.
+  async function refrescarPlegadas() {
+    for (const [ruta, p] of plegadas()) {
+      if (p.cargando) continue;
+      if (!abiertas().has(ruta)) {
+        fijarPlegada(ruta, () => null);
+        continue;
+      }
+      const hasta = Math.max(1, p.paths.length + p.folders.length);
+      const leida: Pagina = { paths: [], folders: [], next: 0, total: 0 };
+      try {
+        while (leida.next !== null && leida.paths.length + leida.folders.length < hasta) {
+          const pagina = await pedirPagina(ruta, leida.next);
+          leida.paths.push(...pagina.paths);
+          leida.folders.push(...pagina.folders);
+          leida.next = pagina.next;
+          leida.total = pagina.total;
+        }
+        fijarPlegada(ruta, () => ({ ...leida, cargando: false, fallo: null }));
+      } catch {
+        fijarPlegada(ruta, () => null);
+      }
+    }
+  }
 
   onMount(() => {
     if (!props.preview) void cargar();
@@ -201,12 +326,19 @@ export default function ArbolDeArchivos(props: {
 
   function alternar(ruta: string) {
     const abiertas_ = new Set(abiertas());
-    if (!abiertas_.delete(ruta)) abiertas_.add(ruta);
+    const abre = !abiertas_.delete(ruta);
+    if (abre) abiertas_.add(ruta);
+    // Abrir una carpeta que falló la vuelve a pedir, y con el árbol a medias
+    // también la lista: abrir y cerrar no deja un error viejo puesto.
+    if (abre && plegadas().get(ruta)?.fallo) fijarPlegada(ruta, () => null);
+    if (abre && lector.pendiente()) lector.pedir();
     setAbiertas(abiertas_);
   }
 
-  // La vista previa lee un commit: ahí no hay árbol que escribir.
+  // La vista previa lee un commit: ahí no hay árbol que escribir. Crear sí,
+  // en la tarea que nace para eso (`crearSinTarea`).
   const editable = () => !props.preview;
+  const creable = () => editable() || Boolean(props.crearSinTarea);
   seguirPluginTypst();
   const conOjo = (ruta: string) => !props.preview && conVistaTypst() && esTypst(ruta);
   const [seleccion, setSeleccion] = createSignal<{ ruta: string; tipo: Tipo } | null>(null);
@@ -281,13 +413,18 @@ export default function ArbolDeArchivos(props: {
     const n = nuevo();
     if (!n || nombreInvalido(nombre)) return false;
     const path = unir(n.padre, nombre);
+    const sinTarea = props.preview ? props.crearSinTarea : undefined;
     const hecho = await operar(() =>
-      n.tipo === "archivo"
-        ? invoke("tree_create_file", { ...ids(), path })
-        : invoke("tree_create_folder", { ...ids(), path }),
+      sinTarea
+        ? sinTarea(n.tipo, path)
+        : n.tipo === "archivo"
+          ? invoke("tree_create_file", { ...ids(), path }, machineOf(props.session))
+          : invoke("tree_create_folder", { ...ids(), path }, machineOf(props.session)),
     );
     if (!hecho) return false;
     setNuevo(null);
+    // La tarea que nació abre su árbol y el archivo.
+    if (sinTarea) return true;
     setSeleccion({ ruta: path, tipo: n.tipo });
     if (n.tipo === "archivo") props.onAbrir(path, false);
     return true;
@@ -303,7 +440,7 @@ export default function ArbolDeArchivos(props: {
   async function renombrar(desde: string, nombre: string): Promise<boolean> {
     if (nombreInvalido(nombre)) return false;
     const hasta = unir(padreDe(desde), nombre);
-    const hecho = await operar(() => invoke("tree_rename", { ...ids(), from: desde, to: hasta }));
+    const hecho = await operar(() => invoke("tree_rename", { ...ids(), from: desde, to: hasta }, machineOf(props.session)));
     if (!hecho) return false;
     setRenombrando(null);
     const s = seleccion();
@@ -314,7 +451,7 @@ export default function ArbolDeArchivos(props: {
 
   async function borrar(nodo: Nodo) {
     setMenu(null);
-    const hecho = await operar(() => invoke("tree_delete", { ...ids(), path: nodo.ruta }));
+    const hecho = await operar(() => invoke("tree_delete", { ...ids(), path: nodo.ruta }, machineOf(props.session)));
     if (!hecho) return;
     const s = seleccion();
     if (s && debajoDe(s.ruta, nodo.ruta)) setSeleccion(null);
@@ -346,6 +483,12 @@ export default function ArbolDeArchivos(props: {
 
   // Con el teclado (Mayús+F10, la tecla de menú, Supr) el evento no trae
   // coordenadas: el menú sale pegado a la fila que tiene el foco.
+  /** El editor de Typst a la vista, si es de este árbol: recibe rutas arrastradas o del menú. */
+  const editorTypstAqui = () => {
+    const e = editorTypst();
+    return e && e.session === props.session && e.arbol === props.arbol ? e : null;
+  };
+
   function abrirMenu(e: MouseEvent | KeyboardEvent, nodo: Nodo | null, borrando = false) {
     if (!editable()) return;
     e.preventDefault();
@@ -395,8 +538,52 @@ export default function ArbolDeArchivos(props: {
   }
 
   /** El documento Typst que se compila en esta tarea: el que resolvió la última compilación. */
-  /** El ojo abierto es la elección de la persona: con ella, todo archivo de la tarea se ve junto a su PDF. */
+  /** El ojo abierto es la elección de la persona; sin ella, la vista compila el `main.typ` más cercano. */
   const principalTypst = () => principalElegido(props.project);
+
+  /** Lo que falta de una carpeta plegada abierta: cargando, vacía o «Mostrar más». */
+  function PieDePlegada(p: { ruta: string; hondura: number }) {
+    const estado = () => plegadas().get(p.ruta);
+    const sangria = () => `${p.hondura * SANGRIA + 12 + CHEVRON + 6}px`;
+    const nota = "m-0 py-1 pr-3 text-caption text-neutral-500";
+    createEffect(() => {
+      if (!plegadas().has(p.ruta)) void cargarPlegada(p.ruta);
+    });
+    return (
+      <Show when={estado()}>
+        {(e) => (
+          <>
+            <Show when={e().fallo}>
+              {(f) => (
+                <div class="py-1 pr-3" style={{ "padding-left": sangria() }} role="alert">
+                  <p class="m-0 text-xs text-error-strong">{t("code.tree.folded.failed")}</p>
+                  <FailureNote f={f()} />
+                </div>
+              )}
+            </Show>
+            <Show when={e().cargando}>
+              <p class={nota} style={{ "padding-left": sangria() }}>{t("code.tree.folded.loading")}</p>
+            </Show>
+            <Show when={!e().cargando && !e().fallo && e().total === 0}>
+              <p class={nota} style={{ "padding-left": sangria() }}>{t("code.tree.folded.empty")}</p>
+            </Show>
+            <Show when={!e().cargando && e().next !== null ? e().next : null}>
+              {(desde) => (
+                <button
+                  type="button"
+                  class="w-full py-1 pr-3 text-left text-caption text-primary outline-none hover:underline focus-visible:outline-2 focus-visible:outline-primary"
+                  style={{ "padding-left": sangria() }}
+                  onClick={() => void cargarPlegada(p.ruta, desde())}
+                >
+                  {t("code.tree.folded.more", { count: e().total - desde() })}
+                </button>
+              )}
+            </Show>
+          </>
+        )}
+      </Show>
+    );
+  }
 
   function Fila(p: { nodo: Nodo; hondura: number }) {
     const sangria = () => `${p.hondura * SANGRIA + 12}px`;
@@ -405,7 +592,7 @@ export default function ArbolDeArchivos(props: {
     const abierta = (ruta: string) => abiertasAhora().has(ruta);
     const clasesDeFila = () =>
       cn(
-        "flex w-full items-center gap-1.5 py-1 pr-3 text-left text-[0.75rem] outline-none hover:bg-surface-muted focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
+        "flex w-full items-center gap-1.5 py-1 pr-3 text-left text-label outline-none hover:bg-surface-muted focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
         seleccion()?.ruta === p.nodo.ruta && "bg-surface-muted",
       );
     const campoDeRenombre = (icono: JSX.Element) => (
@@ -431,8 +618,15 @@ export default function ArbolDeArchivos(props: {
                 )}
               >
                 <button
-                  class={clasesDeFila()}
+                  class={cn(clasesDeFila(), c().plegada || c().ignorada ? "opacity-60" : undefined)}
                   style={{ "padding-left": sangria() }}
+                  title={
+                    c().ignorada
+                      ? t("code.tree.folded.ignored")
+                      : c().plegada
+                        ? t("code.tree.folded.dependencies")
+                        : undefined
+                  }
                   aria-expanded={abierta(c().ruta)}
                   onClick={() => {
                     setSeleccion({ ruta: c().ruta, tipo: "carpeta" });
@@ -478,6 +672,9 @@ export default function ArbolDeArchivos(props: {
                 <For each={c().hijos}>
                   {(h) => <Fila nodo={h} hondura={p.hondura + 1} />}
                 </For>
+                <Show when={c().plegada && !busca().trim()}>
+                  <PieDePlegada ruta={c().ruta} hondura={p.hondura + 1} />
+                </Show>
               </Show>
             </>
           )}
@@ -489,7 +686,7 @@ export default function ArbolDeArchivos(props: {
               when={!a().nube}
               fallback={
                 <div
-                  class="flex w-full cursor-default items-center gap-1.5 py-1 pr-3 text-[0.75rem] opacity-60"
+                  class="flex w-full cursor-default items-center gap-1.5 py-1 pr-3 text-label opacity-60"
                   style={{ "padding-left": sangria() }}
                   title={t("code.tree.cloud")}
                   aria-disabled="true"
@@ -512,10 +709,15 @@ export default function ArbolDeArchivos(props: {
                   data-ruta={a().ruta}
                   class={cn(clasesDeFila(), conOjo(a().ruta) && "pr-7")}
                   style={{ "padding-left": sangria() }}
+                  onPointerDown={(e) => {
+                    if (editorTypstAqui()) arrastrarRuta(e, props.session, props.arbol, a().ruta);
+                  }}
                   onClick={() => {
+                    if (fueArrastreDeRuta()) return;
                     setSeleccion({ ruta: a().ruta, tipo: "archivo" });
                     props.onAbrir(a().ruta, Boolean(a().cambio));
                   }}
+                  onDblClick={() => props.onAbrirFijo?.(a().ruta, Boolean(a().cambio))}
                   onContextMenu={(e) => abrirMenu(e, a())}
                   onKeyDown={(e) => teclaDeFila(e, a())}
                 >
@@ -539,7 +741,7 @@ export default function ArbolDeArchivos(props: {
                     {(estado) => (
                       <span
                         class={cn(
-                          "shrink-0 font-mono text-[0.625rem] font-semibold",
+                          "shrink-0 font-mono text-2xs font-semibold",
                           colorDeMarca(estado().marca),
                         )}
                         role="img"
@@ -623,13 +825,13 @@ export default function ArbolDeArchivos(props: {
               class="min-h-7 px-0 py-0 text-xs"
             />
           </label>
-          <Show when={editable()}>
+          <Show when={creable()}>
             <Button
               variant="ghost"
               size="iconCompact"
               class="size-6 text-neutral-500"
               aria-label={t("code.tree.new_file")}
-              title={t("code.tree.new_file")}
+              title={editable() ? t("code.tree.new_file") : t("code.tree.new_file.empty_task")}
               onClick={() => empezarNuevo("archivo")}
             >
               <FilePlus size={14} />
@@ -639,7 +841,7 @@ export default function ArbolDeArchivos(props: {
               size="iconCompact"
               class="size-6 text-neutral-500"
               aria-label={t("code.tree.new_folder")}
-              title={t("code.tree.new_folder")}
+              title={editable() ? t("code.tree.new_folder") : t("code.tree.new_folder.empty_task")}
               onClick={() => empezarNuevo("carpeta")}
             >
               <FolderPlus size={14} />
@@ -679,7 +881,7 @@ export default function ArbolDeArchivos(props: {
             when={visibles().length > 0}
             fallback={
               <Show when={busca().trim()}>
-                <p class="m-0 px-3 py-2 text-[0.6875rem] text-neutral-500">
+                <p class="m-0 px-3 py-2 text-caption text-neutral-500">
                   {t("code.tree.search.empty", { query: busca().trim() })}
                 </p>
               </Show>
@@ -692,7 +894,7 @@ export default function ArbolDeArchivos(props: {
         </div>
 
         <Show when={recortado()}>
-          <p class="m-0 px-3 py-2 text-[0.6875rem] text-neutral-500">
+          <p class="m-0 px-3 py-2 text-caption text-neutral-500">
             {t("code.tree.truncated")}
           </p>
         </Show>
@@ -701,7 +903,25 @@ export default function ArbolDeArchivos(props: {
       <Show when={fallo()}>
         {(f) => (
           <div class="px-3 pb-3">
-            <FailureNote f={f()} />
+            {/* Un plazo vencido no es «reinicia la app»: se dice qué pasó y se ofrece otra vez. */}
+            <Show when={falloTransitorio()} fallback={<FailureNote f={f()} />}>
+              <p class="m-0 py-3 text-ui text-error-strong">{t("code.tree.failed.slow")}</p>
+            </Show>
+            <Button variant="ghost" size="compact" onClick={() => lector.reintentar()}>
+              {t("code.tree.retry")}
+            </Button>
+          </div>
+        )}
+      </Show>
+
+      <Show when={rutaEnVuelo()}>
+        {(v) => (
+          <div
+            class="pointer-events-none fixed z-[90] max-w-64 truncate rounded-md border border-border bg-surface-raised px-2 py-1 font-mono text-xs text-neutral-950 shadow-md"
+            style={{ left: `${v().x + 12}px`, top: `${v().y + 10}px` }}
+            aria-hidden="true"
+          >
+            {nombreDe(v().ruta)}
           </div>
         )}
       </Show>
@@ -754,6 +974,25 @@ export default function ArbolDeArchivos(props: {
                         <>
                           <Show when={nodo().tipo === "carpeta"}>
                             <span class="my-1 block h-px bg-border" />
+                          </Show>
+                          <Show when={nodo().tipo === "archivo" && editorTypstAqui()?.ruta !== nodo().ruta && editorTypstAqui()}>
+                            {(editor) => (
+                              <button
+                                role="menuitem"
+                                class={ITEM_DE_MENU}
+                                onClick={() => {
+                                  setMenu(null);
+                                  pedirInsercionDeRuta({
+                                    session: props.session,
+                                    arbol: props.arbol,
+                                    editor: editor().ruta,
+                                    destino: nodo().ruta,
+                                  });
+                                }}
+                              >
+                                {t("code.tree.insert_path")}
+                              </button>
+                            )}
                           </Show>
                           <button
                             role="menuitem"
@@ -867,7 +1106,7 @@ function CampoDeNombre(props: {
             el.setSelectionRange(0, punto > 0 ? punto : props.inicial.length);
           })
         }
-        class="min-h-6 rounded-sm px-1 py-0 font-mono text-[0.75rem]"
+        class="min-h-6 rounded-sm px-1 py-0 font-mono text-label"
         value={valor()}
         aria-label={props.etiqueta}
         spellcheck={false}

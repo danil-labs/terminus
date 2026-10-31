@@ -35,12 +35,13 @@ export function AccountAvatar(props: { profile: AccountProfile | null; class?: s
 /**
  * La persona y sus acciones. Con `status` (escritorio) sigue al motor por
  * `danil-connect`; sin él (web) la lee una vez de `source`. `refresh: false`
- * no la pide al montar (el pie: el motor ya la pide al arrancar).
+ * no la pide al montar (el pie: el motor ya la pide al arrancar). `watch` la
+ * vuelve a pedir cuando cambia (una sesión de la lista con otra foto).
  */
 export function createAccountIdentity(
   source: AccountProfileSource,
   status?: () => DanilConnectStatus | null,
-  { refresh = true } = {},
+  { refresh = true, watch }: { refresh?: boolean; watch?: () => unknown } = {},
 ) {
   const [profile, setProfile] = createSignal<AccountProfile | null>(null);
   const [busy, setBusy] = createSignal(false);
@@ -54,6 +55,7 @@ export function createAccountIdentity(
   };
 
   if (status) createEffect(on(status, (s) => void show(profileFromStatus(s)).catch(() => {})));
+  if (watch) createEffect(on(watch, () => void show(source.read()).catch(() => {}), { defer: true }));
   onMount(() => {
     if (!refresh) return;
     // En el escritorio esto pide el perfil otra vez: una foto cambiada en la web entra aquí.
@@ -101,7 +103,7 @@ export function AccountIdentityBlock(props: { identity: AccountIdentityState }) 
             {who()}
           </div>
           <Show when={id.profile()?.name && id.profile()?.email}>
-            <div class="min-w-0 truncate text-[0.8125rem] text-neutral-500">{id.profile()?.email}</div>
+            <div class="min-w-0 truncate text-ui text-neutral-500">{id.profile()?.email}</div>
           </Show>
         </div>
         <div class="flex shrink-0 items-center gap-2">
@@ -127,9 +129,9 @@ export function AccountIdentityBlock(props: { identity: AccountIdentityState }) 
           </Show>
         </div>
       </div>
-      <p class="m-0 text-[0.8125rem] text-neutral-500">{t("danil.account.photo_hint")}</p>
+      <p class="m-0 text-ui text-neutral-500">{t("danil.account.photo_hint")}</p>
       <Show when={id.problem()}>
-        {(text) => <p class="m-0 text-[0.8125rem] text-error-strong" role="alert">{text()}</p>}
+        {(text) => <p class="m-0 text-ui text-error-strong" role="alert">{text()}</p>}
       </Show>
     </div>
   );

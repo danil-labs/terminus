@@ -1,6 +1,7 @@
 import Rocket from "lucide-solid/icons/rocket";
 import { For, Show } from "solid-js";
 import { render } from "solid-js/web";
+import { cn } from "../lib/utils";
 import { Button } from "./Button";
 
 export function celebrateFinishedTask(rect: DOMRect) {
@@ -43,12 +44,17 @@ export function FinishTaskButton(props: {
   description: string;
   busy: boolean;
   onFinish: (rect: DOMRect) => void;
+  /** La tarjeta del riel lo pone en línea con la hora, en una línea de 16 px. */
+  compact?: boolean;
 }) {
   return <Button
     type="button"
     variant="ghost"
     size="iconCompact"
-    class="size-6 shrink-0 bg-brand-purple/10 text-brand-purple hover:bg-brand-purple/20 hover:text-brand-purple disabled:opacity-100"
+    class={cn(
+      "shrink-0 bg-brand-purple/10 text-brand-purple hover:bg-brand-purple/20 hover:text-brand-purple disabled:opacity-100",
+      props.compact ? "size-[18px] min-h-0 min-w-0 bg-transparent p-0 hover:bg-transparent" : "size-6",
+    )}
     data-session-finish
     aria-label={props.label}
     title={props.description}
@@ -56,11 +62,11 @@ export function FinishTaskButton(props: {
     disabled={props.busy}
     onClick={event => props.onFinish(event.currentTarget.getBoundingClientRect())}
   >
-    <span class="relative flex size-5 items-center justify-center" aria-hidden="true">
+    <span class={cn("relative flex items-center justify-center", props.compact ? "size-4" : "size-5")} aria-hidden="true">
       <Show when={props.busy}>
         <span class="finish-task-flame absolute h-2 w-1 rounded-full bg-warning" />
       </Show>
-      <Rocket size={15} class="finish-task-rocket relative" />
+      <Rocket size={props.compact ? 13 : 15} class="finish-task-rocket relative" />
     </span>
   </Button>;
 }

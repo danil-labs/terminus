@@ -5,6 +5,7 @@ export const STATUS_ICONS: Record<Exclude<StatusLabel, "working">, LucideName> =
   approving: "shield-question-mark",
   asked: "circle-question-mark",
   failed: "circle-alert",
+  interrupted: "circle-pause",
   unseen: "check",
   delivered: "check",
 };
@@ -26,6 +27,11 @@ export const LUCIDE = {
     { kind: "circle", cx: 12, cy: 12, r: 10 },
     { kind: "line", x1: 12, y1: 8, x2: 12, y2: 12 },
     { kind: "line", x1: 12, y1: 16, x2: 12.01, y2: 16 },
+  ],
+  "circle-pause": [
+    { kind: "circle", cx: 12, cy: 12, r: 10 },
+    { kind: "line", x1: 10, y1: 15, x2: 10, y2: 9 },
+    { kind: "line", x1: 14, y1: 15, x2: 14, y2: 9 },
   ],
   "circle-question-mark": [
     { kind: "circle", cx: 12, cy: 12, r: 10 },

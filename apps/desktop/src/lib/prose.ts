@@ -7,11 +7,8 @@
  * el selector de idioma. Los datos —un repo, una rama, una ruta, la salida de
  * `git`— siguen viajando como texto: no hay nada que traducir en ellos.
  *
- * `Prosa` es `string | Frase` porque la migración va módulo por módulo
- * (`util::Prosa` es el mismo tipo con `serde(untagged)`): una cadena es un
- * módulo sin migrar y se pinta tal cual. Cuando no quede ninguna, `Cruda` se
- * borra en Rust —rompe la compilación en cada sitio que quede— y esta unión se
- * colapsa a `Frase`.
+ * `Prosa` es `string | Frase`: una cadena es un mensaje del motor que aún no
+ * viene por catálogo y se pinta tal cual.
  *
  * Una clave desconocida no puede pasar dentro de un build: catálogo y backend
  * viajan en el mismo binario y `scripts/guards/locales.mjs` falla `pnpm verify` si
@@ -23,6 +20,7 @@
 // Con extensión: estos módulos se cargan también desde `node --test`, que no
 // tiene el resolvedor de Vite (`SYSTEM.md` § De dónde sale cada frase).
 import { t } from "./i18n.ts";
+import { SIN_ESPACIO, textoSinEspacio } from "./no-space.ts";
 
 /** Lo que manda un backend ya migrado. Espeja `util::Frase`. */
 export type Frase = {
@@ -40,5 +38,8 @@ export type Frase = {
 export type Prosa = string | Frase;
 
 export function prosa(p: Prosa): string {
-  return typeof p === "string" ? p : t(p.clave, p.datos);
+  if (typeof p === "string") return p;
+  // Sus cifras llegan en bytes y se pintan con unidad.
+  if (p.clave === SIN_ESPACIO) return textoSinEspacio(p.datos);
+  return t(p.clave, p.datos);
 }

@@ -74,7 +74,7 @@ export default function KeepAwake() {
 
   return (
     <Show when={status()?.supported}>
-      <Popover open={open()} onOpenChange={setOpen} placement="top-end" gutter={6}>
+      <Popover open={open()} onOpenChange={setOpen} placement="bottom-end" gutter={6}>
         <PopoverTrigger
           as={(p: object) => (
             <button
@@ -94,7 +94,7 @@ export default function KeepAwake() {
         <PopoverContent class="w-[280px] p-0">
           <div class="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
             <h2 class="m-0 text-xs font-semibold text-neutral-950">{t("shell.keep_awake.title")}</h2>
-            <span class="text-[0.6875rem] text-neutral-500">
+            <span class="text-caption text-neutral-500">
               {status() ? `${nameOf(status()!.mode)} · ${state()}` : ""}
             </span>
           </div>
@@ -114,8 +114,8 @@ export default function KeepAwake() {
                     </Show>
                   </span>
                   <span class="min-w-0">
-                    <span class="block text-[0.8125rem] text-neutral-950">{nameOf(mode)}</span>
-                    <span class="block text-[0.6875rem] text-neutral-500">{descriptionOf(mode)}</span>
+                    <span class="block text-ui text-neutral-950">{nameOf(mode)}</span>
+                    <span class="block text-caption text-neutral-500">{descriptionOf(mode)}</span>
                   </span>
                 </button>
               )}

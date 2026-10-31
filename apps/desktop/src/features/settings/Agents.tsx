@@ -3,7 +3,7 @@ import Check from "lucide-solid/icons/check";
 import FolderOpen from "lucide-solid/icons/folder-open";
 import Plus from "lucide-solid/icons/plus";
 import X from "lucide-solid/icons/x";
-import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
+import { createSignal, For, type JSX, onCleanup, onMount, Show } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
 import { t } from "../../lib/i18n";
 import { invoke } from "../../lib/invoke.ts";
@@ -61,6 +61,8 @@ export default function Agents(props: {
   /** La carpeta abierta: donde nace por omisión un agente nuevo. */
   proyecto: string;
   onAgentProfile?: (project: string, name: string) => void;
+  /** Lo que sigue a los agentes de este workspace: los de atención a clientes. */
+  after?: JSX.Element;
 }) {
   const [propios, setPropios] = createStore<Fila[]>([]);
   const [delRepositorio, setDelRepositorio] = createStore<FilaDelRepositorio[]>([]);
@@ -438,7 +440,7 @@ export default function Agents(props: {
           });
         }}
       >
-        <div aria-hidden="true" class="px-2 pt-1.5 pb-1 text-[0.6875rem] text-neutral-500">
+        <div aria-hidden="true" class="px-2 pt-1.5 pb-1 text-caption text-neutral-500">
           {t("settings.agents.menu_title", { name: p.fila.agent.name })}
         </div>
         <Show
@@ -590,6 +592,8 @@ export default function Agents(props: {
         }}
       />
 
+      {props.after}
+
       <Dialog
         open={mudanza() !== null}
         onOpenChange={(abierto) => {
@@ -617,10 +621,10 @@ export default function Agents(props: {
                   if (volverA) enfocar(volverA, volverA.replace(/^add:/, "pf:"));
                 }}
               >
-                <DialogTitle class="m-0 text-[15px] font-semibold">
+                <DialogTitle class="m-0 text-lead font-semibold">
                   {t("settings.agents.move_title", { name })}
                 </DialogTitle>
-                <div id="agents-move-body" class="text-[13px] text-neutral-700">
+                <div id="agents-move-body" class="text-ui text-neutral-700">
                   <p class="m-0 mt-2">{t("settings.agents.move_body", { name, home })}</p>
                   <ul class="m-0 mt-2.5 grid list-disc gap-0.5 pl-[18px]">
                     <li>{t("settings.agents.move_stays", { home })}</li>
@@ -670,7 +674,7 @@ function Titulo(p: { name: string; profile: AgentProfile }) {
     <div class="flex min-w-0 flex-wrap items-center gap-2">
       <span>{visible()}</span>
       <Show when={visible() !== p.name}>
-        <span class="font-mono text-[0.6875rem] text-neutral-500">{p.name}</span>
+        <span class="font-mono text-caption text-neutral-500">{p.name}</span>
       </Show>
     </div>
   );
@@ -707,7 +711,7 @@ function AvisoDeAgentes(p: { aviso: Aviso; onCerrar: () => void }) {
       onFocusIn={() => clearTimeout(reloj)}
       onFocusOut={() => programar(3000)}
     >
-      <p class="m-0 text-[0.8125rem] font-semibold">{p.aviso.titulo}</p>
+      <p class="m-0 text-ui font-semibold">{p.aviso.titulo}</p>
       <Show when={p.aviso.cuerpo}>
         <p class="m-0 text-xs text-neutral-700">{p.aviso.cuerpo}</p>
       </Show>

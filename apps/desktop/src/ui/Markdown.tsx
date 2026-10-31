@@ -15,6 +15,7 @@ import {
   onCleanup,
   Show,
   Suspense,
+  useContext,
 } from "solid-js";
 import { SolidMarkdown } from "solid-markdown";
 import { copyText } from "../lib/clipboard";
@@ -26,6 +27,7 @@ import { Button } from "./Button";
 import { EnlargeableImage } from "./EnlargeableImage";
 import { prosaDe } from "./Failure";
 import { FilePreview } from "./FilePreview";
+import { FileMachine } from "./fileMachine";
 import { BordeDeColumna, MarkdownTable } from "./MarkdownTable";
 import { MermaidDiagram } from "./Mermaid";
 import { partidorDeBloques } from "./markdown-blocks";
@@ -205,9 +207,12 @@ const COMPONENTES = {
      Si no viene dentro del mensaje ni del disco, queda su texto
      alternativo — que es lo que el markdown puso ahí para cuando no se
      pueda pintar. */
-  img: (p) => (
+  img: (p) => {
+    // La imagen de una tarea de otra máquina no está en este disco: la lee su motor.
+    const maquina = useContext(FileMachine);
+    return (
     <Show
-      when={imagenInerte(p.src) ?? fuenteLocal(p.src)}
+      when={imagenInerte(p.src) ?? (maquina() ? null : fuenteLocal(p.src))}
       fallback={
         <Show when={localFilePath(p.src)} fallback={<span class="text-neutral-500">{p.alt}</span>}>
           {(ruta) => (
@@ -224,7 +229,8 @@ const COMPONENTES = {
     >
       {(fuente) => <EnlargeableImage src={fuente()} alt={p.alt} />}
     </Show>
-  ),
+    );
+  },
   code: (p) => {
     const nodo = p.node as unknown as MarkdownNode;
     return tieneClase(nodo, "math-inline") ? (
@@ -304,7 +310,7 @@ function CopiarEnlace(props: { destino: string }) {
       </button>
       <Show when={fallo()}>
         {(texto) => (
-          <p role="alert" class="flex max-w-64 items-start gap-2 px-2 py-1.5 text-[0.75rem] text-error-strong">
+          <p role="alert" class="flex max-w-64 items-start gap-2 px-2 py-1.5 text-label text-error-strong">
             <TriangleAlert size={13} class="mt-0.5 shrink-0" />
             {texto()}
           </p>

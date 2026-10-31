@@ -12,6 +12,16 @@ export function linkedWorkspaces(computer: Pick<Computer, "workspaces">): Readon
   return Array.isArray(list) ? new Set(list.filter((id): id is string => typeof id === "string")) : null;
 }
 
+/**
+ * Las funciones que el motor de `computer` anuncia (`status.service_features`
+ * de su último `hello`). Un plano de control que no las dice da ninguna: la
+ * función se apaga, la máquina no se marca desactualizada.
+ */
+export function serviceFeatures(computer: { service_features?: unknown }): string[] {
+  const list = computer.service_features;
+  return Array.isArray(list) ? list.filter((f): f is string => typeof f === "string" && !!f) : [];
+}
+
 /** Si la cuenta tiene al menos un workspace a la vista en alguna de sus computadoras. */
 export function hasLinkedWorkspaces(computers: readonly Pick<Computer, "workspaces">[]): boolean {
   return computers.some((c) => {
@@ -64,6 +74,27 @@ export function callWorkspace(workspace: string | null, args: Readonly<Record<st
 /** Un evento con `workspace` que no está vinculado no llega; uno sin workspace, sí. */
 export function linkedEvent(event: { workspace?: unknown }, linked: ReadonlySet<string> | null): boolean {
   return !linked || typeof event.workspace !== "string" || linked.has(event.workspace);
+}
+
+/**
+ * Los workspaces que nombra una página del relay (en el sobre, en el `payload`
+ * o en las entradas de `attention`) y que `linked` no tiene. El relay ya filtró
+ * la página con la lista vigente: si nombra uno que aquí no está, la lista de
+ * aquí es vieja (se vinculó después de leer `GET /v1/computers`).
+ */
+export function unlinkedWorkspaces(events: readonly { name: string; payload?: unknown; workspace?: unknown }[], linked: ReadonlySet<string> | null): string[] {
+  if (!linked) return [];
+  const named = new Set<string>();
+  const add = (value: unknown) => {
+    const id = value && typeof value === "object" && !Array.isArray(value) ? (value as { workspace?: unknown }).workspace : undefined;
+    if (typeof id === "string" && id && !linked.has(id)) named.add(id);
+  };
+  for (const e of events) {
+    add(e);
+    add(e.payload);
+    if (e.name === "attention" && Array.isArray(e.payload)) for (const entry of e.payload) add(entry);
+  }
+  return [...named];
 }
 
 /**

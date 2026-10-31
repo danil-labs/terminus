@@ -1,5 +1,6 @@
+import { RADIUS } from "@terminus/design";
 import { useState } from "react";
-import { Platform, StyleSheet, Text, useColorScheme, View } from "react-native";
+import { Platform, StyleSheet, Text, View } from "react-native";
 import { useTheme } from "../theme";
 import { WebFrame } from "./WebFrame";
 
@@ -26,7 +27,7 @@ export function scriptLiteral(text: string): string {
 /** Un bloque ```mermaid: el diagrama con mermaid, en su propia página, del color del tema. */
 export function MermaidDiagram({ definition }: { definition: string }) {
   const theme = useTheme();
-  const dark = useColorScheme() === "dark";
+  const dark = useTheme().dark;
   const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="${CSP}">
 <style>html,body{margin:0;background:transparent;color:${theme.text}}#d{padding:8px;overflow-x:auto}#d svg{max-width:100%;height:auto}</style></head>
@@ -56,5 +57,5 @@ export function CodeFallback({ text }: { text: string }) {
 
 const styles = StyleSheet.create({
   block: { alignSelf: "stretch", marginVertical: 4 },
-  mono: { fontFamily: Platform.select({ ios: "Menlo", default: "monospace" }), fontSize: 12.5, lineHeight: 18, padding: 10, borderRadius: 8 },
+  mono: { fontFamily: Platform.select({ ios: "Menlo", default: "monospace" }), fontSize: 12.5, lineHeight: 18, padding: 10, borderRadius: RADIUS.lg },
 });

@@ -1,18 +1,21 @@
 import GitBranch from "lucide-solid/icons/git-branch";
 import { t } from "../../lib/i18n";
-import ArbolDeArchivos from "./FileTree";
+import type { Tipo } from "./FileTree";
+import ArbolDeArchivos from "./FileTreeLazy";
 
 /**
  * La carpeta del proyecto antes de que la tarea exista: el commit del que
  * nacerá su copia de trabajo, con la rama base en la cabecera.
  *
  * Solo elige, como el panel de la tarea (`Code.tsx`): el archivo se lee en una
- * pestaña del centro (`lib/tabs.ts`, `FileViewer.tsx`).
+ * pestaña del centro (`lib/tabs.ts`, `FileViewer.tsx`). Crear un archivo o una
+ * carpeta aquí abre la tarea vacía donde se crean (`onCrear`).
  */
 export default function VistaPreviaDeTarea(props: {
   project: string;
   baseRef?: string;
   visible: boolean;
+  onCrear?: (tipo: Tipo, ruta: string) => Promise<void>;
   onAbrir: (arbol: string, ruta: string, cambiado: boolean) => void;
 }) {
   const branch = () =>
@@ -32,6 +35,7 @@ export default function VistaPreviaDeTarea(props: {
           kind="folder"
           visible={props.visible}
           preview={{ baseRef: props.baseRef }}
+          crearSinTarea={props.onCrear}
           onAbrir={(ruta) => props.onAbrir(ARBOL_DE_VISTA_PREVIA, ruta, false)}
         />
       </div>

@@ -25,6 +25,7 @@ test("el main de producción reenvía la CLI con pipes, archivos, salida descart
     const stub = join(scratch, "app_lib.rs");
     const library = join(scratch, "libapp_lib.rlib");
     writeFileSync(stub, `pub struct Error { pub message_key: &'static str }
+pub fn background_dispatch() {}
 pub fn launch() -> Result<(), Error> { println!("window"); Ok(()) }
 pub fn stop_engine() -> i32 { println!("stop-engine"); 0 }
 `);
@@ -85,6 +86,13 @@ fn main() {
       t.diagnostic(`${roots.size} comandos raíz contrastados con ${lock.release}`);
     });
 
+    for (const rank of ["peer", "worker"]) {
+      const args = ["task", "create", "--as", rank, "--handler", "reviewer", "--json"];
+      const result = run(args);
+      assert.equal(result.status, 23);
+      assert.equal(result.stdout, `${args.join("\n")}\n`);
+    }
+
     const piped = run(["task", "á con espacios", "--json"], { input: "entrada\n" });
     assert.equal(piped.status, 23);
     assert.equal(piped.stdout, "task\ná con espacios\n--json\nentrada\n");
@@ -108,7 +116,7 @@ fn main() {
     assert.equal(streamed.stdout, `chat\n--stream\n${"x".repeat(256 * 1024)}`);
     assert.equal(streamed.stderr, `${"y".repeat(256 * 1024)}engine stderr\n`);
 
-    for (const args of [["--root", "path with spaces", "status"], ["--engine=/tmp/engine", "status"], ["--profile", "desktop-lab", "status"], ["github", "status"], ["github", "install"], ["--instance=123", "status"], ["--instance", "123", "status"], ["--json", "instances"], ["--help"], ["-h"], ["--version"], ["-V"], ["kn", "--help"]]) {
+    for (const args of [["--root", "path with spaces", "status"], ["--engine=/tmp/engine", "status"], ["--profile", "desktop-lab", "status"], ["github", "status"], ["github", "install"], ["--machine=cmp_qa", "activity", "list"], ["--machine", "cmp_qa", "activity", "list"], ["--instance=123", "status"], ["--instance", "123", "status"], ["--json", "instances"], ["--help"], ["-h"], ["--version"], ["-V"], ["kn", "--help"]]) {
       const result = run(args);
       assert.equal(result.status, 23);
       assert.equal(result.stdout, `${args.join("\n")}\n`);

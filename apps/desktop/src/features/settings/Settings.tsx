@@ -1,23 +1,26 @@
 import { invoke } from "../../lib/invoke.ts";
-import Blocks from "lucide-solid/icons/blocks";
-import CircleUserRound from "lucide-solid/icons/circle-user-round";
-import Palette from "lucide-solid/icons/palette";
 import Bot from "lucide-solid/icons/bot";
+import CircleUserRound from "lucide-solid/icons/circle-user-round";
+import ExternalLink from "lucide-solid/icons/external-link";
 import Folders from "lucide-solid/icons/folders";
-import Puzzle from "lucide-solid/icons/puzzle";
-import Radar from "lucide-solid/icons/radar";
-import GitBranch from "lucide-solid/icons/git-branch";
 import Monitor from "lucide-solid/icons/monitor";
+import Plug from "lucide-solid/icons/plug";
+import Shield from "lucide-solid/icons/shield";
 import SlidersHorizontal from "lucide-solid/icons/sliders-horizontal";
 import Sparkles from "lucide-solid/icons/sparkles";
 import { listen } from "../../lib/serviceEvents";
-import { createSignal, For, type JSX, lazy, onCleanup, onMount, Show, Suspense } from "solid-js";
+import { createResource, createSignal, For, type JSX, lazy, onCleanup, onMount, Show, Suspense } from "solid-js";
+import { Dynamic } from "solid-js/web";
 import { capabilities } from "../../lib/platform";
 import { t } from "../../lib/i18n";
+import { flechaDeLista } from "../../lib/shortcuts";
 import { type Superficie } from "../../lib/surfaces";
+import { cn } from "../../lib/utils";
+import { Badge } from "../../ui/Badge";
 import { Button } from "../../ui/Button";
+import { Select } from "../../ui/Select";
 import { Dialog, DialogContent, DialogTitle } from "../../ui/Dialog";
-import { Close, MarcaAgente, MarcaProveedor } from "../../ui/icons";
+import { Close } from "../../ui/icons";
 import {
   Sidebar,
   SidebarContent,
@@ -28,73 +31,49 @@ import {
 } from "../../ui/sidebar";
 import type { ModelChoices } from "../projects/NewAgent";
 import AIProviders from "./AIProviders";
+import ConnectionsOperation from "./ConnectionsOperation";
+import { CustomerAgents, CustomerConnections } from "./CustomerService";
 import Environment from "./Environment";
+import { machines } from "../machines/store";
+import { secretsRoute } from "./secrets-support";
 import General from "./General";
 import type { ContextoDeProyectos } from "./ManageProjects";
-import Plugins from "./Plugins";
+import { NotifyBehavior } from "./NotifyBehavior";
 import Providers from "./Providers";
-import Radiant from "./Radiant";
+import { SETTINGS_ENTRIES, type SettingsEntryId, type SettingsGroup, settingsTarget } from "./settings-entries";
 import Skills from "./Skills";
 import Workspaces from "./Workspaces";
+import { SettingsPanel, SettingsSection } from "./layout";
 // Chunks aparte: solo los carga quien abre la sección.
 const DanilAccount = lazy(() => import("./DanilAccount"));
+const ActivityLogs = lazy(() => import("./ActivityLogs"));
 const Appearance = lazy(() => import("./Appearance"));
+const ManageProjects = lazy(() => import("./ManageProjects"));
+const Agents = lazy(() => import("./Agents"));
+
+/** `/admin` de la web de alfa; el escritorio la abre en el navegador. */
+const ADMIN_URL = "https://alfa-app.danil.ai/admin";
+const Secrets = lazy(() => import("./Secrets"));
 
 /**
- * Configuración: el contenedor y su navegación.
- *
- * El riel agrupa las secciones y solo cambia entre ellas. Así una configuración
- * crece por dentro sin volver a crecer a lo largo del riel.
+ * Configuración: siete entradas, y lo que eran secciones sueltas va en
+ * pestañas dentro de su entrada (`settings-entries.ts`).
  */
 
-type Destino = {
-  id: string;
+/** `panel: null` es una pestaña que la app todavía no tiene: sale con «pronto». */
+type Pestana = { id: string; name: string; panel: (() => JSX.Element) | null };
+
+type Entrada = {
+  id: SettingsEntryId;
+  group: SettingsGroup;
   name: string;
-  /**
-   * La silueta de la sección. Se reconoce antes de leer, y este riel se
-   * recorre a diario. `undefined` deja el hueco a las marcas de agente y
-   * proveedor, que es lo que llena las filas de esas listas.
-   */
-  icono?: () => JSX.Element;
-  /** `null` cuando la app todavía no lo tiene. */
-  panel: (() => JSX.Element) | null;
-  /**
-   * Qué le falta para poder trabajar con esto, en dos palabras, y la frase
-   * entera para el `title`. Los trae `list_surfaces`.
-   *
-   * **Aquí no deshabilitan nada**, y esa es la diferencia con el chat: esta es
-   * justo la pantalla donde se conecta lo que falta, así que apagar el renglón
-   * dejaría el arreglo sin sitio donde hacerse.
-   */
-  marca?: string | null;
-  porque?: string | null;
+  hint: string;
+  icono: () => JSX.Element;
+  tabs: Pestana[];
 };
 
-/**
- * El catálogo de IA viene de Rust: añadir un agente le abre sitio aquí.
- *
- * **Recibe el accesor y no la lista, y eso es carga estructural.** El panel se
- * pinta con `destino().panel?.()`, que es una expresión reactiva: si esta
- * función leyera `superficies()`, `destino()` dependería de ella y **cada
- * refresco de la lista devolvería un objeto nuevo con un `panel` nuevo**, o sea
- * montar `AIProviders` entero desde cero.
- *
- * Sin él: pulsar «Agregar cuenta» emite el evento `account`, la lista se
- * refresca, y el desplegable del proveedor se cierra llevándose el `Accounts` de
- * dentro —con `enCurso`, la URL y el campo del código—. La persona se autentica
- * en el navegador y vuelve a una app sin dónde pegar el código, con el proceso
- * del CLI vivo esperándolo: medido, 36 segundos.
- *
- * Con el accesor, `destino()` deja de depender de la lista: el panel se monta
- * una vez y `AIProviders` recibe el contenido nuevo como prop, que su `Index`
- * aplica sin recrear filas. Cambiar de destino sigue montando uno nuevo, que es
- * lo que esa expresión sí tiene que hacer.
- *
- * `name` es un getter por lo mismo: leído aquí, cambiar de lengua remonta
- * General y su selector relee una lengua que aún no se guardó.
- */
 /** Lo que la sección de agentes necesita de la ventana. Getters: leerlos aquí
- *  haría a `destino()` depender de ellos. */
+ *  haría a `entrada()` depender de ellos. */
 type ContextoDeAgentes = {
   readonly modelos: ModelChoices;
   readonly proyecto: string;
@@ -103,149 +82,120 @@ type ContextoDeAgentes = {
   onAgentProfile: (project: string, name: string) => void;
 };
 
-// Fuera de la carga inicial: solo pesa cuando se abre la página.
-const ManageProjects = lazy(() => import("./ManageProjects"));
-// Como Proyectos: Agentes llega en su propio trozo, fuera de la carga inicial.
-const Agents = lazy(() => import("./Agents"));
-
-const destinosDe = (
+/**
+ * **Recibe el accesor de `superficies` y no la lista, y eso es carga
+ * estructural.** Si leyera la lista, cada refresco de `list_surfaces` daría
+ * pestañas nuevas y remontaría `AIProviders` entero, llevándose a media
+ * autenticación el campo del código de «Agregar cuenta» (medido: 36 s con el
+ * CLI esperando). Los nombres son getters por lo mismo: leídos aquí, cambiar
+ * de lengua remontaría General antes de guardar la lengua.
+ */
+const pestanasDe = (
   superficies: () => Superficie[],
   agentes: ContextoDeAgentes,
   proyectos: ContextoDeProyectos | undefined,
-): Destino[] => [
-  {
-    id: "general",
-    get name() {
-      return t("settings.nav.general");
-    },
-    icono: () => <SlidersHorizontal size={15} />,
-    panel: () => <General />,
-  },
-  {
-    id: "appearance",
-    get name() {
-      return t("settings.nav.appearance");
-    },
-    icono: () => <Palette size={15} />,
-    panel: () => (
-      <Suspense fallback={null}>
-        <Appearance proyecto={agentes.proyecto} />
-      </Suspense>
-    ),
-  },
-  {
-    id: "entorno",
-    get name() {
-      return t("settings.nav.environment");
-    },
-    icono: () => <Monitor size={15} />,
-    panel: () => <Environment />,
-  },
-  // Skills y servidores MCP juntos: los dos los añade la persona y ninguno
-  // lleva credencial de cliente. Separados, «Conexiones» nombraba servidores
-  // MCP sin decirlo y las skills quedaban escondidas dentro de General.
-  {
-    id: "skills",
-    get name() {
-      return t("settings.nav.skills");
-    },
-    icono: () => <Blocks size={15} />,
-    panel: () => <Skills />,
-  },
-  {
-    id: "agentes",
-    get name() {
-      return t("settings.nav.agents");
-    },
-    icono: () => <Bot size={15} />,
-    panel: () => (
+  workspace: () => string | null,
+  activityMachine: () => string | null,
+  workspaceName: () => string | null,
+): Record<string, Pestana | undefined> => {
+  const cuenta = capabilities().danilAccount || capabilities().accountProfile;
+  const tab = (id: string, name: () => string, panel: Pestana["panel"]): Pestana => ({ id, get name() { return name(); }, panel });
+  return {
+    "cuenta-danil": cuenta ? tab("cuenta-danil", () => t("settings.tab.profile"), () => <Suspense fallback={null}><DanilAccount part="profile" /></Suspense>) : undefined,
+    emails: capabilities().accountEmails ? tab("emails", () => t("settings.tab.emails"), () => <Suspense fallback={null}><DanilAccount part="emails" /></Suspense>) : undefined,
+    security: tab("security", () => t("settings.tab.security"), null),
+    general: tab("general", () => t("settings.nav.general"), () => <General />),
+    appearance: tab("appearance", () => t("settings.nav.appearance"), () => <Suspense fallback={null}><Appearance proyecto={agentes.proyecto} /></Suspense>),
+    notify: tab("notify", () => t("settings.tab.notify"), () => <SettingsPanel><SettingsSection title={t("settings.tab.notify")}><NotifyBehavior /></SettingsSection></SettingsPanel>),
+    workspaces: tab("workspaces", () => t("settings.tab.workspace_bar"), () => <Workspaces />),
+    "proveedores-ia": tab("proveedores-ia", () => t("settings.nav.ai_providers"), () => <AIProviders superficies={superficies()} agentesEnUso={agentes.agentesEnUso} />),
+    machines: cuenta ? tab("machines", () => t("settings.tab.machines"), () => <Suspense fallback={null}><DanilAccount part="machines" /></Suspense>) : undefined,
+    entorno: tab("entorno", () => t("settings.nav.environment"), () => <Environment />),
+    activity: tab("activity", () => t("activity.title"), () => <Suspense fallback={null}><ActivityLogs workspace={workspace()} machine={activityMachine()} /></Suspense>),
+    proyectos: tab("proyectos", () => t("settings.tab.folders"), proyectos ? () => <Suspense fallback={null}><ManageProjects contexto={proyectos} /></Suspense> : null),
+    fuentes: tab("fuentes", () => t("settings.nav.sources"), () => <Providers />),
+    secrets: tab("secrets", () => t("settings.tab.secrets"), capabilities().nativeWindow || capabilities().accountCredentials ? () => <Suspense fallback={null}><Secrets /></Suspense> : null),
+    agentes: tab("agentes", () => t("settings.nav.agents"), () => (
       <Suspense fallback={null}>
         <Agents
           modelos={agentes.modelos}
           proyecto={agentes.proyecto}
           onAgentProfile={agentes.onAgentProfile}
+          after={<CustomerAgents workspace={workspaceName} />}
         />
       </Suspense>
-    ),
-  },
-  {
-    id: "proyectos",
-    get name() {
-      return t("settings.nav.projects");
-    },
-    icono: () => <Folders size={15} />,
-    panel: proyectos
-      ? () => (
-          <Suspense fallback={null}>
-            <ManageProjects contexto={proyectos} />
-          </Suspense>
-        )
-      : null,
-  },
-  {
-    id: "plugins",
-    get name() {
-      return t("settings.nav.plugins");
-    },
-    icono: () => <Puzzle size={15} />,
-    panel: () => <Plugins />,
-  },
-  {
-    id: "proveedores-ia",
-    get name() {
-      return t("settings.nav.ai_providers");
-    },
-    icono: () => <Sparkles size={15} />,
-    panel: () => <AIProviders superficies={superficies()} agentesEnUso={agentes.agentesEnUso} />,
-  },
-  {
-    id: "fuentes",
-    get name() {
-      return t("settings.nav.sources");
-    },
-    icono: () => <GitBranch size={15} />,
-    panel: () => <Providers />,
-  },
-  {
-    id: "radiant",
-    get name() {
-      return t("settings.nav.radiant");
-    },
-    icono: () => <Radar size={15} />,
-    panel: () => <Radiant />,
-  },
-  ...(capabilities().danilAccount || capabilities().accountProfile
-    ? [
-        {
-          id: "cuenta-danil",
-          get name() {
-            return t("settings.nav.danil_account");
-          },
-          icono: () => <CircleUserRound size={15} />,
-          panel: () => (
-            <Suspense fallback={null}>
-              <DanilAccount />
-            </Suspense>
-          ),
-        },
-      ]
-    : []),
-];
+    )),
+    skills: tab("skills", () => t("settings.nav.skills"), () => <Skills />),
+    operation: tab("operation", () => t("settings.tab.operation"), () => <ConnectionsOperation workspace={workspace()} />),
+    customers: tab("customers", () => t("settings.tab.customers"), () => <CustomerConnections workspace={workspaceName} />),
+  };
+};
 
-const GRUPOS: { nombre: () => string; ids: string[] }[] = [
-  { nombre: () => t("settings.nav.group_app"), ids: ["general", "appearance", "entorno"] },
-  { nombre: () => t("settings.nav.group_custom"), ids: ["skills", "agentes", "proyectos", "plugins"] },
-  {
-    nombre: () => t("settings.nav.group_connections"),
-    ids: ["cuenta-danil", "proveedores-ia", "fuentes", "radiant"],
-  },
+const ENCABEZADOS: Record<SettingsEntryId, { name: () => string; hint: () => string; icono: () => JSX.Element }> = {
+  account: { name: () => t("settings.entry.account"), hint: () => t("settings.entry.account_hint"), icono: () => <CircleUserRound size={15} /> },
+  preferences: { name: () => t("settings.entry.preferences"), hint: () => t("settings.entry.preferences_hint"), icono: () => <SlidersHorizontal size={15} /> },
+  "ai-accounts": { name: () => t("settings.entry.ai_accounts"), hint: () => t("settings.entry.ai_accounts_hint"), icono: () => <Sparkles size={15} /> },
+  machines: { name: () => t("settings.entry.machines"), hint: () => t("settings.entry.machines_hint"), icono: () => <Monitor size={15} /> },
+  projects: { name: () => t("settings.entry.projects"), hint: () => t("settings.entry.projects_hint"), icono: () => <Folders size={15} /> },
+  "agents-skills": { name: () => t("settings.entry.agents_skills"), hint: () => t("settings.entry.agents_skills_hint"), icono: () => <Bot size={15} /> },
+  connections: { name: () => t("settings.nav.connections"), hint: () => t("settings.entry.connections_hint"), icono: () => <Plug size={15} /> },
+};
+
+/** Una entrada sale si tiene alguna pestaña que ya existe. */
+const entradasDe = (pestanas: Record<string, Pestana | undefined>): Entrada[] =>
+  SETTINGS_ENTRIES.flatMap((e) => {
+    const tabs = e.tabs.flatMap((id) => (pestanas[id] ? [pestanas[id]!] : []));
+    if (!tabs.some((p) => p.panel)) return [];
+    const h = ENCABEZADOS[e.id];
+    return [{ id: e.id, group: e.group, get name() { return h.name(); }, get hint() { return h.hint(); }, icono: h.icono, tabs }];
+  });
+
+const GRUPOS: { id: SettingsGroup; nombre: () => string }[] = [
+  { id: "you", nombre: () => t("settings.nav.group_you") },
+  { id: "workspace", nombre: () => t("settings.nav.group_workspace") },
 ];
 
 const idTab = (id: string) => `cfg-tab-${id}`;
+const idSub = (id: string) => `cfg-sub-${id}`;
+
+/** «Administración ↗»: en la web de alfa, solo para owner y admin; el escritorio no sabe el rol y la ofrece siempre. */
+function AdminLink(props: { workspace: string | null }) {
+  const page = capabilities().adminPage;
+  const [allowed] = createResource(async () => (page ? await page.allowed().catch(() => false) : capabilities().nativeWindow));
+  const open = () => {
+    const query = props.workspace ? `?workspace=${encodeURIComponent(props.workspace)}` : "";
+    if (page) window.location.assign(page.href(props.workspace));
+    else void invoke("open_external", { target: `${ADMIN_URL}${query}` }).catch(() => {});
+  };
+  return (
+    <Show when={allowed()}>
+      <div class="mt-auto border-0 border-t border-solid border-border px-0 pb-3 pl-2 pt-2">
+        <SidebarMenu role="presentation">
+          <SidebarMenuItem role="presentation">
+            <SidebarMenuButton
+              data-settings-admin=""
+              selectionMark={false}
+              class="h-10 min-h-10 grid-cols-[18px_minmax(0,1fr)_auto] gap-2.5 rounded-l-[10px] rounded-r-none border-0 py-0 pl-3.5 pr-3"
+              onClick={open}
+            >
+              <span class="flex size-4 items-center justify-center"><Shield size={15} /></span>
+              <span class="truncate">{t("settings.admin")}</span>
+              <ExternalLink size={13} class="text-neutral-500" />
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </div>
+    </Show>
+  );
+}
 
 export default function Settings(props: {
+  workspace?: string | null;
+  /** Su nombre: con él se avisa si la atención que se ve es de otra cuenta. */
+  workspaceName?: string | null;
+  activityMachine?: string | null;
   onClose: () => void;
-  /** Con qué destino abrir. El menú del riel entra directo a administrar. */
+  /** Con qué entrada o pestaña abrir: un id de `settings-entries.ts`, viejo o nuevo. */
   panel?: string;
   /** Con qué se crea un agente desde Agentes: lo mismo que ofrece el riel. */
   modelos: ModelChoices;
@@ -325,26 +275,32 @@ export default function Settings(props: {
       void pesos.then((f) => f());
     });
   });
-  const TODOS = () =>
-    destinosDe(superficies, {
-      get modelos() {
-        return props.modelos;
-      },
-      get proyecto() {
-        return props.proyecto ?? "";
-      },
-      get agentesEnUso() {
-        return props.agentesEnUso ?? [];
-      },
-      onAgentProfile: (project, name) => props.onAgentProfile?.(project, name),
-    }, props.proyectos);
+  const pestanas = pestanasDe(superficies, {
+    get modelos() {
+      return props.modelos;
+    },
+    get proyecto() {
+      return props.proyecto ?? "";
+    },
+    get agentesEnUso() {
+      return props.agentesEnUso ?? [];
+    },
+    onAgentProfile: (project, name) => props.onAgentProfile?.(project, name),
+  }, props.proyectos, () => props.workspace ?? null, () => props.activityMachine ?? null, () => props.workspaceName ?? null);
+  const ENTRADAS = entradasDe(pestanas);
 
-  const [activo, setActivo] = createSignal(props.panel ?? "general");
+  // Sin soporte del motor activo, Secretos no se ofrece; su enlace directo sí abre el aviso.
+  const pestanaVisible = (p: Pestana) => p.id !== "secrets" || secretsRoute(capabilities().accountCredentials ? "worker" : "engine", machines()) !== "unsupported";
+  const pedido = settingsTarget(props.panel);
+  const inicial = ENTRADAS.find((e) => e.id === pedido?.entry) ?? ENTRADAS[0];
+  const [activo, setActivo] = createSignal<SettingsEntryId>(inicial.id);
+  // La pestaña elegida en cada entrada: volver a una entrada la deja como estaba.
+  const [subs, setSubs] = createSignal<Partial<Record<SettingsEntryId, string>>>(
+    pedido?.tab && inicial.id === pedido.entry && inicial.tabs.some((p) => p.id === pedido.tab && p.panel) ? { [inicial.id]: pedido.tab } : {},
+  );
   let hoja: HTMLDivElement | undefined;
-  // El foco viaja con las flechas sin arrastrar la selección: así se puede
-  // recorrer la lista entera —incluidos los que aún no existen, que sí se
-  // enfocan y anuncian por qué no— sin cambiar de panel en cada paso.
-  const [foco, setFoco] = createSignal("general");
+  // El foco viaja con las flechas sin arrastrar la selección.
+  const [foco, setFoco] = createSignal<SettingsEntryId>(inicial.id);
   onMount(() => {
     const alTeclear = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -363,17 +319,29 @@ export default function Settings(props: {
     window.addEventListener("keydown", alTeclear, true);
     onCleanup(() => window.removeEventListener("keydown", alTeclear, true));
   });
+  // Con la hoja ya abierta, `panel` no vuelve a leerse: un enlace interno («Iniciar sesión» en Secretos) cambia de destino por aquí.
+  onMount(() => {
+    const alPedir = (e: Event) => {
+      const id = (e as CustomEvent<unknown>).detail;
+      const target = settingsTarget(typeof id === "string" ? id : undefined);
+      const d = ENTRADAS.find((x) => x.id === target?.entry);
+      if (!d) return;
+      if (target?.tab) setSubs((s) => ({ ...s, [d.id]: target.tab! }));
+      abrir(d);
+    };
+    window.addEventListener("harness:open-settings", alPedir);
+    onCleanup(() => window.removeEventListener("harness:open-settings", alPedir));
+  });
 
   function mover(paso: number | "inicio" | "fin") {
-    const destinos = TODOS();
-    const i = destinos.findIndex((d) => d.id === foco());
+    const i = ENTRADAS.findIndex((d) => d.id === foco());
     const j =
       paso === "inicio"
         ? 0
         : paso === "fin"
-          ? destinos.length - 1
-          : (i + paso + destinos.length) % destinos.length;
-    const id = destinos[j].id;
+          ? ENTRADAS.length - 1
+          : (i + paso + ENTRADAS.length) % ENTRADAS.length;
+    const id = ENTRADAS[j].id;
     setFoco(id);
     document.getElementById(idTab(id))?.focus();
   }
@@ -391,27 +359,37 @@ export default function Settings(props: {
     mover(paso);
   }
 
-  function abrir(d: Destino) {
+  function abrir(d: Entrada) {
     setFoco(d.id);
     // WebKit no le da el foco a un botón al pulsarlo, así que sin esto el
-    // primer clic deja las flechas sin punto de partida: se pulsa un destino,
-    // se pulsa abajo, y no se mueve nada.
+    // primer clic deja las flechas sin punto de partida.
     document.getElementById(idTab(d.id))?.focus({ focusVisible: false } as FocusOptions);
-    if (d.panel) setActivo(d.id);
+    setActivo(d.id);
   }
 
-  function Fila(p: { d: Destino }) {
-    const existe = () => p.d.panel !== null;
-    // **Lo que falta se ve aquí, porque dejó de verse en el chat.** Su menú
-    // ofrece solo lo utilizable, así que este riel es el único sitio donde se
-    // descubre que algo existe y qué le falta para poder usarse.
-    const marca = () =>
-      !existe()
-        ? { texto: t("settings.nav.soon"), porque: t("settings.nav.soon_why") }
-        : p.d.marca
-          ? { texto: p.d.marca, porque: p.d.porque ?? undefined }
-          : null;
+  const entrada = () => ENTRADAS.find((d) => d.id === activo()) ?? ENTRADAS[0];
+  const pestana = () => {
+    const e = entrada();
+    return e.tabs.find((p) => p.id === subs()[e.id] && p.panel) ?? e.tabs.find((p) => p.panel && pestanaVisible(p))!;
+  };
+  const elegir = (p: Pestana) => {
+    if (p.panel) setSubs((antes) => ({ ...antes, [entrada().id]: p.id }));
+  };
 
+  // Las flechas mueven entre pestañas, que es lo que un `tablist` promete.
+  function moverPestana(e: KeyboardEvent) {
+    if (!flechaDeLista(e)) return;
+    const paso = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+    if (paso === 0) return;
+    e.preventDefault();
+    const usables = entrada().tabs.filter((p) => p.panel && pestanaVisible(p));
+    const i = usables.findIndex((p) => p.id === pestana().id);
+    const siguiente = usables[(i + paso + usables.length) % usables.length];
+    elegir(siguiente);
+    document.getElementById(idSub(siguiente.id))?.focus();
+  }
+
+  function Fila(p: { d: Entrada }) {
     return (
       <SidebarMenuItem role="presentation">
         <SidebarMenuButton
@@ -419,102 +397,73 @@ export default function Settings(props: {
           role="tab"
           aria-selected={activo() === p.d.id}
           aria-controls="cfg-panel"
-          aria-disabled={existe() ? undefined : true}
           tabindex={foco() === p.d.id ? 0 : -1}
           isActive={activo() === p.d.id}
           selectionMark={false}
-          title={marca()?.porque}
-          // El fondo del activo vive en el átomo. En este riel basta junto con
-          // el peso del nombre: la barra de acento pertenece a la navegación
-          // principal y aquí duplicaba una señal sobre una lista corta.
-          // **Apagada por color y no por opacidad**, y no es una preferencia:
-          // el 45 % se aplicaba a la fila entera, así que se llevaba por delante
-          // la palabra que dice POR QUÉ está apagada. «pronto» medía **1,77:1 en
-          // claro y 1,72:1 en oscuro** —la peor medición de toda la revisión de
-          // diseño, y simétrica: no la salvaba ningún tema—, y el nombre de la
-          // fila quedaba en 3,04 y 4,33. Una fila apagada que no se puede leer
-          // no dice que no está disponible: dice nada.
-          //
-          // `neutral-500` es el gris de lo secundario del sistema y pasa AA en
-          // las cuatro superficies de los dos temas. Lo que marca «no
-          // disponible» sigue estando: el cursor, `aria-disabled`, la ausencia
-          // de hover y el propio rótulo.
-          class="pestana-fundida h-10 min-h-10 grid-cols-[18px_minmax(0,1fr)_auto] gap-2.5 rounded-l-[10px] rounded-r-none border-0 py-0 pl-3.5 pr-3 focus-visible:outline-offset-[-2px] data-[active=true]:bg-surface data-[active=true]:font-semibold data-[active=true]:hover:bg-surface aria-disabled:cursor-default aria-disabled:text-neutral-500 aria-disabled:hover:bg-transparent"
+          // El fondo del activo vive en el átomo; la barra de acento pertenece a
+          // la navegación principal y aquí duplicaba una señal sobre una lista corta.
+          class="pestana-fundida h-10 min-h-10 grid-cols-[18px_minmax(0,1fr)] gap-2.5 rounded-l-[10px] rounded-r-none border-0 py-0 pl-3.5 pr-3 focus-visible:outline-offset-[-2px] data-[active=true]:bg-surface data-[active=true]:font-semibold data-[active=true]:hover:bg-surface"
           onClick={() => abrir(p.d)}
           onKeyDown={teclas}
         >
-          {/* Su marca, cuando la hay. Reconocer «Claude» o «GitHub» por su
-              silueta es más rápido que leer, y esta lista se recorre a diario.
-              Los que no tienen —Jira, Confluence, Opencode— dejan el hueco: un
-              símbolo inventado afirmaría de quién es algo que no sabemos. */}
-          <Show
-            when={p.d.icono}
-            fallback={
-              <span class="flex size-4 items-center justify-center text-neutral-950">
-                <MarcaAgente id={p.d.id} size={15} />
-                <MarcaProveedor id={p.d.id} size={15} />
-              </span>
-            }
-          >
-            {/* Sin color propio: hereda el del botón, que ya sale de `@theme` y
-                se invierte con el tema. Clavado, el icono desaparece en oscuro. */}
-            {(icono) => (
-              <span class="flex size-4 items-center justify-center">
-                {icono()()}
-              </span>
-            )}
-          </Show>
+          {/* Sin color propio: hereda el del botón, que sale de `@theme` y se
+              invierte con el tema. */}
+          <span class="flex size-4 items-center justify-center">{p.d.icono()}</span>
           <span class="truncate">{p.d.name}</span>
-          <Show when={marca()}>
-            {(m) => (
-              <span class="ui-sidebar-menu-badge text-[0.625rem] font-normal text-neutral-500">
-                {m().texto}
-              </span>
-            )}
-          </Show>
         </SidebarMenuButton>
       </SidebarMenuItem>
     );
   }
 
-  const destino = () => TODOS().find((d) => d.id === activo()) ?? TODOS()[0];
-
   return (
     <Dialog open onOpenChange={(abierto) => !abierto && props.onClose()}>
         <DialogContent
-          // **880×640 era un tope por debajo de la ventana**, así que la hoja
-          // nacía tocándolo: con la ventana por omisión —1000×720, menos los
-          // 24 px del margen del diálogo por lado— el área útil ya es 952×672, y
-          // agrandar la ventana no daba ni un píxel más. Medido a 1440×900 y a
-          // 1512×982: la hoja seguía en 880×640.
-          //
-          // El ancho conserva tope porque el panel de la derecha es prosa y
-          // controles: pasado el ancho de una columna legible, estirarlo no
-          // añade nada. El alto sí crece con la ventana, porque lo que crece
-          // aquí es el riel — un agente más es una fila más.
+          // El ancho conserva tope porque el panel es prosa y controles; el alto
+          // crece con la ventana.
           ref={hoja}
           class="flex h-[min(900px,100%)] w-[min(1120px,100%)] max-w-[1120px] flex-col overflow-hidden p-0"
           aria-label={t("settings.title")}
         >
-          {/* **La fila tiene que ser `minmax(0,1fr)` y no la implícita.** Sin
-              declararla, `grid-auto-rows: auto` la dimensiona por su contenido:
-              el riel medía lo que sumaban sus grupos, crecía por debajo del
-              fondo de la hoja —163 px a 720×520— y se llevaba el pie con él. Y
-              como el `SidebarContent` heredaba esa altura, su `overflow-y-auto`
-              no tenía nada que desplazar: `scrollHeight` era igual a
-              `clientHeight`. Acotar la fila es lo que hace que el riel se
-              desplace; el `overflow` por sí solo no hacía nada. */}
-          <div class="grid min-h-0 flex-1 grid-cols-[224px_minmax(0,1fr)] grid-rows-[minmax(0,1fr)]">
+          {/* **La fila tiene que ser `minmax(0,1fr)` y no la implícita.** Con
+              `grid-auto-rows: auto` el riel crece por debajo de la hoja y su
+              `overflow-y-auto` no tiene nada que desplazar. */}
+          <div class="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)] md:grid-cols-[224px_minmax(0,1fr)] md:grid-rows-[minmax(0,1fr)]">
+            <header class="grid gap-3 border-b border-border bg-rail px-4 py-3 md:hidden">
+              <div class="flex items-center justify-between gap-3">
+                <DialogTitle class="m-0 text-lead font-semibold">{t("settings.title")}</DialogTitle>
+                <Button variant="ghost" size="iconCompact" onClick={props.onClose} aria-label={t("settings.close")}>
+                  <Close size={16} />
+                </Button>
+              </div>
+              <Select
+                aria-label={t("settings.nav.label")}
+                value={activo()}
+                onChange={(event) => {
+                  const id = event.currentTarget.value as SettingsEntryId;
+                  setFoco(id);
+                  setActivo(id);
+                }}
+              >
+                <For each={GRUPOS}>{(group) => (
+                  <optgroup label={group.nombre()}>
+                    <For each={ENTRADAS.filter((entry) => entry.group === group.id)}>
+                      {(entry) => <option value={entry.id}>{entry.name}</option>}
+                    </For>
+                  </optgroup>
+                )}</For>
+              </Select>
+              <AdminLink workspace={props.workspaceName ?? null} />
+            </header>
             <Sidebar
               role="tablist"
               aria-orientation="vertical"
               aria-label={t("settings.nav.label")}
-              class="border-0 bg-rail"
+              class="hidden border-0 bg-rail md:grid"
             >
               <SidebarHeader class="pb-6 pl-5 pr-3 pt-4">
-                <DialogTitle class="m-0 text-[0.9375rem] font-semibold">
+                <h2 class="m-0 text-lead font-semibold">
                   {t("settings.title")}
-                </DialogTitle>
+                </h2>
               </SidebarHeader>
 
               {/* Sin barra visible: su canal separaba la pestaña activa del panel
@@ -522,50 +471,80 @@ export default function Settings(props: {
               <SidebarContent class="flex flex-col gap-6 overflow-y-auto px-0 pb-4 pl-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 <For each={GRUPOS}>
                   {(g) => (
-                    <div role="presentation" class="flex flex-col gap-3">
-                      <p class="m-0 px-3 text-xs text-neutral-500">{g.nombre()}</p>
-                      <SidebarMenu role="presentation" class="gap-1.5">
-                        <For each={g.ids}>
-                          {(id) => (
-                            <Show when={TODOS().find((d) => d.id === id)}>
-                              {(d) => <Fila d={d()} />}
-                            </Show>
-                          )}
-                        </For>
-                      </SidebarMenu>
-                    </div>
+                    <Show when={ENTRADAS.some((e) => e.group === g.id)}>
+                      <div role="presentation" class="flex flex-col gap-3">
+                        <p class="m-0 px-3 text-xs text-neutral-500">{g.nombre()}</p>
+                        <SidebarMenu role="presentation" class="gap-1.5">
+                          <For each={ENTRADAS.filter((e) => e.group === g.id)}>{(d) => <Fila d={d} />}</For>
+                        </SidebarMenu>
+                      </div>
+                    </Show>
                   )}
                 </For>
               </SidebarContent>
+              <AdminLink workspace={props.workspaceName ?? null} />
             </Sidebar>
 
             <div class="relative min-h-0 min-w-0 bg-surface">
               <Button
                 variant="ghost"
                 size="iconCompact"
-                class="absolute right-8 top-3 z-10 size-7"
+                class="absolute right-8 top-3 z-10 hidden size-7 md:inline-flex"
                 onClick={props.onClose}
                 aria-label={t("settings.close")}
               >
                 <Close size={16} />
               </Button>
-            {/* Sin franja de título: el renglón activo del sidebar ya nombra lo
-                que hay aquí, y repetirlo arriba es el rótulo redundante que
-                el sistema visual descarta.
-
-                `destino().panel?.()` vive dentro de una expresión reactiva:
-                cambiar de destino la vuelve a evaluar y monta el panel que
-                corresponde, sin conservar las cuentas del anterior. */}
-            <div
-              id="cfg-panel"
-              role="tabpanel"
-              aria-labelledby={activo() === "workspaces" ? undefined : idTab(destino().id)}
-              class="h-full min-w-0 overflow-auto px-8 pb-10 pt-[76px]"
-            >
-              <Show when={activo() === "workspaces"} fallback={destino().panel?.()}>
-                <Workspaces />
-              </Show>
-            </div>
+              {/* Cada panel debe montarse como componente: invocarlo aquí
+                  metería sus señales en el efecto de selección y lo repintaría
+                  cuando cambian sus propios controles. */}
+              <div
+                id="cfg-panel"
+                role="tabpanel"
+                aria-labelledby={idTab(entrada().id)}
+                class="h-full min-w-0 overflow-auto px-4 pb-10 pt-5 md:px-8 md:pt-6"
+              >
+                <header class="mb-6 grid gap-0.5 pr-10">
+                  <h2 class="m-0 text-lg font-semibold">{entrada().name}</h2>
+                  <p class="m-0 text-ui text-neutral-500">{entrada().hint}</p>
+                </header>
+                <Show when={entrada().tabs.length > 1}>
+                  <div
+                    role="tablist"
+                    aria-label={entrada().name}
+                    onKeyDown={moverPestana}
+                    class="mb-6 flex items-end gap-5 overflow-x-auto border-0 border-b border-solid border-border"
+                  >
+                    <For each={entrada().tabs.filter(pestanaVisible)}>
+                      {(p) => (
+                        <button
+                          type="button"
+                          role="tab"
+                          id={idSub(p.id)}
+                          aria-selected={pestana().id === p.id}
+                          aria-controls="cfg-subpanel"
+                          aria-disabled={p.panel ? undefined : true}
+                          title={p.panel ? undefined : t("settings.nav.soon_why")}
+                          tabindex={pestana().id === p.id ? 0 : -1}
+                          onClick={() => elegir(p)}
+                          class={cn(
+                            "-mb-px inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap border-0 border-b-2 border-solid border-transparent bg-transparent px-0 pt-0 pb-2 text-sm text-neutral-500 hover:text-neutral-950 aria-disabled:cursor-default aria-disabled:hover:text-neutral-500",
+                            pestana().id === p.id && "border-neutral-950 font-semibold text-neutral-950",
+                          )}
+                        >
+                          {p.name}
+                          <Show when={!p.panel}>
+                            <Badge forma="dato">{t("settings.nav.soon")}</Badge>
+                          </Show>
+                        </button>
+                      )}
+                    </For>
+                  </div>
+                </Show>
+                <div id="cfg-subpanel" role={entrada().tabs.length > 1 ? "tabpanel" : undefined} aria-labelledby={entrada().tabs.length > 1 ? idSub(pestana().id) : undefined} class="min-w-0">
+                  <Dynamic component={pestana().panel ?? (() => null)} />
+                </div>
+              </div>
             </div>
           </div>
       </DialogContent>

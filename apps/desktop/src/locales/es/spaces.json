@@ -1,14 +1,5 @@
 {
-  "spaces.archived.deleted": "eliminada",
-  "spaces.archived.empty": "No hay tareas archivadas.",
-  "spaces.archived.foot_title": "Todas las tareas archivadas del workspace, de todos los espacios",
-  "spaces.archived.no_match": "Ninguna tarea archivada coincide.",
-  "spaces.archived.search": "Buscar por título, proyecto o espacio",
-  "spaces.archived.subtitle": {
-    "one": "Todos los proyectos y espacios · 1 tarea",
-    "other": "Todos los proyectos y espacios · {count} tareas"
-  },
-  "spaces.archived.title": "Archivadas",
+  "spaces.order.error": "No se pudo guardar el orden de los espacios. Inténtalo de nuevo.",
   "spaces.bar.label": "Espacios de {workspace}",
   "spaces.default_name": "Espacio 1",
   "spaces.delete.archive_and_delete": {

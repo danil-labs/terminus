@@ -4,17 +4,28 @@ import { taskCard } from "../src/index.ts";
 
 const row = { id: "t1", title: "Tarea", esperando: false, folder: "p1", agent: "Ada", last_message: "¿Borro la rama?" };
 
-test("si te necesita, la línea 2 es lo que pide", () => {
+test("si te necesita lo dice su estado; la tarjeta no lleva lo que pide", () => {
   const card = taskCard({ ...row, esperando: true }, { live: [], approving: [] });
   assert.equal(card.state, "asked");
   assert.equal(card.needsYou, true);
-  assert.equal(card.request, "¿Borro la rama?");
+  assert.equal("request" in card, false);
 });
 
-test("si no, carpeta, agente y máquina; el chat del agente no repite su cara", () => {
-  const card = taskCard({ ...row, machine: "Mac", machine_on: false }, { live: ["t1"], approving: [] });
+test("una fallida te necesita; una que detuviste tiene su propio estado y no te necesita", () => {
+  const failed = taskCard({ ...row, outcome: "failed" as const }, { live: [], approving: [] });
+  assert.equal(failed.state, "failed");
+  assert.equal(failed.needsYou, true);
+  const stopped = taskCard({ ...row, outcome: "interrupted" as const, sin_ver: true }, { live: [], approving: [] });
+  assert.equal(stopped.state, "interrupted", "detenida va antes que sin ver");
+  assert.equal(stopped.needsYou, false);
+  assert.equal(stopped.delivered, false);
+});
+
+test("si no, proveedor, carpeta, máquina y agente; el chat del agente no repite su cara", () => {
+  const card = taskCard({ ...row, provider: "claude", machine: "Mac", machine_on: false }, { live: ["t1"], approving: [] });
+  assert.equal(card.provider, "claude");
+  assert.equal(taskCard(row, { live: [], approving: [] }).machine, null);
   assert.equal(card.state, "working");
-  assert.equal(card.request, null);
   assert.equal(card.folder, "p1");
   assert.equal(card.agent, "Ada");
   assert.deepEqual(card.machine, { id: "Mac", on: false });

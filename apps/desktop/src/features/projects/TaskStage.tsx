@@ -73,7 +73,7 @@ export default function EtapaDeTarea(props: {
       {(e) => (
         <span
           class={cn(
-            "shrink-0 text-[0.6875rem] leading-none font-medium",
+            "shrink-0 text-caption leading-none font-medium",
             e().clase,
             props.class,
           )}

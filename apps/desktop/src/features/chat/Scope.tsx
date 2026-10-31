@@ -6,6 +6,7 @@ import {
   createSignal,
   type JSX,
 } from "solid-js";
+import type { InvokeOptions } from "@tauri-apps/api/core";
 import { invoke } from "../../lib/invoke.ts";
 import { t } from "../../lib/i18n";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -95,7 +96,7 @@ function Panel(props: { children: JSX.Element }) {
       tabindex="-1"
       // Portado a `<body>`, así que no hereda el tamaño ni el color de la fila:
       // lo que allí venía del contenedor, aquí hay que decirlo.
-      class="w-[300px] overflow-hidden p-0 text-[0.6875rem] text-neutral-500 shadow-lg"
+      class="w-[300px] overflow-hidden p-0 text-caption text-neutral-500 shadow-lg"
       onOpenAutoFocus={(e: Event) => {
         e.preventDefault();
         queueMicrotask(() => {
@@ -115,6 +116,9 @@ export default function Alcance(props: {
   /** Lo que se lee en el botón de añadir, después del `+`. */
   agregar: string;
   items: Source[];
+  materialOptions?: InvokeOptions;
+  materialTarget: string;
+  materialAvailable: boolean;
   /**
    * Le llega el id de la fuente que quedó en el workspace. **Rechaza si el
    * material entró pero no se pudo traer a la tarea**, y entonces este panel se
@@ -250,11 +254,13 @@ export default function Alcance(props: {
    * repositorio ya no está en el disco, si la copia no se pudo clonar. Cerrando
    * a ciegas, ese fallo se leía como que había funcionado.
    */
-  async function traer(fn: () => Promise<{ id: string }>) {
+  async function traer(fn: () => Promise<{ id: string }>, target = props.materialTarget) {
     setOcupado(true);
     setFallo(null);
     try {
+      if (!props.materialAvailable) throw { what: t("projects.context.task_unavailable") };
       const s = await fn();
+      if (target !== props.materialTarget) throw { what: t("projects.context.target_changed") };
       await props.onTraer(s.id);
       cerrar();
     } catch (e) {
@@ -274,7 +280,7 @@ export default function Alcance(props: {
         // chip; preguntarla aquí sería decidir dos veces lo mismo.
         branch: r.branch || undefined,
         name: r.name,
-      }),
+      }, props.materialOptions),
     );
 
   /**
@@ -291,20 +297,25 @@ export default function Alcance(props: {
   const traerEscrito = () => {
     const t = url().trim();
     if (!t) return;
+    const options = props.materialOptions;
     if (esDireccionWeb(t)) {
       return void traer(() =>
-        invoke<{ id: string }>("add_repo_url", { cloneUrl: t }),
+        invoke<{ id: string }>("add_repo_url", { cloneUrl: t }, options),
       );
     }
-    void traer(() => invoke<{ id: string }>("add_folder", { locator: t }));
+    void traer(() => invoke<{ id: string }>("add_folder", { locator: t }, options));
   };
 
   async function traerCarpeta() {
+    const target = props.materialTarget;
+    const options = props.materialOptions;
     setFallo(null);
     try {
+      if (!props.materialAvailable) throw { what: t("projects.context.task_unavailable") };
       const ruta = await open({ directory: true, multiple: false });
       if (typeof ruta !== "string") return;
-      await traer(() => invoke<{ id: string }>("add_folder", { locator: ruta }));
+      if (target !== props.materialTarget) throw { what: t("projects.context.target_changed") };
+      await traer(() => invoke<{ id: string }>("add_folder", { locator: ruta }, options), target);
     } catch (e) {
       decir(e);
     }
@@ -335,7 +346,7 @@ export default function Alcance(props: {
       />
       <input
         ref={enfocar}
-        class="w-full bg-transparent py-1 pr-2 pl-6 text-[0.6875rem] outline-none"
+        class="w-full bg-transparent py-1 pr-2 pl-6 text-caption outline-none"
         placeholder={marcador}
         value={busca()}
         onInput={(e) => setBusca(e.currentTarget.value)}
@@ -376,7 +387,7 @@ export default function Alcance(props: {
     // tener una fuente, la forma de añadir contexto o código no existía en
     // pantalla: vivía dentro del menú del `+` de la caja, donde hay que ir a
     // buscarla sabiendo ya que está.
-    <div class="flex flex-wrap items-center gap-1.5 px-1 pb-1 text-[0.6875rem] text-neutral-500">
+    <div class="flex flex-wrap items-center gap-1.5 px-1 pb-1 text-caption text-neutral-500">
       <span class="shrink-0">{props.rotulo}:</span>
 
       <For each={props.items}>
@@ -692,7 +703,7 @@ export default function Alcance(props: {
                   >
                     <input
                       ref={enfocar}
-                      class="min-w-0 flex-1 rounded-sm border border-border bg-transparent px-2 py-1 font-mono text-[0.6875rem] outline-none focus:border-border-strong"
+                      class="min-w-0 flex-1 rounded-sm border border-border bg-transparent px-2 py-1 font-mono text-caption outline-none focus:border-border-strong"
                       placeholder={t("chat.scope.address_or_path_placeholder")}
                       value={url()}
                       onInput={(e) => setUrl(e.currentTarget.value)}

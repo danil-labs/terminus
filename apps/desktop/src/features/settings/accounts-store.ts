@@ -12,6 +12,7 @@ import { legible, type Query, type Read } from "../../lib/limits";
 import { t } from "../../lib/i18n";
 import type { Failure } from "../../ui/Failure";
 import { detalleDe } from "../../ui/Failure";
+import { machineOf } from "../machines/store";
 
 export type Account = {
   id: string;
@@ -29,6 +30,12 @@ export type Account = {
    * consultar tampoco la tiene. Ahí la etiqueta es lo único que queda.
    */
   identity: string | null;
+  /**
+   * Identidad estable del workspace o la suscripción, cuando el motor la conoce.
+   * OpenCode publica el id de su organización: dos cuentas con el mismo correo
+   * y plan siguen separadas si pertenecen a organizaciones distintas.
+   */
+  credential_group?: string | null;
   /** Si alguna vez terminó bien una conexión. No se borra al perder la credencial. */
   authenticated_at: number | null;
   /** En la web con varias máquinas: dónde tiene sesión esta misma cuenta. */
@@ -86,6 +93,8 @@ export type AccountStatus = {
    * disco y no del llavero.
    */
   unreadable?: Failure;
+  /** La sesión quedó guardada pero el proveedor todavía no le dio de alta el servicio a la cuenta; `url` es la página que lo completa. */
+  signup?: { url: string | null };
 };
 
 /**
@@ -187,7 +196,7 @@ export function createAccountLimit(props: {
         provider: props.agent,
         id: props.id,
         force,
-      });
+      }, machineOf(props.id));
       setEstado(r);
       const buena = legible(r);
       if (buena) setUltimo(buena);

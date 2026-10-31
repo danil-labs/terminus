@@ -22,7 +22,7 @@ export type Project = {
   // Se calcula al leer; crear o quitar .git puede cambiarlo sin modificar el proyecto guardado.
   kind: "git" | "folder";
   cloud?: "google_drive" | "one_drive" | "icloud" | "dropbox" | "box" | "other" | null;
-  // Las máquinas con su carpeta, cuando el panel junta varias (`web/fleet.ts`).
+  // Las máquinas con su carpeta, cuando el panel junta varias (`@terminus/fleet`).
   machines?: string[];
   // El remoto del que otra máquina lo clona; un motor anterior no lo dice.
   remote_url?: string | null;
@@ -228,6 +228,60 @@ export type CreatedHandler = {
 export type HandlerList = {
   agents: HandlerDefinition[];
   rechazados: { origin: string; reason: string }[];
+};
+
+export type HandlerMemory = {
+  name: string;
+  source: string;
+  key: string;
+  identity: string;
+  scope_source: string;
+  reach: string;
+  store: string | { slot: string };
+  dir: string | null;
+  identity_dir?: string;
+  synced: boolean;
+  across_projects: boolean;
+  status: "ok" | "external" | "synced-by-name" | "legacy-by-name" | "in-doubt" | "unavailable";
+  reason?: string;
+  entries: number;
+  legacy?: string;
+  legacy_entries?: number;
+  server?: string;
+};
+
+export type HandlerRequest = {
+  kind: "mcp" | "memory" | "tools" | "network";
+  slot?: string;
+  access?: string;
+  why?: string | null;
+  name?: string;
+  host?: string;
+  state: "approved" | "requested_not_granted" | "requested_not_managed";
+  server?: string;
+  granted_access?: string;
+  allowed_tools?: string[];
+  reason?: string;
+};
+
+export type HandlerRequests = {
+  handler: string;
+  source: string;
+  key: string;
+  digest: string | null;
+  dirty: boolean;
+  approval: { digest: string; at: number; by: string; revoked_at: number | null } | null;
+  stale: string | null;
+  requests: HandlerRequest[];
+};
+
+export type HandlerApproval = { mcp?: string; tool?: string; "accept-hints"?: string };
+export type HandlerRelease = {
+  handler: string | null;
+  identity: string;
+  released: boolean;
+  quarantine: Record<string, unknown> | null;
+  digest: string | null;
 };
 
 // Estos estados no distinguen pensar de ejecutar herramientas.

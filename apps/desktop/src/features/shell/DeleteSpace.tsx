@@ -12,6 +12,7 @@ import {
   type TaskSeen,
 } from "../../lib/spaces";
 import { invoke } from "../../lib/invoke.ts";
+import { machineOf } from "../machines/store";
 import type { Project } from "../../lib/model";
 import { Button } from "../../ui/Button";
 import { Dialog, DialogContent, DialogTitle } from "../../ui/Dialog";
@@ -33,7 +34,7 @@ export default function DeleteSpace(props: {
   onTocadas: (folders: string[]) => void;
 }) {
   const [previa, { mutate }] = createResource(() => props.space.id, (id) =>
-    invoke<DeletePreview>("space_delete_preview", { id }),
+    invoke<DeletePreview>("space_delete_preview", { id }, machineOf(id)),
   );
   const [marcas, setMarcas] = createSignal(new Map<string, "new" | "changed">());
   const [fallos, setFallos] = createSignal<{ task: string; title: string; error: Failure }[]>([]);
@@ -51,7 +52,7 @@ export default function DeleteSpace(props: {
   const carpeta = (id: string) => props.proyectos.find((p) => p.id === id)?.name ?? id;
   const nombre = () => spaceName(props.space);
 
-  const releer = () => invoke<DeletePreview>("space_delete_preview", { id: props.space.id });
+  const releer = () => invoke<DeletePreview>("space_delete_preview", { id: props.space.id }, machineOf(props.space.id));
 
   const confirmar = async () => {
     const vista = previa();
@@ -63,7 +64,7 @@ export default function DeleteSpace(props: {
       const salida = await invoke<DeleteOutcome>("delete_space", {
         id: props.space.id,
         seen: { tasks: vista.tasks, discard: sinCommitear().length > 0 },
-      });
+      }, machineOf(props.space.id));
       if (salida.deleted) {
         props.onEliminada(enviadas.size);
         return;
@@ -94,17 +95,17 @@ export default function DeleteSpace(props: {
     return (
       <li class="grid min-h-12 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 rounded-md border border-border bg-surface px-3 py-1.5" data-delete-row={p.s.task}>
         <div class="grid min-w-0">
-          <span class="flex min-w-0 items-center gap-2 text-[0.8125rem] font-medium text-neutral-950">
+          <span class="flex min-w-0 items-center gap-2 text-ui font-medium text-neutral-950">
             <span class="truncate" title={p.s.title}>{p.s.title || p.s.task}</span>
             <Show when={marca()}>
               {(m) => (
-                <span data-delete-mark={m()} class="shrink-0 rounded-sm bg-neutral-950 px-1.5 text-[0.6875rem] leading-4 font-semibold text-neutral-50">
+                <span data-delete-mark={m()} class="shrink-0 rounded-sm bg-neutral-950 px-1.5 text-caption leading-4 font-semibold text-neutral-50">
                   {m() === "new" ? t("spaces.delete.mark_new") : t("spaces.delete.mark_changed")}
                 </span>
               )}
             </Show>
           </span>
-          <span class="truncate text-[0.6875rem] text-neutral-500">{carpeta(p.s.folder)}</span>
+          <span class="truncate text-caption text-neutral-500">{carpeta(p.s.folder)}</span>
         </div>
         <span class="text-xs text-neutral-700">{p.extra}</span>
         <Button
@@ -122,7 +123,7 @@ export default function DeleteSpace(props: {
   const Seccion = (p: { icono: JSX.Element; titulo: string; porque: string; filas: TaskSeen[]; extra?: (s: TaskSeen) => JSX.Element; clave: string }) => (
     <Show when={p.filas.length > 0}>
       <section class="grid gap-1.5" data-delete-section={p.clave}>
-        <h3 class="m-0 flex items-center gap-2 text-[0.8125rem] font-semibold text-neutral-950">{p.icono}{p.titulo}</h3>
+        <h3 class="m-0 flex items-center gap-2 text-ui font-semibold text-neutral-950">{p.icono}{p.titulo}</h3>
         <p class="m-0 text-xs text-neutral-700">{p.porque}</p>
         <ul class="m-0 grid list-none gap-1.5 p-0">
           <For each={p.filas}>{(s) => <Fila s={s} extra={p.extra?.(s)} />}</For>
@@ -150,11 +151,11 @@ export default function DeleteSpace(props: {
           setTimeout(() => cancelar?.focus(), 0);
         }}
       >
-        <DialogTitle class="m-0 px-5 pt-5 pb-2 text-[0.9375rem] font-semibold">
+        <DialogTitle class="m-0 px-5 pt-5 pb-2 text-lead font-semibold">
           {t("spaces.delete.title", { name: nombre() })}
         </DialogTitle>
         <div class="grid min-h-0 flex-1 gap-4 overflow-y-auto px-5 pb-4" aria-busy={previa.loading || borrando()}>
-          <p id="delete-space-what-happens" class="m-0 text-[0.8125rem] leading-relaxed text-neutral-700">
+          <p id="delete-space-what-happens" class="m-0 text-ui leading-relaxed text-neutral-700">
             <Show when={previa()} fallback={t("spaces.delete.reading")}>
               {tareas().length > 0 ? t("spaces.delete.body", { count: tareas().length }) : t("spaces.delete.body_empty")}
             </Show>
@@ -168,19 +169,19 @@ export default function DeleteSpace(props: {
               class="grid grid-cols-[16px_minmax(0,1fr)] gap-x-2 rounded-md border border-border-strong bg-surface-raised p-3 outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             >
               <FileWarning size={16} aria-hidden="true" class="mt-0.5 text-error-strong" />
-              <b class="text-[0.8125rem] text-neutral-950">{t("spaces.delete.changed_title")}</b>
+              <b class="text-ui text-neutral-950">{t("spaces.delete.changed_title")}</b>
               <span class="col-start-2 text-xs text-neutral-700">{t("spaces.delete.changed_body")}</span>
             </div>
           </Show>
           <Show when={fallos().length > 0}>
             <section class="grid gap-1.5" data-delete-failures="">
-              <h3 class="m-0 text-[0.8125rem] font-semibold text-error-strong">{t("spaces.delete.failed_title", { count: fallos().length })}</h3>
+              <h3 class="m-0 text-ui font-semibold text-error-strong">{t("spaces.delete.failed_title", { count: fallos().length })}</h3>
               <p class="m-0 text-xs text-neutral-700">{t("spaces.delete.failed_body")}</p>
               <ul class="m-0 grid list-none gap-1 p-0">
                 <For each={fallos()}>
                   {(f) => (
                     <li class="rounded-md border border-error-strong px-3">
-                      <span class="block pt-2 text-[0.8125rem] font-medium text-neutral-950">{f.title}</span>
+                      <span class="block pt-2 text-ui font-medium text-neutral-950">{f.title}</span>
                       <FailureNote f={f.error} />
                     </li>
                   )}

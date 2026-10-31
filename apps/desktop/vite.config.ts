@@ -60,7 +60,7 @@ function webBuild(serve: boolean): UserConfig {
   const endpoint = origin(env.TERMINUS_WEB_ENDPOINT || "https://computers.danil.ai");
   const supabaseUrl = origin(env.TERMINUS_WEB_SUPABASE_URL);
   const supabaseKey = (env.TERMINUS_WEB_SUPABASE_KEY ?? "").trim();
-  const login = env.TERMINUS_WEB_LOGIN || "/";
+  const login = env.TERMINUS_WEB_LOGIN || `${base}auth`;
   const extra = (env.TERMINUS_WEB_CONNECT ?? "").replace(/[^\w:/.* -]/g, " ").split(/\s+/).filter(Boolean);
   const connect = [endpoint, endpoint.replace(/^http/, "ws"), supabaseUrl, ...extra].filter(Boolean).join(" ");
   const version = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8")).version as string;
@@ -102,9 +102,14 @@ function webBuild(serve: boolean): UserConfig {
     base,
     define: {
       __TERMINUS_VERSION__: JSON.stringify(version),
-      __TERMINUS_WEB__: JSON.stringify({ endpoint, supabaseUrl, supabaseKey, login }),
+      __TERMINUS_WEB__: JSON.stringify({ endpoint, supabaseUrl, supabaseKey, login, alphaOauth: env.TERMINUS_WEB_ALPHA_OAUTH === "1", workos: env.TERMINUS_WEB_WORKOS === "1" }),
+      "import.meta.env.TERMINUS_ALPHA": JSON.stringify(env.TERMINUS_WEB_ALPHA === "1"),
+      "import.meta.env.TERMINUS_BROADCAST_WRITES": JSON.stringify(env.TERMINUS_WEB_BROADCAST_WRITES === "1"),
+      "import.meta.env.TERMINUS_BROADCAST_DELIVERY": JSON.stringify(env.TERMINUS_WEB_BROADCAST_DELIVERY === "1"),
     },
     plugins: [page],
+    // Los iconos de la pestaña solo los usa la web; la ventana de escritorio no los copia.
+    publicDir: fileURLToPath(new URL("./web-public/", import.meta.url)),
     build: {
       outDir,
       emptyOutDir: true,
@@ -122,6 +127,9 @@ const desktop: UserConfig = {
   // el `@theme` de `src/styles/global.css` y este plugin es todo el cableado.
   plugins: [solid(), tailwindcss(), excalidrawFonts()],
   define: { __TERMINUS_CONTRACT__: CONTRACT },
+  // noVNC (la pantalla de una VM) usa `await` de nivel superior. Solo lo carga
+  // su trozo perezoso: un webview sin soporte falla al abrir esa pestaña, no la app.
+  esbuild: { supported: { "top-level-await": true } },
   clearScreen: false,
   // **Sin esto la ventana sale en blanco en desarrollo, y sin un solo error.**
   //

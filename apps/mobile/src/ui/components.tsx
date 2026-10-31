@@ -1,3 +1,4 @@
+import { RADIUS, TEXT } from "@terminus/design";
 import { router } from "expo-router";
 import type { ReactNode } from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
@@ -55,7 +56,7 @@ export function Row({
           {title}
         </Text>
         {typeof subtitle === "string" ? (
-          <Text numberOfLines={1} style={{ color: theme.textMuted, fontSize: 13 }}>
+          <Text numberOfLines={1} style={{ color: theme.textMuted, fontSize: TEXT.ui }}>
             {subtitle}
           </Text>
         ) : (
@@ -87,18 +88,18 @@ export function openTask(host: string, workspace: string, folder: string, id: st
 }
 
 /** La vista previa de una tarea (mantener pulsada su tarjeta). */
-export function openPreview(host: string, id: string) {
-  router.push({ pathname: "/preview", params: { host, id } });
+export function openPreview(host: string, id: string, intent?: "finish") {
+  router.push({ pathname: "/preview", params: { host, id, ...(intent ? { intent } : {}) } });
 }
 
 const styles = StyleSheet.create({
   avatar: { alignItems: "center", justifyContent: "center" },
   sheetTitle: { fontSize: 20, fontWeight: "700", paddingHorizontal: 16, paddingTop: 16, paddingBottom: 4 },
-  section: { paddingHorizontal: 16, paddingTop: 18, paddingBottom: 6, fontSize: 13, fontWeight: "700" },
+  section: { paddingHorizontal: 16, paddingTop: 18, paddingBottom: 6, fontSize: TEXT.ui, fontWeight: "700" },
   row: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingVertical: 9 },
   rowBody: { flex: 1, gap: 2 },
   rowTitle: { fontSize: 16 },
   badge: { minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 6, alignItems: "center", justifyContent: "center" },
-  badgeText: { color: "#fff", fontSize: 12, fontWeight: "700" },
-  dot: { width: 8, height: 8, borderRadius: 4 },
+  badgeText: { color: "#fff", fontSize: TEXT.label, fontWeight: "700" },
+  dot: { width: 8, height: 8, borderRadius: RADIUS.sm },
 });

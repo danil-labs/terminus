@@ -1,10 +1,14 @@
-import { Show, createSignal, onCleanup, onMount } from "solid-js";
+import { Show, createSignal, lazy, onCleanup, onMount } from "solid-js";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { Button } from "../../ui/Button";
 import { Toast } from "../../ui/Toast";
 import { t } from "../../lib/i18n";
 import { invoke } from "../../lib/invoke.ts";
-import { stopTurns } from "./CloseGuard";
+import { waitingThen } from "./liveTurns";
+
+/** Elegir qué hacer con las tareas vivas solo hace falta con una versión lista: va aparte de la carga inicial. */
+const Aplicar = lazy(() => import("./restartWait").then((m) => ({ default: m.Aplicar })));
+const EsperaDeTareas = lazy(() => import("./restartWait").then((m) => ({ default: m.EsperaDeTareas })));
 
 /** El reinicio requiere una acción de la persona; descartar dura hasta otra versión. */
 const CADA = 30 * 60 * 1000;
@@ -111,21 +115,21 @@ export default function AvisoDeVersion() {
           <Button variant="ghost" size="compact" onClick={() => setAlDia(false)}>{t("shell.update.later")}</Button>
         </Toast>
       </Show>
-      <Show when={instalada() && !instaladaVista() && !hay()}>
+      <Show when={waitingThen()}>
+        <EsperaDeTareas />
+      </Show>
+      <Show when={instalada() && !instaladaVista() && !hay() && !waitingThen()}>
         <Toast>
           <p class="m-0 text-xs text-neutral-500">{t("shell.update.installed")}</p>
           <div class="flex flex-wrap gap-1.5">
-            <Aplicar />
-            <Button variant="ghost" size="compact" onClick={() => setInstaladaVista(true)}>
-              {t("shell.update.later")}
-            </Button>
+            <Aplicar onLater={() => setInstaladaVista(true)} />
           </div>
         </Toast>
       </Show>
-      <Show when={hay()}>
+      <Show when={waitingThen() ? null : hay()}>
         {(u) => (
           <Toast>
-            <p class="m-0 text-[0.8125rem] font-semibold">
+            <p class="m-0 text-ui font-semibold">
               {t("shell.update.available", { version: u().version })}
             </p>
 
@@ -165,51 +169,17 @@ export default function AvisoDeVersion() {
                 {t("shell.update.ready")}
               </p>
               <div class="flex flex-wrap gap-1.5">
-                <Aplicar />
+                <Aplicar
+                  onLater={() => {
+                    setDescartadas((d) => [...d, u().version]);
+                    setHay(null);
+                    setInstaladaVista(true);
+                  }}
+                />
               </div>
             </Show>
           </Toast>
         )}
-      </Show>
-    </>
-  );
-}
-
-type LiveTurn = { session: string; workspace: string; project: string; started_at: number; shell?: { id: string; command: string } };
-
-/**
- * Reiniciar aplica la ventana nueva; el motor nuevo entra cuando el viejo queda
- * sin trabajo. Con tareas vivas se dice cuántas y se ofrece detenerlas ya.
- */
-function Aplicar() {
-  const [vivas, setVivas] = createSignal<LiveTurn[]>([]);
-  async function mirar() {
-    const turnos = (await invoke("list_live_turns").catch(() => [])) as LiveTurn[];
-    setVivas(turnos);
-  }
-  onMount(() => {
-    void mirar();
-    const reloj = setInterval(() => void mirar(), 10_000);
-    onCleanup(() => clearInterval(reloj));
-  });
-  async function detenerYAplicar() {
-    await stopTurns(vivas());
-    void invoke("restart_app");
-  }
-  return (
-    <>
-      <Show when={vivas().length > 0}>
-        <p class="m-0 basis-full text-xs text-neutral-500">
-          {t("shell.update.waiting_tasks", { count: vivas().length })}
-        </p>
-      </Show>
-      <Button variant="secondary" size="compact" onClick={() => void invoke("restart_app")}>
-        {t("shell.update.restart")}
-      </Button>
-      <Show when={vivas().length > 0}>
-        <Button variant="ghost" size="compact" onClick={() => void detenerYAplicar()}>
-          {t("shell.update.stop_and_apply")}
-        </Button>
       </Show>
     </>
   );

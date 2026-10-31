@@ -1,18 +1,21 @@
-import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
+import { For, Show, Suspense, createSignal, lazy, onCleanup, onMount } from "solid-js";
 import { listen } from "../../lib/serviceEvents";
 import { invoke } from "../../lib/invoke.ts";
-import Plug from "lucide-solid/icons/plug";
 import { Button } from "../../ui/Button";
 import { Textarea } from "../../ui/Textarea";
 import { FailureNote, asFailure, type Failure } from "../../ui/Failure";
 import { cn } from "../../lib/utils";
-import { MarcaProveedor } from "../../ui/icons";
+import { MarcaProveedor, McpMark } from "../../ui/icons";
 import { t } from "../../lib/i18n";
 import { prosa, type Frase } from "../../lib/prose";
 import { ITEM_DE_MENU, Popover, PopoverContent, PopoverTrigger } from "../../ui/Popover";
 import { Badge } from "../../ui/Badge";
 import { lockedBy } from "../../lib/governance";
 import { GovernedNotice } from "./Governed";
+
+// Fuera de la carga inicial: este archivo también da el vistazo del riel.
+const CredentialsInUse = lazy(() => import("./credentials/AccountCredentials").then((m) => ({ default: m.CredentialsInUse })));
+const LocalKeysBanner = lazy(() => import("./credentials/AccountCredentials").then((m) => ({ default: m.LocalKeysBanner })));
 import {
   mcpLoginUrl,
   mcpPendingSignIn,
@@ -96,6 +99,16 @@ type AgenteMcp = {
 };
 
 /**
+ * Los remotos con cuenta los autoriza el motor, una vez para todos los agentes
+ * (`mcp_oauth`): una sola sesión, sin filas por agente. Solo los locales traen
+ * `escuchando`.
+ */
+const autorizaElMotor = (c: Conocido) => c.pide_sesion && c.escuchando === undefined;
+
+/** La clave de `enCurso` del inicio de sesión del motor, que no es de ningún agente. */
+const MOTOR = "motor";
+
+/**
  * El estado de un servidor en una palabra y un color, para ver de un vistazo.
  * Las clases son las del sistema —`tag`, `tag puesto`, `tag pendiente`, `tag
  * repo`, `tag falta`—: verde significa lo mismo aquí que en Proveedores.
@@ -123,6 +136,13 @@ function estado(
   // que la persona puede arreglar, y decirlo así lleva a la acción correcta.
   if (c.escuchando === false)
     return { texto: t("settings.tools.state.silent"), tono: "danger" };
+  if (autorizaElMotor(c)) {
+    if ((c.sesiones ?? []).length === 0)
+      return { texto: t("settings.tools.state.needs_login"), tono: "warning" };
+    if (salud && salud !== "listo" && salud !== "pide-sesion")
+      return { texto: t("settings.tools.state.silent"), tono: "danger" };
+    return { texto: t("settings.tools.state.connected"), tono: "success" };
+  }
   if (salud === "listo")
     return { texto: t("settings.tools.state.ready"), tono: "success" };
   // «Pide sesión» lo pregunta la app, que no tiene credencial: un servidor de
@@ -205,8 +225,10 @@ export default function Herramientas(props: { solo?: string | string[] }) {
     setEnCurso((s) => new Set(s).add(k));
     setFallo(null);
     temporizadores.set(k, window.setTimeout(() => quitarEnCurso(k), 120_000));
+    // La del motor no es de un agente: `provider` solo dice quién la pidió.
+    const provider = agentId === MOTOR ? (reciben()[0]?.id ?? "") : agentId;
     try {
-      const m = await invoke<Frase>("mcp_login", { provider: agentId, id: servicioId });
+      const m = await invoke<Frase>("mcp_login", { provider, id: servicioId });
       setAviso(prosa(m));
     } catch (e) {
       setFallo(asFailure(e));
@@ -371,11 +393,16 @@ export default function Herramientas(props: { solo?: string | string[] }) {
     setFallo(null);
     try {
       if (c.conectado) {
+        // Quitar revoca también la sesión del motor: es la de todos los agentes.
         await invoke("disconnect_known_mcp", { id: c.id });
       } else {
         await invoke("connect_known_mcp", { id: c.id });
       }
       await cargar();
+      // Conectar uno con cuenta abre ya su inicio de sesión: sin él no sirve.
+      const ahora = conocidos().find((x) => x.id === c.id);
+      if (!c.conectado && ahora && autorizaElMotor(ahora) && (ahora.sesiones ?? []).length === 0)
+        void iniciarSesion(MOTOR, c.id);
     } catch (e) {
       setFallo(asFailure(e));
     } finally {
@@ -461,6 +488,10 @@ export default function Herramientas(props: { solo?: string | string[] }) {
               const chip = () => estado(c(), salud()[c().id]);
               /** Un local con la app cerrada. `undefined` en los remotos. */
               const muerta = () => c().escuchando === false;
+              /** Con la sesión del motor la tarjeta dice «conectado» y nada más. */
+              const listaYa = () => autorizaElMotor(c()) && c().conectado && (c().sesiones ?? []).length > 0;
+              const requiere = () => (listaYa() ? null : c().requiere);
+              const despues = () => c().conectado && !listaYa();
 
               return (
                 <li class="grid grid-cols-[minmax(0,1fr)] gap-1.5 rounded-md border border-border bg-surface-raised px-3 py-2.5">
@@ -470,7 +501,7 @@ export default function Herramientas(props: { solo?: string | string[] }) {
                         `name` — el camino lo dice el control de abajo. */}
                     {/* Base propia, no `flex-1`: con base cero el nombre se
                         encogía hasta «F…» en vez de bajar el chip. */}
-                    <span class="flex min-w-0 flex-[1_1_10rem] items-center gap-2 text-[0.8125rem] font-semibold">
+                    <span class="flex min-w-0 flex-[1_1_10rem] items-center gap-2 text-ui font-semibold">
                       <MarcaProveedor id={formas[0].grupo} size={16} />
                       <span class="truncate">{formas[0].name}</span>
                     </span>
@@ -482,6 +513,50 @@ export default function Herramientas(props: { solo?: string | string[] }) {
                     >
                       {chip().texto}
                     </Badge>
+                    {/* Sin sesión del motor, iniciarla es lo que falta. Mientras
+                        dura se puede abrir la página si el navegador no se
+                        abrió solo, o cancelar. */}
+                    <Show when={autorizaElMotor(c()) && c().conectado && (c().sesiones ?? []).length === 0}>
+                      <Show
+                        when={enCurso().has(claveLogin(MOTOR, c().id))}
+                        fallback={
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            class="shrink-0"
+                            onClick={() => void iniciarSesion(MOTOR, c().id)}
+                          >
+                            {t("settings.tools.login")}
+                          </Button>
+                        }
+                      >
+                        <span class="flex shrink-0 items-center gap-1">
+                          <Show
+                            when={urlDeLogin()}
+                            fallback={<span class="text-xs text-neutral-500">{t("settings.tools.opening")}</span>}
+                          >
+                            {(u) => (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                class="px-2 text-xs"
+                                onClick={() => void invoke("open_external", { target: u() })}
+                              >
+                                {t("settings.tools.open_login")}
+                              </Button>
+                            )}
+                          </Show>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            class="px-2 text-xs text-neutral-500"
+                            onClick={() => quitarEnCurso(claveLogin(MOTOR, c().id))}
+                          >
+                            {t("settings.tools.cancel_login")}
+                          </Button>
+                        </span>
+                      </Show>
+                    </Show>
                     {/* Ni conectar ni quitar son acciones del agente: ninguno
                         va en morado. La forma la da la jerarquía: conectar es
                         la acción de la fila y quitar es lo que se hace una
@@ -550,15 +625,15 @@ export default function Herramientas(props: { solo?: string | string[] }) {
                       no esté conectado, en gris: sin conectar no pasa nada, es
                       un requisito más, y en ámbar competiría con la tarjeta
                       que sí funciona. */}
-                  <Show when={c().requiere || c().conectado || muerta()}>
+                  <Show when={requiere() || despues() || muerta()}>
                     <div class="grid gap-1 text-xs text-neutral-500">
-                      <Show when={c().requiere}>
+                      <Show when={requiere()}>
                         {(q) => <p class="m-0">{prosa(q())}</p>}
                       </Show>
                       <Show when={muerta() && !c().conectado}>
                         <p class="m-0">{t("settings.tools.dead_before")}</p>
                       </Show>
-                      <Show when={c().conectado}>
+                      <Show when={despues()}>
                         <p class="m-0">{prosa(c().despues)}</p>
                       </Show>
                     </div>
@@ -617,9 +692,9 @@ export default function Herramientas(props: { solo?: string | string[] }) {
                       dicen lo que va a pasar cuando el agente lo use. En
                       `ghost` el botón conserva el alto y el sitio de la fila
                       sin gritar. */}
-                  <Show when={c().conectado && c().pide_sesion && reciben().length > 0}>
+                  <Show when={c().conectado && c().pide_sesion && !autorizaElMotor(c()) && reciben().length > 0}>
                     <div class="mt-0.5 grid gap-1 border-t border-border pt-2">
-                      <p class="m-0 text-[0.6875rem] font-medium uppercase tracking-wide text-neutral-500">
+                      <p class="m-0 text-caption font-medium uppercase tracking-wide text-neutral-500">
                         {t("settings.tools.session")}
                       </p>
                       <For each={reciben()}>
@@ -738,7 +813,7 @@ export default function Herramientas(props: { solo?: string | string[] }) {
       <Show when={!props.solo}>
         <section class="grid grid-cols-[minmax(0,1fr)] gap-2">
           <div class="flex items-center justify-between gap-2">
-            <h3 class="m-0 text-[0.8125rem] font-semibold">{t("settings.tools.others")}</h3>
+            <h3 class="m-0 text-ui font-semibold">{t("settings.tools.others")}</h3>
             <Button
               variant="ghost"
               size="sm"
@@ -759,7 +834,7 @@ export default function Herramientas(props: { solo?: string | string[] }) {
               </p>
               <Textarea
                 rows={4}
-                class="font-mono text-[0.6875rem]"
+                class="font-mono text-caption"
                 value={bloque()}
                 onInput={(e) => setBloque(e.currentTarget.value)}
               />
@@ -793,10 +868,10 @@ export default function Herramientas(props: { solo?: string | string[] }) {
                         `shrink-0` ensanchaba la pantalla y sacaba «Quitar» de
                         la hoja. Lo que no cabe se corta; entera en `title`. */}
                     <span class="grid min-w-0 flex-1 gap-0.5">
-                      <span class="truncate text-[0.8125rem] font-semibold">{p.name}</span>
+                      <span class="truncate text-ui font-semibold">{p.name}</span>
                       {/* De dónde sale, nunca su credencial. */}
                       <span
-                        class="truncate font-mono text-[0.6875rem] text-neutral-500"
+                        class="truncate font-mono text-caption text-neutral-500"
                         title={p.detalle || undefined}
                       >
                         {p.detalle || t("settings.tools.no_source")}
@@ -826,6 +901,13 @@ export default function Herramientas(props: { solo?: string | string[] }) {
             </ul>
           </Show>
         </section>
+      </Show>
+
+      <Show when={!props.solo}>
+        <Suspense fallback={null}>
+          <LocalKeysBanner kinds={["mcp_secret"]} />
+          <CredentialsInUse kinds={["mcp_secret"]} title={t("danil.credentials.mcp_title")} />
+        </Suspense>
       </Show>
 
       {/* Lo que contestó el inicio de sesión. Con caja y no como párrafo suelto:
@@ -867,6 +949,8 @@ export default function Herramientas(props: { solo?: string | string[] }) {
 export function ConexionesMenu(props: {
   /** Abre Configuración en el panel de Conexiones. */
   onManage: () => void;
+  /** El tamaño del disparador donde lo monten. */
+  triggerClass?: string;
 }) {
   const [conocidos, setConocidos] = createSignal<Conocido[]>([]);
   const [puestos, setPuestos] = createSignal<Puesto[]>([]);
@@ -887,7 +971,7 @@ export function ConexionesMenu(props: {
     }
   }
 
-  // Al montar, para que el número del riel no dependa de haber abierto el
+  // Al montar, para que el punto del disparador no dependa de haber abierto el
   // panel una vez, y otra vez cada apertura: lo declarado pudo cambiar desde
   // Configuración mientras el riel seguía a la vista.
   onMount(() => void cargar());
@@ -924,7 +1008,7 @@ export function ConexionesMenu(props: {
         <Show
           when={pide()}
           fallback={
-            <div class="flex min-h-8 items-center gap-2 px-2 py-1 text-[0.8125rem]" title={p.detalle || undefined}>
+            <div class="flex min-h-8 items-center gap-2 px-2 py-1 text-ui" title={p.detalle || undefined}>
               {contenido()}
               {/* Ámbar si está muerto, verde si está puesto y sano. */}
               <span
@@ -952,7 +1036,7 @@ export function ConexionesMenu(props: {
               when={estado() === "waiting"}
               fallback={<span class="size-1.5 shrink-0 rounded-full bg-error-strong" />}
             >
-              <span class="shrink-0 text-[0.6875rem] text-neutral-500">
+              <span class="shrink-0 text-caption text-neutral-500">
                 {mcpLoginUrl() ? t("settings.tools.open_login") : t("settings.tools.opening")}
               </span>
             </Show>
@@ -969,7 +1053,7 @@ export function ConexionesMenu(props: {
         setAbierto(v);
         if (v) void cargar();
       }}
-      placement="top-start"
+      placement="right-end"
       gutter={4}
     >
       <PopoverTrigger
@@ -978,19 +1062,15 @@ export function ConexionesMenu(props: {
             {...p}
             variant="ghost"
             size="icon"
-            class="relative size-7 shrink-0 text-neutral-500"
+            class={cn("relative size-7 shrink-0 text-neutral-500", props.triggerClass)}
             aria-haspopup="menu"
             aria-label={t("shell.sidebar.mcp.trigger")}
             title={t("shell.sidebar.mcp.trigger")}
           >
-            <Plug size={15} />
+            <McpMark size={props.triggerClass ? 16 : 14} />
+            {/* Sin contador: solo el punto, arriba, cuando alguno pide sesión. */}
             <Show when={pendientes().size > 0}>
-              <span class="absolute -bottom-0.5 -right-0.5 size-1.5 rounded-full bg-error-strong" />
-            </Show>
-            <Show when={total() > 0}>
-              <span class="ui-sidebar-menu-badge absolute -top-1 -right-1 min-w-3.5 rounded-full bg-neutral-200 px-1 text-center text-[0.625rem] font-semibold text-neutral-950">
-                {total()}
-              </span>
+              <span class="absolute top-0.5 right-0.5 size-1.5 rounded-full bg-error-strong" />
             </Show>
           </Button>
         )}

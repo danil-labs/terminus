@@ -1,20 +1,31 @@
-import { For, Match, Show, Switch, createEffect, createSignal, on, onCleanup, onMount } from "solid-js";
+import { For, Match, Show, Suspense, Switch, createEffect, createSignal, lazy, on, onCleanup, onMount } from "solid-js";
 import { invoke } from "../../lib/invoke.ts";
-import { FailureNote, asFailure, type Failure } from "../../ui/Failure";
+import { FailureNote, asFailure, detalleDe, type Failure } from "../../ui/Failure";
 import { Skeleton } from "../../ui/Skeleton";
 import { MarcaGitHost } from "../../ui/icons";
 import { listGitHosts, type GitHost } from "../../lib/gitHosts.ts";
+import type { Startup, Workspace } from "./workspaces-store";
 import { manifiesto, t } from "../../lib/i18n";
 import { prosa, type Frase } from "../../lib/prose";
 import { Badge } from "../../ui/Badge";
 import { Button } from "../../ui/Button";
 import { Input } from "../../ui/Input";
+import { Toggle } from "../../ui/Toggle";
 import Ellipsis from "lucide-solid/icons/ellipsis";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "../../ui/DropdownMenu";
 import { SettingsBlock, SettingsPanel, SettingsRow, SettingsSection } from "./layout";
+import type { GithubAccountState } from "./github-account/GithubAccount";
+import { ExternalLink } from "../../ui/ExternalLink";
+
+// La tarjeta de Drive es la del alta; su chunk solo lo carga quien abre Fuentes.
+const Integraciones = lazy(() => import("../onboarding/ToolCards").then((m) => ({ default: m.Integraciones })));
+// GitHub de la cuenta de Danil: con sesión, su tarjeta reemplaza la local.
+const GithubAccount = lazy(() => import("./github-account/GithubAccount"));
+const CredentialsInUse = lazy(() => import("./credentials/AccountCredentials").then((m) => ({ default: m.CredentialsInUse })));
+const LocalKeysBanner = lazy(() => import("./credentials/AccountCredentials").then((m) => ({ default: m.LocalKeysBanner })));
 
 /**
  * Proveedores de código: de dónde salen los proyectos de la organización.
@@ -124,7 +135,13 @@ export default function Providers(props: { solo?: string | string[] }) {
 }
 
 function WorkspaceProviders(props: { solo?: string | string[] }) {
-  const scope = invoke<{ active: string | null }>("list_workspaces").then((s) => s.active ?? "pending");
+  const startup = invoke<Startup>("list_workspaces");
+  const scope = startup.then((s) => s.active ?? "pending");
+  const [scopeId, setScopeId] = createSignal<string | null>(null);
+  void scope.then((id) => setScopeId(id === "pending" ? null : id), () => {});
+  const [githubAccount, setGithubAccount] = createSignal<GithubAccountState>({ mode: "unknown", connected: false, reauthorize: false });
+  /** La tarjeta local se ve sin sesión de Danil, con un motor sin GitHub de la cuenta o mientras la local manda. */
+  const githubLocal = (id: string) => id !== "github" || githubAccount().mode === "local";
   let disposed = false;
   onCleanup(() => {
     disposed = true;
@@ -132,7 +149,7 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
       if (state === "esperando" || state === "instalando") void cancelarNavegador(id);
     }
   });
-  const [cli, setCli] = createSignal<{ available: boolean; version: string | null; managed_supported: boolean; installable: boolean } | null>(null);
+  const [cli, setCli] = createSignal<{ available: boolean; version: string | null; managed_supported: boolean; installable: boolean; host_signed_in?: boolean } | null>(null);
   const [loadingCli, setLoadingCli] = createSignal(true);
   const [installingCli, setInstallingCli] = createSignal(false);
   const [cliFailure, setCliFailure] = createSignal<Failure | null>(null);
@@ -153,6 +170,35 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
     } finally { setLoadingCli(false); }
   }
   onMount(() => { void refreshCli().catch((e) => setCliFailure(asFailure(e))); });
+  // «Usar el GitHub de esta computadora»: es de esta máquina y no viaja con la cuenta.
+  const [hostGithub, setHostGithub] = createSignal(false);
+  const [savingHost, setSavingHost] = createSignal(false);
+  const [hostFailure, setHostFailure] = createSignal<Failure | null>(null);
+  onMount(() => {
+    void startup
+      .then((s) => setHostGithub(!!s.workspaces.find((w) => w.id === s.active)?.host_github))
+      .catch(() => {});
+  });
+  // Sólo tiene sentido con un gh con sesión en esta máquina; un motor que no
+  // lo publica todavía cae en «hay gh». Encendido se enseña igual, para apagarlo.
+  const hostUsable = () => { const c = cli(); return !!c && (c.host_signed_in ?? c.available); };
+  async function changeHostGithub(enabled: boolean) {
+    const id = await scope;
+    if (id === "pending") return;
+    const before = hostGithub();
+    setHostGithub(enabled);
+    setSavingHost(true);
+    setHostFailure(null);
+    try {
+      const w = await invoke<Workspace>("set_workspace_host_github", { id, enabled });
+      setHostGithub(!!w.host_github);
+    } catch (e) {
+      setHostGithub(before);
+      setHostFailure({ what: t("providers.github.host_mode.save_failed"), detail: detalleDe(e) });
+    } finally {
+      setSavingHost(false);
+    }
+  }
   const [lista, setLista] = createSignal<Provider[] | null>(null);
   const [cargando, setCargando] = createSignal(true);
   const [fallo, setFallo] = createSignal<Failure | null>(null);
@@ -534,6 +580,13 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                         <Badge>{t("settings.providers.state.off")}</Badge>
                       }
                     >
+                      <Match when={p.id === "github" && githubAccount().mode === "account"}>
+                        <Show when={githubAccount().connected} fallback={<Badge>{t("settings.providers.state.off")}</Badge>}>
+                          <Show when={githubAccount().reauthorize} fallback={<Badge tone="success">{t("settings.providers.state.on")}</Badge>}>
+                            <Badge tone="warning">{t("providers.github.account.reauthorize_badge")}</Badge>
+                          </Show>
+                        </Show>
+                      </Match>
                       <Match when={estado() === "comprobando"}>
                         <Badge>{t("settings.providers.state.checking")}</Badge>
                       </Match>
@@ -550,6 +603,28 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                     </Switch>
                   }
                 >
+                  <Show when={p.id === "github" && (hostUsable() || hostGithub())}>
+                    <SettingsRow
+                      label={t("providers.github.host_mode.title")}
+                      description={hostGithub() && !hostUsable() ? t("providers.github.host_mode.ignored") : undefined}
+                    >
+                      <Toggle
+                        checked={hostGithub()}
+                        label={t("providers.github.host_mode.title")}
+                        disabled={savingHost()}
+                        onChange={(on) => void changeHostGithub(on)}
+                      />
+                    </SettingsRow>
+                    <Show when={hostFailure()}>{(f) => <FailureNote f={f()} />}</Show>
+                  </Show>
+                  <Show when={p.id === "github" ? scopeId() : null}>
+                    {(id) => (
+                      <Suspense fallback={null}>
+                        <GithubAccount scope={id()} local={!!p.connected} onState={setGithubAccount} />
+                      </Suspense>
+                    )}
+                  </Show>
+                  <Show when={githubLocal(p.id)}>
                   <Switch>
                     <Match when={p.connected && !esperaAqui() && !montajes()[p.id] ? p.connected : null}>
                       {(c) => (
@@ -568,7 +643,7 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                                         when={c().identity.user !== c().identity.name}
                                       >
                                         {" "}
-                                        <span class="font-mono text-[0.6875rem]">{c().identity.user}</span>
+                                        <span class="font-mono text-caption">{c().identity.user}</span>
                                       </Show>
                                       <Show
                                         when={
@@ -577,17 +652,17 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                                         }
                                       >
                                         {" · "}
-                                        <span class="font-mono text-[0.6875rem]">{c().workspace}</span>
+                                        <span class="font-mono text-caption">{c().workspace}</span>
                                       </Show>
                                     </span>
                                   }
                                 >
                                   <span class="flex flex-col gap-0.5">
-                                    <span class="font-mono text-[0.6875rem]">{c().data.correo}</span>
+                                    <span class="font-mono text-caption">{c().data.correo}</span>
                                     <strong class="text-neutral-950">
                                       {c().identity.name}
                                     </strong>
-                                    <span class="font-mono text-[0.6875rem]">{c().workspace}</span>
+                                    <span class="font-mono text-caption">{c().workspace}</span>
                                   </span>
                                 </Show>
                               }
@@ -734,18 +809,9 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                           <SettingsRow
                             label={t("settings.providers.waiting", { name: p.name })}
                             description={
-                              <a
-                                class="text-link underline underline-offset-2 outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                                href="#"
-                                onClick={(ev) => {
-                                  ev.preventDefault();
-                                  invoke("open_external", { target: e().url }).catch(
-                                    () => {},
-                                  );
-                                }}
-                              >
+                              <ExternalLink url={e().url}>
                                 {t("settings.providers.open", { name: p.name })}
-                              </a>
+                              </ExternalLink>
                             }
                           >
                             <Button
@@ -772,18 +838,9 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                         <SettingsRow
                           label={t("settings.providers.setup_waiting", { name: p.name })}
                           description={
-                            <a
-                              class="text-link underline underline-offset-2 outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                              href="#"
-                              onClick={(ev) => {
-                                ev.preventDefault();
-                                invoke("open_external", { target: url() }).catch(
-                                  () => {},
-                                );
-                              }}
-                            >
+                            <ExternalLink url={url()}>
                               {t("settings.providers.open", { name: p.name })}
-                            </a>
+                            </ExternalLink>
                           }
                         >
                           <Button size="compact" disabled={estado() !== null} onClick={() => void actualizarAcceso(p.id)}>
@@ -870,18 +927,9 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                               : prosa(p.token_label)
                           }
                           description={
-                            <a
-                              class="text-link underline underline-offset-2 outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                              href="#"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                invoke("open_external", {
-                                  target: p.token_url,
-                                }).catch(() => {});
-                              }}
-                            >
+                            <ExternalLink url={p.token_url}>
                               {t("settings.providers.create_token", { name: p.name })}
-                            </a>
+                            </ExternalLink>
                           }
                         >
                           {/* Oculto mientras se pega, y en cuanto el llavero lo
@@ -930,6 +978,7 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                       </form>
                     </Match>
                   </Switch>
+                  </Show>
 
                   <Show when={falla()}>
                     {(f) => (
@@ -981,7 +1030,7 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                                 <li>
                                   <div class="flex items-center gap-2 rounded-sm border border-border bg-surface px-2 py-1.5 text-xs">
                                     <span class="min-w-0 flex-1 truncate">{a.name}</span>
-                                    <span class="font-mono text-[0.6875rem] text-neutral-500">{a.key}</span>
+                                    <span class="font-mono text-caption text-neutral-500">{a.key}</span>
                                     <Show when={p.id !== "github" && (!p.select_area || selected())}>
                                       <Button
                                         variant="outline"
@@ -1022,7 +1071,7 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                                           <li class="flex items-baseline gap-2 text-xs">
                                             <span class="min-w-0 truncate">{r.name}</span>
                                             <Show when={r.slug !== r.name}>
-                                              <span class="min-w-0 truncate font-mono text-[0.6875rem] text-neutral-500">{r.slug}</span>
+                                              <span class="min-w-0 truncate font-mono text-caption text-neutral-500">{r.slug}</span>
                                             </Show>
                                             {/* Traerlo es el acto: el botón
                                                 vive en la fila del repositorio
@@ -1071,7 +1120,7 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
                             <Badge tone="warning">{t("providers.github.cli.attention")}</Badge>
                           </Show>
                         </summary>
-                        <SettingsRow label={t("providers.github.cli.title")} description={t("providers.github.cli.help")}>
+                        <SettingsRow label={t("providers.github.cli.title")}>
                           <Show when={cli()} fallback={
                             <Show when={loadingCli()} fallback={
                               <Show when={!cliFailure()}><span class="text-xs text-neutral-500">{t("providers.github.cli.unavailable")}</span></Show>
@@ -1094,6 +1143,24 @@ function WorkspaceProviders(props: { solo?: string | string[] }) {
               );
             }}
           </For>
+          <Show when={!props.solo}>
+            <SettingsSection title={t("onboarding.tools.drive")} description={t("onboarding.tools.about.drive")}>
+              <div class="mt-3">
+                <Suspense fallback={null}>
+                  <Integraciones solo={["drive"]} onCambio={() => {}} />
+                </Suspense>
+              </div>
+            </SettingsSection>
+            <SettingsSection title={t("onboarding.tools.references.group")} description={t("onboarding.tools.references.about")}>
+              <div class="mt-3">
+                <Suspense fallback={null}>
+                  <Integraciones solo={["zotero"]} onCambio={() => {}} />
+                  <LocalKeysBanner kinds={["zotero"]} />
+                  <CredentialsInUse kinds={["zotero"]} title={t("danil.credentials.zotero_title")} />
+                </Suspense>
+              </div>
+            </SettingsSection>
+          </Show>
         </SettingsPanel>
       </Show>
     </Show>

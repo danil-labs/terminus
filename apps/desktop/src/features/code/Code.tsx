@@ -6,12 +6,13 @@ import { precargarEditor } from "./editorLoad";
 import { Skeleton } from "../../ui/Skeleton";
 import { Channel } from "@tauri-apps/api/core";
 import { invoke } from "../../lib/invoke.ts";
+import { machineOf } from "../machines/store";
 import GitBranch from "lucide-solid/icons/git-branch";
 import { FailureNote, asFailure, type Failure } from "../../ui/Failure";
 import type { ArbolEnTarea } from "../../lib/model";
 import { t } from "../../lib/i18n";
 import { workLabel } from "../projects/branchLabel";
-import ArbolDeArchivos from "./FileTree";
+import ArbolDeArchivos from "./FileTreeLazy";
 import KnIntegrate from "./KnIntegrate";
 import KnCloud from "./KnCloud";
 import { siguienteLista } from "./trees";
@@ -36,6 +37,7 @@ export default function Codigo(props: {
   visible: boolean;
   /** Abrir un archivo es abrir una pestaña del centro; lo hace `App.tsx`. */
   onAbrir: (arbol: string, ruta: string, cambiado: boolean) => void;
+  onAbrirFijo?: (arbol: string, ruta: string, cambiado: boolean) => void;
   onMovido: (session: string, arbol: string, desde: string, hasta: string) => void;
   onBorrado: (session: string, arbol: string, ruta: string) => void;
 }) {
@@ -64,7 +66,7 @@ export default function Codigo(props: {
       const as = await invoke<ArbolEnTarea[]>("list_task_trees", {
         project: props.project,
         session: sid,
-      });
+      }, machineOf(sid));
       recordarArboles(sid, as);
       if (!mia()) return;
       setArboles(siguienteLista(arboles(), { ok: true, lista: as }));
@@ -94,7 +96,8 @@ export default function Codigo(props: {
 
   createEffect(on(() => arboles().filter((tree) => !tree.missing).map((tree) => tree.path).join("\n"), (path) => {
     setWatchFailure(null);
-    if (!path) return;
+    // El canal no cruza el relay (`router.ts` · `CHANNELS`): el árbol de otra máquina se relee al cerrar cada turno.
+    if (!path || machineOf(props.session)) return;
     let disposed = false;
     let scheduled: ReturnType<typeof setTimeout> | undefined;
     const changes = new Channel<void>();
@@ -135,12 +138,12 @@ export default function Codigo(props: {
               <header class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-2 border-b border-border py-2 pr-3 pl-3">
                 <WorkdirIcon kind={a.kind} cloud={a.cloud} class="mt-0.5 shrink-0 text-neutral-500" />
                 <div class="min-w-0">
-                  <div class="truncate text-[0.8125rem] font-medium" title={a.path}>
+                  <div class="truncate text-ui font-medium" title={a.path}>
                     {a.name}
                   </div>
                   <Show when={workLabel(a.branch, a.alias)}>
                     {(etiqueta) => (
-                      <div class="mt-0.5 flex min-w-0 items-center gap-1 font-mono text-[0.6875rem] text-neutral-500">
+                      <div class="mt-0.5 flex min-w-0 items-center gap-1 font-mono text-caption text-neutral-500">
                         <GitBranch size={11} class="shrink-0" aria-hidden="true" />
                         <span class="min-w-0 truncate" title={etiqueta()}>{etiqueta()}</span>
                       </div>
@@ -165,7 +168,7 @@ export default function Codigo(props: {
                 </Show>
                 <Show when={a.dirty_before}>
                   {(n) => (
-                    <p class="m-0 px-3 pt-2 text-[0.6875rem] text-neutral-500">
+                    <p class="m-0 px-3 pt-2 text-caption text-neutral-500">
                       {t("code.tree.dirty_before", { count: n() })}
                     </p>
                   )}
@@ -177,6 +180,7 @@ export default function Codigo(props: {
                   kind={a.kind}
                   visible={props.visible}
                   onAbrir={(ruta, cambiado) => props.onAbrir(a.key, ruta, cambiado)}
+                  onAbrirFijo={(ruta, cambiado) => props.onAbrirFijo?.(a.key, ruta, cambiado)}
                   onMovido={(desde, hasta) => props.onMovido(props.session, a.key, desde, hasta)}
                   onBorrado={(ruta) => props.onBorrado(props.session, a.key, ruta)}
                 />

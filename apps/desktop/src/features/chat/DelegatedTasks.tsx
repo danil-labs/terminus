@@ -1,4 +1,4 @@
-import { type ComponentProps, createEffect, createMemo, createSignal, For, on, Show } from "solid-js";
+import { type ComponentProps, createEffect, createSignal, on, Show } from "solid-js";
 import GitBranch from "lucide-solid/icons/git-branch";
 import { t } from "../../lib/i18n";
 import type { SenderTask } from "../../lib/recipients";
@@ -6,60 +6,55 @@ import { Button } from "../../ui/Button";
 import { asFailure, FailureNote } from "../../ui/Failure";
 import { Popover, PopoverContent, PopoverTrigger } from "../../ui/Popover";
 import Sessions, { type SessionRow } from "../projects/Sessions";
-import { taskPriority, type TaskActivity } from "@terminus/design";
+import { DelegatedSkeleton } from "./DelegatedSkeleton";
+import { delegatedRailRows } from "./delegatedRail";
+import { buildTaskTree, type TaskBranch, type TaskTreeRow, taskDescendants } from "@terminus/tasks";
+import { taskPriority } from "@terminus/design";
+import { delegatedAttention } from "./delegatedRail";
 
-export type DelegatedListProps = Omit<ComponentProps<typeof Sessions>, "sessions" | "flat" | "includeArchived" | "groupByAuthor" | "groupByHandler">;
+export { delegatedAttention } from "./delegatedRail";
 
-export function delegatedAttention(rows: SessionRow[], live: readonly string[], approvals: readonly string[]): TaskActivity {
-  return {
-    aprobando: rows.some(row => approvals.includes(row.id)),
-    esperando: rows.some(row => row.esperando),
-    viva: rows.some(row => live.includes(row.id)),
-    outcome: rows.some(row => row.outcome === "failed") ? "failed" : null,
-    sinVer: rows.some(row => row.sin_ver),
-  };
-}
+export type DelegatedListProps = Omit<ComponentProps<typeof Sessions>, "sessions" | "flat" | "card" | "hoverCardPlacement" | "includeArchived" | "groupByAuthor" | "groupByHandler">;
 
-export function delegatedDescendants(rows: SessionRow[], root: string): SessionRow[] {
-  const selected = new Set([root]);
-  let previous = 0;
-  while (previous !== selected.size) {
-    previous = selected.size;
-    for (const row of rows) {
-      const launcher = row.parent ?? row.launched_by;
-      if (launcher && selected.has(launcher)) selected.add(row.id);
-    }
-  }
-  return rows.filter(row => row.id !== root && selected.has(row.id));
+export function delegatedDescendants(rows: SessionRow[], root: TaskTreeRow): SessionRow[] {
+  return taskDescendants(rows, [root]);
 }
 
 export function delegatedFamilies(rows: SessionRow[]): Map<string, string[]> {
-  const known = new Map(rows.map(row => [row.id, row]));
   const families = new Map<string, string[]>();
-  for (const row of rows) {
-    const seen = new Set([row.id]);
-    let parent = row.parent ?? row.launched_by;
-    while (parent && !seen.has(parent)) {
-      seen.add(parent);
-      const family = families.get(parent);
-      if (family) family.push(row.id);
-      else families.set(parent, [row.id]);
-      const ancestor = known.get(parent);
-      parent = ancestor?.parent ?? ancestor?.launched_by;
+  const visit = (branches: TaskBranch<SessionRow>[], ancestors: string[]) => {
+    for (const branch of branches) {
+      for (const ancestor of ancestors) families.set(ancestor, [...(families.get(ancestor) ?? []), branch.tarea.id]);
+      visit(branch.hijas, [...ancestors, branch.tarea.id]);
     }
-  }
+  };
+  visit(buildTaskTree(rows), []);
   return families;
 }
 
+/**
+ * Las delegadas con la tarjeta del riel (`taskCard`): estado y título; proveedor, máquina, agente y PR.
+ *
+ * Sin carpeta: viven en la de su madre. No se pasa `carpetaDe` (aunque la traiga la lista) y se pide `hideFolder`.
+ */
 export function DelegatedTaskList(props: {
   rows: SessionRow[];
   list: (folder: string) => DelegatedListProps;
   readOnly?: boolean;
+  hoverCardPlacement?: "left-start" | "right-start";
 }) {
-  const folders = createMemo(() => [...new Set(props.rows.map(row => row.folder ?? ""))]);
-  return <For each={folders()}>{folder => <Sessions {...props.list(folder)}
-    sessions={props.rows.filter(row => (row.folder ?? "") === folder)}
-    flat includeArchived readOnly={props.readOnly} groupByAuthor={false} groupByHandler={false} />}</For>;
+  const folderOf = (id: string) => props.rows.find(row => row.id === id)?.folder ?? "";
+  const base = (): DelegatedListProps => ({ ...props.list(props.rows[0]?.folder ?? ""), carpetaDe: undefined });
+  return <Sessions {...base()} card hoverCardPlacement={props.hoverCardPlacement} sessions={props.rows} includeArchived readOnly={props.readOnly}
+    groupByAuthor={false} groupByHandler={false} hideFolder
+    projectOf={row => row.folder ?? ""}
+    destinosDe={row => props.list(row.folder ?? "").destinos}
+    onPick={id => props.list(folderOf(id)).onPick(id)}
+    onDelete={id => props.list(folderOf(id)).onDelete(id)}
+    onMove={(id, to) => props.list(folderOf(id)).onMove(id, to)}
+    onEtapa={(id, stage) => props.list(folderOf(id)).onEtapa(id, stage)}
+    onRenombrar={(id, title) => props.list(folderOf(id)).onRenombrar(id, title)}
+    onPin={base().onPin ? (id, pinned) => props.list(folderOf(id)).onPin?.(id, pinned) : undefined} />;
 }
 
 export function DelegatedLaunch(props: {
@@ -77,11 +72,23 @@ export function DelegatedLaunch(props: {
     esperando: false, stage: null, agent: null, parent_agent: null, chat_de_agente: false,
   });
   return <div data-delegated-launch={props.reference.task} class="my-2 min-w-0 border-l border-border pl-2">
-    <DelegatedTaskList rows={[row() ?? referenceRow()]} list={props.list} readOnly={!row()} />
-    <Show when={!row()}><p class="m-0 px-2 pt-1 text-xs text-neutral-500">
-      {props.loading ? t("chat.delegation.loading") : props.error ? t("chat.delegation.failed") : t("chat.delegation.unavailable")}
-    </p></Show>
+    <Show when={row() || !props.loading} fallback={<DelegatedSkeleton />}>
+      <DelegatedTaskList rows={[row() ?? referenceRow(), ...taskDescendants(props.rows, [row() ?? referenceRow()])]} list={props.list} readOnly={!row()} />
+      <Show when={!row()}><p class="m-0 px-2 pt-1 text-xs text-neutral-500">
+        {props.error ? t("chat.delegation.failed") : t("chat.delegation.unavailable")}
+      </p></Show>
+    </Show>
   </div>;
+}
+
+/** El sitio del botón de delegadas cuando no hay ninguna: apagado, para que la barra no cambie de forma. */
+export function DelegatedNone() {
+  return <Button type="button" variant="chrome" size="iconCompact"
+    class="relative size-7 cursor-default text-neutral-500 opacity-60 hover:bg-transparent"
+    data-delegated-trigger="toolbar" aria-disabled="true"
+    aria-label={t("chat.delegation.none")} title={t("chat.delegation.none")}>
+    <GitBranch size={14} aria-hidden="true" />
+  </Button>;
 }
 
 export default function DelegatedActivity(props: {
@@ -97,30 +104,32 @@ export default function DelegatedActivity(props: {
   const [all, setAll] = createSignal(false);
   const [open, setOpen] = createSignal(false);
   createEffect(on(() => props.context, () => { setOpen(false); setAll(false); }));
-  const active = () => props.rows.filter(row => taskPriority(delegatedAttention([row], props.live, props.approvals)));
-  const shown = () => all() ? props.rows : active();
-  return <Show when={props.rows.length || props.error}>
+  const rows = () => delegatedRailRows(props.rows, true, props.live, props.approvals);
+  const active = () => rows().filter(row => taskPriority(delegatedAttention([row], props.live, props.approvals)));
+  // «Activas» son solo las que te necesitan o siguen trabajando, sin sus madres de contexto.
+  const shown = () => all() ? rows() : active();
+  return <Show when={rows().length || props.error} fallback={<DelegatedNone />}>
     <Popover open={open()} onOpenChange={setOpen} placement="left-start" gutter={8}>
       <PopoverTrigger as={(trigger: object) => <Button {...trigger} type="button" variant="chrome" size="iconCompact"
         class="relative size-7 text-neutral-500"
         data-delegated-trigger="toolbar"
-        aria-label={t("chat.delegation.open", { count: props.rows.length })}
-        title={t("chat.delegation.open", { count: props.rows.length })}>
+        aria-label={t("chat.delegation.open", { count: rows().length })}
+        title={t("chat.delegation.open", { count: rows().length })}>
         <GitBranch size={14} aria-hidden="true" />
-        <span class="absolute -right-0.5 -bottom-0.5 min-w-3 rounded bg-surface-raised px-0.5 text-[9px] leading-3 tabular-nums">{props.rows.length}</span>
+        <span class="absolute -right-0.5 -bottom-0.5 min-w-3 rounded bg-surface-raised px-0.5 text-[9px] leading-3 tabular-nums">{rows().length}</span>
       </Button>} />
       <PopoverContent class="w-96 max-w-[calc(100vw-24px)] p-2" aria-label={t("chat.delegation.heading")}>
         <div class="flex items-center justify-between gap-2 px-2 pb-2 text-xs">
-          <span class="font-medium">{t("chat.delegation.total", { count: props.rows.length })}</span>
+          <span class="font-medium">{t("chat.delegation.total", { count: rows().length })}</span>
           <div class="flex gap-1" role="group" aria-label={t("chat.delegation.filter")}>
-            <Button size="sm" variant="ghost" class="h-6 px-2 text-xs" aria-pressed={!all()} onClick={() => setAll(false)}>{t("chat.delegation.activity")}</Button>
-            <Button size="sm" variant="ghost" class="h-6 px-2 text-xs" aria-pressed={all()} onClick={() => setAll(true)}>{t("chat.delegation.all")}</Button>
+            <Button size="sm" variant="ghost" class="h-6 px-2 text-xs aria-pressed:bg-surface-muted aria-pressed:text-neutral-950" aria-pressed={!all()} onClick={() => setAll(false)}>{t("chat.delegation.activity")}</Button>
+            <Button size="sm" variant="ghost" class="h-6 px-2 text-xs aria-pressed:bg-surface-muted aria-pressed:text-neutral-950" aria-pressed={all()} onClick={() => setAll(true)}>{t("chat.delegation.all")}</Button>
           </div>
         </div>
         <div data-delegated-list class="max-h-[min(55vh,420px)] overflow-y-auto overscroll-contain">
           <Show when={props.error}>{error => <><FailureNote f={asFailure(error())} /><Button variant="ghost" size="sm" onClick={props.onRetry}>{t("chat.delegation.retry")}</Button></>}</Show>
-          <Show when={shown().length} fallback={<p class="m-0 px-2 py-3 text-xs text-neutral-500">{props.loading ? t("chat.delegation.loading") : t("chat.delegation.idle")}</p>}>
-            <DelegatedTaskList rows={shown()} list={folder => ({ ...props.list(folder), onPick: id => {
+          <Show when={shown().length} fallback={props.loading ? <DelegatedSkeleton /> : <p class="m-0 px-2 py-3 text-xs text-neutral-500">{t("chat.delegation.idle")}</p>}>
+            <DelegatedTaskList rows={shown()} hoverCardPlacement="left-start" list={folder => ({ ...props.list(folder), onPick: id => {
               setOpen(false);
               props.list(folder).onPick(id);
             } })} />

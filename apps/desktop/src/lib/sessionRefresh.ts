@@ -78,6 +78,9 @@ export function conservarPorElFinal<T>(previous: T[], incoming: T[]): T[] {
   return kept.length === previous.length && kept.every((row, i) => row === previous[i]) ? previous : kept;
 }
 
+/** Lo más que espera la barra a la lectura de una carpeta. */
+export const READ_TIMEOUT = 20_000;
+
 // Descartar una respuesta cuando salió otra después deja la lista vacía si esa
 // otra no vuelve; pintar vacío ante un fallo esconde las tareas hasta el
 // siguiente aviso.
@@ -91,12 +94,20 @@ export function sessionRefresh<T>(options: {
   cancel?: (handle: unknown) => void;
   /** Cuánto espera `gathered` a juntar en una sola lectura los avisos que llegan seguidos. */
   gather?: number;
+  /**
+   * El tope de la lectura de una carpeta. La que no vuelve a tiempo cuenta como
+   * fallida —se queda lo que había y se reintenta—: una carpeta colgada no
+   * congela la barra entera.
+   */
+  timeout?: number;
 }) {
   const schedule = options.schedule ?? ((run, ms) => setTimeout(run, ms));
   const cancel = options.cancel ?? ((handle) => clearTimeout(handle as ReturnType<typeof setTimeout>));
   let generation = 0;
   let started = 0;
-  let applied = 0;
+  // Por carpeta, el pedido más nuevo que ya se pintó: uno anterior que vuelve
+  // tarde no la pisa, y no frena a las demás.
+  const applied = new Map<string, number>();
   let delay = 0;
   let retry: unknown;
   let batch: { projects: Set<string>; handle: unknown; waiting: (() => void)[] } | null = null;
@@ -107,28 +118,54 @@ export function sessionRefresh<T>(options: {
     retry = undefined;
   }
 
+  /**
+   * Lee cada carpeta y la pinta **en cuanto vuelve**, sin esperar a las demás:
+   * la más lenta (otra máquina, una carpeta colgada hasta `timeout`) ya no
+   * retrasa a la que acaba de cambiar. Las carpetas que no se leyeron se
+   * quedan como estaban, así que releer solo una no borra el resto del riel;
+   * las que ya no están en `projects()` se sueltan.
+   */
   async function refresh(projects: string[]): Promise<void> {
     const current = generation;
     const request = ++started;
-    const results = await Promise.all(projects.map(async (project) => {
-      try {
-        return [project, await options.read(project)] as const;
-      } catch {
-        return [project, null] as const;
-      }
-    }));
-    if (current !== generation || request < applied) return;
-    applied = request;
-    options.apply((previous) => Object.fromEntries(
-      results.map(([project, rows]) => [
-        project,
-        rows === null
+    const timeout = options.timeout ?? READ_TIMEOUT;
+    const paint = (project: string, rows: T[] | null) => {
+      const vigentes = new Set(options.projects());
+      // Un aviso de una carpeta que el riel no enseña no la mete.
+      if (!vigentes.has(project)) return;
+      options.apply((previous) => {
+        const next: SessionLists<T> = {};
+        for (const [k, v] of Object.entries(previous)) if (vigentes.has(k)) next[k] = v;
+        next[project] = rows === null
           ? previous[project] ?? []
-          : conservar(previous[project] ?? [], rows, options.key),
-      ]),
-    ));
+          : conservar(previous[project] ?? [], rows, options.key);
+        return next;
+      });
+    };
+    const results = await Promise.all(projects.map(async (project) => {
+      let handle: ReturnType<typeof setTimeout> | undefined;
+      let rows: T[] | null;
+      try {
+        const late = new Promise<null>((done) => {
+          handle = setTimeout(() => done(null), timeout);
+        });
+        rows = await Promise.race([options.read(project), late]);
+      } catch {
+        rows = null;
+      } finally {
+        clearTimeout(handle);
+      }
+      // Vieja: ya se pintó algo más nuevo de esta carpeta, o cambió el workspace.
+      if (current !== generation || request < (applied.get(project) ?? 0)) return null;
+      if (rows !== null) applied.set(project, request);
+      paint(project, rows);
+      return rows !== null;
+    }));
+    if (current !== generation) return;
+    const vigentes = results.filter((ok): ok is boolean => ok !== null);
+    if (vigentes.length === 0) return;
     clearRetry();
-    if (results.every(([, rows]) => rows !== null)) {
+    if (vigentes.every(Boolean)) {
       delay = 0;
       return;
     }
@@ -159,6 +196,7 @@ export function sessionRefresh<T>(options: {
     gathered,
     reset() {
       generation++;
+      applied.clear();
       delay = 0;
       clearRetry();
       if (batch) {

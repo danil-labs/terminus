@@ -8,8 +8,12 @@
 /** El velo de la ventana: un número es el del chat; el objeto trae también pestañas y paneles. */
 export type ChatVeil = number | { chat?: number | null; tabs?: number | null; panels?: number | null };
 
-/** `chat_background`: todo `null` si ni el workspace ni la máquina eligieron nada. */
-export type ChatBackground = { preset: string | null; data_url: string | null; veil: ChatVeil | null };
+/**
+ * `chat_background`: todo `null` si ni el workspace ni la máquina eligieron nada.
+ * `image_url`, la imagen en la cuenta de Danil; por el relay, una imagen grande
+ * llega solo así (`data_url` nulo). Un motor anterior no la manda.
+ */
+export type ChatBackground = { preset: string | null; data_url: string | null; image_url?: string | null; veil: ChatVeil | null };
 
 /**
  * `set_chat_background`: el patrón y el velo se reemplazan siempre (`null` los
@@ -51,4 +55,20 @@ export function chatBackgroundView(answer: unknown): ChatBackgroundView {
       panels: unit(parts.panels),
     },
   };
+}
+
+/**
+ * La imagen en la cuenta (`image_url`) cuando no hay patrón elegido: solo
+ * `https:`, que se pide con la sesión de la persona. `null` si no hay.
+ */
+export function chatBackgroundImageUrl(answer: unknown): string | null {
+  const raw = answer && typeof answer === "object" ? (answer as Partial<Record<keyof ChatBackground, unknown>>) : {};
+  if (typeof raw.preset === "string" && raw.preset.trim()) return null;
+  const url = raw.image_url;
+  if (typeof url !== "string") return null;
+  try {
+    return new URL(url).protocol === "https:" ? url : null;
+  } catch {
+    return null;
+  }
 }

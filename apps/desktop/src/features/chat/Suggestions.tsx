@@ -74,7 +74,7 @@ export default function Suggestions(props: {
             {(s, i) => (
               <li>
                 <Show when={s.group && s.group !== props.items[i() - 1]?.group}>
-                  <p class="m-0 flex items-center gap-2 px-2.5 pt-1.5 pb-0.5 text-[0.6875rem] font-semibold tracking-[0.3px] text-neutral-500 uppercase">
+                  <p class="m-0 flex items-center gap-2 px-2.5 pt-1.5 pb-0.5 text-caption font-semibold tracking-[0.3px] text-neutral-500 uppercase">
                     <span class="min-w-0 truncate">{s.group}</span>
                     <Show when={s.groupHint}>
                       {(hint) => (
@@ -121,7 +121,7 @@ export default function Suggestions(props: {
                       </span>
                     )}
                   </Show>
-                  <span class={cn("min-w-0 flex-1 truncate font-mono text-xs text-neutral-950", s.mark && "text-[0.8125rem] font-medium")}>
+                  <span class={cn("min-w-0 flex-1 truncate font-mono text-xs text-neutral-950", s.mark && "text-ui font-medium")}>
                     {s.title}
                   </span>
                   <Show when={s.detail}>
@@ -145,7 +145,7 @@ export default function Suggestions(props: {
         </ul>
       </Show>
       <Show when={props.truncated}>
-        <p class="m-0 border-t border-border px-3 py-1.5 text-[0.6875rem] text-neutral-500">
+        <p class="m-0 border-t border-border px-3 py-1.5 text-caption text-neutral-500">
           {t("chat.suggestions.truncated")}
         </p>
       </Show>

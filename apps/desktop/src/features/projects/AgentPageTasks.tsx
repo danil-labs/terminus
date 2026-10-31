@@ -1,3 +1,4 @@
+import { withTaskAncestors, taskIdentity } from "@terminus/tasks";
 import Search from "lucide-solid/icons/search";
 import { type ComponentProps, createEffect, createMemo, createSignal, For, on, Show } from "solid-js";
 import { t } from "../../lib/i18n";
@@ -27,9 +28,11 @@ export default function AgentPageTasks(props: {
   createEffect(on(filtro, () => setPaginas(1), { defer: true }));
 
   const de = (f: FiltroDeTareas) => filtrarTareas(props.tasks, f, props.list.vivas, props.list.aprobando);
+  const matches = createMemo(() => de(filtro()));
+  const contextRows = createMemo(() => withTaskAncestors(props.tasks, matches()));
   const visibles = createMemo(() => search().trim()
-    ? { rows: de(filtro()), quedan: false }
-    : primerasRaices(de(filtro()), paginas() * PAGINA));
+    ? { rows: contextRows(), quedan: false }
+    : primerasRaices(contextRows(), paginas() * PAGINA));
   const filtros: { id: FiltroDeTareas; label: () => string }[] = [
     { id: "all", label: () => t("projects.agent_tasks.filter_all") },
     { id: "running", label: () => t("projects.agent_tasks.filter_running") },
@@ -40,7 +43,7 @@ export default function AgentPageTasks(props: {
   return <section data-agent-page-tasks class="flex min-w-0 flex-col gap-1">
     <div class="flex h-7 items-center gap-2">
       <h2 class="m-0 text-xs font-semibold text-neutral-700">{t("projects.agent_tasks.launched")}</h2>
-      <span class="font-mono text-[0.6875rem] text-neutral-500">{props.tasks.length}</span>
+      <span class="font-mono text-caption text-neutral-500">{props.tasks.length}</span>
       <Button variant="ghost" size="icon" class="ml-auto size-7 text-neutral-500" aria-pressed={buscando()}
         aria-label={t("projects.agent_tasks.search")} title={t("projects.agent_tasks.search")}
         onClick={() => { setBuscando(!buscando()); if (!buscando()) setSearch(""); }}>
@@ -56,12 +59,12 @@ export default function AgentPageTasks(props: {
         <Button variant={filtro() === f.id ? "secondary" : "outline"} size="compact" class="rounded-full"
           aria-pressed={filtro() === f.id} onClick={() => setFiltro(f.id)}>
           {f.label()}
-          <span class="font-mono text-[0.6875rem] font-normal text-neutral-500">{de(f.id).length}</span>
+          <span class="font-mono text-caption font-normal text-neutral-500">{de(f.id).length}</span>
         </Button>
       }</For>
     </div>
     <Show when={visibles().rows.length > 0} fallback={<p class="m-0 px-2 py-3 text-sm text-neutral-500">{t("projects.agent_tasks.no_results")}</p>}>
-      <Sessions {...props.list} sessions={visibles().rows} onPick={props.onPick} groupByAuthor={false} search={search()} />
+      <Sessions {...props.list} sessions={visibles().rows} matchingIds={filtro() === "all" ? undefined : matches().map(taskIdentity)} onPick={props.onPick} groupByAuthor={false} search={search()} />
     </Show>
     <Show when={visibles().quedan}>
       <Button variant="ghost" size="compact" class="self-start" onClick={() => setPaginas(paginas() + 1)}>

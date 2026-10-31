@@ -25,7 +25,7 @@ npm run bridge          # bridge de desarrollo contra el motor del lab
 ```
 
 Los paquetes compartidos se prueban desde su carpeta: `node --test 'packages/*/test/*.test.ts'`
-en la raíz. Si tocas `packages/design` o `packages/tasks`, corre también
+en la raíz. Si tocas `packages/design`, `packages/tasks` o `packages/chat`, corre también
 `node apps/desktop/scripts/verify.mjs --no-cargo`: el escritorio los usa y el
 guard `shared-design` los compara con sus catálogos.
 
@@ -53,7 +53,8 @@ se agregan con `npx expo install <paquete>`, que elige la versión compatible.
 - **Abrir no enciende.** Leer nunca enciende una máquina; solo las acciones de
   la lista de intención del relay (escribir, crear tarea, aprobar, contestar)
   despiertan una VM administrada. Las acciones que el relay no toma por
-  intención (fijar, archivar, subir una imagen, agregar o quitar una cuenta:
+  intención (fijar, renombrar, archivar, subir una imagen, agregar o quitar una cuenta,
+  crear, renombrar o eliminar un espacio, cambiar Mantener despierta:
   `WAKES_FIRST` en `apps/mobile/src/lib/hosts.ts`) la encienden antes por el plano de control.
   Una máquina propia apagada no se puede despertar: no se le manda la acción
   (`machine_asleep`) y se dice en tono neutro. Apagada nunca se pinta como
