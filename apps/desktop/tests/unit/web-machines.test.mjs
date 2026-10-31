@@ -13,7 +13,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { engine } from "../helpers/fake-relay.mjs";
 import { sleep } from "../helpers/jsdom-app.mjs";
-import { MAC, SAME, VM, account, folder, on, open, registry, row, table, until } from "../helpers/web-machines.mjs";
+import { MAC, SAME, VM, account, folder, on, open, registry, table, until } from "../helpers/web-machines.mjs";
 
 test("a primary context on another machine clears the empty-context notice", async () => {
   const configured = { workspaces: [{ ...SAME, context_root: "/lab/context" }], active: "w" };

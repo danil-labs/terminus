@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import { sleep } from "../helpers/jsdom-app.mjs";
-import { MAC, VM, account, on, open, row, table, until } from "../helpers/web-machines.mjs";
+import { MAC, VM, account, on, open, table, until } from "../helpers/web-machines.mjs";
 
 test("an action on a computer that is off and cannot be woken fails short and neutral", async () => {
   const { app, invoke, calls, doc, text } = await open("web-machines-off", [VM, MAC], {

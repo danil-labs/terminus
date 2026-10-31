@@ -1,9 +1,8 @@
 /** Storage keeps its machine and workspace and never waits for an offline VM. Mounts `dist-web/`. */
 import assert from "node:assert/strict";
 import test from "node:test";
-import { fleet } from "../helpers/fake-relay.mjs";
 import { sleep } from "../helpers/jsdom-app.mjs";
-import { MAC, SAME, VM, account, on, open, registry, table, until } from "../helpers/web-machines.mjs";
+import { MAC, SAME, VM, open, table, until } from "../helpers/web-machines.mjs";
 
 test("storage keeps its machine and workspace and never waits for an offline VM", async () => {
   const storage = (bytes) => ({ bytes, tareas: [], compartido: [], sueltos: [], recuperable: 0, medido_en: 1, aviso: null });
