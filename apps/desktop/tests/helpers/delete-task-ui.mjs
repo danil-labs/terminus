@@ -14,7 +14,7 @@ const app = await boot("listo", "delete-task-consent", responses({
   task_lifecycle_apply: args => {
     applications.push(args);
     if (scenario === "partial") return { status: "partial", applied: [{ project: "p2", id: "child" }], failures: [{ project: "p1", id: "t1", error: { message: "Disk removal failed" } }] };
-    if (reject) throw { code: scenario === "refresh" ? "task_family_consent_changed" : "operation_failed", message: "Family contents changed" };
+    if (reject) throw { code: scenario === "refresh" ? "task_family_consent_changed" : "operation_failed", detail: "family", message: "Family contents changed" };
     return { status: "complete", applied: [{ project: "p1", id: "t1" }, { project: "p2", id: "child" }], failures: [] };
   },
 }));
