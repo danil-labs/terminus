@@ -97,7 +97,7 @@ const step = (w) => w.document.querySelector("[data-danil-onboarding]");
 test("«Personaliza» ofrece iniciar sesión con Danil por el navegador, y se puede empezar sin ella", async () => {
   const engine = danil({ state: "disconnected", name: "alberto-mbp" });
   const { w, fallos } = await personalize("danil-onboarding", engine.table);
-  assert.equal(heading(w), "Personaliza Terminus.", w.document.body.textContent.slice(0, 600));
+  assert.equal(heading(w), "Personaliza Danil.", w.document.body.textContent.slice(0, 600));
   assert.equal(step(w)?.dataset.danilOnboarding, "disconnected");
   assert.ok(step(w).textContent.includes("Inicia sesión con Danil."));
   assert.ok(!w.document.body.textContent.includes("Continuar como"), "one-click sign-in stays off");
@@ -112,7 +112,7 @@ test("«Personaliza» ofrece iniciar sesión con Danil por el navegador, y se pu
 
   button(w, "Empezar").click();
   await sleep(300);
-  assert.ok(!w.document.body.textContent.includes("Personaliza Terminus."), "starting does not wait for Danil");
+  assert.ok(!w.document.body.textContent.includes("Personaliza Danil."), "starting does not wait for Danil");
   assert.deepEqual(fallos, []);
 });
 
@@ -124,17 +124,17 @@ test("la sección de Danil se va sola cuando la persona confirma en el navegador
   app.emit("danil-connect", { state: "connected", computer_id: "cmp_1", name: "alberto-mbp", email: "alberto@danil.ai", online: true });
   await sleep(300);
   assert.equal(step(app.w), null);
-  assert.equal(heading(app.w), "Personaliza Terminus.");
+  assert.equal(heading(app.w), "Personaliza Danil.");
 });
 
 test("«Personaliza» no ofrece Danil con la sesión ya iniciada ni con un motor sin el flujo", async () => {
   const connected = danil({ state: "connected", computer_id: "cmp_1", name: "Mac", email: "alberto@danil.ai", online: true });
   const a = await personalize("danil-onboarding-connected", connected.table);
-  assert.equal(heading(a.w), "Personaliza Terminus.");
+  assert.equal(heading(a.w), "Personaliza Danil.");
   assert.equal(step(a.w), null);
 
   const b = await personalize("danil-onboarding-old-engine", { danil_connect_status: unknown() });
-  assert.equal(heading(b.w), "Personaliza Terminus.");
+  assert.equal(heading(b.w), "Personaliza Danil.");
   assert.equal(step(b.w), null);
 });
 

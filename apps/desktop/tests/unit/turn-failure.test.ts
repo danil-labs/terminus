@@ -23,7 +23,7 @@ import { transcripcion as transcript } from "../../src/features/chat/transcript.
 const root = join(dirname(fileURLToPath(import.meta.url)), "../..");
 
 test("el bloqueo de otra app se traduce al releer el fallo guardado", () => {
-  assert.match(failureText({ text: "accounts.error.home_other_app" }), /Otra app de Terminus/);
+  assert.match(failureText({ text: "accounts.error.home_other_app" }), /Otra app de Danil/);
 });
 
 test("cada clase de fallo dice algo distinto", () => {
@@ -134,7 +134,7 @@ test("un cupo en espera dice cuándo sigue solo, no cuándo vuelve", () => {
     text: "crudo",
     fallo: { clase: "sin_cupo", detail: "429", vuelve_en: returnsAt, resumes_at: continuesAt },
   });
-  assert.match(text, /Terminus la retoma sola/);
+  assert.match(text, /Danil la retoma sola/);
   assert.match(text, /9:30/);
   assert.doesNotMatch(text, /Vuelve a las/);
 });
