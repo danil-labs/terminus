@@ -359,7 +359,7 @@
   "shell.window.maximize": "Maximize",
   "shell.window.minimize": "Minimize",
   "shell.window.restore": "Restore",
-  "shell.work_tree.no_session": "No task is open yet",
+  "shell.work_tree.no_session": "This task has no working folder to show",
   "shell.folder.open": "Open folder",
   "shell.folder.view_on": "View files on {name}",
   "shell.folder.copy": "Copy path",
