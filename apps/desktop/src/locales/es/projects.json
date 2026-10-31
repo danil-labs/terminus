@@ -268,7 +268,6 @@
     "one": "Desplegar la subtarea de «{title}»",
     "other": "Desplegar las {count} subtareas de «{title}»"
   },
-  "projects.sessions.worktree_missing": "Worktree desconectado: su carpeta ya no está en disco.",
   "projects.sessions.time_now": "ahora",
   "projects.sessions.time_minutes": "{count}m",
   "projects.sessions.time_hours": "{count}h",

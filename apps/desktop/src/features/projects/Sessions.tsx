@@ -22,7 +22,7 @@ import { KeyedList } from "../../ui/KeyedList";
 import { Input } from "../../ui/Input";
 import { Toast, ToastPortal } from "../../ui/Toast";
 import { RETARDO_TOOLTIP, TooltipContent, TooltipRoot, TooltipTrigger } from "../../ui/Tooltip";
-import { MarcaAgente, WorktreeRoto } from "../../ui/icons";
+import { MarcaAgente } from "../../ui/icons";
 import {
   ITEM_DE_MENU,
   Popover,
@@ -547,13 +547,6 @@ export default function Sessions(props: {
     const todas = porCarpeta();
     return todas.length === 1 ? todas[0].git() : Object.assign({}, ...todas.map((c) => c.git()));
   });
-  const worktreeDe = (id: string) => {
-    for (const c of porCarpeta()) {
-      const estado = c.historiales()?.get(id);
-      if (estado) return estado;
-    }
-    return undefined;
-  };
   // Borrar se lleva la carpeta de trabajo entera, y esos documentos no están
   // commiteados en ningún lado: no tienen de dónde volver. Por eso la
   // confirmación vive en la propia fila, con lo que se pierde escrito.
@@ -719,6 +712,8 @@ export default function Sessions(props: {
     const cuando = () => r.s.last_turn_at ?? r.s.updated_at;
     // Memo: al hacer clic el menú se reinicia y, sin él, la ranura reescribe su clase.
     const abierto = createMemo(() => menu() === r.s.id);
+    // Sin rama no hay nada que decir en la tarjeta, salvo un PR que siga vivo.
+    const gitEnTarjeta = () => !propioDeOtra() && (git().kind === "kn" || git().kind === "branch" || (git().kind === "detached" && git().pull_known && !!git().pull));
     const gitStyle = () => {
       const appearance = gitAppearance(git());
       return git().stale ? { ...appearance, color: "text-neutral-500" } : appearance;
@@ -732,7 +727,7 @@ export default function Sessions(props: {
         </span></Show>
         <span data-session-status class="inline-flex size-6 shrink-0 items-center justify-center">
           <EstadoDeTarea {...r.actividad}
-            identity={() => <Show when={activeAgent()}>{agent => <span data-session-agent><AstroAvatar name={agent()} status={working() ? "working" : "awake"} orbit body={profiles()[agent()]?.body} avatar={profiles()[agent()]?.avatar} size={18} /></span>}</Show>}
+            identity={() => <Show when={activeAgent()}>{agent => <span data-session-agent><AstroAvatar name={agent()} status={working() ? "working" : "awake"} body={profiles()[agent()]?.body} avatar={profiles()[agent()]?.avatar} size={18} /></span>}</Show>}
             identityLabel={activeAgent() ? nombre(activeAgent()!) : undefined}
             provisional={esProvisional(r.s.id)} archivada={!!r.s.archived} />
         </span>
@@ -743,20 +738,18 @@ export default function Sessions(props: {
           <FolderChip id={projectOf(r.s)} name={folder()} untitled={tarjetaDelRiel()} class="task-card-folder text-xs text-neutral-500" />
         }</Show>
         <Show when={!props.hideMachine && r.s.machine}>{machine => <MachineChip machine={machine()} on={r.s.machine_on !== false} class="task-card-machine" />}</Show>
-        <Show when={(worktreeDe(r.s.id)?.owned && !worktreeDe(r.s.id)?.available) || (!propioDeOtra() && ["kn", "branch", "detached"].includes(git().kind))}>
+        <Show when={gitEnTarjeta()}>
           <span class="task-card-git">
-            <Show when={worktreeDe(r.s.id)?.owned && !worktreeDe(r.s.id)?.available}><span class="inline-flex text-error-strong" title={t("projects.sessions.worktree_missing")} aria-label={t("projects.sessions.worktree_missing")}><WorktreeRoto size={12} /></span></Show>
-            <Show when={!propioDeOtra() && ["kn", "branch", "detached"].includes(git().kind)}><Show when={git().kind === "kn" || !git().pull_known || !git().pull} fallback={<RailPull status={git()} />}>
+            <Show when={!propioDeOtra()}><Show when={git().kind === "kn" || !git().pull_known || !git().pull} fallback={<RailPull status={git()} />}>
               <span data-session-pr class={cn("inline-flex shrink-0", gitStyle().color)} title={sessionGitDescription(git())} aria-label={sessionGitDescription(git())}><Dynamic component={gitStyle().icon} size={12} aria-hidden="true" /></span>
             </Show></Show>
             <Show when={abridor()}>{who => <ChipDeCara kind="opener" icon={CornerDownRight} name={who()} tip={t("projects.sessions.opened_by", { name: nombre(who()) })} />}</Show>
             <Show when={anterior()}>{who => <ChipDeCara kind="handoff" icon={ArrowLeftRight} name={who()} tip={t("projects.sessions.handed_from", { name: nombre(who()) })} />}</Show>
           </span>
         </Show>
-        <span class="min-w-0 flex-1" />
         <span class="task-card-tail">
           <Show when={r.s.deferred}><span data-deferred class="shrink-0 text-neutral-500" title={t("projects.sessions.deferred")} aria-label={t("projects.sessions.deferred")}>⧗</span></Show>
-          <span class="inline-flex size-[18px] shrink-0 items-center justify-center">{r.cohete()}</span>
+          <span class="task-card-rocket">{r.cohete()}</span>
           <span data-session-time class="whitespace-nowrap text-[0.71875rem] tabular-nums">{shortTaskTime(cuando())}</span>
         </span>
       </div>

@@ -1,3 +1,4 @@
+import { TaskOrbit } from "./TaskOrbit";
 import { useTheme } from "./theme";
 import { astroBlink, astroMotion, ASTRO_SHAPES, astroBody, astroColors, type AstroNode } from "@terminus/design";
 import { Image, View } from "react-native";
@@ -32,7 +33,7 @@ export function AgentAvatar({ name, size = 32, host, folder, working = false }: 
   const eye = body === "hole" ? "#eef1fa" : "#0b1026";
   const asleep = !working && agent?.status === "asleep";
   return <View style={{ width: size, height: size, opacity: asleep ? 0.62 : 1 }}>
-    {image && failed !== image ? <Image source={{ uri: image }} style={{ width: size, height: size, borderRadius: size / 2 }} resizeMode="contain" onError={() => setFailed(image)} /> : (
+    {image && failed !== image ? <><Image source={{ uri: image }} style={{ width: size, height: size, borderRadius: size / 2 }} resizeMode="contain" onError={() => setFailed(image)} />{working ? <View pointerEvents="none" style={{ position: "absolute", inset: -3 }}><TaskOrbit size={size + 6} /></View> : null}</> : (
       <Svg width={size} height={size} viewBox="0 0 64 64">
         <Shape node={ASTRO_SHAPES[body]} colors={colors} time={time} eye={eye} />
         {asleep ? <G fill="none" stroke={body === "hole" ? "#eef1fa" : "#0b1026"} strokeWidth={2.7} strokeLinecap="round"><Path d="M21.5 34q4.5 4 9 0M33.5 34q4.5 4 9 0" /></G> : <G fill={eye} transform={astroBlink(time)}><Ellipse cx={26} cy={34} rx={2.7} ry={3.5} /><Ellipse cx={38} cy={34} rx={2.7} ry={3.5} /></G>}

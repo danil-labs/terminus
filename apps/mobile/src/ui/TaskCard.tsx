@@ -17,7 +17,7 @@ import { type Theme, useTheme } from "./theme";
  * La chapa de la máquina que corre la tarea, como `MachineChip` del escritorio:
  * el servidor y su nombre; apagada, más tenue (nunca como error).
  */
-export function MachineChip({ name, on, size = 12 }: { name: string; on: boolean; size?: number }) {
+export function MachineChip({ name, on, size = 14 }: { name: string; on: boolean; size?: number }) {
   const theme = useTheme();
   return (
     <View style={[styles.chip, { opacity: on ? 1 : 0.6 }]} accessibilityLabel={on ? name : w("shell.machines.task_off", { name })}>
@@ -118,10 +118,9 @@ function TaskCardView({
   const pull = cardPull(git);
   const chips = secondLine(card, pull);
   const [width, setWidth] = useState(320);
-  const limits = width <= 350 ? { folder: 56, machine: 48, git: 62 } : width <= 400 ? { folder: 84, machine: 80, git: 62 } : { folder: 100, machine: 86, git: 72 };
-  const room = Math.max(0, width - 32 - 16 - 86 - 20 - limits.git);
-  const scale = Math.min(1, room / (limits.folder + limits.machine));
-  const sections = { folder: Math.floor(limits.folder * scale), machine: Math.floor(limits.machine * scale), git: limits.git };
+  const gitWidth = 56;
+  const room = Math.max(0, width - 32 - 16 - 86 - 20 - gitWidth);
+  const sections = { folder: Math.min(112, Math.floor(room / 2)), machine: Math.min(104, Math.floor(room / 2)), git: gitWidth };
   const ready = online && canFinishTask(task, git, card.activity.viva || card.activity.aprobando);
   const branch = !git?.shared_with ? git?.branch : null;
   const kn = git?.kind === "kn" && !git.shared_with ? git.kn : null;

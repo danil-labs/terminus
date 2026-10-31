@@ -7128,6 +7128,7 @@ export default function App() {
           ? t("projects.threads.heading", { name: displayName(identidadVisualDeLaCelda() ?? "", cellProfile()), title: threadTitle(filaDe(pp.sesion ?? "")) })
           : displayName(identidadVisualDeLaCelda() ?? "", cellProfile())}
         chatBody={cellProfile().body}
+        workAgent={identidadVisualDeLaCelda()}
         chatDescription={declared()?.description}
         chatAvatar={cellProfile().avatar}
         bodyOf={(name) => profiles()[name]?.body ?? null}

@@ -268,7 +268,6 @@
     "one": "Expand the subtask of “{title}”",
     "other": "Expand the {count} subtasks of “{title}”"
   },
-  "projects.sessions.worktree_missing": "Worktree disconnected: its folder is no longer on disk.",
   "projects.sessions.time_now": "now",
   "projects.sessions.time_minutes": "{count}m",
   "projects.sessions.time_hours": "{count}h",
