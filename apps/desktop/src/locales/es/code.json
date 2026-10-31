@@ -1,9 +1,4 @@
 {
-  "code.column.close.label": "Cerrar el árbol de trabajo",
-  "code.column.close.title": "Cerrar el árbol de trabajo (Esc)",
-  "code.column.export_chat": "Exportar chat",
-  "code.column.export_chat.busy": "Exportando…",
-  "code.column.title": "Carpeta",
   "code.comparing": "Comparando…",
   "code.diff.layout.label": "Cómo se pinta el cambio",
   "code.diff.layout.unified": "Unificada",
