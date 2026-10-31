@@ -66,18 +66,6 @@ export function Print(props: { size?: number }) {
   );
 }
 
-export function WorktreeRoto(props: { size?: number }) {
-  return (
-    <Svg size={props.size}>
-      <circle cx="6" cy="5" r="2.2" />
-      <circle cx="6" cy="19" r="2.2" />
-      <circle cx="18" cy="12" r="2.2" />
-      <path d="M6 7.2v3.1m0 3.4v3.2m2-4.6h2.1m3.8 0H15" />
-      <path d="m10.3 9.7 3.4 4.6m0-4.6-3.4 4.6" />
-    </Svg>
-  );
-}
-
 /**
  * Marcas de terceros, rellenas y no con trazo: una marca es una silueta, y
  * `Svg` de arriba es para glifos de interfaz. Los trazos salen de simple-icons

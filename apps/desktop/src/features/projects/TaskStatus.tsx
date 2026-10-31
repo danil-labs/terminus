@@ -68,21 +68,33 @@ function RailDashedRing(props: { size?: number }) {
   );
 }
 
-/** Identidad estable; el estado del turno ocupa su esquina, nunca el centro. */
+function dotColor(state: ReturnType<typeof taskPriority>) {
+  switch (state) {
+    case "unseen": return "bg-success-strong";
+    case "failed": return "bg-error-strong";
+    case "approving":
+    case "asked": return "bg-warning-strong";
+    default: return "bg-neutral-500";
+  }
+}
+
+/**
+ * Identidad estable. Trabajando lo dice la animación del agente, sin arco
+ * (sólo con movimiento reducido); sin agente queda un loader chico. Cualquier
+ * otro estado es un punto de color en la esquina.
+ */
 function CardMark(props: TaskActivity & { identity: () => JSX.Element; identityLabel?: string; provisional?: boolean; archivada?: boolean }) {
   const state = () => taskPriority(props);
   const delivered = () => !state() && props.outcome === "delivered";
   const label = () => [props.identityLabel, props.provisional ? t("projects.status.provisional") : taskLabel(state()) || (delivered() ? t("projects.status.delivered") : props.archivada ? t("projects.status.archived") : "")].filter(Boolean).join(" · ");
-  return <span class="task-card-identity" data-task-orbit role={label() ? "img" : undefined} title={label()} aria-label={label() || undefined}>
+  return <span class="task-card-identity" data-task-orbit data-with-agent={props.identityLabel ? "" : undefined} role={label() ? "img" : undefined} title={label()} aria-label={label() || undefined}>
     {props.identity()}
     <Show when={props.provisional} fallback={
       <Show when={state() === "working"} fallback={
         <Show when={state() || delivered() || props.archivada}>
-          <span class={cn("task-card-badge", state() === "unseen" ? "text-success-strong" : railColor(state()))}>
-            <Dynamic component={state() ? stateIcon(state()) : delivered() ? Check : Archive} size={12} aria-hidden="true" />
-          </span>
+          <span class="task-card-badge"><span aria-hidden="true" class={cn("size-[7px] rounded-full", dotColor(state()))} /></span>
         </Show>
-      }><span class="task-card-orbit"><Spinner size={22} class="text-primary motion-reduce:animate-none" /></span></Show>
+      }><span class="task-card-orbit"><Spinner size={props.identityLabel ? 22 : 16} class="animate-spin-lento text-primary motion-reduce:animate-none" /></span></Show>
     }><span class="task-card-orbit"><RailDashedRing size={22} /></span></Show>
   </span>;
 }

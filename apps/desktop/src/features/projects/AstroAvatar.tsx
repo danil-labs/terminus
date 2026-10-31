@@ -55,7 +55,6 @@ function AstroShape(props: { node: AstroNode }) {
  * y corta el parpadeo a media animación.
  */
 export function AstroAvatar(props: {
-  orbit?: boolean;
   name: string;
   status: HandlerStatus;
   size?: number;
@@ -87,7 +86,6 @@ export function AstroAvatar(props: {
   return (
     <span
       class="astro-face relative inline-flex shrink-0"
-      data-astro-orbit={props.orbit ? "true" : undefined}
       data-astro-working={props.status === "working" ? "true" : undefined}
     >
       <Show
