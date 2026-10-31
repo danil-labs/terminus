@@ -1,11 +1,10 @@
-import Archive from "lucide-solid/icons/archive";
 import Check from "lucide-solid/icons/check";
 import CircleAlert from "lucide-solid/icons/circle-alert";
 import CircleHelp from "lucide-solid/icons/circle-help";
 import CirclePause from "lucide-solid/icons/circle-pause";
 import ShieldQuestion from "lucide-solid/icons/shield-question";
+import { SignalDot, taskSignalTone } from "../../ui/SignalDot";
 import { type JSX, Match, Show, Switch } from "solid-js";
-import { Dynamic } from "solid-js/web";
 import { t } from "../../lib/i18n";
 import { Spinner } from "../../ui/Spinner";
 import { cn } from "../../lib/utils";
@@ -49,16 +48,6 @@ export function stateIcon(state: ReturnType<typeof taskPriority>) {
  * El color de cada estado en la tarjeta del riel: preguntar y pedir aprobación
  * comparten el ámbar fuerte, que sobre el fondo del riel se lee como texto.
  */
-function railColor(state: ReturnType<typeof taskPriority>) {
-  switch (state) {
-    case "failed": return "text-error-strong";
-    case "interrupted": return "text-neutral-500";
-    case "approving":
-    case "asked": return "text-warning-strong";
-    default: return "text-neutral-500";
-  }
-}
-
 /** El anillo punteado de la tarea que el motor todavía registra. */
 function RailDashedRing(props: { size?: number }) {
   return (
@@ -66,16 +55,6 @@ function RailDashedRing(props: { size?: number }) {
       <circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-dasharray="2.2 2.4" />
     </svg>
   );
-}
-
-function dotColor(state: ReturnType<typeof taskPriority>) {
-  switch (state) {
-    case "unseen": return "bg-success-strong";
-    case "failed": return "bg-error-strong";
-    case "approving":
-    case "asked": return "bg-warning-strong";
-    default: return "bg-neutral-500";
-  }
 }
 
 /**
@@ -92,7 +71,7 @@ function CardMark(props: TaskActivity & { identity: () => JSX.Element; identityL
     <Show when={props.provisional} fallback={
       <Show when={state() === "working"} fallback={
         <Show when={state() || delivered() || props.archivada}>
-          <span class="task-card-badge"><span aria-hidden="true" class={cn("size-[7px] rounded-full", dotColor(state()))} /></span>
+          <span class="task-card-badge"><SignalDot tone={taskSignalTone(state())} /></span>
         </Show>
       }><span class="task-card-orbit"><Spinner size={props.identityLabel ? 22 : 16} class="animate-spin-lento text-primary motion-reduce:animate-none" /></span></Show>
     }><span class="task-card-orbit"><RailDashedRing size={22} /></span></Show>
@@ -123,19 +102,14 @@ function RailMark(props: TaskActivity & { provisional?: boolean; archivada?: boo
           <Spinner size={lado()} class="text-primary motion-reduce:animate-none" />
         </span>
       </Match>
-      <Match when={state() === "unseen"}>
-        <span class="inline-flex shrink-0 items-center justify-center" style={{ width: `${lado()}px`, height: `${lado()}px` }} title={label()} aria-label={label()}>
-          <span aria-hidden="true" class="size-[7px] rounded-full bg-success-strong" />
-        </span>
-      </Match>
       <Match when={state()}>
-        <span class={cn("inline-flex shrink-0 items-center justify-center", railColor(state()))} title={label()} aria-label={label()}>
-          <Dynamic component={stateIcon(state())} size={lado()} aria-hidden="true" />
+        <span class="inline-flex shrink-0 items-center justify-center" style={{ width: `${lado()}px`, height: `${lado()}px` }} title={label()} aria-label={label()}>
+          <SignalDot tone={taskSignalTone(state())} />
         </span>
       </Match>
       <Match when={props.archivada && !props.plegadas}>
         <span class="inline-flex shrink-0 items-center justify-center text-neutral-500" title={t("projects.status.archived")} aria-label={t("projects.status.archived")}>
-          <Archive size={lado()} aria-hidden="true" />
+          <SignalDot tone="neutral" />
         </span>
       </Match>
     </Switch>
@@ -161,11 +135,9 @@ export default function EstadoDeTarea(props: TaskActivity & {
   return <Show when={!props.identity} fallback={<CardMark {...props} identity={props.identity!} />}>
   <Show when={!props.riel} fallback={<RailMark {...props} plegadas={props.ambito === "plegadas"} />}>
   <Show when={state() || (props.outcome === "delivered" && props.ambito !== "plegadas")}><span class={cn("inline-flex shrink-0 items-center gap-0.5", props.class)}>
-    <Show when={state()} fallback={<Show when={props.outcome === "delivered" && props.ambito !== "plegadas"}><span class="inline-flex shrink-0 text-neutral-500" title={t("projects.status.delivered")} aria-label={t("projects.status.delivered")}><Check size={lado()} aria-hidden="true" /></span></Show>}>
+    <Show when={state()} fallback={<Show when={props.outcome === "delivered" && props.ambito !== "plegadas"}><span class="inline-flex shrink-0 text-neutral-500" title={t("projects.status.delivered")} aria-label={t("projects.status.delivered")}><SignalDot tone="neutral" /></span></Show>}>
       <span class={cn("inline-flex shrink-0 items-center justify-center", stateColor(state()))} style={{ width: `${lado()}px`, height: `${lado()}px` }} title={label()} aria-label={label()}>
-        <Show when={state() === "working"} fallback={<Dynamic component={stateIcon(state())} size={lado()} aria-hidden="true" />}>
-          <span aria-hidden="true" class="size-1.5 rounded-full bg-current" />
-        </Show>
+        <SignalDot tone={taskSignalTone(state())} />
       </span>
     </Show>
   </span></Show>

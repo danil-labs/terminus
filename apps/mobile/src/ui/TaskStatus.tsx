@@ -1,4 +1,4 @@
-import { type IconShape, LUCIDE, STATUS_ICONS, STATUS_LABELS, type StatusLabel, type TaskState, topState } from "@terminus/design";
+import { type IconShape, LUCIDE, SIGNAL_DOT_SIZE, STATUS_ICONS, STATUS_LABELS, type StatusLabel, type TaskState, topState } from "@terminus/design";
 import { Platform, View } from "react-native";
 import Svg, { Circle, Line, Path } from "react-native-svg";
 import { AgentAvatar } from "./AgentAvatar";
@@ -56,7 +56,7 @@ export function TaskMark({ state, delivered = false, size = 16, identity }: { st
     return <View testID="task-identity" {...(Platform.OS === "web" ? { title: label } : {})} style={{ width: 24, height: 24, alignItems: "center", justifyContent: "center" }} accessibilityRole={label ? "image" : undefined} accessibilityLabel={label || undefined}>
       {identity.agent ? <AgentAvatar name={identity.agent} host={identity.host} folder={identity.folder} size={18} working={state === "working"} /> : null}
       {state === "working" ? (identity.agent ? null : <TaskOrbit size={16} />) : state || delivered ? <View pointerEvents="none" style={{ position: "absolute", top: -2, right: -2, width: 12, height: 12, borderRadius: 6, alignItems: "center", justifyContent: "center", backgroundColor: theme.surface }}>
-        <View testID="task-dot" style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: color }} />
+        <View testID="task-dot" style={{ width: SIGNAL_DOT_SIZE, height: SIGNAL_DOT_SIZE, borderRadius: SIGNAL_DOT_SIZE / 2, backgroundColor: color }} />
       </View> : null}
     </View>;
   }
