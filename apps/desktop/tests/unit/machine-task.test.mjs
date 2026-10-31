@@ -150,9 +150,16 @@ test("la tarea nueva lleva la barra de una tarea: ubicación, herramientas apaga
   const delegadas = doc.querySelector('[data-delegated-trigger="toolbar"]');
   assert.equal(delegadas?.getAttribute("aria-disabled"), "true");
   assert.equal(delegadas.title, "Aún no hay tareas delegadas");
-  // Sin tarea no hay archivos: no hay columna derecha y el icono de carpeta queda apagado.
-  assert.equal(doc.querySelector("[data-conversacion]")?.nextElementSibling, null, "la tarea nueva no abre columna derecha");
-  assert.equal(boton("Archivos de la tarea")?.disabled, true);
+  // La carpeta existe: su icono abre el panel con los archivos base, sin columna aparte.
+  const carpeta = boton("Archivos de la tarea");
+  assert.equal(carpeta?.disabled, false, "la carpeta existe: su icono no se apaga");
+  assert.equal(carpeta.getAttribute("aria-pressed"), "false");
+  carpeta.click();
+  await sleep(300);
+  assert.equal(boton("Archivos de la tarea")?.getAttribute("aria-pressed"), "true", "el panel de la carpeta no abrió");
+  assert.ok(doc.querySelector("[data-task-location]"), "la barra de ubicación desapareció con el panel abierto");
+  boton("Archivos de la tarea").click();
+  await sleep(100);
   // Una tarea real sin delegadas conserva el hueco, y su búsqueda sí funciona.
   await openTask(app, "t1");
   assert.equal(doc.querySelector('[data-delegated-trigger="toolbar"]')?.getAttribute("aria-disabled"), "true");

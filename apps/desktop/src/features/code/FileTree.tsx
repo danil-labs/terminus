@@ -81,6 +81,8 @@ export default function ArbolDeArchivos(props: {
   arbol: string;
   kind: "git" | "folder" | "kn";
   visible: boolean;
+  /** Acciones del árbol entero (guardar en la carpeta), junto a la búsqueda: el nombre de la carpeta ya lo dice la barra de la tarea. */
+  acciones?: JSX.Element;
   /** Sin tarea aún, lee el commit de la rama base en lugar de una copia. */
   preview?: { baseRef?: string };
   /**
@@ -825,6 +827,7 @@ export default function ArbolDeArchivos(props: {
               class="min-h-7 px-0 py-0 text-xs"
             />
           </label>
+          {props.acciones}
           <Show when={creable()}>
             <Button
               variant="ghost"

@@ -61,6 +61,7 @@ import {
   anexarDeltas,
   anexarImagen,
   type ChatEvent,
+  type ChatExportado,
   clave,
   mcpCallFromName,
   mensajesDelHilo,
@@ -488,6 +489,8 @@ export default function App() {
   // abiertos a la vez y los tres dirían "activo" si se derivara de ahí.
   const pestanas = createTabs({ transient: true });
   const archivosDeTarea = createTaskFiles();
+  /** Sin tarea todavía, el panel de la carpeta del proyecto vive bajo su propia llave. */
+  const llaveDeBorrador = (proyecto: string | undefined) => (proyecto ? `borrador:${proyecto}` : "");
   const [anchoDeArchivos, setAnchoDeArchivos] = createPref("taskFiles.width", 0.55);
   const [anchoDelArbol, setAnchoDelArbol] = createPref("taskFiles.treeWidth", 330);
   const pestanaActiva = () => (proyectoAbierto() ? null : pestanas.active());
@@ -1712,9 +1715,11 @@ export default function App() {
   const [folder, setFolder] = createSignal<string | null>(null);
 
   const sidebar = createSidebar();
+  const carpetaDelProyecto = () =>
+    carpetaDeTrabajo(projectList().find((p) => p.id === project()) ?? {});
   // Los archivos viven dentro de la tarea (`archivosDeTarea`); sin tarea no hay nada que enseñar.
   const alternarElArbol = () => {
-    const id = sessionId();
+    const id = sessionId() ?? (carpetaDelProyecto() ? llaveDeBorrador(project()) : "");
     if (id) archivosDeTarea.toggle(id);
   };
 
@@ -5440,6 +5445,17 @@ export default function App() {
     void abrirRuta(f + sep + rel.split("/").join(sep), rel);
   }
 
+  /** El árbol recuenta por `harness:copia`, como al guardar un archivo desde su pestaña. */
+  async function exportarChat(id: string, proyecto: string) {
+    try {
+      const salida = await invoke<ChatExportado>("export_chat", { project: proyecto, id }, deLaTarea(id));
+      abrirArtefacto(salida.rel, salida.path);
+      window.dispatchEvent(new CustomEvent("harness:copia"));
+    } catch (e) {
+      setError(prosaDe(e));
+    }
+  }
+
   async function forkDesde(turno: string, mode: "full" | "focused", encargado: string | null) {
     const workspace = workspaceActivo();
     const id = sessionId();
@@ -6720,21 +6736,25 @@ export default function App() {
       <FolderOpen size={16} />
     </BotonConAtajo>
   );
-  // La tarea nueva aún no tiene archivos que abrir: el botón ocupa su lugar apagado, con su porqué.
-  const botonDelArbol = () => (
-    <BotonConAtajo
-      variant="ghost"
-      size="icon"
-      class="relative size-7 shrink-0 text-neutral-500"
-      disabled
-      aria-pressed={false}
-      aria-label={t("code.panel.toggle")}
-      accion="workTree"
-      etiqueta={t("shell.work_tree.no_session")}
-    >
-      <FolderOpen size={16} />
-    </BotonConAtajo>
-  );
+  // La tarea nueva abre la carpeta del proyecto; sin carpeta no hay nada que enseñar y el botón queda apagado con su porqué.
+  const botonDelArbol = () => {
+    const llave = () => (carpetaDelProyecto() ? llaveDeBorrador(project()) : "");
+    return (
+      <BotonConAtajo
+        variant={llave() && archivosDeTarea.panel(llave()).open ? "secondary" : "ghost"}
+        size="icon"
+        class="relative size-7 shrink-0 text-neutral-500"
+        disabled={!llave()}
+        onClick={() => archivosDeTarea.toggle(llave())}
+        aria-pressed={!!llave() && archivosDeTarea.panel(llave()).open}
+        aria-label={t("code.panel.toggle")}
+        accion="workTree"
+        etiqueta={llave() ? t("code.panel.toggle") : t("shell.work_tree.no_session")}
+      >
+        <FolderOpen size={16} />
+      </BotonConAtajo>
+    );
+  };
   const PanelDeChat = (pp: {
     sesion: string | null;
     /** El proyecto de esa tarea. `null` en la ventana en blanco, que no tiene. */
@@ -6753,6 +6773,9 @@ export default function App() {
     const esperandoAqui = () => !pp.soloLectura && esperando();
     const proyectoDeLaCelda = () =>
       (pp.sesion ? projectList() : composerProjects()).find((p) => p.id === (pp.proyecto ?? project()));
+    // El panel de archivos de esta celda: el de su tarea, o el de la carpeta mientras no hay tarea.
+    const clavePanel = () => pp.sesion
+      ?? (carpetaDeTrabajo(proyectoDeLaCelda() ?? {}) ? llaveDeBorrador(proyectoDeLaCelda()?.id) : "");
     const [estadoDelTrabajo, { refetch: refreshWork }] = createTaskWork(() => pp.sesion
       ? { project: proyectoDeLaCelda()?.id ?? "", id: pp.sesion }
       : undefined);
@@ -6991,9 +7014,9 @@ export default function App() {
       when={viewingProfile() && declared()}
       fallback={
     <TaskFilesRow
-      open={!!pp.sesion && archivosDeTarea.panel(pp.sesion).open}
-      covers={!!pp.sesion && (archivosDeTarea.panel(pp.sesion).expanded || paneles.isSplit() || compacta())}
-      hasTabs={!!pp.sesion && archivosDeTarea.panel(pp.sesion).tabs.length > 0}
+      open={!!clavePanel() && archivosDeTarea.panel(clavePanel()).open}
+      covers={!!clavePanel() && (archivosDeTarea.panel(clavePanel()).expanded || paneles.isSplit() || compacta())}
+      hasTabs={!!clavePanel() && archivosDeTarea.panel(clavePanel()).tabs.length > 0}
       width={anchoDeArchivos()}
       treeWidth={anchoDelArbol()}
       onWidth={setAnchoDeArchivos}
@@ -7001,7 +7024,7 @@ export default function App() {
       location={ubicacion}
       chat={
     <Chat
-        besideFiles={!!pp.sesion && archivosDeTarea.panel(pp.sesion).open}
+        besideFiles={!!clavePanel() && archivosDeTarea.panel(clavePanel()).open}
         onSearchReady={target => {
           if (!pp.sesion) return;
           setThreadSearchTargets(previous => {
@@ -7063,7 +7086,6 @@ export default function App() {
             </div>
           </Show>
         </>}
-        location={ubicacion()}
         machine={pp.sesion ? filaDe(pp.sesion)?.machine : undefined}
         msgs={mensajes()}
         /* Identidad de lo que tiene delante, no ids de proyecto/tarea: es lo
@@ -7734,6 +7756,7 @@ export default function App() {
                     visible={visible()} readOnly={editorDeletionLocked(p.session)}
                     expandedOnly={paneles.isSplit() || compacta()}
                     onSaved={() => window.dispatchEvent(new CustomEvent("harness:copia"))}
+                    onExportChat={() => exportarChat(p.session, p.project)}
                     onMoved={archivoMovido} onRemoved={archivoBorrado} />
                 </Suspense>
               </div>
@@ -7820,6 +7843,37 @@ export default function App() {
             />
           </div>
         )}
+      </Index>
+
+      {/* Los archivos base de la carpeta, antes de que exista la tarea: el mismo panel, leído del proyecto. */}
+      <Index each={sitiosEnBlanco()}>
+        {(sitio) => {
+          const llave = () => (carpetaDelProyecto() ? llaveDeBorrador(project()) : "");
+          const panel = () => archivosDeTarea.panel(llave());
+          const [usado, setUsado] = createSignal(false);
+          createEffect(() => { if (llave() && panel().open) setUsado(true); });
+          const cubre = () => panel().expanded || paneles.isSplit() || compacta();
+          const visible = () => !!llave() && panel().open && !tapadoPorElProyecto(sitio());
+          const ancho = () => (cubre() ? undefined : taskFilesWidth(panel().tabs.length > 0, anchoDeArchivos(), anchoDelArbol()));
+          return (
+            <Show when={usado() && project()}>
+              {(proyecto) => (
+                <div class="pointer-events-none z-10 flex min-h-0 min-w-0 justify-self-end pt-9 pr-2 pb-2 *:pointer-events-auto"
+                  classList={{ hidden: !visible(), "w-full pl-2": cubre(), "mt-8": llevaTiraInterior(sitio()), "transition-[width] duration-200 ease-out": !moviendoHueco() }}
+                  style={{ ...estiloDeLaCelda(sitio()), width: ancho() }}
+                  onPointerDown={() => mandarVentana(sitio())}>
+                  <Suspense fallback={null}>
+                    <TaskFilesCard project={proyecto()} session="" panelKey={llave()} preview={{ baseRef: draftBases()[claveAbierta()] }}
+                      files={archivosDeTarea} visible={visible()}
+                      expandedOnly={paneles.isSplit() || compacta()}
+                      onSaved={() => {}} onExportChat={async () => {}}
+                      onMoved={() => {}} onRemoved={() => {}} />
+                  </Suspense>
+                </div>
+              )}
+            </Show>
+          );
+        }}
       </Index>
 
       {/* Cada documento queda montado, escondido cuando no es el que se
