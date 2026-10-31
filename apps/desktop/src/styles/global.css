@@ -1011,6 +1011,7 @@
 
 /* Con la ventana escondida o sin foco no se mueve nada; al volver arrancan de
    nuevo y se anclan otra vez al reloj común. */
+:root[data-window-idle] [data-task-orbit] [data-spinner],
 :root[data-window-idle] .astro-face,
 :root[data-window-idle] .astro-face::after,
 :root[data-window-idle] .astro-face * {
