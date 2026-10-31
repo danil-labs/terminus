@@ -196,7 +196,7 @@ export type WorkThread = { lines: ChatLine[]; live: ChatLine[]; runs: WorkRun[] 
 
 const opensRun = (turn: Turn) => turn.role === "user" && !turn.permission && !turn.answers?.length && !turn.shell;
 const isSegment = (turn: Turn) => turn.role !== "user" && turn.role !== "system" && turn.role !== "shell";
-const isEmpty = (line: Line) => line.kind === "message" && !line.text && !line.images.length && !line.attachments.length;
+const isEmpty = (line: Line) => line.kind === "message" && !line.text && !line.images.length && !line.attachments.length && !line.refs?.length;
 
 function decisionOf(turn: Turn): Step | null {
   if (!turn.permission) return null;

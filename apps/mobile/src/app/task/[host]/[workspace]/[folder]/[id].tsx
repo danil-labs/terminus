@@ -423,7 +423,11 @@ export default function TaskScreen() {
   const liveLines = thread.live;
   // Las respuestas del agente, para contar en el botón las que entraron desde que se subió.
   const replies = useRef(0);
-  replies.current = lines.filter((line) => line.kind === "message" && line.role !== "user" && line.role !== "system" && line.role !== "shell").length;
+  const repliesHeld = lines.filter((line) => line.kind === "message" && line.role !== "user" && line.role !== "system" && line.role !== "shell").length;
+  // Una página anterior no es una respuesta nueva: al moverse la ventana, la cuenta sigue donde iba.
+  const repliesBase = useRef({ start: base, offset: 0 });
+  if (repliesBase.current.start !== base) repliesBase.current = { start: base, offset: repliesHeld - replies.current };
+  replies.current = repliesHeld - repliesBase.current.offset;
   const onScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
     if (Platform.OS === "web" && prepending.current) return;
     const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
@@ -447,11 +451,27 @@ export default function TaskScreen() {
     const shown = showJump(next);
     setJump((now) => (now.shown === shown ? now : { shown, unseen: unseen(next, replies.current) }));
   }, []);
+  // Lo que entró arriba no mueve la barra: sin este paso nadie vuelve a mirar si hace falta más.
+  const continueUp = useCallback(() => {
+    const node = scroller();
+    if (!node || prepending.current || sheetOpened.current) return;
+    const page = webSlice.current;
+    if (webReady.current !== page.scope || node.scrollTop >= MARGIN) return;
+    if (page.first > 0) {
+      const held = anchorOf(node);
+      prepending.current = held;
+      if (held) prependTimer.current = setTimeout(() => {
+        if (prepending.current === held) resetReading();
+      }, PREPEND_RECOVERY_MS);
+      setWebWindow({ scope: page.scope, first: page.rows[Math.max(0, page.first - TAIL_PAGE_SIZE)].key });
+    } else if (!needleNow.current) void askOlderNow.current();
+  }, []);
   const onContentSize = useCallback(() => {
     const node = scroller();
     if (!node || webReady.current !== webSlice.current.scope) return;
     if (prepending.current || !follow.current.following) restoreReading(node);
     else toBottom(false);
+    if (!prepending.current && !follow.current.following) continueUp();
   }, []);
   const newReplies = jump.shown ? unseen(follow.current, replies.current) : 0;
   const streaming = liveLines.some((line) => line.key === "live");

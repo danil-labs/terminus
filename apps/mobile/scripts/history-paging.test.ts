@@ -58,3 +58,10 @@ test("una pregunta fuera de la cola no descarta la respuesta en silencio", async
   const { host } = fakeHost((command) => (command === "load_session" ? session : command === "pending_requests" ? { questions: [], permissions: [] } : []));
   await assert.rejects(answerQuestion(host, "w", "f", "t", { request_id: null, turn: "lejos", questions: [{ id: "q", question: "?", options: [], multiple: false }] } as never, {}, {}), /question_unverified/);
 });
+
+test("un turno cuyo texto no cupo en la página sigue siendo un renglón", async () => {
+  const { workRuns } = await import("../src/lib/steps.ts");
+  const ref = { version: 1 as const, turn: 1, pointer: "/text", revision: "r", bytes: 9000 };
+  const thread = workRuns([{ id: "u", role: "user", text: "hola" }, { id: "a", role: "agent", text: "", history_refs: [ref] }] as never, [], false);
+  assert.ok(thread.lines.some((line) => line.kind === "message" && line.refs?.length === 1));
+});
