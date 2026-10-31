@@ -5,6 +5,23 @@
 run; locally it is allowed and listed in the summary. `--no-cargo` skips the
 Rust steps.
 
+`pnpm verify --quick` is a working check, never a merge gate: run the full chain
+before merging. It compares with `origin/dev` (`--base=<ref>` changes it) through
+`git merge-base` and `git diff`, including uncommitted and untracked files, and
+always runs the static guards, the linter and `tsc`. Of the tests, it runs those
+that reach a changed file through their imports or a `src/`, `scripts/` or
+`alpha-entry/` path they name. `src-tauri/` and `seldon-runtime.lock` add the
+Rust steps and both vite builds, which cargo needs. A selected test that reads
+`dist/` also adds the builds. A source
+change does not select the tests that mount `dist/`, `mount-frontend`,
+`missing-classes`, `theme-inversion`, `bundle-size` or the perf ceilings unless they also import the
+changed file: they depend on the whole front and appear in the list of what was
+skipped. Every run names that list
+and says it is not a complete verification. It falls back to the full chain,
+and says why, when git cannot answer, when `package.json`, a lockfile,
+`verify.mjs`, `verify-scope.mjs`, `git.mjs`, `tests/helpers/` or `packages/`
+changed, or when a file has no place in the map.
+
 The engine (`seldon-runtime`) is not in this repository. Guards that need to
 know what the engine registers or emits read its frozen contract:
 `src-tauri/crates/engine-protocol/commands.json` (commands and events) and

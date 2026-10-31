@@ -25,6 +25,7 @@ Read the guide of the area before editing it.
 pnpm install            # desktop and packages (pnpm workspace)
 pnpm verify             # the desktop chain: guards, front build and Rust
 pnpm verify --no-cargo  # the same chain without Rust
+pnpm verify --quick     # guards, linter, tsc and the tests of this diff; not a merge gate
 ```
 
 `pnpm <script>` at the root runs the desktop's script. `apps/mobile/` is outside
