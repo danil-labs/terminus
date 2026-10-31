@@ -1,11 +1,4 @@
-/**
- * Llevar el trabajo de una carpeta de esta Mac a la VM elegida en «Ejecutar en»:
- * al enviar se abre la hoja con lo que hay sin subir, «Llevar y enviar» copia
- * por partes con la máquina en la cabecera y la tarea nace en la VM sobre la
- * foto. Si la copia se corta, el mensaje vuelve a la caja y «Reintentar» sigue
- * desde la parte que faltaba. El proxy (`features/machines/router.ts`) se simula con sus
- * respuestas por máquina. Monta `dist/`.
- */
+/** Copia explícita de carpetas, reintento, cancelación y creación remota sin copia. Monta dist/. */
 import assert from "node:assert/strict";
 import test from "node:test";
 import { boot, sleep } from "../helpers/jsdom-app.mjs";
@@ -83,8 +76,11 @@ const until = async (check, ms = 4000) => {
   return false;
 };
 
-async function start(name, log, overrides) {
-  const app = await boot("listo", name, responses(log, overrides));
+async function start(name, log, overrides, explicit = true) {
+  const app = await boot("listo", name, responses(log, {
+    list_live_sessions: () => [{ id: "local-task", title: "Local", provider: "codex", refs: [], created_at: 0, updated_at: 0, turns: 1, parent: null }],
+    ...overrides,
+  }), undefined, { "harness.layout.sidebar.view.w": JSON.stringify({ folders: [], agent: null, group: "folder" }) });
   await sleep(600);
   const doc = app.w.document;
   const button = (label) => [...doc.querySelectorAll("button")].find((b) => b.textContent?.trim().startsWith(label));
@@ -98,6 +94,12 @@ async function start(name, log, overrides) {
   assert.ok(await until(() => doc.querySelector('[data-machine-option="vm"]')));
   doc.querySelector('[data-machine-option="vm"]').click();
   await sleep(300);
+  if (explicit) {
+    doc.querySelector('[data-folder-group="p1"] [aria-haspopup="menu"]').click();
+    assert.ok(await until(() => doc.querySelector("[data-carry-folder]")));
+    doc.querySelector("[data-carry-folder]").click();
+    assert.ok(await until(() => doc.querySelector("[data-carry-sheet]")));
+  }
   return { app, doc, button };
 }
 
@@ -108,7 +110,7 @@ async function write(app, message) {
   field.closest("form").dispatchEvent(new app.w.Event("submit", { bubbles: true, cancelable: true }));
 }
 
-test("enviar a la VM con trabajo sin subir abre la hoja, copia por partes y la tarea nace en la foto", async () => {
+test("llevar explícitamente a la VM copia por partes y crea la tarea sobre la foto", async () => {
   const log = [];
   const { app, doc } = await start("carry-window", log);
   await write(app, "arregla el login");
@@ -181,7 +183,7 @@ test("sin nada sin subir y con el proyecto en la VM se manda como siempre, sin h
       return { ...STATUS, ahead: 0, changed: 0, untracked: 0 };
     },
     list_projects: (_args, options) => [{ id: "p1", name: "P1", working_directory: machineOf(options) === "vm" ? "/home/vm/p1" : "/lab/p1", kind: "git", portfolio: null, sources: [] }],
-  });
+  }, false);
   await write(app, "hola");
   assert.ok(await until(() => log.some((c) => c.name === "send_message")), "no se mandó");
   assert.equal(doc.querySelector("[data-carry-sheet]"), null);
@@ -284,4 +286,37 @@ test("a same-named destination folder with another id does not bypass repository
   } finally {
     app.w.close();
   }
+});
+
+
+test("cancelar la copia explícita permite enviar en la VM sin copiar", async () => {
+  const log = [];
+  const { app, doc } = await start("carry-cancel-send", log);
+  assert.ok(await until(() => doc.querySelector("[data-carry-sheet]")));
+  const field = doc.querySelector("textarea");
+  field.value = "usa lo que ya existe en la VM";
+  field.dispatchEvent(new app.w.Event("input", { bubbles: true }));
+  [...doc.querySelectorAll("[role=dialog] button")].find(b => b.textContent.trim() === "Cancelar").click();
+  assert.equal(doc.querySelector("textarea").value, "usa lo que ya existe en la VM");
+  await write(app, "usa lo que ya existe en la VM");
+  assert.ok(await until(() => log.some(c => c.name === "send_message")), "cancelar dejó el envío atrapado en la transferencia");
+  assert.equal(doc.querySelector("[data-carry-sheet]"), null);
+  assert.equal(log.find(c => c.name === "send_message").machine, "vm");
+  assert.equal(log.filter(c => c.name === "work_write_part").length, 0);
+  assert.deepEqual(app.fallos, []);
+});
+
+for (const sourceOn of [true, false]) test(`crear en una VM no consulta ni copia desde la Mac (${sourceOn ? "encendida" : "apagada"})`, async () => {
+  const log = [];
+  const { app, doc } = await start(`carry-dirty-no-auto-${sourceOn}`, log, {
+    machine_list: [
+      { id: "local", local: true, active: true, on: sourceOn, hosts: true },
+      { id: "vm", local: false, active: false, on: true, hosts: true },
+    ],
+  }, false);
+  await write(app, "usa el proyecto de la VM");
+  assert.ok(await until(() => log.some(c => c.name === "send_message")), "enviar abrió una transferencia implícita");
+  assert.equal(doc.querySelector("[data-carry-sheet]"), null);
+  assert.equal(log.filter(c => c.name.startsWith("work_")).length, 0);
+  assert.deepEqual(app.fallos, []);
 });

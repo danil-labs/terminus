@@ -114,3 +114,21 @@ export function connectionAudit(endpoint: string, token: string, id: string, f: 
     f,
   );
 }
+
+export type ConnectionCapabilities = {
+  features: string[];
+  limits: { max_destinations: number; max_destination_bindings: number };
+};
+
+/** Un 404 distingue el servicio anterior; las demás fallas no son falta de soporte. */
+export function connectionCapabilities(endpoint: string, token: string, f: Fetch = globalFetch): Promise<Answer<ConnectionCapabilities>> {
+  return request(apiUrl(endpoint, "/v1/connections/capabilities"), token, "GET", (body) => {
+    const value = body as Partial<ConnectionCapabilities> | null;
+    if (!Array.isArray(value?.features) || !value.features.every(v => typeof v === "string") ||
+      !Number.isInteger(value.limits?.max_destinations) || (value.limits?.max_destinations ?? 0) < 1 ||
+      !Number.isInteger(value.limits?.max_destination_bindings) || (value.limits?.max_destination_bindings ?? 0) < 1) {
+      throw new Error("bad_capabilities");
+    }
+    return value as ConnectionCapabilities;
+  }, f);
+}
