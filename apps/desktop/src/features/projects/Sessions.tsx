@@ -723,7 +723,7 @@ export default function Sessions(props: {
       const appearance = gitAppearance(git());
       return git().stale ? { ...appearance, color: "text-neutral-500" } : appearance;
     };
-    return <div class="task-card-lines" data-selected={r.s.id === props.current ? "true" : undefined} data-outside={!tarjetaDelRiel() || undefined}>
+    return <div class="task-card-lines" data-outside={!tarjetaDelRiel() || undefined}>
       <div class="flex h-[22px] min-w-0 items-center gap-1.5">
         <div class="min-w-0 flex-1">{r.titulo}</div>
         <Show when={!tarjetaDelRiel()}><EtapaDeTarea etapa={r.s.stage} /></Show>
@@ -1177,7 +1177,7 @@ export default function Sessions(props: {
             // La tarjeta: 52 px fijos y dos líneas, pase lo que pase con los datos.
             "group/session relative flex h-[52px] min-w-0 cursor-pointer flex-col justify-center gap-[5px] rounded-[10px] border border-transparent py-[7px] pr-2 pl-2.5 hover:bg-neutral-100 focus-visible:outline-2 focus-visible:outline-primary",
             // Abierta: un tinte y un borde suave. Ni barra de color, ni negrita, ni sombra.
-            f.s.id === props.current && "border-border bg-neutral-200 hover:bg-neutral-200",
+            f.s.id === props.current && "task-card-selected border-border bg-neutral-200 hover:bg-neutral-200",
             // Fijada: el borde lo dibuja `::after` para poder abrirle un hueco
             // arriba al centro, donde va el alfiler sin fondo; los 7 px de
             // arriba son los que el alfiler necesita para no recortarse.

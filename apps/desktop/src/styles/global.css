@@ -1069,7 +1069,7 @@
    omitir una sección por agrupación elimina también su ancho. */
 .task-card-lines { container-type: inline-size; width: 100%; min-width: 0; --task-card-surface: var(--color-rail); }
 .task-card-lines[data-outside] { --task-card-surface: var(--color-surface); }
-.task-card-lines[data-selected="true"] { --task-card-surface: var(--color-neutral-200); }
+.task-card-selected .task-card-lines { --task-card-surface: var(--color-neutral-200); }
 .task-card-metadata { display: flex; min-width: 0; align-items: center; gap: 5px; height: 16px; }
 .task-card-provider { display: inline-flex; flex: 0 0 16px; width: 16px; align-items: center; }
 .task-card-folder { flex: 0 0 100px; width: 100px; min-width: 0; }
