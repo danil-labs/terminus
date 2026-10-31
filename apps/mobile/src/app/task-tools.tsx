@@ -17,9 +17,8 @@ import { useTheme } from "../ui/theme";
 
 /**
  * Herramientas del chat: sus subtareas, cada una con su tarjeta de dos
- * líneas. Viven aquí y en Buscar, nunca anidadas en Inicio. El árbol de
- * trabajo de la rama necesita comandos que el teléfono todavía no manda
- * (`list_task_trees`, `tree_changes`) y no se enseña.
+ * líneas. Viven aquí y en Buscar, nunca anidadas en Inicio. Los archivos
+ * de la tarea tienen su propia pantalla (`task-files.tsx`).
  */
 export default function TaskToolsScreen() {
   const theme = useTheme();

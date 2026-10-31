@@ -215,7 +215,8 @@ lleva su comentario allí:
 | Identidad de agentes | `list_agent_profiles`, `preview_file` | — |
 | Cuentas de IA | `list_accounts`, `account_status`, `account_limits` | `add_account`, `login_account`, `submit_login_code`, `cancel_login`, `discard_account`, `remove_account` |
 | Fondo del chat | `chat_background` | — |
-| Chat enriquecido | `tree_show` (solo el árbol `terminus-chat-visuals`), `chat_visual_part`, `preview_file`, `attachment_preview` | — |
+| Chat enriquecido | `tree_show` (el árbol `terminus-chat-visuals`), `chat_visual_part`, `preview_file`, `attachment_preview` | — |
+| Archivos de la tarea | `list_task_trees`, `tree_files`, `tree_show` (cualquier árbol de la tarea, solo lectura) | — |
 | Carpetas nuevas | `get_project_directory`, `project_clone_status` | `create_project`, `start_project_clone`, `cancel_project_clone` |
 | Registros de actividad por máquina | `list_activity`, `read_activity`, `read_activity_log` | — |
 | PR en la tarjeta | `list_session_git` (por carpeta, con las visibles en `priority`) | — |

@@ -516,6 +516,7 @@ export default function TaskScreen() {
         finding={finding}
         onFind={setFinding}
         onTools={() => router.push({ pathname: "/task-tools", params: { host: params.host, workspace, folder: params.folder, id } })}
+        onFiles={() => router.push({ pathname: "/task-files", params: { host: params.host, workspace, folder: params.folder, id } })}
       />
       <View style={styles.thread}>
       <FlatList
