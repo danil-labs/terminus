@@ -69,6 +69,7 @@ const ARBOLES = [WEB].filter((d) => existsSync(d));
  * normal: el registro es la lista de lo que la app hace, no de lo que podría.
  */
 const SIN_INTERFAZ = {
+  delete_session: "contrato legacy; la ventana exige task_lifecycle_v1 con previa y consentimiento",
   // La columna derecha de la tarea nueva se quitó: sus archivos viven dentro de la tarea. Siguen en el contrato del motor.
   create_empty_session: "la pedía la columna derecha de la tarea nueva, que ya no existe; queda en el contrato del motor",
   // Extensión de orquestadores: las pide el relay de Danil Computers (MCP remoto), no una pantalla.

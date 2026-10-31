@@ -807,6 +807,10 @@ if (!roto) {
   assert.equal(agentSends[0].taskFromAgent, true);
   assert.equal(agentSends[0].baseRef, null);
   assert.ok(draftDoc.querySelector('[data-sidebar-tasks] [data-sesion="new-agent-task"] [data-session-agent]'), "el primer mensaje crea una tarea visible con la pastilla de su arquetipo");
+  const activeDraftRow = draftDoc.querySelector('[data-sidebar-tasks] [data-sesion="new-agent-task"]');
+  assert.equal(activeDraftRow.querySelectorAll("[data-session-agent]").length, 1, "la identidad activa se pinta una sola vez");
+  assert.ok(activeDraftRow.querySelector('[data-session-status] [data-task-orbit] [data-astro-status="working"]'), "la cara activa va dentro del arco a la derecha del título");
+  assert.equal(activeDraftRow.querySelector('[data-session-preview] [data-session-agent]'), null, "la segunda línea no duplica la cara activa");
   assert.deepEqual(draftApp.fallos, []);
   draftApp.w.close();
 
@@ -910,13 +914,15 @@ if (!roto) {
     threadDoc.dispatchEvent(new threadApp.w.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     await sleep(50);
   };
-  // La tarjeta del riel no lleva botón de fijar ni capa de acciones: el menú sale del hueco del estado.
+  // El menú conserva su propio hueco y no sustituye la identidad de la tarjeta.
   assert.equal(sidebarTask("dm").querySelector("[data-session-pin]"), null, "fijar no tiene botón propio en la tarjeta");
   assert.equal(sidebarTask("dm").querySelector(".bg-linear-to-l"), null, "la tarjeta no lleva el velo degradado de las acciones");
-  assert.ok(sidebarTask("dm").querySelector('[data-session-status] + [data-session-actions] button[aria-haspopup="menu"]'),
-    "el menú ocupa el hueco del estado, a la derecha del título");
+  assert.ok(sidebarTask("dm").querySelector('[data-session-actions] button[aria-haspopup="menu"]'),
+    "el menú permanece disponible junto al título");
+  assert.equal(sidebarTask("dm").querySelector('[data-session-status] [data-session-actions]'), null,
+    "el menú no ocupa la identidad fija");
   // Fijada: el alfiler va en el hueco del borde, no dentro de la tarjeta.
-  assert.ok(sidebarTask("dm").querySelector(':scope > [role="img"][aria-label="Fijada"] svg.lucide-pin'), "la fijada lleva su alfiler en el borde");
+  assert.ok(sidebarTask("dm").querySelector('[role="img"][aria-label="Fijada"] svg.tarjeta-fijada-alfiler'), "la fijada lleva su alfiler en el borde");
   assert.ok(sidebarTask("dm").className.includes("tarjeta-fijada"), "la fijada dibuja su borde con ::after");
   assert.equal(sidebarTask("dm").querySelector('[data-session-preview] [aria-label="Fijada"]'), null);
   openPinnedTaskMenu("dm");
@@ -928,7 +934,7 @@ if (!roto) {
   await sleep(150);
   assert.deepEqual(pinChanges.at(-1), { project: "p", id: "dm", pinned: false });
   assert.equal(sidebarTask("dm")?.dataset.pinned, undefined);
-  assert.equal(sidebarTask("dm").querySelector(':scope > [role="img"][aria-label="Fijada"]'), null, "sin fijar no queda alfiler");
+  assert.equal(sidebarTask("dm").querySelector('[role="img"][aria-label="Fijada"]:has(svg.tarjeta-fijada-alfiler)'), null, "sin fijar no queda alfiler");
   await closeMenu();
   openPinnedTaskMenu("dm");
   await sleep(50);
@@ -963,19 +969,23 @@ if (!roto) {
   const previewOfCoordinator = () => sidebarTask("topic").querySelector("[data-session-status]");
   threadApp.emit("chat", { kind: "started", session: "topic-work", workspace: "w" });
   await sleep(100);
-  assert.equal(previewOfCoordinator().querySelectorAll('[aria-label="Está trabajando"]').length, 1,
+  assert.equal(previewOfCoordinator().querySelectorAll('[aria-label$="Está trabajando"]').length, 1,
     "el coordinador conserva un foco de actividad cuando solo trabaja su subtarea");
   threadApp.emit("chat", { kind: "started", session: "topic", workspace: "w" });
   await sleep(100);
-  assert.equal(previewOfCoordinator().querySelectorAll("[aria-label]").length, 1,
+  assert.equal(previewOfCoordinator().querySelectorAll('[aria-label$="Está trabajando"]').length, 1,
     "un solo estado ocupa su columna, sin contador de subtareas");
+  assert.equal(sidebarTask("topic").querySelectorAll("[data-session-status]").length, 1, "el estado ocupa una sola ranura");
+  assert.equal(previewOfCoordinator().querySelectorAll("[data-task-orbit]").length, 1, "la ranura lleva una sola órbita");
+  assert.equal(previewOfCoordinator().querySelectorAll("[data-session-agent]").length, 1, "una sola identidad vive dentro de la órbita");
+  assert.equal(previewOfCoordinator().textContent.trim(), "", "la ranura no añade un contador de subtareas");
   threadApp.emit("chat", { kind: "done", session: "topic", workspace: "w", ok: true });
   await sleep(200);
-  assert.equal(previewOfCoordinator().querySelectorAll('[aria-label="Está trabajando"]').length, 1,
+  assert.equal(previewOfCoordinator().querySelectorAll('[aria-label$="Está trabajando"]').length, 1,
     "terminar el turno principal conserva la actividad delegada");
   threadApp.emit("chat", { kind: "done", session: "topic-work", workspace: "w", ok: true });
   await sleep(200);
-  assert.equal(previewOfCoordinator().querySelectorAll('[aria-label="Está trabajando"]').length, 0,
+  assert.equal(previewOfCoordinator().querySelectorAll('[aria-label$="Está trabajando"]').length, 0,
     "el foco de actividad se apaga al terminar la última subtarea");
   const toolbarButtons = [...delegatedToolbar.parentElement.querySelectorAll("button")];
   assert.deepEqual(toolbarButtons.map(button => button.getAttribute("aria-label")), [
@@ -1727,13 +1737,11 @@ if (!roto) {
     await sleep(100);
     assert.ok(tab("p").querySelector(`.${color} > svg.lucide-${icon}`), kn);
     for (const surface of [row("p"), tab("p")]) assert.equal(surface.querySelector("svg.lucide-git-branch"), null);
-    // La tarjeta del riel solo avisa del borrador sin guardar, con el ícono solo.
+    // Git/kn conserva su sección y color; el detalle queda en la etiqueta.
+    assert.ok(row("p").querySelector(`[data-session-pr].${color} svg.lucide-${icon}`), kn);
     if (kn === "draft") {
-      assert.ok(row("p").querySelector("[data-session-pr] svg.lucide-file-pen-line"), kn);
       assert.match(gitDeFila("p"), /Cone/);
       assert.doesNotMatch(row("p").querySelector("[data-session-pr]").textContent, /Cone/);
-    } else {
-      assert.equal(row("p").querySelector("[data-session-pr]"), null, kn);
     }
     assert.match(tab("p").title, label);
   }
@@ -1806,6 +1814,10 @@ if (!roto) {
   const workingDot = tab("p").querySelector('.rounded-full.bg-current');
   assert.ok(workingDot);
   assert.ok([...workingDot.classList].every((name) => !name.includes("animate")), "the working indicator stays visible without blinking");
+  assert.equal(row("p").querySelectorAll("[data-task-orbit]").length, 1, "una tarea sin encargado conserva identidad con órbita");
+  assert.equal(row("p").querySelector('[data-task-orbit] [data-session-agent]'), null, "sin encargado no hay una cara inventada");
+  assert.equal(row("p").querySelectorAll('[data-task-orbit] svg:not([data-spinner])').length, 0, "sin encargado el centro queda vacío");
+  assert.equal(row("p").querySelectorAll('[data-session-preview] [data-session-provider]').length, 1, "el proveedor conserva su sección fija debajo");
   assert.equal(tab("p").querySelector("svg[data-spinner]"), null);
   sidebar.emit("question", { session: "p", workspace: "w", turno: "question-turn", preguntas: [{ id: "choose", question: "¿Qué opción?", options: [], free_text: true }] });
   await sleep(100);
@@ -2117,7 +2129,7 @@ if (!roto) {
   assert.equal(taskEditor.value, "Borrador de tarea");
   assert.equal(taskEditor.selectionStart, 2);
   assert.equal(taskEditor.selectionEnd, 5);
-  assert.ok(controlsDoc.querySelector('[data-sesion="recent"] [data-session-status] [aria-label="Está trabajando"]'), "la fila se actualiza sin recrear su editor");
+  assert.ok(controlsDoc.querySelector('[data-sesion="recent"] [data-session-status] [aria-label$="Está trabajando"]'), "la fila se actualiza sin recrear su editor");
   assert.deepEqual(taskRenames, [], "refrescar no guarda un nombre a medio escribir");
   taskEditor.dispatchEvent(new sidebarControls.w.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
   assert.deepEqual(taskRenames, [], "Escape descarta el borrador aunque el agente esté trabajando");
@@ -2433,18 +2445,18 @@ if (!roto) {
   finishPendingTurn("s1");
   await sleep(80);
   const hiddenRow = () => pendingDoc.querySelector('[data-sesion="s1"]');
-  assert.ok(hiddenRow().querySelector('[aria-label="Está trabajando"]'));
+  assert.ok(hiddenRow().querySelector('[aria-label$="Está trabajando"]'));
   pendingTurnApp.emit("chat", { kind: "delta", session: "s1", workspace: "w", text: "Respuesta parcial" });
   pendingTurnApp.w.dispatchEvent(new pendingTurnApp.w.Event("focus"));
   await sleep(80);
-  assert.ok(hiddenRow().querySelector('[aria-label="Está trabajando"]'), "streaming and reconciliation preserve activity in a hidden task");
+  assert.ok(hiddenRow().querySelector('[aria-label$="Está trabajando"]'), "streaming and reconciliation preserve activity in a hidden task");
   hiddenTurnOutcome = "delivered";
   registeredTurns = [];
   pendingTurnApp.w.dispatchEvent(new pendingTurnApp.w.Event("focus"));
   await sleep(80);
   // Entregada y vista, la tarea se queda donde estaba, entre las «Tareas».
   assert.equal(pendingDoc.querySelector('[data-sidebar-section="settled"]'), null, "no hay sección «Asentadas»");
-  assert.equal(hiddenRow().querySelector('[aria-label="Está trabajando"]'), null);
+  assert.equal(hiddenRow().querySelector('[aria-label$="Está trabajando"]'), null);
   // En la tarjeta del riel una entregada no lleva ícono: vista se apaga, sin ver lleva el punto verde.
   assert.ok(hiddenRow().dataset.apagada === "true" || hiddenRow().querySelector('[aria-label="Terminó y no la has abierto"]'), "recovering a missed done refreshes the hidden task result");
   assert.deepEqual(pendingTurnApp.fallos, []);
@@ -2728,7 +2740,13 @@ if (!roto) {
       .map(id => ({ ...viva, id, title: `Tarea ${id}` })),
     task_blockers: () => ({ unsaved: [], not_finished: false }),
     set_task_archived: args => { menuActions.push(["archive", args]); removedFromMenu.add(args.id); },
-    delete_session: args => { menuActions.push(["delete", args]); removedFromMenu.add(args.id); },
+    machine_list: [{ id: "local", local: true, active: true, on: true, hosts: true, features: ["task_lifecycle_v1"] }],
+    task_lifecycle_preview: args => ({ members: [{ project: args.project, id: args.id, title: `Tarea ${args.id}`, working: false, files: [], inspection: { status: "complete" } }], consent: "reviewed-menu-family" }),
+    task_lifecycle_apply: args => {
+      menuActions.push(["delete", args]);
+      removedFromMenu.add(args.id);
+      return { status: "complete", applied: [{ project: args.project, id: args.id }], failures: [] };
+    },
   });
   const menuDoc = fromAnotherTask.w.document;
   const selectedTask = () => menuDoc.querySelector('[data-sesion][aria-current="true"]')?.getAttribute("data-sesion");
@@ -2750,7 +2768,14 @@ if (!roto) {
   menuDoc.querySelector('[role="alertdialog"] button').click();
   await sleep(100);
   assert.equal(selectedTask(), "s1", "confirmar el borrado conserva la tarea abierta");
-  assert.deepEqual(menuActions[1], ["delete", { project: "", id: "s3", force: false }]);
+  assert.equal(menuActions.length, 1, "the first confirmation only opens the family review");
+  const deletionReview = menuDoc.querySelector('[role="dialog"]');
+  assert.ok(deletionReview);
+  deletionReview.querySelector('input[type="checkbox"]').click();
+  [...deletionReview.querySelectorAll('button')].find(button => button.textContent.trim() === "Borrar la tarea").click();
+  await sleep(100);
+  assert.equal(selectedTask(), "s1", "applying the reviewed deletion preserves the open task");
+  assert.deepEqual(menuActions[1], ["delete", { project: "", id: "s3", action: "delete", consent: "reviewed-menu-family", discard: true }]);
   assert.deepEqual(fromAnotherTask.fallos, []);
   let recreated = false;
   let rejectRecreation = true;
@@ -3761,10 +3786,11 @@ if (!roto) {
   assert.ok(cuadro("w3").querySelector("svg.lucide-circle-question-mark"));
   assert.equal(cuadro("w4").dataset.attention, undefined, "un estado que la ventana no conoce no se pinta");
   const filaDeColumna = (id) => doc.querySelector(`[data-sesion="${id}"]`);
-  // La tarjeta del riel: sin ver es un punto verde; vista no lleva ícono y se apaga.
-  assert.ok(filaDeColumna("s1").querySelector('[aria-label="Terminó y no la has abierto"] .bg-success-strong'), "la fila dice terminada sin ver");
+  // La tarjeta del riel: sin ver es un check verde; vista lo deja neutro y se apaga.
+  assert.ok(filaDeColumna("s1").querySelector('[aria-label="Terminó y no la has abierto"] .text-success-strong svg.lucide-check'), "la fila dice terminada sin ver");
   assert.equal(filaDeColumna("s3").dataset.apagada, "true", "una entregada ya vista se apaga, en su sitio");
-  assert.equal(filaDeColumna("s3").querySelector('[aria-label="Resultado entregado"]'), null, "y no lleva ícono");
+  assert.ok(filaDeColumna("s3").querySelector('[aria-label="Resultado entregado"] svg.lucide-check'), "y conserva el check en su esquina");
+  assert.equal(filaDeColumna("s3").querySelector('[aria-label="Resultado entregado"] .text-success-strong'), null, "sin el verde de lo no visto");
   const pliegue = doc.querySelector('button[aria-label="Plegar «Proyecto»"]');
   pliegue.click();
   await sleep(50);

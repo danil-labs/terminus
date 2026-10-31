@@ -1,6 +1,8 @@
 import { type IconShape, LUCIDE, STATUS_ICONS, STATUS_LABELS, type StatusLabel, type TaskState, topState } from "@terminus/design";
-import { View } from "react-native";
+import { Platform, View } from "react-native";
 import Svg, { Circle, Line, Path } from "react-native-svg";
+import { AgentAvatar } from "./AgentAvatar";
+import { TaskOrbit } from "./TaskOrbit";
 import { lang } from "../lib/i18n";
 import { type Theme, useTheme } from "./theme";
 
@@ -45,16 +47,21 @@ function Icon({ state, color, size }: { state: Exclude<StatusLabel, "working">; 
 }
 
 /** The mark of one task, or of a folded group; nothing when there is nothing to say. */
-export function TaskMark({ state, delivered = false, size = 16 }: { state: TaskState | null; delivered?: boolean; size?: number }) {
+export function TaskMark({ state, delivered = false, size = 16, identity }: { state: TaskState | null; delivered?: boolean; size?: number; identity?: { agent?: string | null; provider?: string | null; host?: string; folder?: string } }) {
   const theme = useTheme();
   const box = { width: size, height: size, alignItems: "center" as const, justifyContent: "center" as const };
-  if (state === "working") {
-    return (
-      <View style={box} accessibilityLabel={stateText("working")}>
-        <View style={{ width: size * 0.4, height: size * 0.4, borderRadius: size, backgroundColor: theme.primary }} />
-      </View>
-    );
+  if (identity) {
+    const label = [identity.agent, state ? stateText(state) : delivered ? stateText("delivered") : ""].filter(Boolean).join(" · ");
+    const cornerState = state && state !== "working" ? state : "delivered";
+    const color = state === "asked" || state === "approving" ? theme.warningStrong : state ? stateColor(state, theme) : theme.delivered;
+    return <View testID="task-identity" {...(Platform.OS === "web" ? { title: label } : {})} style={{ width: 24, height: 24, alignItems: "center", justifyContent: "center" }} accessibilityRole={label ? "image" : undefined} accessibilityLabel={label || undefined}>
+      {identity.agent ? <AgentAvatar name={identity.agent} host={identity.host} folder={identity.folder} size={18} working={state === "working"} /> : null}
+      {state === "working" ? <View pointerEvents="none" style={{ position: "absolute", inset: 0 }}><TaskOrbit /></View> : state || delivered ? <View pointerEvents="none" style={{ position: "absolute", top: -2, right: -2, width: 12, height: 12, borderRadius: 6, backgroundColor: theme.surface }}>
+        <Icon state={cornerState} color={color} size={12} />
+      </View> : null}
+    </View>;
   }
+  if (state === "working") return <View style={box} accessibilityLabel={stateText("working")}><TaskOrbit size={size} /></View>;
   if (state) {
     return (
       <View style={box} accessibilityLabel={stateText(state)}>

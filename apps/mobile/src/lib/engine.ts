@@ -75,7 +75,7 @@ export type Agent = {
 };
 
 /** Lo que una máquina sabe de un workspace. */
-export type Folder = Project & { key: string; host: string };
+export type Folder = Project & { key: string; host: string; cloud?: string | null };
 
 export type HostSnapshot = {
   host: string;

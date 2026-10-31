@@ -351,7 +351,7 @@ export function Composer({
     void send();
   }
 
-  const showStop = running && !hasText && Boolean(onStop);
+  const showStop = running && Boolean(onStop);
   const sendLabel = shell ? w("chat.composer.run") : w("chat.composer.send");
 
   return (
@@ -487,7 +487,7 @@ export function Composer({
             </Pressable>
           ) : null}
           {showStop ? (
-            <Pressable testID="stop" onPress={onStop} accessibilityLabel={w("chat.turn.stop")} style={[styles.send, { backgroundColor: theme.text }]}>
+            <Pressable testID="stop" onPress={onStop} accessibilityRole="button" accessibilityLabel={w("chat.turn.stop")} style={[styles.send, { backgroundColor: theme.text }]}>
               <Icon name="square" size={11} color={theme.bg} fill={theme.bg} />
             </Pressable>
           ) : shell ? (
@@ -500,12 +500,6 @@ export function Composer({
           )}
         </View>
       </View>
-      {running && hasText && onStop ? (
-        <Pressable onPress={onStop} style={styles.stopLine} testID="stop-inline">
-          <Icon name="square" size={10} color={theme.textMuted} fill={theme.textMuted} />
-          <Text style={{ color: theme.textMuted, fontSize: TEXT.ui }}>{w("chat.turn.stop")}</Text>
-        </Pressable>
-      ) : null}
       {note ? <Text style={[styles.hint, { color: theme.textMuted, paddingHorizontal: 16 }]}>{note}</Text> : null}
 
       <Sheet visible={sheet === "attach"} title={w("chat.attachments.add")} onClose={() => setSheet(null)}>
@@ -633,7 +627,6 @@ const styles = StyleSheet.create({
   modelPill: { borderWidth: StyleSheet.hairlineWidth, flexShrink: 1 },
   send: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center" },
   run: { flexDirection: "row", alignItems: "center", gap: 6, height: 34, borderRadius: 17, paddingHorizontal: 14 },
-  stopLine: { flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-end", paddingHorizontal: 8 },
   files: { gap: 6, paddingHorizontal: 4, paddingTop: 4 },
   file: { flexDirection: "row", alignItems: "center", gap: 5, borderRadius: RADIUS.lg, paddingHorizontal: 8, paddingVertical: 5 },
   queue: { gap: 6 },

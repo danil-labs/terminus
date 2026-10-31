@@ -2,7 +2,6 @@ import { invoke } from "../../lib/invoke.ts";
 import ArrowLeftRight from "lucide-solid/icons/arrow-left-right";
 import ChevronRight from "lucide-solid/icons/chevron-right";
 import CornerDownRight from "lucide-solid/icons/corner-down-right";
-import FilePenLine from "lucide-solid/icons/file-pen-line";
 import MoreVertical from "lucide-solid/icons/more-vertical";
 import Pin from "lucide-solid/icons/pin";
 import PinOff from "lucide-solid/icons/pin-off";
@@ -32,7 +31,7 @@ import {
 } from "../../ui/Popover";
 import { WithMentions } from "../chat/WithMentions";
 import FolderChip from "./FolderChip";
-import SessionGit, { RailPull, sessionGitDescription } from "./SessionGit";
+import { gitAppearance, RailPull, sessionGitDescription } from "./SessionGit";
 import { WithTaskHoverCard } from "./TaskHoverCardTrigger";
 import { MachineChip } from "../machines/MachineChip";
 import { bringHereLabel, canBringHere } from "../machines/store";
@@ -362,6 +361,10 @@ export default function Sessions(props: {
   carpetaDe?: (row: SessionRow) => string | undefined;
   /** Bajo la cabecera de su carpeta, la fila no repite la carpeta. */
   hideFolder?: boolean;
+  /** Bajo su cabecera de máquina, se omite la sección completa. */
+  hideMachine?: boolean;
+  /** El riel mantiene los intereses Git por carpeta antes de repartir sus grupos. */
+  gitManaged?: boolean;
   /**
    * La tarjeta del riel fuera del riel (las delegadas): su fila y su tarjeta
    * flotante, sin lo que el riel hace con la lista.
@@ -530,6 +533,7 @@ export default function Sessions(props: {
       filas().map(s => [s.id, s.updated_at]), props.vivas, props.current,
     ]));
     createEffect(on(gitInput, () => {
+      if (props.gitManaged) return;
       watcher.prioritize([...(props.current ? [props.current] : []), ...props.vivas, ...filas().map(s => s.id)]);
       watcher.refresh();
     }));
@@ -697,7 +701,9 @@ export default function Sessions(props: {
     cohete: () => JSX.Element;
   }) => {
     // Qué lleva la línea 2 lo decide la tarjeta compartida con el teléfono (`@terminus/tasks`).
-    const tarjeta = () => taskCard(r.s, { live: props.vivas, approving: props.aprobando, hideFolder: hideFolder(r.s) });
+    const tarjeta = () => taskCard(r.s, { live: props.vivas, approving: props.aprobando, hideFolder: hideFolder(r.s), hideMachine: props.hideMachine });
+    const working = () => taskPriority(r.actividad) === "working" && !esProvisional(r.s.id);
+    const activeAgent = () => r.s.agent;
     const git = () => gitDe(r.s);
     // La rama de quien comparte el árbol de su padre se dice en la fila del padre.
     const propioDeOtra = () => !!git().shared_with || sharesTaskGit(r.s, gitRows(), props.relatedSessions ?? props.sessions);
@@ -713,85 +719,48 @@ export default function Sessions(props: {
     const cuando = () => r.s.last_turn_at ?? r.s.updated_at;
     // Memo: al hacer clic el menú se reinicia y, sin él, la ranura reescribe su clase.
     const abierto = createMemo(() => menu() === r.s.id);
-    return (
-      <>
-        <div class="flex h-[18px] min-w-0 items-center gap-1.5">
-          <div class="min-w-0 flex-1">{r.titulo}</div>
-          <span class="relative flex h-5 min-w-[22px] shrink-0 items-center justify-end">
-            <span
-              data-session-status
-              class={cn(
-                "inline-flex size-4 items-center justify-center",
-                r.conMenu && "group-hover/session:hidden group-focus-visible/session:sr-only group-has-[:focus-visible]/session:sr-only",
-                r.conMenu && abierto() && "hidden",
-              )}
-            >
-              <EstadoDeTarea
-                riel
-                {...r.actividad}
-                provisional={esProvisional(r.s.id)}
-                archivada={!!r.s.archived}
-                size={14}
-              />
-            </span>
-            <Show when={r.conMenu}>
-              <span
-                data-session-actions
-                data-abierto={abierto() ? "true" : undefined}
-                class={cn(
-                  "hidden group-hover/session:inline-flex group-focus-visible/session:inline-flex group-has-[:focus-visible]/session:inline-flex",
-                  abierto() && "inline-flex",
-                )}
-              >
-                {r.menu()}
-              </span>
-            </Show>
+    const gitStyle = () => {
+      const appearance = gitAppearance(git());
+      return git().stale ? { ...appearance, color: "text-neutral-500" } : appearance;
+    };
+    return <div class="task-card-lines" data-outside={!tarjetaDelRiel() || undefined}>
+      <div class="flex h-[22px] min-w-0 items-center gap-1.5">
+        <div class="min-w-0 flex-1">{r.titulo}</div>
+        <Show when={!tarjetaDelRiel()}><EtapaDeTarea etapa={r.s.stage} /></Show>
+        <Show when={r.conMenu}><span class="inline-flex w-5 shrink-0 items-center justify-center">
+          <span data-session-actions class={cn("hidden group-hover/session:inline-flex group-focus-within/session:inline-flex", abierto() && "inline-flex")} data-abierto={abierto() ? "true" : undefined}>{r.menu()}</span>
+        </span></Show>
+        <span data-session-status class="inline-flex size-6 shrink-0 items-center justify-center">
+          <EstadoDeTarea {...r.actividad}
+            identity={() => <Show when={activeAgent()}>{agent => <span data-session-agent><AstroAvatar name={agent()} status={working() ? "working" : "awake"} orbit body={profiles()[agent()]?.body} avatar={profiles()[agent()]?.avatar} size={18} /></span>}</Show>}
+            identityLabel={activeAgent() ? nombre(activeAgent()!) : undefined}
+            provisional={esProvisional(r.s.id)} archivada={!!r.s.archived} />
+        </span>
+      </div>
+      <div data-session-preview class={cn("task-card-metadata text-xs font-normal leading-4 text-neutral-500", r.apagada && "opacity-80 group-hover/session:opacity-100")}>
+        <span data-session-provider class="task-card-provider" title={tarjeta().provider ?? r.s.provider} aria-label={tarjeta().provider ?? r.s.provider}><MarcaAgente id={r.s.provider} size={13} /></span>
+        <Show when={!hideFolder(r.s) && !launcherOf(r.s) && props.carpetaDe?.(r.s)}>{folder =>
+          <FolderChip id={projectOf(r.s)} name={folder()} untitled={tarjetaDelRiel()} class="task-card-folder text-xs text-neutral-500" />
+        }</Show>
+        <Show when={!props.hideMachine && r.s.machine}>{machine => <MachineChip machine={machine()} on={r.s.machine_on !== false} class="task-card-machine" />}</Show>
+        <Show when={(worktreeDe(r.s.id)?.owned && !worktreeDe(r.s.id)?.available) || (!propioDeOtra() && ["kn", "branch", "detached"].includes(git().kind))}>
+          <span class="task-card-git">
+            <Show when={worktreeDe(r.s.id)?.owned && !worktreeDe(r.s.id)?.available}><span class="inline-flex text-error-strong" title={t("projects.sessions.worktree_missing")} aria-label={t("projects.sessions.worktree_missing")}><WorktreeRoto size={12} /></span></Show>
+            <Show when={!propioDeOtra() && ["kn", "branch", "detached"].includes(git().kind)}><Show when={git().kind === "kn" || !git().pull_known || !git().pull} fallback={<RailPull status={git()} />}>
+              <span data-session-pr class={cn("inline-flex shrink-0", gitStyle().color)} title={sessionGitDescription(git())} aria-label={sessionGitDescription(git())}><Dynamic component={gitStyle().icon} size={12} aria-hidden="true" /></span>
+            </Show></Show>
+            <Show when={abridor()}>{who => <ChipDeCara kind="opener" icon={CornerDownRight} name={who()} tip={t("projects.sessions.opened_by", { name: nombre(who()) })} />}</Show>
+            <Show when={anterior()}>{who => <ChipDeCara kind="handoff" icon={ArrowLeftRight} name={who()} tip={t("projects.sessions.handed_from", { name: nombre(who()) })} />}</Show>
           </span>
-        </div>
-        <div
-          data-session-preview
-          class={cn(
-            "flex h-4 min-w-0 items-center gap-[7px] overflow-hidden text-xs font-normal leading-4 text-neutral-500",
-            r.apagada && "opacity-80 group-hover/session:opacity-100",
-          )}
-        >
-          <Show when={tarjeta().agent}>
-            {(agente) => <ChipDeCara kind="agent" name={agente()} tip={nombre(agente())} working={props.vivas.includes(r.s.id)} />}
-          </Show>
-          <Show when={tarjeta().provider}>
-            {(proveedor) => <span data-session-provider class="flex shrink-0" title={proveedor()} aria-label={proveedor()}><MarcaAgente id={proveedor()} size={12} /></span>}
-          </Show>
-          {/* La carpeta solo si el riel no agrupa por carpeta, y solo en la raíz:
-              una subtarea vive en la carpeta de su madre. Es lo primero que se recorta. */}
-          <Show when={!hideFolder(r.s) && !launcherOf(r.s) && props.carpetaDe?.(r.s)}>
-            {(carpeta) => <FolderChip id={projectOf(r.s)} name={carpeta()} untitled={tarjetaDelRiel()} class="min-w-0 shrink text-xs text-neutral-500" />}
-          </Show>
-          <Show when={!propioDeOtra()}>
-            <Show
-              when={git().kind === "kn"}
-              fallback={<RailPull status={git()} />}
-            >
-              <Show when={git().kn === "draft"}>
-                <span data-session-pr class="inline-flex shrink-0 text-primary" title={sessionGitDescription(git())} aria-label={sessionGitDescription(git())}>
-                  <FilePenLine size={12} aria-hidden="true" />
-                </span>
-              </Show>
-            </Show>
-          </Show>
-          <Show when={abridor()}>
-            {(quien) => <ChipDeCara kind="opener" icon={CornerDownRight} name={quien()} tip={t("projects.sessions.opened_by", { name: nombre(quien()) })} />}
-          </Show>
-          <Show when={anterior()}>
-            {(quien) => <ChipDeCara kind="handoff" icon={ArrowLeftRight} name={quien()} tip={t("projects.sessions.handed_from", { name: nombre(quien()) })} />}
-          </Show>
-          <span class="min-w-1 flex-1" />
-          <span class="flex shrink-0 items-center gap-[5px]">
-            {r.cohete()}
-            <span data-session-time class="whitespace-nowrap text-[0.71875rem] tabular-nums">{shortTaskTime(cuando())}</span>
-          </span>
-        </div>
-      </>
-    );
+        </Show>
+        <span class="min-w-0 flex-1" />
+        <span class="task-card-tail">
+          <Show when={r.s.deferred}><span data-deferred class="shrink-0 text-neutral-500" title={t("projects.sessions.deferred")} aria-label={t("projects.sessions.deferred")}>⧗</span></Show>
+          <span class="inline-flex size-[18px] shrink-0 items-center justify-center">{r.cohete()}</span>
+          <span data-session-time class="whitespace-nowrap text-[0.71875rem] tabular-nums">{shortTaskTime(cuando())}</span>
+        </span>
+      </div>
+    </div>;
   };
 
   /** En el riel y en las delegadas la fila lleva su tarjeta flotante; en las demás listas, no. */
@@ -825,7 +794,6 @@ export default function Sessions(props: {
       sinVer: f.s.sin_ver,
     });
     // Agrupando por agente la cabecera ya lo dice; en el chat del agente, también.
-    const conPastilla = () => !(props.groupByHandler && props.groupByAuthor !== false) && !f.s.chat_de_agente && !!f.s.agent;
     const title = () => f.s.inbox ? t("projects.threads.inbox")
       : f.s.chat_de_agente && !f.s.agent_thread ? t("projects.threads.persistent_chat")
       : f.s.command_title ? t("projects.threads.command")
@@ -866,7 +834,7 @@ export default function Sessions(props: {
           // El cohete es absoluto: sin este hueco el título se mete debajo. Por
           // `:has`, no por clase reactiva: cada fila mutaría al llegar git.
           <div class={cn(
-            "flex min-w-0 items-center gap-1 text-ui leading-[1.35] [:has(>[data-finish-slot])_&]:pr-16",
+            "flex min-w-0 items-center gap-1 text-ui leading-[1.35]",
             // La tarjeta del riel: 13,5 px en su línea de 18, sin chincheta ni «Contexto».
             tarjetaDelRiel() && "text-[0.84375rem] leading-[18px]",
             apagada() && "text-neutral-500 group-hover/session:text-neutral-950",
@@ -962,10 +930,11 @@ export default function Sessions(props: {
           <Show when={confirmando() === f.s.id} fallback={<>
               {/* En la tarjeta del riel fijar va primero: el alfiler ya no
                   tiene botón propio en la fila. */}
-              <Show when={m.riel && props.onPin}>
+              <Show when={props.onPin}>
                 <button
                   role="menuitem"
                   data-session-pin
+                  aria-label={fijada(f.s) ? t("projects.sessions.unpin_named", { title: f.s.title }) : t("projects.sessions.pin_named", { title: f.s.title })}
                   class={`${ITEM_DE_MENU} flex items-center gap-2 font-semibold`}
                   onClick={() => void setPinned(f.s)}
                 >
@@ -1208,7 +1177,7 @@ export default function Sessions(props: {
             // La tarjeta: 52 px fijos y dos líneas, pase lo que pase con los datos.
             "group/session relative flex h-[52px] min-w-0 cursor-pointer flex-col justify-center gap-[5px] rounded-[10px] border border-transparent py-[7px] pr-2 pl-2.5 hover:bg-neutral-100 focus-visible:outline-2 focus-visible:outline-primary",
             // Abierta: un tinte y un borde suave. Ni barra de color, ni negrita, ni sombra.
-            f.s.id === props.current && "border-border bg-neutral-200 hover:bg-neutral-200",
+            f.s.id === props.current && "task-card-selected border-border bg-neutral-200 hover:bg-neutral-200",
             // Fijada: el borde lo dibuja `::after` para poder abrirle un hueco
             // arriba al centro, donde va el alfiler sin fondo; los 7 px de
             // arriba son los que el alfiler necesita para no recortarse.
@@ -1221,6 +1190,7 @@ export default function Sessions(props: {
             "group/session relative grid min-w-0 cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-0.5 rounded-sm border border-transparent py-1 pr-1 pl-2 hover:bg-neutral-100 focus-visible:outline-2 focus-visible:outline-primary",
             f.s.id === props.current &&
               "border-neutral-500 bg-neutral-200 font-semibold text-neutral-950 shadow-sm",
+            fijada(f.s) && "tarjeta-fijada mt-[7px] rounded-[10px] border-transparent",
             renombrando() === f.s.id && "bg-neutral-200 hover:bg-neutral-200",
             // Con el menú abierto el puntero puede irse de la fila, y el velo
             // del menú se vería recortado sobre otro fondo.
@@ -1301,101 +1271,7 @@ export default function Sessions(props: {
             empezarARenombrar(f.s);
           }}
         >
-          {/* Solo el título, como el historial de Claude. La fecha y el
-            agente son metadatos: para elegir una conversación de una
-            lista corta se usa de qué iba, no cuándo fue.
-
-            El punto es la excepción, y no es metadato: una sesión
-            detenida esperando a una persona se ve igual que una
-            terminada, y con varias abiertas la que espera es justo la
-            que nadie vuelve a abrir. Purple fijo —no `primary`— porque
-            es la señal de «esto espera por ti» del sistema visual, y un
-            indicador que cambia de color con el tema deja de
-            reconocerse.
-
-            Y las menciones del título se pintan COMO MENCIONES: el
-            nombre de una tarea referencia entidades reales, y
-            aplanarlo a texto en el historial es donde se perdería. */}
-          <Show when={tarjetaDelRiel()} fallback={
-          <div class="flex items-start gap-1.5">
-            {/* **El hueco se reserva aunque no haya nada que plegar**, igual
-              que en la fila de un proyecto: sin él, la fila con hijas
-              correría su título 22 px a la derecha y la lista dejaría de
-              leerse como una columna.
-
-              Y es un `span` y no un botón deshabilitado: un control
-              invisible que no hace nada sigue anunciándose, y aquí habría
-              uno por cada tarea del historial. */}
-            {/* El punto es `EstadoDeTarea`, el mismo que lleva la pestaña
-              de la tarea: el orden de urgencia y el color se deciden ahí
-              una sola vez, para que la fila y la pestaña no puedan decir
-              cosas distintas de la misma tarea. */}
-            <div class="min-w-0 flex-1">
-              <Titulo />
-              {/* Proveedor, mensaje y estado del modelo en una línea. */}
-              <div data-session-preview class="mt-1 flex min-w-0 items-center gap-1.5 text-caption font-normal leading-tight text-neutral-500">
-                <Show when={worktreeDe(f.s.id)?.owned && !worktreeDe(f.s.id)?.available}>
-                  <span class="flex shrink-0 text-error-strong" title={t("projects.sessions.worktree_missing")} aria-label={t("projects.sessions.worktree_missing")}><WorktreeRoto size={13} /></span>
-                </Show>
-                <span class="flex shrink-0" title={f.s.provider} aria-label={f.s.provider}><MarcaAgente id={f.s.provider} size={13} /></span>
-                {/* En el sidebar la máquina la dice su tarjeta flotante. */}
-                <Show when={!props.sidebar && f.s.machine}>
-                  {(machine) => <MachineChip machine={machine()} on={f.s.machine_on !== false} class="max-w-[96px]" />}
-                </Show>
-                <Show when={f.s.deferred}>
-                  <span data-deferred class="shrink-0 text-neutral-500" title={t("projects.sessions.deferred")} aria-label={t("projects.sessions.deferred")}>⧗</span>
-                </Show>
-                {/* El botón del cohete es translúcido: sin desvanecer, el mensaje se lee a
-                    través. Máscara y no velo: el fondo del riel cambia con el tema y el wallpaper. */}
-                <span class="min-w-0 flex-1 truncate [:has(>[data-finish-slot])_&]:[mask-image:linear-gradient(to_left,transparent_56px,black_88px)]">{f.s.last_message}</span>
-                <EstadoDeTarea
-                  {...activity()}
-                  outcome={activity().outcome ?? f.s.outcome}
-                  size={13}
-                />
-              </div>
-              {/* Agente, y rama o worktree con su git, en la última línea. */}
-              <SessionGit
-                status={effectiveTaskGit(f.s, gitRows(), props.relatedSessions ?? props.sessions)}
-                shared={sharesTaskGit(f.s, gitRows(), props.relatedSessions ?? props.sessions)}
-                hasLead={conPastilla()}
-                lead={
-                  <Show when={conPastilla() && f.s.agent}>
-                  {(nombre) => {
-                    const visible = () => displayName(nombre(), profiles()[nombre()]);
-                    return (
-                      <span
-                        data-session-agent
-                        class={cn(
-                          "inline-flex max-w-full shrink-0 items-center gap-1 rounded-full border border-border py-px pr-1.5 pl-0.5 text-xs leading-4 text-neutral-700",
-                          f.s.id === props.current ? "bg-neutral-50" : "bg-neutral-100",
-                        )}
-                        title={visible()}
-                      >
-                        <AstroAvatar
-                          name={nombre()}
-                          status={props.vivas.includes(f.s.id) ? "working" : "asleep"}
-                          body={profiles()[nombre()]?.body}
-                          avatar={profiles()[nombre()]?.avatar}
-                          size={16}
-                        />
-                        <span class="whitespace-nowrap">{shortAgentName(visible())}</span>
-                      </span>
-                    );
-                  }}
-                </Show>
-                }
-              />
-            </div>
-            {/* La etapa va al final de la misma línea y no debajo: una segunda
-                línea daría dos alturas de fila en la misma lista según quién
-                esté marcada, y un historial se recorre de un vistazo
-                precisamente porque todas las filas miden igual. Quien se
-                recorta es el título — de los dos, el que se lee a distancia es
-                la palabra corta. */}
-            <EtapaDeTarea etapa={f.s.stage} class="mt-[3px]" />
-          </div>
-          }>
+          <div class="col-span-full min-w-0">
             <Show when={fijada(f.s)}>
               {/* El alfiler va en el hueco del borde, arriba al centro, sin fondo. */}
               <span role="img" aria-label={t("projects.sessions.pinned")} class="pointer-events-none absolute -top-1.5 left-1/2 flex size-3 -translate-x-1/2 items-center justify-center text-neutral-500">
@@ -1408,7 +1284,7 @@ export default function Sessions(props: {
               titulo={<Titulo />}
               apagada={apagada()}
               conMenu={conMenu()}
-              menu={() => <Menu riel />}
+              menu={() => <Menu riel={tarjetaDelRiel()} />}
               cohete={() => (
                 <Show when={puedeFinalizar() && renombrando() !== f.s.id}>
                   <span data-session-actions data-finish-slot class="flex">
@@ -1425,61 +1301,9 @@ export default function Sessions(props: {
                 </Show>
               )}
             />
-          </Show>
+          </div>
 
-          {/* Fuera del flujo y junto al título para no tapar el PR de la segunda línea.
-              `right-8` deja libre el menú de acciones. La tarjeta del riel lo
-              lleva en línea, antes de la hora. */}
-          <Show when={!tarjetaDelRiel() && puedeFinalizar() && renombrando() !== f.s.id}>
-            <span data-session-actions data-finish-slot class="absolute top-0 right-8 z-10 flex">
-              <FinishTaskButton
-                label={t("projects.sessions.finish")}
-                description={f.s.subagent || gitRows()[f.s.id]?.shared_with
-                  ? t("projects.sessions.finish_shared_description")
-                  : t("projects.sessions.finish_description")}
-                busy={finishing().includes(f.s.id)}
-                onFinish={rect => void intentar(f.s.id, true, rect)}
-              />
-            </span>
-          </Show>
 
-          {/* Las acciones son una capa y no una columna: en columna le quitaban
-              su ancho al título de todas las filas, aun invisibles. Van una
-              encima de otra —el menú arriba, fijar abajo— para no tapar más
-              renglón del que tapaba el menú solo. El velo va en `neutral-100`,
-              el fondo que tiene la fila mientras se ve. */}
-          <Show when={!props.readOnly && !tarjetaDelRiel()}><div
-            data-session-actions
-            class={cn(
-              "absolute inset-y-1 right-1 flex flex-col items-center justify-center gap-0.5 rounded-sm bg-neutral-100 opacity-0 group-hover/session:opacity-100 group-focus-within/session:opacity-100",
-              menu() === f.s.id && "opacity-100",
-              // Renombrando, el foco está en el campo: el velo saldría con el
-              // fondo que no es y tapando el final del nombre que se escribe.
-              renombrando() === f.s.id && "hidden",
-            )}
-            data-abierto={menu() === f.s.id ? "true" : undefined}
-          >
-            <span
-              aria-hidden="true"
-              class="pointer-events-none absolute inset-y-0 right-full w-8 bg-linear-to-l from-neutral-100"
-            />
-            <Menu riel={false} />
-            <Show when={props.onPin}>
-              <button
-                type="button"
-                data-session-pin
-                class="grid place-items-center rounded-sm border-0 bg-transparent px-1 py-0.5 leading-[1.3] text-neutral-500 hover:bg-neutral-200 hover:text-neutral-950 focus-visible:outline-2 focus-visible:outline-primary"
-                aria-label={fijada(f.s) ? t("projects.sessions.unpin_named", { title: f.s.title }) : t("projects.sessions.pin_named", { title: f.s.title })}
-                aria-pressed={fijada(f.s)}
-                title={fijada(f.s) ? t("projects.sessions.unpin") : t("projects.sessions.pin")}
-                onClick={() => void setPinned(f.s)}
-              >
-                <Show when={fijada(f.s)} fallback={<Pin size={14} />}>
-                  <PinOff size={14} />
-                </Show>
-              </button>
-            </Show>
-          </div></Show>
         </div>
       </ConTarjeta>
     );

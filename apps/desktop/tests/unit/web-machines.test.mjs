@@ -157,7 +157,7 @@ test("two machines show together and each command goes to the machine it names",
   assert.ok(text().includes("Panel") && text().includes("Notas"), "the projects of both machines are in the sidebar");
   assert.ok(doc.querySelector('[data-sesion="cmp_vm~t1"]'), "the VM task has its namespaced id");
   assert.ok(doc.querySelector('[data-sesion="cmp_mac~t1"]'), "the Mac task with the same raw id does not collide");
-  assert.equal(doc.querySelector('[data-sesion="cmp_vm~t1"] [data-machine]'), null, "the rail card leaves the machine to its hover card");
+  assert.ok(doc.querySelector('[data-sesion="cmp_vm~t1"] [data-machine]'), "the rail card keeps the machine in its fixed slot");
   assert.ok(calls("cmp_vm", "list_projects").some((c) => c.workspace === "w"), "the VM gets the workspace id");
   assert.ok(calls("cmp_mac", "list_projects").some((c) => c.workspace === "w"), "the Mac gets the same workspace id");
   assert.deepEqual([...doc.querySelectorAll("[data-machine-row]")].map((r) => r.dataset.state), ["online", "online"]);
