@@ -16,18 +16,21 @@ const LABELS: Record<MachineStatus, () => string> = {
 
 /** Lo que dura el aviso a la vista antes de cerrarse solo. */
 const VISIBLE_MS = 6000;
+/** Al recargar, el estado de las máquinas se asienta sin avisar. */
+const SETTLE_MS = 20_000;
 
 const signature = (rows: MachineRow[]) => rows.map((m) => `${m.id}:${m.status}`).join("|");
 
 /**
  * On, off, starting or needing an update; none of them is an error. The state
- * shows as a normal toast when it changes (and once on load), closes by itself
- * and can be closed by hand. A hidden list keeps the current state for screen
+ * shows as a normal toast when it changes after loading, closes by itself and
+ * can be closed by hand. A hidden list keeps the current state for screen
  * readers.
  */
 export function SyncNote(props: { machines: Accessor<MachineRow[]> }) {
   const [open, setOpen] = createSignal(false);
   let timer: ReturnType<typeof setTimeout> | undefined;
+  const settledAt = Date.now() + SETTLE_MS;
   const close = () => {
     clearTimeout(timer);
     setOpen(false);
@@ -36,7 +39,7 @@ export function SyncNote(props: { machines: Accessor<MachineRow[]> }) {
     on(
       () => signature(props.machines()),
       (now, before) => {
-        if (!now || now === before) return;
+        if (!now || now === before || Date.now() < settledAt) return;
         clearTimeout(timer);
         setOpen(true);
         timer = setTimeout(() => setOpen(false), VISIBLE_MS);
