@@ -122,7 +122,7 @@ export default function NewTask() {
         ? (await runShell(host, workspace, { folder: target.id, session: null, command: s.command, provider: s.provider, model: s.model, effort: s.effort, permissionMode: s.permissionMode, space: spaceId, agent: chosenAgent, baseRef })).session
         : await createTask(host, workspace, { folder: target.id, prompt: s.prompt, provider: s.provider, model: s.model, effort: s.effort, permissionMode: s.permissionMode, attachments: s.attachments, agent: chosenAgent, space: spaceId, baseRef, unwrapSnapshot });
       rememberMachine(host.id);
-      openTask(host.id, workspace, target.id, id);
+      openTask(host.id, workspace, target.id, id, true);
       return true;
     } catch (error) {
       if (error instanceof HostError && error.code === "key_changed") setNote(t("new.carry_key_changed", { name: host.label }));

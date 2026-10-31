@@ -49,7 +49,7 @@ export default function AgentScreen() {
         ? (await runShell(host, local, { folder, session: null, command: s.command, provider: s.provider, model: s.model, effort: s.effort, permissionMode: s.permissionMode, agent: name })).session
         : await createTask(host, local, { folder, prompt: s.prompt, provider: s.provider, model: s.model, effort: s.effort, permissionMode: s.permissionMode, attachments: s.attachments, agent: name, space: null });
       rememberMachine(host.id);
-      openTask(host.id, local, folder, id);
+      openTask(host.id, local, folder, id, true);
       return true;
     } catch (error) {
       if (error instanceof HostError && error.code === "machine_asleep") setNote(w("web.machines.off_action", { name: host.label }));

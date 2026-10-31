@@ -11,10 +11,12 @@ import { cardOf, cardTask, marksOf } from "../../lib/cards";
 import { useCustomization } from "../../lib/customization";
 import { archiveTask, failureText, setPinned, type Task, taskInSpace, taskKey } from "../../lib/engine";
 import { lang, t, w } from "../../lib/i18n";
+import { decodeFolded, FOLDED_KEY, toggleFolded } from "../../lib/foldedGroups";
 import { useInbox } from "../../lib/inbox";
 import { useMachines } from "../../lib/machines";
 import { Notifications } from "../../lib/notifications";
 import { can, ready, renameSpace } from "../../lib/pending";
+import { store } from "../../lib/store";
 import { effectiveGit } from "../../lib/taskGit";
 import { useTaskGit } from "../../lib/useTaskGit";
 import { shortWhen } from "../../lib/when";
@@ -68,6 +70,15 @@ export default function Home() {
   const [renaming, setRenaming] = useState<string | null>(null);
   const [newSpace, setNewSpace] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [folded, setFolded] = useState<string[]>([]);
+  useEffect(() => {
+    void store.get(FOLDED_KEY).then((raw) => setFolded((now) => (now.length ? now : decodeFolded(raw)))).catch(() => {});
+  }, []);
+  const toggleGroup = (key: string) => setFolded((now) => {
+    const next = toggleFolded(now, key);
+    void store.set(FOLDED_KEY, JSON.stringify(next)).catch(() => {});
+    return next;
+  });
 
   useEffect(() => {
     void Notifications?.getPermissionsAsync().then((p) => setAskNotifications(p.canAskAgain && !p.granted));
@@ -301,10 +312,22 @@ export default function Home() {
             ) : null}
           </Group>
 
-          {groups.map((group) => (
-            <View key={groupKey(group)}>
-              <GroupHeader strong count={group.tasks.length}>{groupLabel(lang, group, groupFolderName, machineName)}</GroupHeader>
-              <Group inset={46}>
+          {groups.map((group) => {
+            const key = groupKey(group);
+            const isFolded = folded.includes(key);
+            const name = groupLabel(lang, group, groupFolderName, machineName);
+            const needing = isFolded ? group.tasks.filter(({ task }) => NEEDS_YOU.has(marks.attention.get(taskKey(task)) ?? "")).length : 0;
+            return (
+            <View key={key}>
+              <GroupHeader
+                strong
+                count={group.tasks.length}
+                folded={isFolded}
+                onToggle={() => toggleGroup(key)}
+                foldLabel={t(isFolded ? "home.group.expand" : "home.group.collapse", { name })}
+                right={needing ? <CountBadge count={needing} /> : undefined}
+              >{name}</GroupHeader>
+              {isFolded ? null : <Group inset={46}>
                 {group.tasks.map(({ task }) => (
                   <TaskRow
                     key={taskKey(task)}
@@ -327,10 +350,11 @@ export default function Home() {
                     )}
                   />
                 ))}
-              </Group>
-              {!group.tasks.length ? <Text style={[styles.empty, { color: theme.textMuted }]}>{t("folder.empty")}</Text> : null}
+              </Group>}
+              {!isFolded && !group.tasks.length ? <Text style={[styles.empty, { color: theme.textMuted }]}>{t("folder.empty")}</Text> : null}
             </View>
-          ))}
+            );
+          })}
           {list.length === 0 && !loading && fleet === "ok" ? (
             <Text style={[styles.empty, { color: theme.textMuted }]}>{t(hosts.some((h) => h.linked) ? "home.no_linked_workspaces" : "home.no_workspaces")}</Text>
           ) : null}
