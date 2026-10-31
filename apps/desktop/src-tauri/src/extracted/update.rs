@@ -113,9 +113,13 @@ fn clear_set_aside(dir: &Path, mut remove: impl FnMut(&Path) -> bool) -> bool {
     if engines_left > 0 {
         return false;
     }
-    others
-        .iter()
-        .fold(true, |clean, path| remove(path) && clean)
+    let mut clean = true;
+    for path in &others {
+        if !remove(path) {
+            clean = false;
+        }
+    }
+    clean
 }
 
 /// El nombre instalado de un ejecutable apartado: sin `old_` ni `old_<tick>_`.
@@ -250,7 +254,12 @@ mod tests {
     #[test]
     fn an_open_window_does_not_stop_the_rest() {
         let folder = folder(&["old_terminus.exe", "old_1_terminus.exe"]);
-        let clean = clear_set_aside(folder.path(), |path| !path.ends_with("old_terminus.exe"));
+        let mut asked = Vec::new();
+        let clean = clear_set_aside(folder.path(), |path| {
+            asked.push(path.to_path_buf());
+            false
+        });
         assert!(!clean);
+        assert_eq!(names(&asked), ["old_1_terminus.exe", "old_terminus.exe"]);
     }
 }
