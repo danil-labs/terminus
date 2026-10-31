@@ -258,7 +258,10 @@ export type FilePreview = {
 /** `tree_show`: un archivo de un árbol de la tarea. */
 export type TreeContent = { kind: string; text: string; bytes: number; truncated: boolean };
 /** `load_session`. */
-export type OpenedSession = { id: string; provider: string; model: string | null; agent?: string | null; permission_mode?: string | null; turns: Turn[] };
+/** The `history` field of a read: `turns[i]` is turn `start + i`. */
+export type HistoryPage = { version?: number; revision?: string; total: number; start: number; end: number; limit: number; has_more: boolean };
+
+export type OpenedSession = { id: string; provider: string; model: string | null; observed_model?: string | null; agent?: string | null; permission_mode?: string | null; turns: Turn[]; history?: HistoryPage | null };
 
 /** `pending_requests`. */
 export type PendingRequests = {

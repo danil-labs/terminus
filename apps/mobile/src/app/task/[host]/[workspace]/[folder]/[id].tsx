@@ -4,6 +4,7 @@ import { SendButton } from "../../../../../ui/SendButton";
 import { Stack, router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AppState, FlatList, Image, type NativeScrollEvent, type NativeSyntheticEvent, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { type HistoryRead, HistoryPager, type LoadedHistory, type OlderState, hasOlder, hasRecentGap } from "@terminus/chat/history";
 import { type ChatEvent, type Question, type Turn, DEFAULT_CHAT_VEIL } from "@terminus/protocol";
 import { delegatedOf, taskTitle } from "@terminus/tasks";
 import {
@@ -17,6 +18,7 @@ import {
   coalesced,
   injectIntoTask,
   loadTask,
+  loadTurns,
   markSeen,
   respondPermission,
   runShell,
@@ -36,6 +38,7 @@ import { useAccount } from "../../../../../lib/account";
 import { useMachines } from "../../../../../lib/machines";
 import { COMPUTERS } from "../../../../../lib/supabase";
 import { useWorkspaces } from "../../../../../lib/workspaces";
+import { HistoryDetail } from "../../../../../ui/chat/HistoryDetail";
 import { Attachments, MessageBody, toolImages } from "../../../../../ui/chat/Message";
 import { ChatScopeContext } from "../../../../../ui/chat/scope";
 import { TurnStatus, WorkGroup } from "../../../../../ui/chat/Work";
@@ -101,6 +104,33 @@ export default function TaskScreen() {
   // Buscar en el chat: con texto, solo las líneas que lo dicen; `null` cerrado.
   const [finding, setFinding] = useState<string | null>(null);
   const key = `${params.host}/${id}`;
+  // La ventana de la conversación y su página anterior; una por máquina, workspace y tarea.
+  const [history, setHistory] = useState<LoadedHistory<Turn> | null>(null);
+  const [older, setOlder] = useState<OlderState>("idle");
+  const pagerScope = `${params.host}\n${workspace}\n${id}`;
+  const pager = useRef<{ scope: string; pager: HistoryPager<Turn> } | null>(null);
+  const hostNow = useRef(host);
+  hostNow.current = host;
+  const pagerNow = () => {
+    if (pager.current?.scope === pagerScope) return pager.current.pager;
+    const scope = pagerScope;
+    const next: HistoryPager<Turn> = new HistoryPager<Turn>({
+      read: async (before): Promise<HistoryRead<Turn>> => {
+        const machine = hostNow.current;
+        if (!machine) throw new HostError("machine_off");
+        if (before !== null) return loadTurns(machine, workspace, folder, id, before);
+        const tail = await loadTask(machine, workspace, folder, id, true);
+        return { turns: tail.session.turns, history: tail.session.history };
+      },
+      onChange: () => {
+        if (pager.current?.scope !== scope) return;
+        setHistory(next.loaded ?? null);
+        setOlder(next.older);
+      },
+    });
+    pager.current = { scope, pager: next };
+    return next;
+  };
   const needle = finding?.trim().toLowerCase() ?? "";
   const webScope = JSON.stringify([params.host, workspace, folder, id, needle]);
   // Las que esta tarea lanzó: la lista las esconde bajo ella, como el riel del escritorio. Las hijas
@@ -129,6 +159,7 @@ export default function TaskScreen() {
   const webReady = useRef<string | null>(null);
   const [paintedScope, setPaintedScope] = useState<string | null>(null);
   const [webWindow, setWebWindow] = useState<{ scope: string; first: string | null }>({ scope: "", first: null });
+  const needleNow = useRef("");
   const webSlice = useRef<{ first: number; rows: readonly ChatLine[]; scope: string }>({ first: 0, rows: [], scope: "" });
   const scroller = () => Platform.OS === "web" ? list.current?.getScrollableNode() as unknown as Element | null : null;
   const toBottom = (animated: boolean) => {
@@ -172,8 +203,10 @@ export default function TaskScreen() {
     if (!host) return;
     const asked = `${host.id}/${id}`;
     const before = liveNow.current;
-    const next = await loadTask(host, workspace, folder, id);
+    const window = pagerNow();
+    const next = await loadTask(host, workspace, folder, id, Boolean(window.loaded));
     if (keyNow.current !== asked) return;
+    window.accept(next.session.turns, next.session.history, { reading: !follow.current.following });
     setView(next);
     putLive(liveAfterRead(liveNow.current, before, { running: next.running, resync }));
   };
@@ -188,6 +221,10 @@ export default function TaskScreen() {
   useEffect(() => {
     setOpenTask(key);
     setView(null);
+    pager.current?.pager.close();
+    pager.current = null;
+    setHistory(null);
+    setOlder("idle");
     putLive([]);
     follow.current = OPENED;
     setJump({ shown: false, unseen: 0 });
@@ -288,12 +325,34 @@ export default function TaskScreen() {
     }
   }
 
-  /** Baja animado al final y vuelve a seguirlo: el botón y mandar un mensaje. */
+  /** Baja animado al final y vuelve a seguirlo: el botón y mandar un mensaje. Sin la cola cargada, primero la trae. */
   const toEnd = () => {
     follow.current = jumped(follow.current);
     setJump({ shown: false, unseen: 0 });
-    toBottom(true);
+    const window = pagerNow();
+    if (window.loaded && hasRecentGap(window.loaded)) void window.latest().then(() => toBottom(false)).catch(fail);
+    else toBottom(true);
   };
+
+  /** Pone lo anterior sobre lo que se lee. En la web la lista no es invertida: el ancla lo sostiene. */
+  const askOlder = async (retry = false) => {
+    const window = pagerNow();
+    if (!window.loaded || !hasOlder(window.loaded) || window.older === "loading" || (window.older === "failed" && !retry)) return;
+    const put = await window.fetchOlder();
+    if (!put) return;
+    const node = scroller();
+    const held = node ? anchorOf(node) : null;
+    if (held) {
+      clearPrepending();
+      prepending.current = held;
+      prependTimer.current = setTimeout(() => {
+        if (prepending.current === held) resetReading();
+      }, PREPEND_RECOVERY_MS);
+    }
+    put();
+  };
+  const askOlderNow = useRef(askOlder);
+  askOlderNow.current = askOlder;
 
   /** Enviar desde el cuadro: un mensaje abre otro turno; `!` corre el comando en la carpeta. */
   const submit = (s: Submission) => {
@@ -347,8 +406,10 @@ export default function TaskScreen() {
   };
   const questions = view?.questions ?? [];
   const asleep = host?.canAct() === "asleep" || host?.canAct() === "outdated";
-  const turns = view?.session.turns ?? NO_TURNS;
-  const thread = useMemo(() => workRuns(turns, live, running, imagesOfTurn), [turns, live, running]);
+  const turns = history?.turns ?? NO_TURNS;
+  const base = history?.start ?? 0;
+  const thread = useMemo(() => workRuns(turns, live, running, imagesOfTurn, base), [turns, live, running, base]);
+  const recentGap = history ? hasRecentGap(history) : false;
   const shown = useRef<ReadonlyMap<string, ChatLine>>(new Map());
   const lines = useMemo(() => {
     const next = keepSame(thread.lines, shown.current);
@@ -381,7 +442,7 @@ export default function TaskScreen() {
           if (prepending.current === held) resetReading();
         }, PREPEND_RECOVERY_MS);
         setWebWindow({ scope: page.scope, first: page.rows[Math.max(0, page.first - TAIL_PAGE_SIZE)].key });
-      }
+      } else if (!sheetOpened.current && webReady.current === page.scope && contentOffset.y < MARGIN && page.first === 0 && !needleNow.current) void askOlderNow.current();
     }
     const shown = showJump(next);
     setJump((now) => (now.shown === shown ? now : { shown, unseen: unseen(next, replies.current) }));
@@ -416,6 +477,7 @@ export default function TaskScreen() {
   const webStart = first < 0 ? Math.max(0, visible.length - TAIL_PAGE_SIZE) : first;
   const listed = useMemo(() => Platform.OS === "web" ? visible.slice(webStart) : [...visible].reverse(), [visible, webStart]);
   webSlice.current = { first: webStart, rows: visible, scope: webScope };
+  needleNow.current = needle;
   useLayoutEffect(() => {
     if (readingScope.current !== webScope) {
       resetReading();
@@ -451,6 +513,18 @@ export default function TaskScreen() {
     };
   }, [webScope]);
 
+  const olderRow = older === "idle" ? null : (
+    <View style={styles.olderRow} accessibilityRole={older === "failed" ? "alert" : undefined} testID="older-state">
+      <Text style={{ color: theme.textMuted, fontSize: TEXT.ui }}>
+        {older === "loading" ? t("task.history.older_loading") : host?.power() === "on" ? t("task.history.older_failed") : t("task.history.older_offline")}
+      </Text>
+      {older === "failed" ? (
+        <Pressable onPress={() => void askOlder(true)} accessibilityRole="button" testID="older-retry">
+          <Text style={{ color: theme.primary, fontSize: TEXT.ui }}>{t("task.history.retry")}</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
   const lastRun = thread.runs.at(-1);
   const since = running ? runClock(view?.liveSince ?? null, lastRun?.at ?? null) : null;
   const asleepNote = asleep && host ? (host.canAct() === "outdated" ? w("web.machines.outdated_action", { name: host.label }) : w("web.machines.off_action", { name: host.label })) : null;
@@ -535,10 +609,12 @@ export default function TaskScreen() {
           const row = <Row line={item} theme={theme} needle={needle} paused={waiting} onOpen={openWork} onQuickReply={item.key === lastAgent && !running && !asleep ? quickReply : undefined} />;
           return Platform.OS === "web" ? <View nativeID={`chat-row:${encodeURIComponent(webScope)}:${item.key}`}>{row}</View> : row;
         }}
-        ListFooterComponent={Platform.OS === "web" ? liveFooter : cached}
-        ListHeaderComponent={Platform.OS === "web" ? cached : liveFooter}
+        onEndReached={Platform.OS === "web" || needle ? undefined : () => void askOlder()}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={Platform.OS === "web" ? liveFooter : <>{cached}{olderRow}</>}
+        ListHeaderComponent={Platform.OS === "web" ? <>{cached}{olderRow}</> : liveFooter}
       />
-      {jump.shown ? (
+      {jump.shown || recentGap ? (
         <Pressable
           onPress={toEnd}
           accessibilityRole="button"
@@ -546,7 +622,7 @@ export default function TaskScreen() {
           style={[styles.toBottom, { backgroundColor: theme.surface, borderColor: theme.border }]}
         >
           <Text style={{ color: theme.text, fontSize: TEXT.ui, fontWeight: "500" }}>
-            {newReplies > 0 ? w("chat.thread.new_messages", { count: newReplies }) : w("chat.thread.to_bottom")}
+            {recentGap ? t("task.history.latest") : newReplies > 0 ? w("chat.thread.new_messages", { count: newReplies }) : w("chat.thread.to_bottom")}
           </Text>
           <Icon name="arrow-down" size={14} color={theme.text} />
         </Pressable>
@@ -627,7 +703,7 @@ function Bubble({ line, theme, streaming, onQuickReply }: { line: Extract<Line, 
   const mine = line.role === "user" && !from;
   const system = line.role === "system";
   const shell = line.role === "shell";
-  if (!line.text && !line.images.length && !line.attachments.length) return null;
+  if (!line.text && !line.images.length && !line.attachments.length && !line.refs?.length) return null;
   // Como en la ventana: lo de la persona va en globo; la respuesta del agente, sin globo y a todo el ancho.
   const agent = line.role !== "user" && !system && !shell;
   const bubble = (
@@ -655,6 +731,7 @@ function Bubble({ line, theme, streaming, onQuickReply }: { line: Extract<Line, 
       ) : line.text || line.images.length ? (
         <MessageBody text={line.text} streaming={streaming} images={line.images} onQuickReply={onQuickReply} />
       ) : null}
+      {line.refs?.map((reference) => <HistoryDetail key={`${reference.turn}${reference.pointer}`} reference={reference} turnId={line.turnId} />)}
     </View>
   );
   if (!from) return bubble;
@@ -783,6 +860,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   footer: { gap: 8 },
+  olderRow: { alignItems: "center", gap: 4, paddingVertical: 6 },
   pending: { flexGrow: 0, maxHeight: "55%", paddingHorizontal: 12, paddingBottom: 8 },
   bubble: { maxWidth: "92%", borderRadius: 14, padding: 10, borderWidth: StyleSheet.hairlineWidth },
   incoming: { alignSelf: "flex-start", maxWidth: "100%", borderColor: "transparent", shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 2, shadowOffset: { width: 0, height: 1 }, elevation: 1 },

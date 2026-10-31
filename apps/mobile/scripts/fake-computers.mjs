@@ -345,7 +345,24 @@ function invoke(m, command, args) {
     case "load_session": {
       const s = e.sessions.get(args.id);
       if (!s) throw { code: "command_failed", detail: "no such task" };
-      return { id: s.id, provider: s.provider, model: s.model, agent: s.agent, turns: s.turns };
+      const opened = { id: s.id, provider: s.provider, model: s.model, agent: s.agent };
+      if (!args.history_request) return { ...opened, turns: s.turns };
+      // Como `bounded_history`: la revisión cambia con cada escritura y los textos largos salen por referencia.
+      const revision = `r${s.turns.length}`;
+      if (args.history_request.kind === "detail") {
+        const { turn, pointer, offset = 0 } = args.history_request;
+        if (args.history_request.revision !== revision) throw { code: "command_failed", detail: "revision_changed" };
+        const body = JSON.stringify(s.turns[turn]?.text ?? "");
+        if (pointer !== "/text") throw { code: "command_failed", detail: "unknown_pointer" };
+        const next = Math.min(body.length, offset + 65_536);
+        return { version: 1, revision, offset, next, total: body.length, done: next === body.length, text: body.slice(offset, next) };
+      }
+      const end = Math.min(args.history_request.before ?? s.turns.length, s.turns.length);
+      const start = Math.max(0, end - 50);
+      const turns = s.turns.slice(start, end).map((t, n) => t.text && t.text.length > 8192
+        ? { ...t, text: "", history_refs: [{ version: 1, turn: start + n, pointer: "/text", bytes: t.text.length + 2, revision }] }
+        : t);
+      return { ...opened, turns, history: { version: 1, revision, total: s.turns.length, start, end, limit: 50, has_more: start > 0 } };
     }
     case "pending_requests": {
       const s = e.sessions.get(args.session);

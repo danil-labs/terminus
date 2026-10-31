@@ -4,6 +4,8 @@
  * por el relay o por el bridge. Sin React Native: se prueba en Node.
  */
 import type {
+  HistoryChunk,
+  HistoryRef,
   AccountLimits,
   AccountList,
   LoginEvent,
@@ -35,6 +37,8 @@ import type {
   WorkspaceAttention,
   LiveTurn,
 } from "@terminus/protocol";
+import { type HistoryRead } from "@terminus/chat/history";
+import { currentRef, readWholeDetail } from "@terminus/chat/historyDetail";
 import { readVisualHtml, type VisualPart, type VisualWhole, VISUAL_FILE, VISUAL_TREE } from "@terminus/chat/visual";
 import { arrangeSpaces, spaceOrder, type AccountWorkspace, groupWorkspaces, linkedAttention, onlyLinked, registryProjects, withRegistry } from "@terminus/computers";
 import { type ChatBackgroundView, chatBackgroundImageUrl, chatBackgroundView, isSingleAttention } from "@terminus/protocol";
@@ -375,10 +379,49 @@ export type TaskView = {
   liveSince: number | null;
 };
 
-export async function loadTask(host: Host, workspace: string, folder: string, id: string): Promise<TaskView> {
+/** Con estos campos exactos, `null` incluido: la copia del relay se busca por los argumentos y así la comparte con la web. */
+const historyRequest = (before: number | null) => ({ version: 1, before, revision: null });
+
+/** La cola de la tarea. Una máquina apagada sin esa copia aún puede tener la entera, solo para quien no tiene nada que perder. */
+async function tailOf(host: Host, workspace: string, folder: string, id: string, holding: boolean, at: { cachedAt: number | null }) {
+  const session = await read<OpenedSession | null>(host, "load_session", workspace, { project: folder, id, history_request: historyRequest(null) }, null, at);
+  if (session || holding || host.power() === "on") return session;
+  return read<OpenedSession | null>(host, "load_session", workspace, { project: folder, id }, null, at);
+}
+
+/** Una página anterior. Sin ella en una máquina apagada no es el principio de la conversación: es que no se puede leer ahora. */
+export async function loadTurns(host: Host, workspace: string, folder: string, id: string, before: number): Promise<HistoryRead<Turn>> {
+  const session = await read<OpenedSession | null>(host, "load_session", workspace, { project: folder, id, history_request: historyRequest(before) }, null, { cachedAt: null });
+  if (!session) throw new HostError("machine_off", host.label);
+  return { turns: session.turns ?? [], history: session.history };
+}
+
+let details: Promise<unknown> = Promise.resolve();
+
+/**
+ * El contenido entero de un campo que no cupo en la página; `null` si no se puede traer de una
+ * vez. En fila: el relay acota las lecturas de historial simultáneas.
+ */
+export function loadDetail(host: Host, workspace: string, folder: string, id: string, ref: HistoryRef, turnId: string | undefined): Promise<string | null> {
+  const part = async (current: HistoryRef, offset: number) =>
+    (await host.call<HistoryChunk>("load_session", workspace, { project: folder, id, history_request: { ...current, kind: "detail", offset } })).value;
+  const run = async () => {
+    const whole = await readWholeDetail(part, ref).catch(async (): Promise<unknown> => {
+      const fresh = await currentRef((before) => loadTurns(host, workspace, folder, id, before), ref, turnId);
+      if (!fresh) throw new HostError("history_detail_changed");
+      return readWholeDetail(part, fresh);
+    });
+    return whole === null ? null : typeof whole === "string" ? whole : JSON.stringify(whole, null, 2);
+  };
+  const next = details.then(run, run);
+  details = next.catch(() => {});
+  return next;
+}
+
+export async function loadTask(host: Host, workspace: string, folder: string, id: string, holding = false): Promise<TaskView> {
   const at = { cachedAt: null as number | null };
   const [session, pending, live, liveTurns] = await Promise.all([
-    read<OpenedSession | null>(host, "load_session", workspace, { project: folder, id }, null, at),
+    tailOf(host, workspace, folder, id, holding, at),
     read<PendingRequests | null>(host, "pending_requests", workspace, { session: id }, null, at).catch((): PendingRequests | null => null),
     read<string[]>(host, "list_active_turns", workspace, { workspace }, [], at).catch((): string[] => []),
     read<LiveTurn[]>(host, "list_live_turns", workspace, {}, [], at).catch((): LiveTurn[] => []),
@@ -446,7 +489,7 @@ export type Draft = {
 
 /** El proveedor y el modelo con que sigue una tarea: los de su último turno. */
 export function taskDefaults(view: TaskView): { provider: string; model: string | null } {
-  const model = [...view.session.turns].reverse().find((t) => t.model)?.model ?? view.session.model ?? null;
+  const model = [...view.session.turns].reverse().find((t) => t.model)?.model ?? view.session.model ?? view.session.observed_model ?? null;
   return { provider: view.session.provider, model };
 }
 
@@ -578,6 +621,8 @@ export async function answerQuestion(host: Host, workspace: string, folder: stri
   // El proceso puede haber terminado o la pregunta haberse respondido en otro cliente.
   const current = await loadTask(host, workspace, folder, id);
   const question = current.questions.find((q) => q.turn === pending.turn);
+  // Una pregunta que ya no entra en la cola no prueba que esté contestada: la respuesta no se descarta en silencio.
+  if (!question && !current.session.turns.some((turn) => turn.id === pending.turn)) throw new HostError("question_unverified");
   if (!question) return;
   const remaining = respuestas.filter((a) => question.questions.some((q) => q.id === a.question));
   if (question.request_id) {

@@ -4,7 +4,7 @@
  * qué ejecutó) y la respuesta. Sin React Native: se prueba en Node.
  */
 import { bareCommand, classify, fileName, isQuestionFile, joinSteps, type StepKind } from "@terminus/chat/steps";
-import type { Turn, TurnTool } from "@terminus/protocol";
+import type { HistoryRef, Turn, TurnTool } from "@terminus/protocol";
 
 export type { StepKind };
 
@@ -27,7 +27,7 @@ export function senderOf(turn: Turn): Sender | null {
 
 /** Un renglón de la conversación. */
 export type Line =
-  | { key: string; kind: "message"; role: string; text: string; images: string[]; attachments: string[]; from?: Sender | null }
+  | { key: string; kind: "message"; role: string; text: string; images: string[]; attachments: string[]; from?: Sender | null; refs?: readonly HistoryRef[]; turnId?: string }
   /** Lo que el agente dijo antes de su respuesta, mientras trabajaba. */
   | { key: string; kind: "progress"; text: string }
   | { key: string; kind: "steps"; rows: StepRow[] }
@@ -51,7 +51,8 @@ const toStep = (tool: TurnTool) => stepOf(tool.name ?? "", tool.target ?? null, 
  */
 export function linesOfTurn(turn: Turn, key: string, images: string[]): Line[] {
   const from = senderOf(turn);
-  const message = (text: string): Line => ({ key, kind: "message", role: turn.role, text, images, attachments: turn.attachments ?? [], from });
+  const refs = turn.history_refs?.filter((ref) => ref.pointer !== "/tools");
+  const message = (text: string): Line => ({ key, kind: "message", role: turn.role, text, images, attachments: turn.attachments ?? [], from, ...(refs?.length ? { refs, turnId: turn.id } : {}) });
   if (turn.shell) return [{ key, kind: "shell", command: turn.text ?? "", output: turn.shell.output ?? "", exitCode: turn.shell.exit_code ?? null }];
   const tools = turn.tools ?? [];
   const pieces = turn.pieces ?? [];
@@ -323,12 +324,12 @@ function deriveRun(stretch: Stretch, pieces: readonly LivePiece[], open: boolean
   return { lines, tail, run };
 }
 
-function stretchesOf(turns: readonly Turn[]): Stretch[] {
+function stretchesOf(turns: readonly Turn[], base: number): Stretch[] {
   const out: { key: string; at: number | null; turns: { turn: Turn; index: number }[] }[] = [];
   turns.forEach((turn, index) => {
-    if (opensRun(turn)) out.push({ key: turn.id ?? String(index), at: turn.at ?? null, turns: [] });
+    if (opensRun(turn)) out.push({ key: turn.id ?? String(base + index), at: turn.at ?? null, turns: [] });
     else if (!out.length) out.push({ key: "start", at: null, turns: [] });
-    out.at(-1)!.turns.push({ turn, index });
+    out.at(-1)!.turns.push({ turn, index: base + index });
   });
   return out;
 }
@@ -339,12 +340,13 @@ const sealedOf = new WeakMap<readonly Turn[], Sealed>();
 /**
  * La conversación con sus ejecuciones: la única derivación que leen el chat y la hoja.
  * Solo la última ejecución cambia con lo vivo; las anteriores se calculan una vez por
- * lectura, porque esto corre con cada pedazo de texto que llega.
+ * lectura, porque esto corre con cada pedazo de texto que llega. `base`: la posición del
+ * primer turno en la transcripción entera; identifica a los turnos sin `id` entre páginas.
  */
-export function workRuns(turns: readonly Turn[], live: readonly LivePiece[], running: boolean, imagesOf: (turn: Turn) => string[] = () => []): WorkThread {
+export function workRuns(turns: readonly Turn[], live: readonly LivePiece[], running: boolean, imagesOf: (turn: Turn) => string[] = () => [], base = 0): WorkThread {
   let sealed = sealedOf.get(turns);
   if (!sealed) {
-    const stretches = stretchesOf(turns);
+    const stretches = stretchesOf(turns, base);
     const done = stretches.slice(0, -1).map((stretch) => deriveRun(stretch, [], false, imagesOf));
     sealed = { lines: done.flatMap((d) => d.lines), runs: done.map((d) => d.run), last: stretches.at(-1) ?? null };
     sealedOf.set(turns, sealed);
