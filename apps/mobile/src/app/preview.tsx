@@ -1,5 +1,5 @@
 import { AgentAvatar } from "../ui/AgentAvatar";
-import { folderColor, TEXT } from "@terminus/design";
+import { TEXT } from "@terminus/design";
 import { canFinishTask, cardPull, previewLabel, taskPreview } from "@terminus/tasks";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState, type ReactNode } from "react";
@@ -10,6 +10,7 @@ import { effectiveGit } from "../lib/taskGit";
 import { useTaskGit } from "../lib/useTaskGit";
 import { TaskFinishConfirmation } from "../ui/TaskFinishConfirmation";
 import { Sheet, SheetOption } from "../ui/Sheet";
+import { FolderIcon } from "../ui/FolderIcon";
 import { PullChip } from "../ui/TaskCard";
 import { TaskActions } from "../ui/TaskActions";
 import { lang, t, w } from "../lib/i18n";
@@ -47,7 +48,7 @@ export default function Preview() {
   const row = cardTask(task, marks);
   const approving = [...marks.attention].filter(([, s]) => s === "approving").map(([k]) => k);
   const preview = taskPreview(lang, row, { live: marks.live, approving });
-  const folderName = snapshot?.folders.find((f) => f.key === task.folderKey)?.name;
+  const folder = snapshot?.folders.find((f) => f.key === task.folderKey);
   const provider = snapshot?.providers[task.host]?.find((p) => p.id === task.provider);
   const several = hosts.length > 1;
   const observed = effectiveGit(book, task, snapshot?.tasks ?? []);
@@ -74,8 +75,8 @@ export default function Preview() {
       <View style={styles.rows}>
         {preview.folder ? (
           <Field label={previewLabel(lang, "folder")}>
-            <View style={[styles.square, { backgroundColor: folderColor(preview.folder) }]} />
-            <Text numberOfLines={1} style={[styles.value, { color: theme.text }]}>{folderName ?? task.folder}</Text>
+            <FolderIcon folder={folder} size={13} />
+            <Text numberOfLines={1} style={[styles.value, { color: theme.text }]}>{folder?.name ?? task.folder}</Text>
           </Field>
         ) : null}
         {preview.agent ? (
@@ -134,7 +135,6 @@ const styles = StyleSheet.create({
   field: { flexDirection: "row", alignItems: "center", gap: 8, minHeight: 22 },
   label: { width: 84, fontSize: TEXT.ui },
   fieldValue: { flex: 1, flexDirection: "row", alignItems: "center", gap: 6 },
-  square: { width: 9, height: 9, borderRadius: 2 },
   value: { flex: 1, fontSize: TEXT.body },
   button: { minHeight: 48, flexDirection: "row", gap: 6, alignItems: "center", justifyContent: "center", borderWidth: 1, borderRadius: 10, paddingVertical: 11 },
 });

@@ -19,7 +19,7 @@ import { Icon } from "../../ui/Icon";
 import { KeyboardScreen } from "../../ui/KeyboardScreen";
 import { matches, NoMatch } from "../../ui/Search";
 import { Sheet, SheetOption } from "../../ui/Sheet";
-import { FolderSquare } from "../../ui/TaskCard";
+import { FolderIcon } from "../../ui/FolderIcon";
 import { useTheme } from "../../ui/theme";
 
 /**
@@ -161,7 +161,7 @@ export default function NewTask() {
       ) : null}
       <SelectorChip
         testID="pick-folder"
-        left={target ? <FolderSquare id={target.key} /> : <Icon name="folder" size={13} color={theme.textMuted} />}
+        left={target ? <FolderIcon folder={target} size={13} /> : <Icon name="folder" size={13} color={theme.textMuted} />}
         value={target?.name ?? t("new.folder")}
         muted={!target}
         onPress={host && workspace ? () => setPicker("folder") : undefined}
@@ -243,7 +243,7 @@ export default function NewTask() {
           return (
             <>
               {shown.length ? shown.map((f) => (
-                <SheetOption key={f.key} testID={`folder-${f.id}`} left={<FolderSquare id={f.key} size={10} />} label={f.name}
+                <SheetOption key={f.key} testID={`folder-${f.id}`} left={<FolderIcon folder={f} size={13} />} label={f.name}
                   detail={f.host === host?.id ? (f.working_directory ?? null) : t("new.carry_from", { name: hostsOfCurrent.find((h) => h.id === f.host)?.label ?? f.host })} selected={f.id === target?.id} onPress={() => {
                   setFolder(f.id);
                   setPicker(null);
