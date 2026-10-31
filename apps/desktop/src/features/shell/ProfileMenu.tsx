@@ -1,4 +1,5 @@
 import Bug from "lucide-solid/icons/bug";
+import { SignalDot } from "../../ui/SignalDot";
 import ChevronRight from "lucide-solid/icons/chevron-right";
 import LogOut from "lucide-solid/icons/log-out";
 import UserRound from "lucide-solid/icons/user-round";
@@ -65,10 +66,7 @@ export default function ProfileMenu(props: {
         </Show>
         {/* Mientras la computadora no puede dormir, el avatar lo dice sin abrir el menú. */}
         <Show when={despierta.status()?.active}>
-          <span
-            aria-hidden="true"
-            class="pointer-events-none absolute right-0.5 bottom-0.5 size-2.5 rounded-full border-2 border-surface-raised bg-warning"
-          />
+          <SignalDot tone="warning" class="pointer-events-none absolute right-0.5 bottom-0.5" />
         </Show>
       </PopoverAnchor>
       <PopoverContent class="w-72 p-1" aria-label={t("shell.profile.menu")}>

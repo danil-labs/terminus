@@ -1,4 +1,5 @@
 import Folder from "lucide-solid/icons/folder";
+import { SignalDot } from "../../ui/SignalDot";
 import GitBranch from "lucide-solid/icons/git-branch";
 import Monitor from "lucide-solid/icons/monitor";
 import { MachineIcon } from "../machines/MachineIcon";
@@ -69,10 +70,7 @@ export default function TaskLocation(props: TaskLocationProps) {
       >
         <MachineIcon wakes={wakes()} size={13} class="shrink-0" />
         <span data-task-location-machine="" class="min-w-0 truncate">{nombre()}</span>
-        <span
-          aria-hidden="true"
-          class={cn("size-1.5 shrink-0 rounded-full", !props.on ? "bg-neutral-300" : wakes() ? "bg-info" : "bg-success")}
-        />
+        <SignalDot tone={props.on ? "success" : "off"} />
       </Pista>
       <Show when={props.project}>
         {(proyecto) => (

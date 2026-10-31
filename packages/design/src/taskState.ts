@@ -35,3 +35,19 @@ export function rolledOutcome(rows: readonly { outcome?: TaskActivity["outcome"]
 export function topState(states: readonly (TaskState | null)[]): TaskState | null {
   return TASK_STATES.find((state) => states.includes(state)) ?? null;
 }
+
+/** The only signal of the app: one dot, one size, a closed list of tones. */
+export const SIGNAL_DOT_SIZE = 7;
+export type SignalTone = "success" | "error" | "warning" | "neutral" | "off" | "working";
+
+/** The tone of a task state; `null` is a task with nothing to say (delivered and seen, archived). */
+export function taskSignalTone(state: TaskState | null | undefined): SignalTone {
+  switch (state) {
+    case "unseen": return "success";
+    case "failed": return "error";
+    case "approving":
+    case "asked": return "warning";
+    case "working": return "working";
+    default: return "neutral";
+  }
+}

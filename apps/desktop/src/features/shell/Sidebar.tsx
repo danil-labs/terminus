@@ -1,4 +1,5 @@
 import { groupCardOptions, workStateOf } from "@terminus/tasks";
+import { SignalDot } from "../../ui/SignalDot";
 import History from "lucide-solid/icons/history";
 import Plus from "lucide-solid/icons/plus";
 import SquarePen from "lucide-solid/icons/square-pen";
@@ -671,7 +672,7 @@ export default function Sidebar(props: {
                       sesión abierta: sin esto el estado se comunicaría solo al
                       desplegar. */}
                   <Show when={props.current}>
-                    <span class="ui-sidebar-menu-badge absolute top-1 right-1 size-1.5 rounded-full bg-primary" />
+                    <SignalDot tone="working" class="ui-sidebar-menu-badge absolute top-1 right-1" />
                   </Show>
                 </SidebarMenuButton>
               </SidebarMenuItem>

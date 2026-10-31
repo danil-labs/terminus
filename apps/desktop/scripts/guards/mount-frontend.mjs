@@ -1687,7 +1687,7 @@ if (!roto) {
   assert.doesNotMatch(tab("p").getAttribute("aria-label"), /sin leer/);
   keepActiveView(sidebar);
   await abrirDesdeElBuscador(sidebar, "Tarea own", "own");
-  assert.ok(tab("own").querySelector('[aria-label="Fallo o interrupción"].text-error-strong svg.lucide-circle-alert'));
+  assert.ok(tab("own").querySelector('[aria-label="Fallo o interrupción"] .signal-dot[data-tone="error"]'));
   assert.ok(tab("own").querySelector("svg.lucide-git-pull-request-draft"));
   assert.equal(tab("own").querySelector("svg.lucide-git-pull-request"), null);
   assert.match(tab("own").title, /feature\/child.*#13/);
@@ -1810,7 +1810,7 @@ if (!roto) {
   await sleep(100);
   sidebar.emit("chat", { kind: "started", session: "p", workspace: "w" });
   await sleep(100);
-  const workingDot = tab("p").querySelector('.rounded-full.bg-current');
+  const workingDot = tab("p").querySelector('.signal-dot[data-tone="working"]');
   assert.ok(workingDot);
   assert.ok([...workingDot.classList].every((name) => !name.includes("animate")), "the working indicator stays visible without blinking");
   assert.equal(row("p").querySelectorAll("[data-task-orbit]").length, 1, "una tarea sin encargado conserva identidad con órbita");
@@ -3777,19 +3777,19 @@ if (!roto) {
   assert.equal(doc.querySelector("[data-title-bar] [data-workspace-name]"), null, "la franja de la ventana ya no nombra el workspace: se cambia en la columna");
   assert.equal(doc.querySelector('button[aria-label^="Workspace: "]'), null, "el menú de workspace del pie del riel se fue");
   assert.equal(cuadro("w").dataset.attention, "failed", "fallo sin ver gana a terminada sin ver");
-  assert.ok(cuadro("w").querySelector('[data-attention-badge="failed"].text-error-strong svg.lucide-circle-alert'));
+  assert.ok(cuadro("w").querySelector('[data-attention-badge="failed"] .signal-dot[data-tone="error"]'));
   assert.equal(cuadro("w2").dataset.attention, "approving", "un permiso gana a todo");
-  assert.ok(cuadro("w2").querySelector("svg.lucide-shield-question-mark"));
+  assert.ok(cuadro("w2").querySelector('.signal-dot[data-tone="warning"]'));
   assert.equal(cuadro("w2").getAttribute("aria-label"), "Beta: Aquí dentro esperan que apruebes una acción");
   assert.equal(cuadro("w3").dataset.attention, "asked", "una pregunta gana a terminada sin ver");
-  assert.ok(cuadro("w3").querySelector("svg.lucide-circle-question-mark"));
+  assert.ok(cuadro("w3").querySelector('.signal-dot[data-tone="warning"]'));
   assert.equal(cuadro("w4").dataset.attention, undefined, "un estado que la ventana no conoce no se pinta");
   const filaDeColumna = (id) => doc.querySelector(`[data-sesion="${id}"]`);
   // La tarjeta del riel: sin ver es el punto verde; vista lo deja neutro y se apaga.
-  assert.ok(filaDeColumna("s1").querySelector('[aria-label="Terminó y no la has abierto"] .task-card-badge .bg-success-strong'), "la fila dice terminada sin ver");
+  assert.ok(filaDeColumna("s1").querySelector('[aria-label="Terminó y no la has abierto"] .task-card-badge .signal-dot[data-tone="success"]'), "la fila dice terminada sin ver");
   assert.equal(filaDeColumna("s3").dataset.apagada, "true", "una entregada ya vista se apaga, en su sitio");
-  assert.ok(filaDeColumna("s3").querySelector('[aria-label="Resultado entregado"] .task-card-badge .bg-neutral-500'), "y conserva el punto en su esquina");
-  assert.equal(filaDeColumna("s3").querySelector('[aria-label="Resultado entregado"] .bg-success-strong'), null, "sin el verde de lo no visto");
+  assert.ok(filaDeColumna("s3").querySelector('[aria-label="Resultado entregado"] .task-card-badge .signal-dot[data-tone="neutral"]'), "y conserva el punto en su esquina");
+  assert.equal(filaDeColumna("s3").querySelector('[aria-label="Resultado entregado"] .signal-dot[data-tone="success"]'), null, "sin el verde de lo no visto");
   const pliegue = doc.querySelector('button[aria-label="Plegar «Proyecto»"]');
   pliegue.click();
   await sleep(50);
