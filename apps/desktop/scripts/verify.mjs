@@ -1,7 +1,9 @@
 #!/usr/bin/env node
-import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { spawn } from "node:child_process";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { availableParallelism, freemem, tmpdir, totalmem } from "node:os";
 import { dirname, join, relative } from "node:path";
+import { setTimeout as sleep } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 
 import { SKIPPED_EXIT_CODE, walkFiles } from "./git.mjs";
@@ -695,37 +697,171 @@ if (undocumented.length) {
 
 const outputOf = (e) => [e?.stdout, e?.stderr].map((s) => (s ?? "").toString()).join("").trimEnd();
 
+const GIB = 1024 ** 3;
+const STEP_TIMEOUT_MS = 15 * 60_000;
+const CARGO_TIMEOUT_MS = 45 * 60_000;
+
+/** Un paso por cada dos núcleos y por cada 2 GiB libres; con 1, la cadena corre en serie. En macOS `freemem` no cuenta la caché: vale la mitad del total. */
+function budget() {
+  const forced = Number(process.env.VERIFY_JOBS);
+  if (Number.isSafeInteger(forced) && forced > 0) return forced;
+  const memory = process.platform === "darwin" ? totalmem() / 2 : freemem();
+  return Math.max(1, Math.min(Math.floor(availableParallelism() / 2), Math.floor(memory / (2 * GIB))));
+}
+
+const running = new Set();
+
+function killGroup(child) {
+  try {
+    if (process.platform === "win32") child.kill();
+    else process.kill(-child.pid, "SIGKILL");
+  } catch {
+    // El proceso pudo salir antes de la señal.
+  }
+}
+
+function run(cmd, args, cwd, env, timeoutMs) {
+  return new Promise((resolve) => {
+    const child = spawn(cmd, args, { cwd, env, stdio: ["ignore", "pipe", "pipe"], detached: process.platform !== "win32", windowsHide: true });
+    let stdout = "";
+    let stderr = "";
+    let timedOut = false;
+    running.add(child);
+    const timer = setTimeout(() => {
+      timedOut = true;
+      killGroup(child);
+    }, timeoutMs);
+    child.stdout.on("data", (chunk) => { stdout += chunk; });
+    child.stderr.on("data", (chunk) => { stderr += chunk; });
+    const finish = (status, signal, error) => {
+      clearTimeout(timer);
+      running.delete(child);
+      resolve({ status, signal, timedOut, stdout, stderr: error ? `${stderr}\n${error.message}` : stderr });
+    };
+    child.on("error", (error) => finish(null, null, error));
+    child.on("close", (status, signal) => finish(status, signal));
+  });
+}
+
+/** Reparte huecos; quien pide más que el total espera a tenerlos todos. */
+function slots(total) {
+  let free = total;
+  const waiting = [];
+  const wake = () => {
+    while (waiting.length && free >= waiting[0].weight) {
+      const { weight, resolve } = waiting.shift();
+      free -= weight;
+      resolve();
+    }
+  };
+  return {
+    acquire: (weight) => new Promise((resolve) => { waiting.push({ weight, resolve }); wake(); }),
+    release: (weight) => { free += weight; wake(); },
+  };
+}
+
+/** Dos cadenas juntas saturan memoria y disco; el candado de un proceso muerto se limpia. */
+async function takeLock() {
+  const dir = join(tmpdir(), "terminus-verify.lock");
+  const owner = join(dir, "pid");
+  for (let warned = false; ; await sleep(2000)) {
+    try {
+      mkdirSync(dir);
+      writeFileSync(owner, String(process.pid));
+      return () => rmSync(dir, { recursive: true, force: true });
+    } catch (error) {
+      if (error?.code !== "EEXIST") return () => {};
+    }
+    let pid = 0;
+    try {
+      pid = Number(readFileSync(owner, "utf8"));
+      process.kill(pid, 0);
+    } catch (error) {
+      if (error?.code === "EPERM") pid = Number(pid);
+      else if (pid || error?.code === "ESRCH") {
+        rmSync(dir, { recursive: true, force: true });
+        continue;
+      }
+    }
+    if (!warned) console.log(`  Otra cadena corre en esta máquina (pid ${pid}); espero a que termine.`);
+    warned = true;
+  }
+}
+
 const startedAt = Date.now();
 let failure = null;
 const skipped = [];
+const JOBS = budget();
+const pool = slots(JOBS);
 
-for (const [name, cmd, args, cwd] of steps) {
-  process.stdout.write(`  ${name.padEnd(50)}`);
-  if (SKIP_RUST && name === cliStep[0]) {
-    console.log("SKIPPED");
-    skipped.push([name, "--no-cargo: necesita rustc y el sidecar fijado; se ejecuta en la cadena completa y verify (rust).", true]);
-    continue;
-  }
-  const start = Date.now();
+async function runStep(step, weight = 1) {
+  const [name, cmd, args, cwd] = step;
+  await pool.acquire(weight);
   try {
-    execFileSync(cmd, args, { cwd, env: cmd === rustBuild.command && cwd === backend && args[0] !== "fmt" ? rustBuild.env : process.env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
-    console.log(`ok   ${((Date.now() - start) / 1000).toFixed(1)}s`);
-  } catch (e) {
-    if (e?.status === SKIPPED_EXIT_CODE) {
-      console.log("SKIPPED");
-      skipped.push([name, outputOf(e)]);
-      continue;
+    if (failure) return;
+    if (SKIP_RUST && name === cliStep[0]) {
+      console.log(`  ${name.padEnd(50)}SKIPPED`);
+      skipped.push([name, "--no-cargo: necesita rustc y el sidecar fijado; se ejecuta en la cadena completa y verify (rust).", true]);
+      return;
     }
-    console.log("FALLA");
-    failure = { name, cmd, args, e };
-    break;
+    const isCargo = cmd === rustBuild.command;
+    const start = Date.now();
+    const result = await run(cmd, args, cwd, isCargo && cwd === backend && args[0] !== "fmt" ? rustBuild.env : process.env, isCargo ? CARGO_TIMEOUT_MS : STEP_TIMEOUT_MS);
+    if (result.status === 0) console.log(`  ${name.padEnd(50)}ok   ${((Date.now() - start) / 1000).toFixed(1)}s`);
+    else if (result.status === SKIPPED_EXIT_CODE) {
+      console.log(`  ${name.padEnd(50)}SKIPPED`);
+      skipped.push([name, outputOf(result)]);
+    } else if (!failure) {
+      console.log(`  ${name.padEnd(50)}${result.timedOut ? "TIMEOUT" : "FALLA"}`);
+      failure = { name, cmd, args, e: result };
+      for (const child of running) killGroup(child);
+    }
+  } finally {
+    pool.release(weight);
   }
 }
+
+const runAll = (list) => Promise.all(list.map((step) => runStep(step)));
+async function runInOrder(list, weight) {
+  for (const step of list) await runStep(step, weight);
+}
+
+const isCargoLane = (step) => rustSteps.includes(step) && step !== engineStep;
+const isVite = (step) => step[0].startsWith("Empaqueta ");
+const isPerf = ([, , args]) => args.some((arg) => typeof arg === "string" && arg.includes("tests/perf/"));
+const firstBuild = steps.findIndex(isVite);
+const beforeBuild = steps.slice(0, firstBuild).filter((step) => step !== engineStep);
+const afterBuild = steps.slice(firstBuild).filter((step) => !isVite(step) && !isCargoLane(step) && (!isPerf(step) || step[0].startsWith("La carga inicial")));
+const measured = steps.slice(firstBuild).filter((step) => isPerf(step) && !afterBuild.includes(step));
+
+const releaseLock = await takeLock();
+for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
+  process.on(signal, () => {
+    for (const child of running) killGroup(child);
+    releaseLock();
+    console.error(`\n  Cadena cortada por ${signal}: lo que no dice ok no se comprobó.\n`);
+    process.exit(1);
+  });
+}
+console.log(`  Hasta ${JOBS} pasos a la vez (VERIFY_JOBS lo cambia).\n`);
+
+if (steps.includes(engineStep)) await runStep(engineStep);
+const cargoLane = SKIP_RUST || failure ? Promise.resolve() : runInOrder(steps.filter(isCargoLane), Math.ceil(JOBS / 2));
+if (!failure) await runAll(beforeBuild);
+if (!failure) await runInOrder(steps.filter(isVite), JOBS);
+if (!failure) await runAll(afterBuild);
+await cargoLane;
+// Miden un techo de gasto; con otros pasos al lado medirían esa carga.
+if (!failure) await runInOrder(measured, JOBS);
+releaseLock();
 
 if (failure) {
   const { name, cmd, args, e } = failure;
   console.error(`\n  Falló: ${name}`);
-  console.error(`      ${[cmd, ...args].join(" ")}\n`);
+  console.error(`      ${[cmd, ...args].join(" ")}`);
+  if (e?.signal) console.error(`      terminó por la señal ${e.signal}`);
+  if (e?.timedOut) console.error("      pasó de su plazo y se mató con sus hijos");
+  console.error("");
   for (const [stream, output] of [["stdout", e?.stdout], ["stderr", e?.stderr]]) {
     const text = (output ?? "").toString().trimEnd();
     if (!text) continue;
