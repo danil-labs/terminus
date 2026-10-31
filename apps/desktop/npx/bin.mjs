@@ -52,7 +52,7 @@ function parseArgs(argv) {
 }
 
 function printHelp() {
-  log(`${paint(C.bold, 'Terminus')} — ${t('help', { manualUrl: MANUAL_DOWNLOAD_URL })}`);
+  log(`${paint(C.bold, 'Danil')} — ${t('help', { manualUrl: MANUAL_DOWNLOAD_URL })}`);
 }
 
 async function sha256File(filePath) {
@@ -196,7 +196,7 @@ async function main() {
     process.exit(1);
   }
 
-  log(paint(C.bold, 'Terminus') + paint(C.dim, ` · ${t('title')}`));
+  log(paint(C.bold, 'Danil') + paint(C.dim, ` · ${t('title')}`));
 
   const plat = detectPlatform();
   log(`  ${t('system')}${plat.label}  ${paint(C.dim, `(${plat.platform}/${plat.arch})`)}`);

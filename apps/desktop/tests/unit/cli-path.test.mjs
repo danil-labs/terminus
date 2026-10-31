@@ -94,3 +94,22 @@ test("Unix launchers pass termination signals to the same process", { skip: proc
   child.kill("SIGTERM");
   assert.deepEqual(await exited, { code: null, signal: "SIGTERM" });
 });
+
+
+test("empty Unix PATH entries include cwd and symlink ancestors are rejected before writing", { skip: process.platform === "win32" }, (t) => {
+  const dir = scratch(t);
+  const binDir = join(dir, "bin");
+  writeFileSync(join(dir, "dn"), "foreign", { mode: 0o755 });
+  const original = process.cwd();
+  try {
+    process.chdir(dir);
+    assert.throws(() => configure({ action: "install", target: process.execPath, binDir, pathValue: ":/usr/bin" }), /PATH collision/);
+    assert.equal(existsSync(binDir), false);
+  } finally { process.chdir(original); }
+  const alias = join(dir, "alias");
+  symlinkSync(dir, alias);
+  for (const dryRun of [false, true]) {
+    assert.throws(() => configure({ action: "install", target: process.execPath, binDir: join(alias, "new-bin"), pathValue: "/usr/bin", dryRun }), /canonical directory/);
+    assert.equal(existsSync(join(dir, "new-bin")), false);
+  }
+});

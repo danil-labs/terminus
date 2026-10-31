@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { chmodSync, closeSync, existsSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
-import { delimiter, isAbsolute, join, resolve } from "node:path";
+import { delimiter, dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const MARK = "danil-cli-launcher:v1 ";
@@ -43,7 +43,9 @@ export function configure({ action, target, binDir, pathValue = process.env.PATH
   if (!["install", "uninstall"].includes(action)) throw new Error("Expected install or uninstall");
   if (!isAbsolute(binDir)) throw new Error("--bin-dir must be absolute");
   const directory = resolve(binDir);
-  if (existsSync(directory) && realpathSync(directory) !== directory) throw new Error("--bin-dir must be a canonical directory");
+  let ancestor = directory;
+  while (!existsSync(ancestor) && dirname(ancestor) !== ancestor) ancestor = dirname(ancestor);
+  if (realpathSync(ancestor) !== ancestor) throw new Error("--bin-dir must be a canonical directory");
   let executable;
   if (action === "install") {
     if (!target || !isAbsolute(target)) throw new Error("--target must be an absolute executable path");
@@ -60,7 +62,7 @@ export function configure({ action, target, binDir, pathValue = process.env.PATH
   });
   if (action === "install") {
     const separator = platform === "win32" ? ";" : delimiter;
-    const dirs = new Set([directory, ...pathValue.split(separator).filter(Boolean).map((part) => resolve(part))]);
+    const dirs = new Set([directory, ...pathValue.split(separator).filter((part) => platform !== "win32" || part).map((part) => resolve(part || process.cwd()))]);
     for (const dir of dirs) {
       let names;
       try { names = readdirSync(dir); } catch (error) { if (error.code === "ENOENT") continue; throw error; }

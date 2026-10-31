@@ -44,7 +44,7 @@ const MESSAGES = {
 
   Qué hace:
     1. Detecta tu sistema operativo y arquitectura.
-    2. Resuelve el artefacto correcto de las releases públicas de Terminus.
+    2. Resuelve el artefacto correcto de las releases públicas de Danil.
     3. Lo descarga a una carpeta temporal.
     4. Verifica su firma minisign antes de ejecutar ni copiar nada.
     5. Windows: lanza el instalador. macOS: descomprime la app y la deja en
@@ -63,7 +63,7 @@ const MESSAGES = {
 
   What it does:
     1. Detects your operating system and architecture.
-    2. Resolves the right artifact from Terminus' public releases.
+    2. Resolves the right artifact from Danil's public releases.
     3. Downloads it to a temporary folder.
     4. Verifies its minisign signature before running or copying anything.
     5. Windows: launches the installer. macOS: unpacks the app and puts it in
@@ -120,8 +120,8 @@ const MESSAGES = {
   'installerLaunched': { es: '\n✓ Instalador lanzado.', en: '\n✓ Installer launched.' },
   'followSteps': { es: ' Sigue los pasos en pantalla.', en: ' Follow the steps on screen.' },
   'selfUpdates': {
-    es: '  A partir de ahora, Terminus se actualiza sola desde dentro de la app.',
-    en: '  From now on, Terminus updates itself from inside the app.',
+    es: '  A partir de ahora, Danil se actualiza sola desde dentro de la app.',
+    en: '  From now on, Danil updates itself from inside the app.',
   },
   'unexpected': {
     es: ({ detail }) => `\nError inesperado: ${detail}`,
