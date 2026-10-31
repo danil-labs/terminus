@@ -38,6 +38,7 @@ export default function TaskFilesCard(props: {
   panelKey?: string;
   files: TaskFiles;
   visible: boolean;
+  readOnly?: boolean;
   /** In a split view or a narrow window the panel only exists expanded. */
   expandedOnly: boolean;
   onSaved: () => void;
@@ -215,6 +216,7 @@ export default function TaskFilesCard(props: {
                 <VisorDeArchivo
                   project={props.project}
                   session={props.session}
+                  readOnly={props.readOnly}
                   base={props.preview?.baseRef}
                   arbol={tab.tree}
                   ruta={tab.path}
