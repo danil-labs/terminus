@@ -46,3 +46,56 @@ manifest y checksums multiplataforma antes de cambiar el pin. No se autorizaron
 publicación, instalaciones productivas ni pruebas de actualización instalada.
 Los resultados de Linux no acreditan cmd, PowerShell, Git Bash, macOS ni móvil
 nativo. Los nombres de distribución Terminus siguen siendo intencionales.
+
+## Delta: CLI operativo exclusivo
+
+Fecha: 2026-10-31. Base del delta: `c8ba7a63`; cliente: `47e8b56b`.
+Plataforma: Linux x86_64. La persona sustituyó la compatibilidad CLI anterior:
+los únicos nombres operativos son `danil` y `dn`. El encargado architect
+`bxdyvc6e` aprobó el diff del cliente sin hallazgos. El cierre del motor se
+registra por separado; su integración sigue fuera del pin de este cliente.
+
+Medición: README, guía CLI, desarrollo, guards y README npm suman 614 líneas y
+34,514 bytes. La guía CLI tiene 96 líneas y 5,495 bytes. No cambió `AGENTS.md`.
+
+| Criterio | Estado | Evidencia del delta |
+|---|---|---|
+| Instrucciones de raíz | pasa | Se conserva la regla dev primero, DCO y Conventional Commits. |
+| Alcance por ámbito | pasa | Se leyeron las guías de escritorio, scripts y tests antes del cambio. |
+| Invariantes | pasa | Pin, RPC e identidades persistidas tienen diff vacío contra `c8ba7a63`. |
+| Arquitectura | pasa | Architect revisó los siete archivos de `47e8b56b`; la guía distingue forwarding interno de comandos instalables. |
+| Decisiones | pasa | El encargo explícito retira compatibilidad CLI legacy y conserva los contratos de distribución y datos. |
+| Arranque | pasa | Ayuda del launcher ejecutada; npx resuelve el único bin local `danil-terminus` sin instalar la app. |
+| Límites operativos | pasa | La guía declara colisiones, propiedad, PATH, helper con `--data`, pin y límites nativos. |
+| Coherencia global | sin comprobar | Se revisó este delta; no se auditó todo el histórico documental. |
+| Navegación | pasa | README y README npm enlazan la guía; doc-paths pasa. |
+| Presupuesto global | sin comprobar | Conteos medidos; no se definió un presupuesto global de autocarga. |
+| Controles | pasa | cli-path comprueba el directorio exacto; cli-forward contrasta las 26 órdenes del sidecar fijado. |
+| Secretos | pasa | El delta documental usa identificadores públicos y placeholders. |
+| Construcción | pasa | Frontend compilado y empaquetado; Cargo check y compilación de tests pasan sobre la misma fuente. |
+| Pruebas completas | pasa | Todos los pasos de verify pasan de forma agregada; Rust termina con 17 pruebas sin fallas ni omisiones. |
+| Verificación | pasa | Se ejecutó `pnpm verify` completo; dos corridas se interrumpieron por capacidad y el paso Rust pendiente se terminó aparte. |
+| Estilo | pasa | Lint dirigido, doc-paths, fmt, clippy y diff --check pasan. |
+
+**14 pasan · 0 fallan · 2 sin comprobar.**
+
+`pnpm verify` no tuvo una corrida única limpia en este delta. La primera se
+interrumpió en cargo check por disco lleno; la segunda pasó frontend, web,
+rendimiento, fmt, check y clippy, pero cargo test agotó el tmpfs. Hubo además
+un fallo del enlazador bajo ese límite. Sin cambiar fuentes ni opciones de
+pruebas, se redistribuyeron artefactos reconstruibles: ejecutables en tmpfs
+con ejecución o disco, y archivos `.rlib`/`.rmeta` e incremental en shm.
+`CARGO_BUILD_JOBS=1 cargo test --locked` terminó con código 0: 9 pruebas de
+biblioteca y 8 de integración, sin fallas ni omisiones.
+
+Evidencia local: `/tmp/danil-only-client-verify.log`,
+`/tmp/danil-only-client-verify-retry.log`,
+`/tmp/danil-only-client-cargo-test-resolved.log` y
+`/tmp/danil-only-client-build-layout.json`. Este último registra la distribución
+de artefactos. La caché temporal ejecutable se retiró tras las pruebas;
+se conservaron los logs. QA repitió cli-path (6/6), la resolución local de npx
+y el instalador Linux del host (10/10) en directorios desechables.
+
+Este delta no cambia la UI ni añade un recorrido visual nativo. No acredita
+Windows/macOS nativos, instalación productiva, actualización instalada ni
+la adopción del motor nuevo por el cliente fijado. No hubo push ni publicación.
