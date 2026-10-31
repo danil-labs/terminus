@@ -1,0 +1,4443 @@
+{
+  "recorded_at_utc": "2026-10-31T16:49:41.866657+00:00",
+  "scope": "VM-main local cleanup and GitHub remote branches; Mac unchanged",
+  "remote_branches": {
+    "terminus": {
+      "deleted": [
+        {
+          "branch": "alfa",
+          "oid": "049a03afef2b473dd511a8cbe17cecb843a2643e",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "chore/cleanup-reuse-second-pass",
+          "oid": "56160ec9d97c3c8e96a6b7bf727a356774303ec0",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "chore/cleanup-reuse-tokens",
+          "oid": "c663dda34839e2e7e2329de4e24c7d95493cac07",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "chore/desktop-030-rc1",
+          "oid": "166df3eaa4e97b34084811de940448bb6fffe44c",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "chore/release-0.2.84",
+          "oid": "101ce3daaacc019e5979603f77dbe6aed99eab0d",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "chore/sync-alfa-into-dev",
+          "oid": "309ee78ad3e3540de52955271a97d7efe9d9c124",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "chore/sync-main-into-dev",
+          "oid": "d28b5f313b32e4cfcc4663069b746be5ec1dd5aa",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "chore/0277",
+          "oid": "7185d11cee39fc5c57e42132f09a637cb3addd8e",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "chore/0279",
+          "oid": "faf61d0e532e7bd49371bcf8487e8c81922f4dbb",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "chore/0280",
+          "oid": "7516a99d34c8c52b0052e64afbe5dc2853ad8028",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "chore/0281",
+          "oid": "8a0bfc12a2e554c44fb80f0e1f9d55a826a56993",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "ci/ensayos-sin-firma",
+          "oid": "5442ff87a37fa6db0d5f3cee40a2b3e8cb6a05cb",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "ci/firmas-windows",
+          "oid": "1e4fd18d29c6dc27e69b241d5288275550c4fcc2",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "ci/menos-firmas-windows",
+          "oid": "d319eff456140c47efe60023f71919d74bbf9e8f",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "ci/prerelease-0275",
+          "oid": "9fbfbe39a9edd904a36d4779d92a98d3fe144314",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "deploy/web-integration-20261028",
+          "oid": "ce99ab99b4dc9263492a4d2e31de45cb1889f325",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "docs/desktop-release-confirmation",
+          "oid": "b638ddea402b8df1beee087b5daf8cd5f602cb56",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "docs/engine-client-estado",
+          "oid": "f41c3097526e1d9f07c037407fce2befb9211d6d",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/account-computers-rename",
+          "oid": "8f746f5caffc7406df10a2bf049cc8d541867c68",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/account-identity",
+          "oid": "bf99e6241eea27458491f01c11787ac5f1ff3f2c",
+          "integration_evidence": "exact merged PR head #171 with merge result in base"
+        },
+        {
+          "branch": "feat/account-spaces-migrate",
+          "oid": "6cbf11e08508140f0f91ca35ed9cc22e99fcff6c",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/activity-logs",
+          "oid": "f3f37044071015927fc7378ed3a6bb550487797b",
+          "integration_evidence": "exact merged PR head #384 with merge result in base"
+        },
+        {
+          "branch": "feat/adopt-contract-5f59d603",
+          "oid": "bac811ff74a31c795b729e8ad79e3b4dbfe77d00",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/alfa-disenos",
+          "oid": "27f9208a9e2cd703b26e4f1fd30616a07a94d1f0",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/alfa-disenos-2",
+          "oid": "c52678ef25ab7fa19312701c198329a6f2660d18",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/alfa-root",
+          "oid": "806aca62cd98cde4fc5ca9c4d1154649a1885e6a",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/alpha-frame-layout",
+          "oid": "629bb80291cbfef0526db5bb9b06d2f4421033a9",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/alpha-inbox-agents-design",
+          "oid": "b844ba284fa6247a23e2790b8be790b5f493d26b",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/alpha-inbox-search-channels",
+          "oid": "33cd106457c436c376fc0f3ae584b8007f6d45e2",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/alpha-messaging-writes",
+          "oid": "cf44f8d51e06099c62a7e8340db3f198ab82f75e",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/alta-instala-gh",
+          "oid": "92308e9037c3695ab36dd221346d6aca712ce363",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/alta-saludo-drive-en-fuentes",
+          "oid": "2592a178dbecccef30c6ab61677bd4a7e6d906f3",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/archivos-en-tarea",
+          "oid": "f7d070f5469c2dffe307bb1f54a40a65b595bb45",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/arranque-seldon",
+          "oid": "a87f3ab3c6d2a81f2132045da6b58b8380d9290a",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/background-tray",
+          "oid": "009df8e1a1081502dc130aeeb260aa3bafef2d02",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/bounded-history",
+          "oid": "fc4229c83ab9506f9af2f52376020cc1b24656d4",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/bundled-work-tools",
+          "oid": "f8dc80c385eb3bf5400d3c893d7e92fdc4c15873",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/carry-on-fleet",
+          "oid": "0282ac4112dc8b5a2681f68998c8f55c2aa3a503",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/carry-work-1-desktop-carry",
+          "oid": "1f3cfa143c53365323c04eaa0e676f57febd79f5",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/carry-work-2-bring-back",
+          "oid": "9574176479c7e5b80afa107dc99a5908574fdd7c",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/carry-work-3-no-remote",
+          "oid": "d385fe04b7bff07f8a200bc07c1c761fdc3fb582",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/carry-work-4-sealed",
+          "oid": "6e5d28d370faf023e8b4545732a2aa48d439e260",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/carry-work-5-web-phone",
+          "oid": "8169d509ce6095b27b9511bf7550baa14b600d23",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/chat-matematicas",
+          "oid": "98ce14003ec2fcb1f18cbef66e8b6833a9b50b24",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/chat-visuals-by-url",
+          "oid": "e3f524543ed6fe4c3aad987622926439000418a1",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/close-with-live-turns",
+          "oid": "2a0819be9ba07f436048c20ffb482355c7ed7fa3",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/composer-terminal-mode",
+          "oid": "e8950a713efe8fcd4fc5e5d8b5797832cf3f2441",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/connect-danil",
+          "oid": "a10970a3d0008d0eb4b86cfa3fb22fef87057848",
+          "integration_evidence": "exact merged PR head #159 with merge result in base"
+        },
+        {
+          "branch": "feat/connect-own-machine",
+          "oid": "445f8d4b374c9d1e2a1f8daa24f035f281df2dc8",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/connections-local",
+          "oid": "de946d0d3d4de9207a25c90603292798ded832fa",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/connections-webhook",
+          "oid": "233b08294a7d1b956d5181cc318a7773363b3ac4",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/danil-account-emails",
+          "oid": "8750cb858ad834957c9a2bd7c36fd5fc0d2996e6",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/danil-session-per-account",
+          "oid": "fe7e9a4d26c7d7c75e49fd5d73f47c2693e2ddcd",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/danil-sign-in-entry",
+          "oid": "efed5bdd3c35fb77af81d9065912017f62a1c6a5",
+          "integration_evidence": "exact merged PR head #160 with merge result in base"
+        },
+        {
+          "branch": "feat/deferred-actions",
+          "oid": "1d76acffccd81f610085c2482829f3604fff2048",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/desktop-account-machines",
+          "oid": "29211bfefeff64d5288e626c122c91534ad4fa8e",
+          "integration_evidence": "exact merged PR head #172 with merge result in base"
+        },
+        {
+          "branch": "feat/drive-app-oficial",
+          "oid": "4a86b012e71aff82aa81390bff9bf6bb0669f91f",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/flecha-volver-coordinadora",
+          "oid": "e9c4a36fefc0275bd6b2a07a2c9669badbc751c8",
+          "integration_evidence": "exact merged PR head #166 with merge result in base"
+        },
+        {
+          "branch": "feat/git-host-list",
+          "oid": "58b6cc6ecdcb05fb3305803baa4a96d59d0c5ac6",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/github-account",
+          "oid": "b97803709f38e1c3af82875c1d07e4501614366b",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/github-de-la-computadora",
+          "oid": "21def3b5102bbda2212132c2a53825f66eefc9f7",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/github-inherit-access",
+          "oid": "9cca3cb2c09f1e61e495b86ef122be8df32ae68f",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/github-star",
+          "oid": "07ecf1e9c446a20975b2bedf18513eb011b804e9",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/github-workspace-production",
+          "oid": "c83b35ad37305eac7772dd1df7e6a81b5426deee",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/glass-panels-inline-visuals",
+          "oid": "35e6e45b3c1efeb3f4844dfc377eec491f83407a",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/global-search",
+          "oid": "cc91a5cba46dec438caff69c51e25c2c302d5334",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/group-folder-by-machine",
+          "oid": "f86188ad0701d308cda93980049e67d5726c9b27",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/herramientas-en-configuracion",
+          "oid": "deb233ed2f2cd8b14c25fee0b04cb7c5b90d5173",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/installer-icons",
+          "oid": "0d60b842997c367c6a797253479f805756d7fa0f",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/integrated-chat-visuals",
+          "oid": "532f7664e485624e5c1e2138a9ec24d63e6f19e3",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/lanzador-0275",
+          "oid": "fc7b6d4b870b0c4d1fb1a67dbcb4b65e90f7c767",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/license-web-phone-fleet",
+          "oid": "6cc8986c95bb1e7a0c2d5e78c0d8127edcd0c144",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/machine-icons",
+          "oid": "19723e9d134b4cc6f5fb2fab56882b05ae2e75f9",
+          "integration_evidence": "exact merged PR head #385 with merge result in base"
+        },
+        {
+          "branch": "feat/machines-panel",
+          "oid": "020f6a36e3f83881aea61e1a352e179a7d00117f",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/machines-usage",
+          "oid": "83b7e93a37f5088b4dbe484e7c3fd73d6cb4ea56",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/master-fd-ventana",
+          "oid": "04cb1162ed72a54c864bdcf8f40152489e64b93a",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/mcp-oauth-terminus",
+          "oid": "78d47fd56d1130b2ec858a42127db76ce15df575",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/memory-history-ui",
+          "oid": "d2fd77856aafdb87a04abc67565548a8bbe77550",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/mobile-app",
+          "oid": "00652765266923efac736455c351d43c7d325a11",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/mobile-card-provider-pr",
+          "oid": "9d4ad25090b94d4edb721c4201a0a1907ca5a140",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/mobile-computers",
+          "oid": "4f90f8ecbb75cad21d37a6bebf06cde8b61605c9",
+          "integration_evidence": "exact merged PR head #158 with merge result in base"
+        },
+        {
+          "branch": "feat/mobile-native-lists",
+          "oid": "e21fd93ac684a20423edb527c695c683129d3477",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/mobile-new-ui-commands",
+          "oid": "050af69910ab2a2934a51f579372904c41fc7e56",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/mobile-parity",
+          "oid": "fa67cf33be3b6293fb84a7af1f5fda32d5305374",
+          "integration_evidence": "exact merged PR head #169 with merge result in base"
+        },
+        {
+          "branch": "feat/mobile-rename-task",
+          "oid": "15995ff6f49808256ae2b2e5528a47d5b678dd98",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/mobile-search-pickers",
+          "oid": "ededcf4a2566876d093c5ba88ccbdb48f1eaff10",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/mobile-work-groups",
+          "oid": "4f7c10fac9d3771731f76e576662222fb1cd046b",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/modelos-locales",
+          "oid": "4b815617aa4fbc12d145f1e508cc4d9f85e21dc7",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/new-danil",
+          "oid": "8872feb0ca67930216d4319eb69db83e7f747c1e",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/new-icon",
+          "oid": "f010801b11aee7b69a06a66d19f15e6914899070",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/notion-herramienta",
+          "oid": "3c456fca3388341051b0a1c0bf1426736105526c",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/onboarding-nuevo-dev",
+          "oid": "fce9415fe55dddcc9bd8f9e0595dd70bfdbbd1fa",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/opencode-gratuitos-tarjeta",
+          "oid": "667b617192fce75500d4e0a816beb15f24c2afd3",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/orchestrator-connections",
+          "oid": "3249777ee33144e8fc04543c2dc8703c250a690e",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/packages-fleet",
+          "oid": "d48a9f329e5171b3b6433c1f794e792a4263d451",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/panel-veil-setting",
+          "oid": "593148dc48b68393f2520d7c7b2fc6a678f0de28",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/per-task-machine",
+          "oid": "5b33f422e0fb20e3f23ec75b3ca8967f5a41b32a",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/radiant-enterprise-usage",
+          "oid": "d4de60ba27aaa01a84fa2ce4daa8f75f57906ee4",
+          "integration_evidence": "exact merged PR head #403 with merge result in base"
+        },
+        {
+          "branch": "feat/reabrir-pestana-cerrada",
+          "oid": "faaf043544e5423a5259d512e7c57e38eb09f44b",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/ready-environment",
+          "oid": "7f4e2892e1c353ae53f6525bfc144013233498fd",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/referencias-zotero-mendeley",
+          "oid": "28f839924afeb1a3d4f60256b0059c9d7f5f0b34",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/reiniciar-cuando-terminen",
+          "oid": "d1e6cb79f7986596f606e843f73eed35530ef87b",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/reintentar-mensaje-fallido",
+          "oid": "38ebafd0202dd6fd288e774f872ee3c110ce5cf0",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/remote-children-client",
+          "oid": "be657875d760f817f6d5f2e22b7921b2cf39aa85",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/remote-project-clone",
+          "oid": "77ea8878fcb765e6159ac859af46cbb6f53d4548",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/remote-wake",
+          "oid": "251c3a4eaa1156bc29bac5a65d57e28694cbb50d",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/seldon-runtime-4c9a710",
+          "oid": "432b5504c54747b058c6900752f5e47c2c0ca12d",
+          "integration_evidence": "exact merged PR head #161 with merge result in base"
+        },
+        {
+          "branch": "feat/settings-admin-design",
+          "oid": "c02f84121a7c04a225e9acce99beb5874e7cc87e",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/settings-secrets",
+          "oid": "8fc4164fbd49a43b8cd839e7914ff2c5e4fd0eb9",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/settings-seven-entries-admin",
+          "oid": "c51778f43314ba40032cd2126cd3a7cc857bd3d4",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/sidebar-nueva-carpeta-y-buscador",
+          "oid": "4011716ab63dcb636879cba454130e686cd2d11f",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/sidebar-redesign",
+          "oid": "5edcf568f2d4efaa5739a4bb47fe4c14b8a15291",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/single-customize-button",
+          "oid": "0b4a2b888af76d912966ea81c037e2c7e4841cb9",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/support-access-view",
+          "oid": "8dfe7681aa61bbe767e431819cc45b5de5b9b7ba",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/tablas-columnas-ajustables",
+          "oid": "15ef7d32fead865360eedf9071c52ef3618ed24b",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/tarea-vacia",
+          "oid": "d22ac58f5ee0b4de845d8d05b1f2e5086729cef8",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/tarjeta-de-tarea",
+          "oid": "ff5bc3419e14fc565abd74446e75f9a5d6ee05b6",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/tarjeta-de-tarea-delegadas",
+          "oid": "9ae1e5cdc35b6044d4d9bafd27441961b6e3c5a4",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/task-card-machine-provider",
+          "oid": "08ac9a08a54d477315de36e72e32ec3a140ef587",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/task-location",
+          "oid": "daba2012f1e723de2e3838e487bc0b5a9a69f6bb",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/terminal-sangria",
+          "oid": "1033b5be0a7625c82627cc83ea75b9c8d4aa6263",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/terminus-license-fleet",
+          "oid": "3a5959ab3adba731fb6f0cda5644256b3ef864de",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/terminus-trial-cta",
+          "oid": "a9d49af2220cce506a7197389f5ebfa4eb6931c4",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/turn-changes-in-panel-new-danil",
+          "oid": "899f512bea3ecc089261ead42e1af55fd5449f08",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/typst-autocompletado-rutas",
+          "oid": "38dc625194073305bf46b6695f9c27f61e22a9c1",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/typst-en-la-ventana",
+          "oid": "235d1b59e9155fa6d348b578f8133ee0a0c6316c",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/update-now-button",
+          "oid": "5e3f68575a376a8ff27692dca16c5db1345eaab9",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/update-waits-for-engine",
+          "oid": "230c068124222361f6ba4dbb87d20361641b55b9",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/update-without-closing",
+          "oid": "9738416921c0d1669dc87ba194a7284b474cae70",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/ventana-anterior",
+          "oid": "c57cc8015c6a27368c06e45edd1b8d5523e94842",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/vm-screen",
+          "oid": "12ed0d90534e4ee03fdbaeb48c35bebb42b9d75d",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/vm-screen-control",
+          "oid": "28a7ed71606df5f5f3f98418a0baeaca05ce2946",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/web-broadcasts",
+          "oid": "1bafe49a9d940e9ff00a6aa003dcd820523e834a",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/web-chat-background",
+          "oid": "f5815cf77e28e01a0adf3875f6836c5501e75b48",
+          "integration_evidence": "exact merged PR head #170 with merge result in base"
+        },
+        {
+          "branch": "feat/web-machine-contract",
+          "oid": "38c69bce403c909bfbb8aae622026e49e53816be",
+          "integration_evidence": "exact merged PR head #157 with merge result in base"
+        },
+        {
+          "branch": "feat/web-multi-account",
+          "oid": "7f4b45b0046d964d34bdba0345b6faaa83a53085",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/web-multi-machine",
+          "oid": "e4cc6cb1bde5ca739d3db6a484ad349c643545bb",
+          "integration_evidence": "exact merged PR head #154 with merge result in base"
+        },
+        {
+          "branch": "feat/web-onboarding",
+          "oid": "8fc991cfd84d6c17d501c8efc434a90ad37abd2d",
+          "integration_evidence": "exact merged PR head #156 with merge result in base"
+        },
+        {
+          "branch": "feat/web-phone-fleet",
+          "oid": "5303f380dbad2b4580667ad9afc818e45d01f533",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/web-phone-pwa",
+          "oid": "6bb7474185f314b537c9da95f31ef380e0efb2fa",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/web-registration-desktop-sign-in",
+          "oid": "ccd1587dce671be1b64a17d84825aaf2a79f6fc7",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/web-transport",
+          "oid": "ef41c6d029952efbc3f7b41aa720b8e71d9106c9",
+          "integration_evidence": "exact merged PR head #150 with merge result in base"
+        },
+        {
+          "branch": "feat/web-workspace-on-machine",
+          "oid": "89882787f506651a0a05817da8abc652b7b86c53",
+          "integration_evidence": "exact merged PR head #168 with merge result in base"
+        },
+        {
+          "branch": "feat/window-attach-live-engine",
+          "oid": "3e97a056f4f644fbce075bf6441f8caa72313883",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/window-engine-notices",
+          "oid": "49caa5a51e827052aace8bc31dc34241e249368d",
+          "integration_evidence": "exact merged PR head #53 with merge result in base"
+        },
+        {
+          "branch": "feat/window-handler-contract-v2",
+          "oid": "4f829d407d4cb79a4b245829271c8c632c062f8d",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/workos-login-alfa",
+          "oid": "dd8d4169ae735763547fc2832cb0e060ec13e0a4",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/workspace-assets",
+          "oid": "94660af3292454a25030915744c233b6d453e076",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/workspace-danil-link",
+          "oid": "36d87a6be7b19d14c55391f2b7502861b17c1b35",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/workspaces-from-account",
+          "oid": "ade671a1cf4c3d49905acdd0b7663e660b95c856",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/zcode-provider",
+          "oid": "e61914d2ce2b52bfd407ad59ac9cfa087d62bbb3",
+          "integration_evidence": "exact merged PR head #123 with merge result in base"
+        },
+        {
+          "branch": "fix/abrir-y-copiar-ruta",
+          "oid": "86552c860959acf13d7ec576094410d6bfd9c9cd",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/account-cards-by-subscription",
+          "oid": "6e7b6d68f7964e6b16ca0fd95bc13f181b5b7490",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/account-machine-chips-both",
+          "oid": "6f299b7da1ee6aa62e8b8dc13cd25da143479638",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/account-photo-hint",
+          "oid": "949a6e463b9a96370a543fdfe707651c9161af78",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/account-workspace-followups",
+          "oid": "97a5837bb10fb9955332f43f731775262217f74a",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/accounts-load-per-card",
+          "oid": "f673816858d4f74cfa7461fb87745e43550b0265",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/actionable-error-handler",
+          "oid": "69b6ad006ba56ffc4f56a8b771b4eb0fbc33b32f",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/active-temporary-tab",
+          "oid": "3573254be185b9808ccaecfa8768b97e65903af2",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/activity-notification-repeat",
+          "oid": "31710d3b42bae09ee690e6d968cda30c1c6406d6",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/add-account-reason-visible",
+          "oid": "0ab9ecd84cc7b6aad3e456f38fe714d36e3ee225",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/adjuntos-compactos-en-chat",
+          "oid": "2bac660b5f93f980c204a67c7edd5c63610c7634",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/alfa-auth-direct",
+          "oid": "6d9691d9c8f7e6203d7a359aab2ff6b9e825d2b2",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/alfa-sign-out-danil-entry",
+          "oid": "8f0fceaa28686cb6135e4b347101557276b3f2ae",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/antigravity-alta-pendiente",
+          "oid": "17c8306744031f6e8a158eac5423304f8d93400b",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/arbol-carpetas-pesadas",
+          "oid": "35717932384a86a4ae3cbdf574c5ae95f621c6c0",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/archive-task-descendants",
+          "oid": "310274c5d9dce7dfd3607fad62a294d945acde2b",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/arranque-con-lista",
+          "oid": "8efedb9616fac8aa842adfbbf7048bb9f383a2de",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/attachments-remote-task",
+          "oid": "c12677311de8af84aef0c45decec2bfce55fd7ec",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/aviso-cambio-de-cuenta",
+          "oid": "91fe71841e479439560ebbe845c023e20f97aba2",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/aviso-hueco-falso",
+          "oid": "3652a4e808df1685b8463018fb78d5548eb9a5da",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/background-limit-and-relist",
+          "oid": "955933518f294c3f6f86ae68773df406a0954a7b",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/barra-ubicacion-con-pantalla",
+          "oid": "81b39845720a097e5049a4e29a48c069b76583df",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/btw-teal-en-grafito",
+          "oid": "1afcb764381321455b773eadcabb741c39cd2456",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/cambiar-workspace",
+          "oid": "036e57e1c170df83928ade9c0c3bf1d22690afce",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/canonical-orchestrator-mcp-url",
+          "oid": "9fc44dc5f7ac7681c46da51a2fb6010b08674a54",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/card-local-machine",
+          "oid": "fe7e0aa95f50ea7b81c0bb8242d79da4d3e09fc7",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/carpeta-nueva-y-tarea-vacia",
+          "oid": "b805fc26ebdf3a806cbdb648002f2b3d72303162",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/carpeta-reintenta",
+          "oid": "5d0ace11eb05409ba62d34d9be509623135f2677",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/carry-reuse-destination-repository",
+          "oid": "91193c0b42457848ac15cb92cd471f2e2d34bcd0",
+          "integration_evidence": "exact merged PR head #383 with merge result in base"
+        },
+        {
+          "branch": "fix/carry-target-project-live",
+          "oid": "3a710d2d6dc4afb185afac667d703cfbaddf46b0",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/chat-cross-machine-routing",
+          "oid": "2c3ae638c160d91b77687cac9e91cc092ac9ff6a",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/chat-delegacion-sin-duplicados",
+          "oid": "5726d4d49eaf179d5b93b68ee9e5b5bb058d7c7b",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/chat-file-card-remote-machine",
+          "oid": "4badeb69168c33484e00ccb0acb2c16ea3aff844",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/chat-location-actions",
+          "oid": "4a5073b67a9418c1f80d38b8983a9fe3cf945864",
+          "integration_evidence": "exact merged PR head #386 with merge result in base"
+        },
+        {
+          "branch": "fix/chat-visual-card-loader",
+          "oid": "03fc96271668612c68d49e70f4d6374fb39ce42b",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/codex-login-una-pestana",
+          "oid": "b5e6bba0ff1e0b204a79b0f23fb38d18f63e5441",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/comentario-guarda",
+          "oid": "312fe55a406a0a925dc635ed82875f3d7e62cc5c",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/command-task-title",
+          "oid": "fe493861aacb81eb0d641c2af08221abc4a12ed0",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/composer-machine-credentials",
+          "oid": "fddf78aea33f3eadee912f25c4a3cc3e8ee6700d",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/conecta-precargado",
+          "oid": "a44f0b9ca51db1c2dec17a6d932408e541bb7a48",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/conecta-transicion",
+          "oid": "0609a1909700ebf9d6a14f0dd8b6c9d78b162755",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/cuenta-sin-comprobar",
+          "oid": "e649f198d0d46d7e291b75b09e1c1eb21e679a45",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/danil-sync-follows-login",
+          "oid": "e582c542766b964e942ab1670b3ed9588508a2e0",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/danil-visible-copy",
+          "oid": "62b32a166890c27104482b2bd55f4ccca6fdfef8",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/delegadas-filtro-activo",
+          "oid": "ca083f1a6939f91a874299176e28d86469331d0b",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/delegated-cards-new-design",
+          "oid": "5c53bf713d169ae802ddf1cd64a52d5c4b265d19",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/delegation-native-qa",
+          "oid": "c8dbefc91f364fdf95b7858ceb5ae1de8f39f356",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/dependency-alerts",
+          "oid": "1d8efb7ffd5a9b92fa39a404150d03313e4ec98b",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/dependency-vulnerabilities",
+          "oid": "2dfddeb64720cc422d2293fcd4efbc911836625b",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/desktop-new-task-waking-notice",
+          "oid": "e9419c4bc085f599f6ad88df7bc0ec3f1d1e566b",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/desktop-remote-archived",
+          "oid": "bb0b4cdd0e3f2a0ca559b8fa0c5f9378799748ce",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/dev-verify-green-2",
+          "oid": "b32c875d5854474aebdbb4cb5a0206ddace78e63",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/diff-de-turno-recortado",
+          "oid": "e4a45ee5c03fbcedc7c531c738004baffc2e0544",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/doc-paths-new-danil",
+          "oid": "6b2c5c7bea395485ecd3887a7712c2dd72e1d458",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/drive-reconectar",
+          "oid": "f1f90637195beccebfe74af19d73652404c9c840",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/engine-lab-isolate-danil",
+          "oid": "00b1fb9fc34f843dab1a4737ccac5f255aa7f9ed",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/entrega-de-tarea-no-se-pierde",
+          "oid": "62886fad028078f9d025017a6401ab913cdecf7e",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/esc-typst-solo-con-foco",
+          "oid": "74b4033b7b6f827a9d1acdd4e023cc4cd1444319",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/failed-card-no-last-message",
+          "oid": "a252fecf2ceb99e3f5f239878917fb77ced7f526",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/filtro-agentes-desinstalados",
+          "oid": "e227a57f98d9ca965edc8a6a63334124d2e3aa66",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/fleet-open-tabs-route",
+          "oid": "e8041a295769e551df82defe27c029d4779cf13f",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/folder-kind-icons",
+          "oid": "02da610af87c0e4c490739a5a6cd71e186d44b7d",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/front-reacciona-al-instante",
+          "oid": "84671782f5cd64ea0e92328d593f1ad441548444",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/git-indicators-survive-remount",
+          "oid": "70adb1301c671b4214de6173344c4b611409abe2",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/github-settings-simplify",
+          "oid": "bd3ebdb557bec07c9f3c20faccaaabbd90a12482",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/github-sin-parpadeo",
+          "oid": "7fb635157a79ee28322c70a441151add517c722e",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/github-workspace-access",
+          "oid": "448538e5357451313c371f12f22acd5293953d2d",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/hide-tool-results-link",
+          "oid": "5509fc6684afdcf76fa5223ebebe931cbc0de4e9",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/hilo-en-blanco-al-restaurar",
+          "oid": "6d2932bba4d803bb9eab995a575baa7c148b472c",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/host-github-only-when-gh",
+          "oid": "e1eff097604d5ca5fb3f97db1c4d50aacb209b86",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/inline-visual-height-scrollbar",
+          "oid": "9ba6336cf09ac280fae381b3f9eac02783f91b93",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/lanzador-avisos",
+          "oid": "ab1696ee373fff5f76c0d5234ca99c2b9cb8265a",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/llama-cohete-alineada",
+          "oid": "d847584bb0c65e5e8d3ad3c4139c9805768ba27f",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/login-espera-visible",
+          "oid": "91e3172ba3d01151a7c996035a6f2ba8c511122a",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/login-mcp-una-pestana",
+          "oid": "b0e98bf0bf8f09b62841beea52d7d6d891550371",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/machine-disconnected-current",
+          "oid": "ecfdf24ecc5e285fb3e7c95b169f33242ed01de8",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/machine-disconnected-web",
+          "oid": "3c10647c31a30d47737036082d3430fce9567b67",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/mandar-ahora-sin-aviso",
+          "oid": "754e79a56ebb0dc033b49b74fef4fc046f6cc132",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/mcp-auth-dot",
+          "oid": "6003f4042e26da2396f4f37424d3f52905ae48d0",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/mcp-menu-card",
+          "oid": "89558c57e00515d3b2ac90ef371df5ee5abb0006",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/mcp-settings-layout",
+          "oid": "eb936dea5ee98aca2967c9c85aeb4d88cbc3af04",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/mendeley-solo-configurado",
+          "oid": "193bb064e389047309d73f5eb5614864df0b8c20",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/mensaje-forzado-duplicado",
+          "oid": "9824097f467f8b741b8b479304fb7647d54d5f53",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/mention-agent-label",
+          "oid": "59b23230459698928d598f1f8e65cf2ce71e9215",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/mentions-other-machines",
+          "oid": "58ecf412542168dd42f49c4d7a3a9c1d813d4267",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/mobile-agents-usage-publish",
+          "oid": "30102aaf7c4401fdf864598bd28428f272af58a6",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/mobile-android-expo-go-crypto",
+          "oid": "3cebd9e45e38b3fabc16e4ef0e04787b95f16c07",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/mobile-chat-refresh",
+          "oid": "1c90e7e9b030d634097cbee6bc0e6c2986239f69",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/mobile-chat-scroll",
+          "oid": "3de7419db2fe61ee5522756b6dbc9b110e95a305",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/mobile-composer-background",
+          "oid": "9b645dc4ff701ff487678e6a3ccc4e1d26e01e81",
+          "integration_evidence": "exact merged PR head #361 with merge result in base"
+        },
+        {
+          "branch": "fix/mobile-composer-no-borders",
+          "oid": "330b9c917f20fc34dd742f52a04bee74520c53b8",
+          "integration_evidence": "exact merged PR head #362 with merge result in base"
+        },
+        {
+          "branch": "fix/mobile-composer-send-permission",
+          "oid": "b16f851e89470f0309f82b38f16796070336a7b9",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/mobile-docs-paths",
+          "oid": "30df9d1d4562347c723a41c20928fc24932c9144",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/mobile-file-questions",
+          "oid": "b715821b648db879f4ce628a1013a5ac3cb53984",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/mobile-header-keyboard",
+          "oid": "2a30b3952efe02f9ee2640179b948cae5d9a34bd",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/mobile-incoming-bubbles-vm-wake",
+          "oid": "feab7693c979abd3b80253625b5df739953413f9",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/mobile-incremental-updates",
+          "oid": "c5e098bc20857d2d49a2750f4634290516e8687d",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/mobile-live-permission-mode",
+          "oid": "c9d4423fc454109b2f48250f8b66f41340a05b0b",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/mobile-no-offline-machines-banner",
+          "oid": "3d6068e020752f24ca0d345ebef835e244868b1d",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/mobile-offline-task-git",
+          "oid": "b0188b8e3e5a0e5f40da39f6cbc2ec3ba3484c37",
+          "integration_evidence": "exact merged PR head #377 with merge result in base"
+        },
+        {
+          "branch": "fix/mobile-provider-login",
+          "oid": "d6592ab2985b81fdbb16e6d52b46170a5ea970cd",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/mobile-remove-prompt-history",
+          "oid": "1d7e09cdcf9b0db1cc5f7adaa9607ae57b5b6b87",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/mobile-rocket-merged-only",
+          "oid": "dd9cd105e6eb167fc983791dd3ac68533f0a62d3",
+          "integration_evidence": "exact merged PR head #378 with merge result in base"
+        },
+        {
+          "branch": "fix/mobile-scroll-al-enviar",
+          "oid": "83269fbf09a19d82db5e9b137b5f87fc7221486f",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/mobile-send-now-once",
+          "oid": "595e5d2c83cc8bf2f7dc4dad3ffad329ac6c5e23",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/mobile-sign-in-first",
+          "oid": "b1ce96d945d9774cfe93b66dcd7cbba41b6cad69",
+          "integration_evidence": "exact merged PR head #163 with merge result in base"
+        },
+        {
+          "branch": "fix/mobile-spaces-steps",
+          "oid": "8e07da0d31799c90172c658f2f15035318364f2b",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/mobile-work-search-visibility",
+          "oid": "ddb5854a2ba850f784dc8b0befa00cf5c455d376",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/mount-frontend-no-group-count",
+          "oid": "196e4f815f8ebf0116b181fb9630782701065f8b",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/notice-link-normalized",
+          "oid": "eee96c1930d3e81eca504bf034f64c5c55babe43",
+          "integration_evidence": "exact merged PR head #164 with merge result in base"
+        },
+        {
+          "branch": "fix/oauth-runtime-pin",
+          "oid": "1b34fc18cd07d71fe85b2f9e17f609127152a937",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/onboarding-bundled-progress",
+          "oid": "db387d5c8db1f28ae755d49abf4ea76e69998131",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/onboarding-eventos-empujados",
+          "oid": "c7bd642f9d0ae4ae531c4a67cbc905fa4b26664d",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/onboarding-fallos-visibles",
+          "oid": "a4451e7d0fecf06482a4a508de5689958e6dfbd6",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/onboarding-fiel-al-mockup",
+          "oid": "05606efd950142e592fc68b68d1ab7b644c1b573",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/onboarding-mapa-centrado",
+          "oid": "d9ce8108c25084105c1a9b5d1e0bd6e69cd27dad",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/onboarding-opencode-auth",
+          "oid": "50f2649e1ea3bec5d86741ab5293b785d9219410",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/onboarding-pruebas-windows",
+          "oid": "377ba9086d3c9efe2cffe380e502435f41b61a22",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/onboarding-ronda-3",
+          "oid": "29e311dffcfedaf1c5f5deb8862038dc75a04067",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/onboarding-tools-plugins",
+          "oid": "804ec0d97cc46a927cc23b33ea33cdadd0133e6d",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/onboarding-ver-mas",
+          "oid": "2652c8663fbe9c719ff3493f5650626523bb4271",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/opencode-oauth-go",
+          "oid": "1d87ebd715a394412b0f0dc6d75cfe893adf87f4",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/panels-persist-across-spaces",
+          "oid": "33a2b7d757b6d5fb0e8516de2f10a9d115253935",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/pantalla-junto-a-la-conversacion",
+          "oid": "4d9ca25c19d7321c26817eb93a6df10a21d0ad89",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/permiso-resuelto-en-todas-las-ventanas",
+          "oid": "24705b8c8ff7739beb15857bdd0dea6143c552f7",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/permission-approve-error",
+          "oid": "1cbc77c6ab33aaf95fd9a9f90ab941607b4af909",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/pestana-activa-y-carpetas-en-documentos",
+          "oid": "5ee4905f86cc8409f38975ab6d36098b52226659",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/plataforma-sistema",
+          "oid": "88da969d5bed0b171db6bd4650d83d1a0a7038b6",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/prose-test",
+          "oid": "628ad784e40b3a2f4ad84d440cbb1962440616ea",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/proveedor-al-cambiar-workspace",
+          "oid": "41ec1a35cb81e5605943218b365e3de99e0315b5",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/proveedor-conectado-verde",
+          "oid": "e419d448e94b0975139a8a6956df423dfb314441",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/publish-node-heap",
+          "oid": "cf168ef08a49bdb8126bc0325495de09698a5451",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/quitar-preview-drag",
+          "oid": "2ca238943b0b2c14258c78b5c7c30e6837752c87",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/rail-only-own-tasks-alfa",
+          "oid": "4a3f33d5e07a0b69d26967b743e5cfc39f61cbf8",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/rail-sin-subtareas",
+          "oid": "c11f5b7e626252fdc4a12d08ad2788f06e1e9266",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/rail-task-drag",
+          "oid": "9e70bfd250341b8fd4d97458f636901c175553d0",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/rail-unseen-tooltip",
+          "oid": "b1040c60bc51436de1e96ed4b9f249b3285c2b9d",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/rebote-tira-pestanas",
+          "oid": "371f7a9fc3f5def59674f668df6c03677b8dab09",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/referencias-solo-zotero",
+          "oid": "888f5452f6d3586ba093ac7797b6e3260686a413",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/remote-attachments",
+          "oid": "483020d464e849caeebe1d8d754b77ecf97a0634",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/remote-chat-visuals",
+          "oid": "2140d1d295068bc5c75d5b19807672570e469066",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/remote-machine-flows-dev",
+          "oid": "355b65939145caec0a5c7a125edb20dd2978f8d7",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/remote-row-open",
+          "oid": "23d93884bd2c842e92d61e24467c7f704b967333",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/remote-task-file-viewer",
+          "oid": "58850a664118ccd6092fd304e52041e0f396e7cc",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/remote-task-space",
+          "oid": "5650ae0c0c2d4decc50b350c231d7c1502d0a3fb",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/remove-sidebar-machine-legend",
+          "oid": "b730e928839d9e1453a8765abb4d305b88c21d76",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/remove-task-header-actions-main",
+          "oid": "3985cde1822d1388e0dfcd8c5287788671ece147",
+          "integration_evidence": "exact merged PR head #390 with merge result in base"
+        },
+        {
+          "branch": "fix/resync-tras-hueco",
+          "oid": "1337218999c9b169264ff5dc1900988deea9dc1e",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/riel-config-por-workspace",
+          "oid": "f53113776d43d093711154b6203f99fefb4f87b7",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/riel-configuracion-zoom",
+          "oid": "602755d76e4e2bf3e1fc490d04579282569b7554",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/riel-subtareas-terminadas",
+          "oid": "6d91f991e99190bd8e38442c4e6ce5056c25f948",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/ruta-windows-con-barra",
+          "oid": "4f73a0e611689ede70249dd26d7a93591ba31482",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/scoped-select-all",
+          "oid": "519d1d4eb2d0cc57e87cb173e2fdc2a7c7d69ecd",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/screen-sin-modo-control",
+          "oid": "f5a5ecbfdf010b28af50dd7a38fbc67971f9a695",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/sender-task-other-machine",
+          "oid": "085ffbddcf6146b216c7fc07a1c101aeeec08e1a",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/service-plan-tests",
+          "oid": "ed1de732079580cf29ce195802d1e6369c389062",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/settings-narrow-reconcile",
+          "oid": "b1ce425525f47b2c8fd3bdf08e4b62a18138b005",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/settings-panel-remount",
+          "oid": "7c3f865b60a4c9a530d08cb78fc8c19c8a8285c3",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/settings-secrets-capability",
+          "oid": "861c7b92574c64cb77449b2467930ec95074dcf5",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/setup-repair-toast-dismiss",
+          "oid": "67559d6e4d817bb5a8b7cfa18902dbe7a2cf7b35",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/shared-engine-contract-compatibility",
+          "oid": "d306fbab4550cc075d01ee09d4252946ce6b00e3",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/shared-space-order",
+          "oid": "f25824dd9b402ea2d2b86f27fd19eb1e1edcca5e",
+          "integration_evidence": "exact merged PR head #389 with merge result in base"
+        },
+        {
+          "branch": "fix/sidebar-botones-separados",
+          "oid": "81b5c4ef73ee3cf7b8971adc0e3b17a57b1e8558",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/sidebar-groups-no-count",
+          "oid": "6f38d1f55f2ef9d2e8a795326b1202aa0ea2ee56",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/sidebar-local-first",
+          "oid": "57fd8b0cc9a6b8d98d192b1923519f51c273be8d",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/sidebar-machine-in-hover-card",
+          "oid": "e434a8b51928742e59cb7d3e3027338cde9ee32b",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/sidebar-no-needs-you-section",
+          "oid": "2f783a6687543c0e6f4e795b39a970e2e5d70450",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/sin-espacio-al-instalar",
+          "oid": "d91ddf96a78e281322d27ed071e2e0a1513492b0",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/slash-menu-tras-plugin",
+          "oid": "336072e2864d90fde52c37d83de0cdb78f2ae496",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/soltar-por-panel",
+          "oid": "0f1b4b29a9e20378825ff0d2fc3243be383520c2",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/source-update-while-reading",
+          "oid": "3ec3996b90a286a6af16e78e917b5a9a305e06cc",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/space-menu-context-only",
+          "oid": "5b5bb10eb422dddec1bb0bffe04e55e11b65bf2c",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/space-saved-tabs",
+          "oid": "7497247e19c280d07f156306c9a20337be2b81d2",
+          "integration_evidence": "exact merged PR head #387 with merge result in base"
+        },
+        {
+          "branch": "fix/space-saved-tabs-main",
+          "oid": "e24e7bf6eeb5c920b09e73597ba7522affe5bd0f",
+          "integration_evidence": "exact merged PR head #388 with merge result in base"
+        },
+        {
+          "branch": "fix/stale-read-show",
+          "oid": "c41a06099a2d87ac8c05d5c35dfd676d2d637565",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/startup-language-deadlock",
+          "oid": "dc3284ace0185d28a81ee9aae5cad037e17acf13",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/steer-una-sola-vez",
+          "oid": "3232053c6048697b951aa380f916419876c5fbfb",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/storage-fleet",
+          "oid": "188d4574198059f8a8a1ecc8de8f5dd203e3cad7",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/tab-sidebar-edge-stale",
+          "oid": "fdaa9557d9f8656cafa95b7a99e850b5964ddca8",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/tab-text-inside-box",
+          "oid": "cf4204d190cb3fc025bd48f8cb0f9eea9c2a0a78",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/tarea-nueva-y-tabs",
+          "oid": "9b59b5ed6dc24d90591888a447902a423511afb4",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/tareas-delegadas-otra-carpeta",
+          "oid": "b556eaff2eb846b50687fabab144e16077676003",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/task-card-pr-read-timeout",
+          "oid": "532c3532aeca42930cc8919605c0ddc0864bbd76",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/task-error-toasts",
+          "oid": "76f225c35274c4967152508d570e707a4b0c213b",
+          "integration_evidence": "exact merged PR head #381 with merge result in base"
+        },
+        {
+          "branch": "fix/task-machine-dot-green-gray",
+          "oid": "d7746cd0dc03a0804e7c50ecf16b0e7c7d4bde73",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/task-mention-wire-metadata",
+          "oid": "701ae7f7f928b6e88006e4f873a50cf69413bb2e",
+          "integration_evidence": "exact merged PR head #375 with merge result in base"
+        },
+        {
+          "branch": "fix/tema-al-arrancar",
+          "oid": "d5b42a560cffb4fdeffd5c7c88e54fc6569d1ece",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/tira-pestanas-scroll",
+          "oid": "ed0e26ad632840817045e2f5f590765ddc982e94",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/tolerate-local-engine-contract",
+          "oid": "a16e8f575c60b6f01d305c25acef83ee82b13551",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/turno-con-visual-no-se-pierde",
+          "oid": "d1e280be8d90eed052459b179b9a247152b3621d",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/typst-arroba-y-archivo-borrado",
+          "oid": "35c3d68053a9d43607dcb1c807c1ba42a8da1bda",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/typst-errores-de-exportar",
+          "oid": "d1cd5fd162e79b4fbd83eafb6bdc226cff704aef",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/typst-preview-default-main",
+          "oid": "f7d4fcfc29cd817211e76098ca63077f032990b3",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/typst-sin-vista-en-vivo",
+          "oid": "5be0f6ddb4f848693db286738285c1a5b91769aa",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/typst-vista-con-globo-de-tarea",
+          "oid": "8a6effe57cd72ec3d33a3731a438eacf04f9c178",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/typst-vista-disposicion",
+          "oid": "61ed5c059d482146be1f0879e652c37f3d293892",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/typst-vista-se-recupera",
+          "oid": "a205aa8882cf527c7657e0e14455203e0bfd424a",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/typst-vista-solo-typ",
+          "oid": "fc4a1924fb54db73ae2d3fd363538c5cea309bcd",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/ubicacion-con-archivos-expandidos",
+          "oid": "a9a4dafad1cf4b0ccf78995b64c979e06dd55bb9",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/unified-task-git",
+          "oid": "cbb0f140f9906f068a29421e63b19e736bbcfb5a",
+          "integration_evidence": "exact merged PR head #371 with merge result in base"
+        },
+        {
+          "branch": "fix/update-previous-engine",
+          "oid": "9cd0572581258cc70a18cbed72e29ce5fc00c78a",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/validated-runtime-pin",
+          "oid": "cf4099b4c4a13057af893c851f006ca0d632a3ba",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/ver-mas-duplicados",
+          "oid": "90481338489c1feecc8bb24f9c63b23157f7fcf2",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/ver-mas-tres-logos",
+          "oid": "64e7331e0ec3911566d5c99d860a9c73e3676d2e",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/verify-green-new-danil",
+          "oid": "5b9dc2d6e05e8a5d7c57d9b3410959655498eb00",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/vista-previa-html-como-pagina",
+          "oid": "a45c5b74fdad9001f18e921cd6bded12b044a622",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/vista-previa-sin-https",
+          "oid": "feb040bbbece2b8da55b96d1a2c06a80a6b9ebf2",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/vistas-hijas",
+          "oid": "dcb9170bf6df4e1afdb1e60c019abf8595229f5c",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/vm-screen-control-web",
+          "oid": "b8fc7984336d0285aa774bb410660e77c6276a94",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/vm-task-folder-kn-tree",
+          "oid": "51742114aad0bd76448faeae71e11090986ba94e",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/volver-boton-nueva-carpeta",
+          "oid": "7358ebffff8205734a3d6b0bc643dbce5a94a137",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/wake-vm-on-send",
+          "oid": "8ddd93c6d935d57f10ea23042fde095e60229266",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/web-account-workspace",
+          "oid": "2912c97f23af495a566b2bba49c3aef8a12ffac8",
+          "integration_evidence": "exact merged PR head #338 with merge result in base"
+        },
+        {
+          "branch": "fix/web-chat-media-attachments",
+          "oid": "72e532ebf5bc2a3d3049f2f342293753120d52f0",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/web-context-source-status",
+          "oid": "1697d8fb2842ef08a08c4bb30c59ceeb3bd41b61",
+          "integration_evidence": "exact merged PR head #369 with merge result in base"
+        },
+        {
+          "branch": "fix/web-context-transient-views",
+          "oid": "cb1d7a7ede799182afecb0e91f79a727642c00de",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/web-id-routes-to-its-machine",
+          "oid": "b38ad2d49ae10313485125c901a2818b7dee603d",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/web-machine-off-notice",
+          "oid": "ed0d925f2ef9c7e61703ece51864adb2fea75f62",
+          "integration_evidence": "exact merged PR head #152 with merge result in base"
+        },
+        {
+          "branch": "fix/web-machine-toast",
+          "oid": "e1e82052419b8b86868eeef47d893907d46a06dc",
+          "integration_evidence": "exact merged PR head #167 with merge result in base"
+        },
+        {
+          "branch": "fix/web-phone-hide-delegated",
+          "oid": "3506005cd1cdc9634feb649ef9f1db595db43272",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/web-provider-login",
+          "oid": "88051ce5156eb6862167b346841e59c27c8524f7",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/web-read-cache-writes",
+          "oid": "9bc96d9b326958b2b8a5c9a0dc6e88d56535c2f1",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/web-recarga-tras-despliegue",
+          "oid": "3edf81ece4c2ea77e465a14cd716f5b12d9c67f2",
+          "integration_evidence": "exact merged PR head #373 with merge result in base"
+        },
+        {
+          "branch": "fix/web-relist-on-new-link",
+          "oid": "6c7d1b98da0ca6bcc1f82bc105099b7a1cef0540",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/web-spaces-from-every-machine",
+          "oid": "8e26511bce8d2a05194ca81e690e201314496ec2",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/web-task-git-state",
+          "oid": "4eceb6a179be3cadac9286b2516dd03c6b649298",
+          "integration_evidence": "exact merged PR head #379 with merge result in base"
+        },
+        {
+          "branch": "fix/web-task-git-status",
+          "oid": "72bb7a782ac49c86cb0bcb835c490535d7ddad92",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/web-task-hover-card",
+          "oid": "b8de4a6cc815fae3c2568bf0acdf802d05f34a52",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/web-team-engine-compatibility",
+          "oid": "8f6ebdccb005057ccc49859f1fa80a66afad5dde",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/web-version-footer",
+          "oid": "4fb6e4c2ac327972a47aea070bfabcee257a469e",
+          "integration_evidence": "exact merged PR head #354 with merge result in base"
+        },
+        {
+          "branch": "fix/window-placement",
+          "oid": "add9f31ab255ea18963913b9b3c8d57648760469",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/workspace-account-choice",
+          "oid": "fcb65b46d56230d4004be48a25ef895ab6781774",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/workspace-here-no-summary",
+          "oid": "3a9c9a5b49c214d4015a98b9a4b351d49cd0ab60",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/workspace-machine-integration-current",
+          "oid": "9fbd4c0b993a55b45c6a604251aec623df1c50ce",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/workspace-memory-v2-ui",
+          "oid": "cfe116cec106c07e856c25316a2c733b4d698898",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/workspace-without-account-settings",
+          "oid": "8cf65f15d8e5145ff08011e6f837f0cfa64ae5ab",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/zotero-aviso-en-su-tarjeta",
+          "oid": "953cfef135d7af5160fe38592861037fa5a27049",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/zotero-bib-notion-una-sesion",
+          "oid": "4537339dcd6dce5ebf6a65e561d619cccf9dd2f6",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/0276-etiqueta-motor-y-aviso",
+          "oid": "48aa5fbf3294db3b9cae050c637f42911a9ac689",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/0277-linux-entorno-appimage",
+          "oid": "043f0bc6f2e16826341db3a4ddab9765f6564a22",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/0277-macos-cli-y-llavero",
+          "oid": "af1af9daa1a79f406c8bac3be16ac216b373b38f",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/0279-actualizador",
+          "oid": "a94de482f38d8cf755ddae4dd9cfed4dd2f9d0cf",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/0279-espera-motor",
+          "oid": "cc26b66f41ae542806d3f6013c8484c099591620",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/0281-barra-sin-motor",
+          "oid": "da644bdd8c1ee0695927d3089f23f12507e96156",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "integration/plan-multi-machine",
+          "oid": "878178d174122d37075cd5c992df0bfa9d8dd775",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "new-config",
+          "oid": "25d0f86f6ef30bec02874accc3a8b36008753a51",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "perf/barrido-de-espacio-fuera-del-arranque",
+          "oid": "aa7e235e9c7e6f773251e7ee21bfd1a3c231b63a",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "perf/chat-open-tail",
+          "oid": "e3569c188ba96d2ef675814da4d429b5f0693290",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "perf/cold-start-cached-sidebar",
+          "oid": "8b59e82af5c66a197670c30e4b91e55b0b74f9da",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "perf/defer-usage-account-card",
+          "oid": "4b95101c40192657e2241a393ba4c5f3b0cc6d58",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "perf/engine-push-client",
+          "oid": "8e4f04d6827ec1875642da3af0a63c0b1052872e",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "perf/one-loader-shared-clock",
+          "oid": "aeea1a58ecb654923a07c6cbad603627deeb43be",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "perf/shared-clock-rail-spinner",
+          "oid": "8760992c2c7fcddb6495ccd4547bda0cb332d5c0",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "perf/streaming-render-budgets",
+          "oid": "28c30e80cd32d8a99fbb271a6bc7667b1e675c25",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "refactor/apps-layout",
+          "oid": "50c71e61dec76e5b2c367477160fe95f26f1b4db",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "refactor/provider-agent-names",
+          "oid": "26b567141b5678cd9a648924a648705c064b8190",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "refactor/repository-layout",
+          "oid": "a6ebdbaaaa0c966a4de033729fd988dc64adc62f",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "refactor/shared-packages",
+          "oid": "d5f9e1f32b7ab8c9315bc4ee05229bc9f3c14d17",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "refactor/web-without-radiant",
+          "oid": "f43c7073a15de788d8c3c4aff9929f91a378a8d2",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "release/spaces-and-maintenance",
+          "oid": "1c0b54a337f87aab1ea258a6845137efe19c6fd2",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "release/0.2.82",
+          "oid": "497274b5723de5e39b4c7af2a64e95176a2f9e4b",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "release/0.2.83",
+          "oid": "4c7529ce81bf3a16bf2498092d348b713742c2a1",
+          "integration_evidence": "exact merged PR head #162 with merge result in base"
+        },
+        {
+          "branch": "release/0.2.87",
+          "oid": "9830bcd05e3649f0b9e2999fa0b4bbb22f87a859",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "release/0.2.88",
+          "oid": "ea7ea80bd0c5f26c5df848d1702bc665228f3d87",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "release/0.2.89",
+          "oid": "4d5a46714a7949e623b00229f156019ea4c0aad3",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "revert/boton-nueva-carpeta",
+          "oid": "2d20d0347064360b8001814a933c3cb1f25c3c02",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "review/auth-direct-on-dev",
+          "oid": "dc23528cf76c0838180093ab3144c99678f26271",
+          "integration_evidence": "ancestor of dev"
+        }
+      ],
+      "verification": {
+        "deleted_absent": true,
+        "kept_present": true,
+        "base_unchanged": true,
+        "remaining_count": 47
+      }
+    },
+    "seldon-host": {
+      "deleted": [
+        {
+          "branch": "chore/api3-to-lab",
+          "oid": "a45bdaf94414761f66f75b7fcce2bec42a622f82",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "chore/clippy-strict-existing-runtime",
+          "oid": "82dec7b4df23c2c53d57fb77844af55b9cabb823",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "chore/reuse-cleanup",
+          "oid": "76d27829d8bfb1c1642c1c2bed77b169eff419d8",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "chore/sync-split-repos",
+          "oid": "87b193f9d02466cc93aee1646cecdb59d30eaf75",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "chore/sync-split-repos-2",
+          "oid": "516f6c5314ab36bd1d218173c2966f2444280681",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "chore/sync-split-repos-3",
+          "oid": "05faa4d78a4b58c96e078c1a425c5cd9a98951eb",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "ci/dev-check-b3830d8",
+          "oid": "b3830d80e86b4a20366208520d56c642e7b1fb60",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "ci/engine-0.2.86",
+          "oid": "6933600d7ee6eed11f8f7842f0f49a790f71c800",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "ci/engine-0.2.87",
+          "oid": "4265953942101003983aa382e90e13b9fef3fdc2",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "ci/engine-builds",
+          "oid": "4b74d345aeec5b175ab7f8f34291f11a818678c5",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "ci/engine-release-e8e099a",
+          "oid": "e8e099af271a855a438cd238f155d364fcaf6707",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "ci/single-macos-job",
+          "oid": "2ce36ba093fcb1b2f7cc374da4dc79b90217dd86",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "docs/approve-c16-c35",
+          "oid": "ddf2562d42fe4450a0e1e70aabff696d6f5cac52",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "docs/architecture-diagram",
+          "oid": "eb11b460cbd8fbc56d3bc449e5b3886be6e67465",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "docs/archive-extracted-client-evidence",
+          "oid": "f558069e97e769db56f88d910e90cc22833cb8ea",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "docs/cli-developer-guide",
+          "oid": "1dffb3b44e1c1788e5e7a36b476affc60a1ca292",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "docs/client-integration-and-qa",
+          "oid": "b8506731509fe4a6f971fec2c7a86ce38f023256",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "docs/contract-and-cli",
+          "oid": "7d22e078182e86e5032e858f43300c9e76711422",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "docs/core-front-decision",
+          "oid": "372632e59075c47f5adde6e00f3c99a4090da342",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "docs/decisions-2026-10-28",
+          "oid": "c12289e61a1895a57248d6416be8c39a3e9f7c06",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "docs/engine-to-window",
+          "oid": "7186c5f40c7d1df2cf5c65c12f704b206cf24d8c",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "docs/horizontal-orchestration",
+          "oid": "328742afcda76779fb03e848bc7230774a51dad2",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "docs/machine-resources",
+          "oid": "3ad48249f1f854136830247bfb934eb03fc0f47c",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "docs/original-runtime-acceptance",
+          "oid": "fd406bd9de8c50093ecf72b71c77a493e50b618b",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "docs/product-map",
+          "oid": "c8cf04e9ea3c897557687423dee813b0bf94357b",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "docs/release-ci-rules",
+          "oid": "96c2e7ffd4335b02f2388c2d60580d2218b63c16",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "docs/runtime-release-4c9a710",
+          "oid": "ebb6660904865dc9a7dec669d0a0ee62beed448d",
+          "integration_evidence": "exact merged PR head #68 with merge result in base"
+        },
+        {
+          "branch": "docs/skills-sistema-terceros",
+          "oid": "47e8f5b974893e979076d415d9f17084bc532084",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "docs/terminal-first-phase4",
+          "oid": "37ad2ca7964f22726189f5861b02aa677e6ce6ad",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "docs/terminus-cli-split",
+          "oid": "80cc02b797c4121f1956d746d4c0b4ef1ae82a68",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/account-credentials",
+          "oid": "0d4af70d14e6a365b91ad3a1936dcf397bf7a209",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/account-identity",
+          "oid": "a6e17850687dd96ffd712313cd7eeb5919393754",
+          "integration_evidence": "exact merged PR head #70 with merge result in base"
+        },
+        {
+          "branch": "feat/account-spaces",
+          "oid": "84e0ffa1c679ad93d760193a400530e34e6e94ee",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/account-spaces-migrate",
+          "oid": "a13e88f370057540f7f3f160cf32e4b9705a83af",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/account-workspace",
+          "oid": "5769a08d72a4f48346be5035c5668451a8eaaed1",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/activity-logs",
+          "oid": "3e7748f9e8eb301865de64df0a73c5430a6b2fd0",
+          "integration_evidence": "exact merged PR head #166 with merge result in base"
+        },
+        {
+          "branch": "feat/agent-c11-quarantine",
+          "oid": "976238e8877bcef32bb3975988360925afb5b78a",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/agent-c19-listed-skills",
+          "oid": "80f59b3ebbc4ff8362faab6d433966b9587c50ff",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/agent-list-mcp",
+          "oid": "c53ef44c3a8d943dd6fdf07d2c621b27311728aa",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/agent-login-remote",
+          "oid": "eb39b2fe0b7ea658108c232685fbabd24484d5a0",
+          "integration_evidence": "exact merged PR head #67 with merge result in base"
+        },
+        {
+          "branch": "feat/agent-manifest-reader",
+          "oid": "079bde5717966f1ee1d35c3765a79dc4b69ce82f",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/agent-memory-identity",
+          "oid": "9c0a07064efd353e0df5864bcbe889cbfbe24d80",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/agent-scope-sources",
+          "oid": "28ccf1c92725bca255982992d9671539fca63282",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/agent-skills-mentions",
+          "oid": "022ef92bdece09b46855058d155d213cd17fe4a7",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/agent-slots-requires",
+          "oid": "3fa5b6edb3d33e07ec3368e6543f01ff06f67645",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/agent-turn-policy-final",
+          "oid": "b9d18ee24f7f8ddcb6e0baa8537695bd214b0e67",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/agentes-sin-rutas-internas",
+          "oid": "5cfc26bbe48213d766b13a1725930c6b10362cf4",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/architecture-agents",
+          "oid": "830b2e18a61000e05e6de35354e2f11066b890e4",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/artifact-read-part",
+          "oid": "c1a6e700b4933dcf6fe1e2d9cc903d3a9d7eee64",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/background-host-integration",
+          "oid": "2dc51cd724ecf02f7bd2703679941b79c1f1b1f8",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/bounded-history",
+          "oid": "709746f9968b6564ca87984a11d91aaf80b704d8",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/carry-work-1-export-import",
+          "oid": "4870085780c68d0f9a470383f633a9ef2e15fcb2",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/carry-work-2-bring-back",
+          "oid": "69952f1cd61cc7d80e4d0dd832e91f2f03f3d4fe",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/carry-work-3-no-remote",
+          "oid": "43f97878142c4d588e872ae29d189616dd71a142",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/carry-work-4-sealed",
+          "oid": "c30e399e0906d9d0c1ac38a2349738bdf4abf8db",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/chat-background-remote",
+          "oid": "b1e340c8d44eaf41951e2a76f364d7f52dfa09fc",
+          "integration_evidence": "exact merged PR head #71 with merge result in base"
+        },
+        {
+          "branch": "feat/chat-visual-reader",
+          "oid": "99abd7b0d9300213219f7bebaa5977bc8b8a8c8f",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/chat-visuals-by-parts",
+          "oid": "54ebbc0f5da8087b2c6623d3f6d7f42b3f9f1897",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/cli-machine-tasks",
+          "oid": "93eabf850954c5e0a5325c70f4da1a8c8b4b3b82",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/cli-run-streaming",
+          "oid": "4d83abc0be3290ec3fc20f1f6069a02ece1eb69c",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/cli-start-production-root",
+          "oid": "6c0c126c0d7eb4f4e46a2d2439350e871f5b79ae",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/cli-terminal-first",
+          "oid": "80a9a1b68a07d9d9a5601a080ec953dd139afff3",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/danil-client-token",
+          "oid": "603d82906e67ed13917e768a17be590ab3ce6d4e",
+          "integration_evidence": "exact merged PR head #69 with merge result in base"
+        },
+        {
+          "branch": "feat/danil-session-per-account",
+          "oid": "6c4b74d577d583bfccfd4c5ff6e2922bc664abc6",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/deferred-actions",
+          "oid": "0c867e2cba622fed4663f5f98868159225e5a45c",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/embed-create-agent-skill",
+          "oid": "6fde54ecfd57495e07641aabdc62f1b90b6ed605",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/engine-device-connect",
+          "oid": "0eb4aefaf6f60d8798d9aac7c3dba6791281a9ca",
+          "integration_evidence": "exact merged PR head #66 with merge result in base"
+        },
+        {
+          "branch": "feat/engine-push-stream",
+          "oid": "17009d689fccf86a3941e83c494f32b35c239966",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/engine-release-key",
+          "oid": "9551978d50570073239582003758168e240d56ca",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/engine-update",
+          "oid": "db9cccf710e5221ddd183873b347e6eff163a331",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/enterprise-history",
+          "oid": "3ecb9a78e766148d07ef1b06b19b98509b6aacfe",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/external-orchestrators",
+          "oid": "cf6ca079fd66fa14f134575669904c91b793435c",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/force-stop-update-resume",
+          "oid": "99d7a960938eeccc639e89b2d2d38be0e7455621",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/gh-lecturas-publicas",
+          "oid": "d6ad01d172a51efd581146ac1f26146d86b5aa85",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/github-account",
+          "oid": "d75b6dae371ae28db47b7f8f2f45ec4eb98076fd",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/github-git-credential-host-mode",
+          "oid": "0be98d22b9be5d5c0dac836e8fd1dc0a967ce45f",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/github-inherit-access",
+          "oid": "e0e75261901994b37db9fec6315272bc699163b1",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/github-pending-permissions",
+          "oid": "9f1f85a04c7de5efa7b3e91191d895b08cdb1204",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/github-scope-by-repo",
+          "oid": "82023fd1c3ac6ccf27109c9db43c51ce6e1a659b",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/github-workspace-production",
+          "oid": "7d0c15ddf4202b85ced84ccd9e08dca99c427a22",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/gitlab-git-host",
+          "oid": "dcdf37df033fa5774d4392113768348b57f2af9e",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/google-drive-desktop",
+          "oid": "0774f28e45a338a228316c4e7e41d9181dfea96a",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/google-drive-integration",
+          "oid": "b831eebda24eff20d1d76b6c9b0fdb90fcbe5917",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/horizontal-orchestration",
+          "oid": "f71746cad14cb3b2feaf335fa2620bb8f2e7e8eb",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/install-disk-space-check",
+          "oid": "70ce1b6d64ce8f85cf8a66dff8675e93131b49a5",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/interactive-agent-adapter",
+          "oid": "5c0494037d98df2fb12d05405da0d50ff4ef1fd4",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/links-rules-memory-sync",
+          "oid": "54e532b643e5fb6b455a25b1311af84c29f2f30d",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/local-orchestrators",
+          "oid": "1f5e0b17a3f8aac01987570e10818d9b7c266ff3",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/local-turn-executor",
+          "oid": "925f4477a2f48e1844e440e575c0e2e1b7a71eb7",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/local-turn-executor-port",
+          "oid": "b019c522e7f31151c340fec6d5a382c792b2533e",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/machine-usage",
+          "oid": "d9f95cce43df2e1a10a065e4f4bdc0f9b73f102b",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/master-fd",
+          "oid": "a83c565d8daf76eb7bab5c189da1e5b579ee85db",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/mcp-oauth-terminus",
+          "oid": "0305f914f41b720dcf7409effe5f451a8d29fcd0",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/memory-frozen-core",
+          "oid": "4113806be53ece25f099c68f1cc51d4ee3f9b2f7",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/modelos-locales",
+          "oid": "79bf3ed68fd91bb1c10de1b7ec7ddeedb3ac5d5c",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/native-agent-runtime",
+          "oid": "de1d616e426c97a08552a718858a9dba5b6c7654",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/notion-mcp-conocido",
+          "oid": "31774ed6331a724f04a99d9396dd1150dc13f4ec",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/onboarding-engine",
+          "oid": "21f568761818b35810e7faad6a460fee4739dfd1",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/orchestration-budgets-pr",
+          "oid": "7b88b3dab37b1590123fbe15b7dc71ecbb070223",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/own-machines-installer",
+          "oid": "27aa8e2ff095b597964bed11d2b89e8fd1497cc2",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/panel-mirror",
+          "oid": "e0d63c34fbee35ef46fbf92bfa6868859d893a98",
+          "integration_evidence": "exact merged PR head #62 with merge result in base"
+        },
+        {
+          "branch": "feat/port-terminus-2026-10-07",
+          "oid": "7a5a8855a53128582103d6007f0b0890d5e5a5c6",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/portable-backups",
+          "oid": "5568c52fbc8134ed418ea8069e2b83529c9bf193",
+          "integration_evidence": "exact merged PR head #65 with merge result in base"
+        },
+        {
+          "branch": "feat/provided-mcp",
+          "oid": "35ef6371996538fa74919d04ffedec6ddd593c19",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/provided-skills",
+          "oid": "77de19844c0364c5658605ec4d5b4a0bbc63f727",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/radiant-enterprise-usage",
+          "oid": "d0261300887a47b3fbe892ecd25f68f9d53b5b64",
+          "integration_evidence": "exact merged PR head #169 with merge result in base"
+        },
+        {
+          "branch": "feat/radiant-governance-skill-files",
+          "oid": "cb0b40f3d349969d9d4f39fa7c0cb1ce5a796bdf",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/referencias-herramientas",
+          "oid": "44e57bfd0b32f4c73ffed7180264bad3d72509a0",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/referencias-zotero-mendeley",
+          "oid": "3fbe495ebbdd524e3bb85dd2bb5302cbf36c84fd",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/relay-account-isolation",
+          "oid": "f9c85668c72ad04b7925692a5eff0bec7eaeff28",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/relay-machine-commands",
+          "oid": "f9c85668c72ad04b7925692a5eff0bec7eaeff28",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/remote-delegation-dev",
+          "oid": "36e87109cc30fc73a7bd0f37ff12434c9cbd9ab4",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/remote-hosts",
+          "oid": "c0f0b7c5137fafa3d8fab42ce3b85fcc56ff79e6",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/remote-project-clone",
+          "oid": "8252a43178647d2ae4a6c5f311aad088d775e8ec",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/remote-task-mentions",
+          "oid": "933890021938d3defa13b1745879bf9a9d08abde",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/rpc1-durable-pending-claude",
+          "oid": "5a5d1e45a72dd6a05993e44f8f5905b6aa643c5c",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/rpc1-registered-clients",
+          "oid": "7789eceb03f584d404a082ee32616eb81b159024",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/rpc1-route-authority-claude",
+          "oid": "cfe85cf1fa66fd28d3a9859408e5e2e4cc958199",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/rpc1-task-identity",
+          "oid": "e9a274fe1ce8a0f22b62c1493a9307f08ed9147b",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/shell-stdin",
+          "oid": "9d85c15f705806443d409a10796ab4a8413e52c0",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/standalone-host",
+          "oid": "9c040d67de157b7ed524d1736b603c3bee7e0f07",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/tarea-vacia",
+          "oid": "4079a874c34e1fd694f5622126b8c79a3ae12c87",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/tarjeta-de-tarea",
+          "oid": "e69a6a9448fcbb2ff930b20829a59ede25caefcc",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/team-computers",
+          "oid": "dc7bbebf7708292afd01516d25453bf3219bf77b",
+          "integration_evidence": "exact merged PR head #63 with merge result in base"
+        },
+        {
+          "branch": "feat/terminal-first-phase4-pr1",
+          "oid": "ac558bbb5f1b11c0d9eaa72ddfecd61fb63a837f",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/terminal-first-phase4-pr2",
+          "oid": "4654f1ed244f3e794cbcf0b1d4a471faae2e7d1c",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/terminal-first-phase4-pr3",
+          "oid": "c38be1442c204f49850ee5f1302b2f7ba140267a",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/terminal-first-phase4-pr4",
+          "oid": "2894647cb00a7c497dd45e97309421099d915048",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/terminus-cli-split-0-1",
+          "oid": "fe5fcde9bfb858fd2290158b169d0d292eaa9aaf",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/terminus-cli-split-2",
+          "oid": "629b1e77377146a9bc0e1b45cef7c72f85455971",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/update-from-commit",
+          "oid": "f586599bcce99362ec381ca62b8281687fb34a5e",
+          "integration_evidence": "exact merged PR head #64 with merge result in base"
+        },
+        {
+          "branch": "feat/vm-desktop",
+          "oid": "3bfb247f3e246b33f6082517838104575ddda49d",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/vm-screen",
+          "oid": "0efeef44b0cdb34de49f82944c0447c32d9ac58d",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/vm-screen-control",
+          "oid": "b7dcf4712c3e437c9f7149d5020e72ffeeb096f3",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/windows-runtime",
+          "oid": "4a6d7b7127c3272b2b1205a324604ed9156141e2",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/workspace-assets",
+          "oid": "d5f20072ab19d571124db3d0af2dd2d488ef805f",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/workspace-danil-link",
+          "oid": "19e352eb619ab97fec66e4f80d89973c7104c7c7",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/zcode-native",
+          "oid": "83eeaec474c81c35f8b5a193dd00e5c98fa082f6",
+          "integration_evidence": "exact merged PR head #43 with merge result in base"
+        },
+        {
+          "branch": "fix/abrir-archivo-sin-git-y-borrado",
+          "oid": "fd5c0977ce3670c3e6613d131bef7ff5bbd19b1f",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/abrir-carpeta-con-explorador",
+          "oid": "e18b9b9cce370d89e70ed29041a38cecb63b86f8",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/account-status-vault-unreadable",
+          "oid": "a1015d2c6c4684bd48dd997c85da24724a6ecc49",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/acl-explicitas-en-cuentas",
+          "oid": "a5ac3c37032bceb5b74a618b0e769c3a1057fbd0",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/adopt-resume-id-lock",
+          "oid": "b86f25932c00526cd1eed1543c375f5cb3561df3",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/agent-probe-cache",
+          "oid": "a3f390f802057fcc9c30b6a895a5559ff53b3d5a",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/antigravity-alta-pendiente",
+          "oid": "a3d31990fd8b4afc85033b9d3f31e000c061519a",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/antigravity-auth-triple",
+          "oid": "fdd2ddc2c340b75bbb8a4d72cbae1ebcd403c9a9",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/antigravity-cuota-windows",
+          "oid": "ffbabe9e8fe689df90feb6c3b59491de1940d898",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/antigravity-mensaje-largo-windows",
+          "oid": "185337f8121770d7c531f6230c9c41af0ab6a415",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/antigravity-remove-account-locked-home",
+          "oid": "e06502d8ca98117c0b0127e455c5eff7b771dd66",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/antigravity-sesion-correo",
+          "oid": "ea59541fd45dc579279e1ef7089b4844588665b5",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/antigravity-sin-ventanas",
+          "oid": "29d1f307f4f691d89a714e47dc97c13922685cc5",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/antigravity-subagentes-asincronos",
+          "oid": "8a82158aa8295cd8cd8d5cd37d1f431e2a1f3403",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/antigravity-version-minima",
+          "oid": "afd192d7d51edefe6943462b796dbaed1bde958e",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/apagado-ordenado",
+          "oid": "02b2b6e32807f53bcfde686c240a058e6552569f",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/arbol-archivos-dependencias-al-final",
+          "oid": "d5a854d00f83c3ec5a39b5303719c6459a4f5fea",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/arbol-carpetas-pesadas",
+          "oid": "1913394d8c54f6c27b4fa1c498081556492d37a3",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/archive-completed-peers",
+          "oid": "2ca6b5a594d92d92ab653cf67ac608b8d61a8499",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/archive-skips-pinned",
+          "oid": "e50b116d17ab7ed55a9f75328aeaff424879cfa8",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/archive-task-descendants",
+          "oid": "baffa2bed8930a9b95347b9acd6b03668a2dd19b",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/arranque-sin-barrido-bloqueante",
+          "oid": "e6e0f3146df6acbb3fa1b6f1750867decbb44613",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/aviso-sin-conectores-claudeai",
+          "oid": "fe3bcfde57a4a15b3c2290aa432541d544d22db1",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/ayuda-service-traducida",
+          "oid": "346d65ebf249c6abd1d875481c17a41c2cebb8f8",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/borrar-tarea-carpeta-ocupada",
+          "oid": "b2f6af6d2f5fdf1cf27cf1b88e5dd19907d43e94",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/candado-huerfano-tienda",
+          "oid": "08cbc523ab8c101b40b7855c4c960dd465f2f981",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/cargo-test-green",
+          "oid": "b6723e6415bbc69a1f17c2bcceb19cf7d2ea8c19",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/carpetas-nuevas-en-documentos",
+          "oid": "8947017193113620910f7f7bb0886bc19b27283d",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/carriles-muertos-arranque",
+          "oid": "d2b0947fedff9ed3a52404e987a750545db04fe1",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/carry-reuse-destination-repository",
+          "oid": "49321af37f97b33b7bd9a605465ea746e97216c0",
+          "integration_evidence": "exact merged PR head #165 with merge result in base"
+        },
+        {
+          "branch": "fix/check-ignore-windows",
+          "oid": "8dd8d0461215d67ac172c7cdb2ac5c304263a00b",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/claude-home-per-account",
+          "oid": "c3e50ae62974ff35c80a57951caccdfdaf8c6e81",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/cli-dev-friction",
+          "oid": "cd5a0893e0dfa7a1ff51dae731fb22df86f840d4",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/cli-endpoint-tmp-cleanup",
+          "oid": "c1c72474a74b94f6dde31b660278cd651bb51c97",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/cli-first-workspace",
+          "oid": "c67f17196467cbd59a82eb1d3745f4765f21078b",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/cli-guide-findings",
+          "oid": "40c976c09963aa4108cc6b9744d8d004c6c3c249",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/cli-motor-apartado",
+          "oid": "83261dd9832029efcaba50f432791847962d4fb5",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/client-extraction-exe",
+          "oid": "b49d16fe15e6f5ed3953bfa49a43e96db8524205",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/clonar-con-conexion-github",
+          "oid": "093406cfb4ceb9fbe0a40dde9a1d5d00d9c3722c",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/codex-login-una-pestana",
+          "oid": "420f3cbd31f4bc0a6b9a477f0b5910070d953548",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/consola-login-sin-espacio",
+          "oid": "04a79d13c9461410361f26c09cc2eb05387b080b",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/cross-machine-sender-reply",
+          "oid": "65bbdd26c869b65d8d1e3172bce0a77235b52021",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/cuenta-solo-tras-login",
+          "oid": "0bf18bd0f776cd0e1ab6d0fc7f6f303cd043c2e4",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/cutover-blockers",
+          "oid": "7ecfd5b1dfbed502b86d51561ed12587ee80200d",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/e2e-lab-vault-cleanup",
+          "oid": "00bf92335d6497bf57316b774ea265eccb06fda8",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/e2e-linux-triage",
+          "oid": "e74a8547ad8c336c67452841c43d93d794b6e85a",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/e2e-venv-crlf",
+          "oid": "25bde30d40449a71a59004bf6683982e1cc82a4e",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/engine-dev-failing-tests",
+          "oid": "f73e2ea8727cb0a3e1f1bd79ce648a53b441c817",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/engine-hang-repeated-request",
+          "oid": "64c198332e59213d3ba74acd0a1737048c2ce9ef",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/entrega-de-tarea-no-se-pierde",
+          "oid": "b5a533ff089a9a1f88cccd5af11b01cd36b344d6",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/esperas-de-login-durables",
+          "oid": "7341e197dffd54d691a724712455753472ddec13",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/exclusion-dependencias",
+          "oid": "f2caaa1fe5ad988034b83c0b3a7e881907bbedbd",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/executor-home-after-engine-death",
+          "oid": "19c73e50d0241ab0820be796207fe4c3a2dc4213",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/executor-journal-busy",
+          "oid": "44c326194aae2fa13240729d8f7a841ad2a91643",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/existing-workspaces-not-auto-linked",
+          "oid": "255880b4aa9d1420bfd894ef9b87e156f06856bc",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/final-qa-linux",
+          "oid": "aa9199b813e56bb0eadeba30d36e701c90841bb2",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/gh-merge-and-diff",
+          "oid": "07feea9b7d2d37bb7ed02900e07256ca6d67fdf9",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/gh-wrapper-resolves-real-gh",
+          "oid": "874f0fdfbd06ed00b1fe98b6c5edf7c1120abd4d",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/github-dependabot-read",
+          "oid": "a44e79c253cd2b501ea0d8b3c3440000ec10fe93",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/host-github-needs-signed-in-gh",
+          "oid": "e5e94ac70172bd023967e2dc8525e52b36174114",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/kn-longpaths-windows",
+          "oid": "7ca102f86ba31fdfec18e688c759fdc6d6da7e49",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/lab-vault-linux-bus",
+          "oid": "e6bf57851b801b3beedb90ee75483591a1003811",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/lanzar-terceros-desprendidos",
+          "oid": "c85c71296a986eecc3f72e5e70f31d386a6d7cae",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/link-all-while-signed-in",
+          "oid": "4f64d13a81385750ee7599c1fc0bcc34fd4030c5",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/linux-peers-descriptor",
+          "oid": "32f4fc266481052e75c16304c88c1c196ec091c4",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/linux-qa",
+          "oid": "471e135f61afc17fc2a457524b7c08ec99b1c543",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/linux-update-absolute-release",
+          "oid": "0e9edc84b409498975afd862a88e626007b168f3",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/login-home-and-resident-retire",
+          "oid": "f7321f28c2f3793b67f406c8de5c9900d41a3058",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/login-mcp-una-pestana",
+          "oid": "242688cf181a7c027560b07ee404fd94a3361353",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/machine-storage-summary",
+          "oid": "a0b0358f61f55a5669e9577f0d593d9ccaa86e51",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/mandar-ahora-sin-atoros",
+          "oid": "d2266aeff0bf7ae5c74ed4660cf033896e69abc9",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/memory-without-project",
+          "oid": "8b18288e1541cf96e01d81fdc0888c23d621ca58",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/mensaje-forzado-duplicado",
+          "oid": "812c6d8f542273a8e1e6d710450d6604d220b0cd",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/migracion-v13-arranque",
+          "oid": "c8d10f3b67233678c7547e0962d1f757805c14ea",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/mirror-energy",
+          "oid": "d22f5c17e425da0fe5f21ab3ee6aa17147f81782",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/modelo-local-catalogo-acp",
+          "oid": "10889025aa5245f90dd99c80485964092bcf4adc",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/name-tasks-by-title",
+          "oid": "cfe14083922db3a1113e3648652ef504bacc1cd0",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/opencode-v2-oauth",
+          "oid": "45867e9c0aeb530ceb61fedbd469f352a71c7f17",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/peer-self",
+          "oid": "8305d19c7c86f0dd131d9770ef46d7e4c3182496",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/permiso-resuelto-en-todas-las-ventanas",
+          "oid": "31ae1e88a6297ec33ea947784828800776777318",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/port-harness-1203",
+          "oid": "8f0ca0ef7bb225f5524fe3aa486d45e24fd3bd6d",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/port-harness-1212-1213",
+          "oid": "82ef067569bf55b35a6e41b520a9527c9d2a6f9f",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/private-endpoint-descriptor",
+          "oid": "b790f3dec4f69f2be057031169e4be8257819f1d",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/prompt-cache-order",
+          "oid": "0f1a92df12695cc34c966789f60cc9e2324d98cb",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/public-contract-features",
+          "oid": "5682748d8e88526a91007a80a94d18784cf6a053",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/referencias-solo-zotero",
+          "oid": "66321d99f18acdfd45b526e705c4057914c757f0",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/relay-login-events-after-restart",
+          "oid": "36bdf63a0fda37b18d82a66d7627605d8c4138ec",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/relay-task-git",
+          "oid": "c61ecffd9bb40c254d342dc05177c35f1fe20c56",
+          "integration_evidence": "exact merged PR head #163 with merge result in base"
+        },
+        {
+          "branch": "fix/remote-task-create-title",
+          "oid": "8953f792ad124825674027ad04353cd09c4267a4",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/remove-workspace-unregisters",
+          "oid": "a233a8f3f5ee9a9c0c729048377c7d490fa0f166",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/repin-create-agent-87c5022",
+          "oid": "970e0b4f3b5a5e942a6b10c2a60edd2da2778e4f",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/resume-across-account-homes",
+          "oid": "0388aeef46bbee450f8225ac9af132a0a3b1a685",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/rustfmt-dev",
+          "oid": "c60cb08a3fb3939cbbeec963022945c40266d039",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/segment-saved-event",
+          "oid": "cab0bc50e714ca5dc1a6309c8770b1067b70502d",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/send-while-closing",
+          "oid": "859885242abe40e503790f20af13568e4c6ef532",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/service-child-oom",
+          "oid": "6ac685f78f25fb10de77454b3fc01b2fe2579d8b",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/session-claim-release",
+          "oid": "5a544db5ec56633c073a302fc9ed1be6d6d20e7c",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/shell-only-title",
+          "oid": "64e3e6e2ff5da393a868cfd348fb91530997f108",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/skills-turnos-solapados",
+          "oid": "496dfcae3fcf1afe1dbe6ac942c2a9c2837e0940",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/stop-task-processes-workspace-id",
+          "oid": "c1f6c027077d476f13f976291535b192a1a877a0",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/sync-split-repos",
+          "oid": "a3e36d1bb77f4542d7adeda88a2a19e4c2681bb4",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/tareas-sincronizadas-entre-clientes",
+          "oid": "afba581c688c3a1b06fa0bd051e0cd9e6b83bab1",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/task-archive-idle-peers",
+          "oid": "8fdb2becd7517554d13fbd2c69840307fa5193c8",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/task-create-valida-antes-del-recibo",
+          "oid": "0fbacac9db333e5a94a4f5f133ec51e0aa8fd1d3",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/team-vm-client-support",
+          "oid": "f63b38475eab8bcf1292e67dbc2ffcf5b68d0c44",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/tree-diff-tope",
+          "oid": "8a9d4074bc0ffbee9315ba87af18984ff08370eb",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/turno-cerrando",
+          "oid": "7d34938d9b800739c01487db62f2b4675415c939",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/turno-con-visual-no-se-pierde",
+          "oid": "4fbda2ec80cdf838ef6323e4303e2d67c726965a",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/typst-exportar-y-proyecto-modular",
+          "oid": "21ce17a255ec99047455ec4169d05b8e4ff2f5cb",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/una-sola-reanudacion-claude",
+          "oid": "6f45490bd8a340c64e8c7c7d33949a76d1c93672",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/unix-repair-private-dirs",
+          "oid": "4265953942101003983aa382e90e13b9fef3fdc2",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/update-source-while-reading",
+          "oid": "ce53c28e86b2d22e360f2ae1492a672bb3e70580",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/validated-host-rollup",
+          "oid": "139ee975aed50e8d94189777db22fad6bbef5f7f",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/vault-probe-handoff",
+          "oid": "2f0227cbc7dded53ff7923b83bdbb8db212abbcd",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/vigilantes-ventana-muerta",
+          "oid": "6a36aadf1a321380ba936eda761c826fc10f9cfb",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/vm-danil-credential",
+          "oid": "5834581edba0e5fc4f37a846db76a2ed0127d684",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/worktree-longpaths-windows",
+          "oid": "26e7a0422a7f3b7ef7936600e05a1241455c8688",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "fix/zcode-capabilities-release",
+          "oid": "257cf2aa921ee096d29860bb9bc4d656d12cbce5",
+          "integration_evidence": "exact merged PR head #44 with merge result in base"
+        },
+        {
+          "branch": "fix/zotero-busqueda-y-bib-vinculado",
+          "oid": "3b99856b2ffe7763f03eda55d1ca391e10207ffe",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "integ/rpc1-a2-a4",
+          "oid": "e0b947a80f2fe332aa75286b4e52255b7340751f",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "integration/plan-multi-machine",
+          "oid": "5b8f29ae233911477a8403df3c769edd3890f65c",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "perf/arranque-limpieza-en-segundo-plano",
+          "oid": "44aa569c3f946f92691b8599a29efc8f713de74e",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "perf/cli-capabilities-descriptor",
+          "oid": "9aac2eb6d47e6e2d8035de03cfa33f8843f50c83",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "refactor/provider-agent-names",
+          "oid": "2580a3f5234c10f194757f86b40fa34c49fca7e8",
+          "integration_evidence": "ancestor of dev"
+        }
+      ],
+      "verification": {
+        "deleted_absent": true,
+        "kept_present": true,
+        "base_unchanged": true,
+        "remaining_count": 33
+      }
+    },
+    "computers": {
+      "deleted": [
+        {
+          "branch": "chore/staging-env",
+          "oid": "d6e6e85802336885f6a5ebb688e88e73f680fc57",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "chore/staging-supabase",
+          "oid": "cb72fc5a040e8f54a74fc8f5cb58fa59a53e203c",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "chore/sync-main-into-dev",
+          "oid": "25dbf064182a6f3b50d8d5dee5d0a14a76216a4d",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "deploy/prod-step1-sin-binding-mcp",
+          "oid": "f22ecde1984c7d2b9ad3bc3eaba0fd8ad47ce1a3",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "deploy/prod-step3-binding-mcp",
+          "oid": "66db6efa0c1555cf6eb8f8db1b07e233934a1f1e",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "docs/mcp-autodeploy",
+          "oid": "f71e4270a77fc0c018389ffbe2685953cc88ec93",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/account-credentials",
+          "oid": "9ce565a9a62caf455a3d22a3d67afff2429b32b9",
+          "integration_evidence": "exact merged PR head #34 with merge result in base"
+        },
+        {
+          "branch": "feat/account-profile",
+          "oid": "8395bd908341ba9c693efc4f15d275f0f3ff380b",
+          "integration_evidence": "exact merged PR head #9 with merge result in base"
+        },
+        {
+          "branch": "feat/account-spaces",
+          "oid": "b5086ef072881789c4d99823bddbab1b11a13da6",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/account-workspace",
+          "oid": "498d4f86b64b8002adbd8c32af16c84d474664dc",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/bounded-history",
+          "oid": "bfe68bb4860970a2d3066efa7dae5deee31fc9eb",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/carry-work-relay",
+          "oid": "8d9d6bfc41e67fbf61ad3c4774f362e2f3da83d3",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/computers-rename",
+          "oid": "88593595d69a8e1a126c7a6aaa25281bbf741a0c",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/control-plane",
+          "oid": "6b90a38f4b842b0a00f41a3eb204bff98864d845",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/control-plane-hardening",
+          "oid": "fc800735a49a9a91fbce30c15c49583a95cdb4f2",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/deferred-actions",
+          "oid": "2bd29a5be6611b9dad50e9f462496a3695ad02ea",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/device-login",
+          "oid": "e8a2269bbb2df423fdaf04b0a8e9a5b4a28a0be2",
+          "integration_evidence": "exact merged PR head #5 with merge result in base"
+        },
+        {
+          "branch": "feat/enterprise-history",
+          "oid": "4a009300c964bb25245275f316364fe5e0a0755e",
+          "integration_evidence": "exact merged PR head #40 with merge result in base"
+        },
+        {
+          "branch": "feat/env-secret-kind",
+          "oid": "9640eb90adb83ba29fb685d1e486e2101b265bf3",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/machine-client-token",
+          "oid": "c4d2abded77be93603f720b9cfa2104cdf81af9c",
+          "integration_evidence": "exact merged PR head #8 with merge result in base"
+        },
+        {
+          "branch": "feat/mcp-authkit-domain",
+          "oid": "9589912b32145f3a8bb671759d89d40567745489",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/mcp-icons",
+          "oid": "e88c3f1d78a3268c92a31e8a3ccced16923b2d32",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/mcp-own-domain",
+          "oid": "4ff49b30393eca26075fb76e23fbc03dfeba4cdb",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/mcp-own-worker",
+          "oid": "43f6e97b75ae1a5575aed6fbc82f1ead73fa7085",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/mcp-webhook",
+          "oid": "afa8440b4f25bef5bc1b2dd7de63fb95bdc1c90a",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/memory-artifacts",
+          "oid": "dcaaf75fa20f35b10ca449f0725bf0bd2040bf32",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/orchestrator-mcp",
+          "oid": "b4d2a40779ef91b7644d0ad8714776fe0932eb14",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/panel-mirror",
+          "oid": "7f9c9a6c0d1a92cc18efd34dfcd30987575a5dd2",
+          "integration_evidence": "exact merged PR head #2 with merge result in base"
+        },
+        {
+          "branch": "feat/provision-and-stop",
+          "oid": "792113cf91718e0d65fd2b2ba79452a55add2315",
+          "integration_evidence": "exact merged PR head #4 with merge result in base"
+        },
+        {
+          "branch": "feat/publish-service-features",
+          "oid": "7b807e4f585e1824d981ccc2e2698e71824ae155",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/radiant-enterprise-usage",
+          "oid": "6ae5a19bbd6fbf6169dfec3e6a1c16f20ed72371",
+          "integration_evidence": "exact merged PR head #38 with merge result in base"
+        },
+        {
+          "branch": "feat/relay-caller-identity",
+          "oid": "c93c40874b908363b1fd4147e6c6f1ac81563c78",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/remote-clone-intents",
+          "oid": "f5ec02c819a7421caf99a8f6c97ccf6d036e997f",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/shared-space-order",
+          "oid": "89ca87a5fee4efe799af71c85975f3d9f020fd5e",
+          "integration_evidence": "exact merged PR head #36 with merge result in base"
+        },
+        {
+          "branch": "feat/terminus-module-license",
+          "oid": "fc800735a49a9a91fbce30c15c49583a95cdb4f2",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/vm-resource-defaults-dev",
+          "oid": "904e6e69aaf761401165940de36c4d2a1c74f1be",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "feat/vm-screen",
+          "oid": "f8c62d50884c6e30820666ee0c8b3e6c862e75f8",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/workspace-assets",
+          "oid": "3185810df6c7c7442b96b8797aabf5b6faae1e0e",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/workspace-intents",
+          "oid": "d0669212877cc9f848df1d4ea3e8b0d490ae8e6d",
+          "integration_evidence": "exact merged PR head #7 with merge result in base"
+        },
+        {
+          "branch": "feat/workspace-owners",
+          "oid": "fa3a3c65e47c185484c25392546f166b108ae443",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "feat/workspace-transfer",
+          "oid": "12ce4b82b0f166d576699ad984f089c7fd9bd0d6",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/add-account-intent",
+          "oid": "4ad9de4d3a5b4b2592062e60edfdabc2920655be",
+          "integration_evidence": "exact merged PR head #6 with merge result in base"
+        },
+        {
+          "branch": "fix/cors-alfa-app",
+          "oid": "6d950b754364cf4a36c2e812f1122216653f5e19",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/cors-alfa-app-dev",
+          "oid": "f54e71197aaf772d56c14fb252713d6236abbcc9",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "fix/renamed-contract",
+          "oid": "c4d75ac420fd185fdbe49f3c47846f9d3027c6e0",
+          "integration_evidence": "exact merged PR head #3 with merge result in base"
+        },
+        {
+          "branch": "fix/shared-space-order-main",
+          "oid": "2665e07b47205c8021be8fc4d98aaad06cb1798c",
+          "integration_evidence": "exact merged PR head #37 with merge result in base"
+        },
+        {
+          "branch": "fix/start-accepts-client-token",
+          "oid": "ef174fcbdf3dd7f1c66da8fd45fe877a3df60491",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "hotfix/relay-caller-identity",
+          "oid": "1871840f2bb84f73b71cc9fd66f1c43eb8a30ad7",
+          "integration_evidence": "ancestor of main"
+        },
+        {
+          "branch": "refactor/reuse-cleanup",
+          "oid": "dd9164492862fe5017c1bac527520ab9319db44f",
+          "integration_evidence": "ancestor of dev"
+        },
+        {
+          "branch": "release/enterprise-history",
+          "oid": "b67256584f8e7718c01deebcf9bf097a8021205e",
+          "integration_evidence": "exact merged PR head #41 with merge result in base"
+        },
+        {
+          "branch": "release/radiant-enterprise",
+          "oid": "a43ca3ce60c616d7e8199654b30b30566917dee8",
+          "integration_evidence": "exact merged PR head #39 with merge result in base"
+        }
+      ],
+      "verification": {
+        "deleted_absent": true,
+        "kept_present": true,
+        "base_unchanged": true,
+        "remaining_count": 8
+      }
+    }
+  },
+  "local_branches": {
+    "terminus": {
+      "deleted": [
+        {
+          "branch": "backup/web-broadcasts-pre-dev",
+          "oid": "cdcfc6744552b7cc21c1a27c75cef4d122c6900a",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "chore/cleanup-reuse-tokens",
+          "oid": "c663dda34839e2e7e2329de4e24c7d95493cac07",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "chore/sync-main-into-dev",
+          "oid": "d28b5f313b32e4cfcc4663069b746be5ec1dd5aa",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "deploy/machine-disconnected-production",
+          "oid": "bed3f55fc572df57e4d53984e08c31095ee956e5",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "deploy/web-current-integration",
+          "oid": "1dd7ad307ce416889f81cca3ba7e919b6765b882",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "deploy/web-integration-20261028",
+          "oid": "ce99ab99b4dc9263492a4d2e31de45cb1889f325",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "feat/activity-logs",
+          "oid": "f3f37044071015927fc7378ed3a6bb550487797b",
+          "integration_evidence": "exact head already verified integrated in remote cleanup"
+        },
+        {
+          "branch": "feat/alpha-frame-layout",
+          "oid": "bc16b4f532896353de52d1fa02b6d9f1f961400c",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "feat/alpha-inbox-agents-design",
+          "oid": "b844ba284fa6247a23e2790b8be790b5f493d26b",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "feat/alpha-live-default",
+          "oid": "4961b53498a13f29b0695c97ac911fd8fb964db2",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "feat/audit-log-screen",
+          "oid": "910dbc62980c3ea01b38c30e0a7b58c6d5b377ba",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "feat/bundled-tools-runtime",
+          "oid": "dec4b9c6b52b11dfc77424a583c8f62fd0391d2a",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "feat/bundled-work-tools",
+          "oid": "5ba928b4022df8a1b711de1d1faebad9ce83f2e4",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "feat/bundled-work-tools-dev",
+          "oid": "f8dc80c385eb3bf5400d3c893d7e92fdc4c15873",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "feat/connections-local",
+          "oid": "de946d0d3d4de9207a25c90603292798ded832fa",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "feat/delegated-task-hierarchy-dev",
+          "oid": "c696a6afa068f8cc30a1263a4ef8c508f834d1c2",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "feat/delegated-task-hierarchy-integration",
+          "oid": "ed1168f6f1147531f58349b3db303b12395807ac",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "feat/mobile-native-lists",
+          "oid": "e21fd93ac684a20423edb527c695c683129d3477",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "feat/mobile-search-pickers",
+          "oid": "ededcf4a2566876d093c5ba88ccbdb48f1eaff10",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "feat/new-danil",
+          "oid": "049a03afef2b473dd511a8cbe17cecb843a2643e",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "feat/orchestrator-connections-dev",
+          "oid": "3249777ee33144e8fc04543c2dc8703c250a690e",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "feat/radiant-enterprise-usage",
+          "oid": "d4de60ba27aaa01a84fa2ce4daa8f75f57906ee4",
+          "integration_evidence": "exact head already verified integrated in remote cleanup"
+        },
+        {
+          "branch": "feat/ready-environment",
+          "oid": "7f4e2892e1c353ae53f6525bfc144013233498fd",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "feat/settings-secrets",
+          "oid": "66a868648d2be77d0f984c5a27c95a247814572b",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "feat/settings-seven-entries-admin",
+          "oid": "c51778f43314ba40032cd2126cd3a7cc857bd3d4",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "feat/vm-screen-control",
+          "oid": "28a7ed71606df5f5f3f98418a0baeaca05ce2946",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "feat/web-phone-fleet",
+          "oid": "5303f380dbad2b4580667ad9afc818e45d01f533",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "feat/web-registration-desktop-sign-in",
+          "oid": "6bdaeb311ae2c4866dc4df3dc5276bf9e797266f",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "feat/workos-login-alfa",
+          "oid": "7d27740927b767c411bf4c12264c170a64a8e9bb",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "fix/account-cards-by-subscription",
+          "oid": "6e7b6d68f7964e6b16ca0fd95bc13f181b5b7490",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "fix/activity-final-integration",
+          "oid": "31710d3b42bae09ee690e6d968cda30c1c6406d6",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "fix/activity-notification-repeat",
+          "oid": "8664b9062d42fbdaecfff27c7728697e51c33da7",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "fix/attachments-remote-task",
+          "oid": "a4ae3b290a1ad9b0e2cefc52da83fef187bec200",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "fix/chat-location-actions",
+          "oid": "4a5073b67a9418c1f80d38b8983a9fe3cf945864",
+          "integration_evidence": "exact head already verified integrated in remote cleanup"
+        },
+        {
+          "branch": "fix/command-task-title",
+          "oid": "fe493861aacb81eb0d641c2af08221abc4a12ed0",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "fix/composer-machine-credentials",
+          "oid": "fddf78aea33f3eadee912f25c4a3cc3e8ee6700d",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "fix/delegation-native-qa",
+          "oid": "c8dbefc91f364fdf95b7858ceb5ae1de8f39f356",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "fix/failed-card-no-last-message",
+          "oid": "a252fecf2ceb99e3f5f239878917fb77ced7f526",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "fix/host-github-only-when-gh",
+          "oid": "e1eff097604d5ca5fb3f97db1c4d50aacb209b86",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "fix/machine-disconnected-current",
+          "oid": "ecfdf24ecc5e285fb3e7c95b169f33242ed01de8",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "fix/machine-disconnected-web",
+          "oid": "3c10647c31a30d47737036082d3430fce9567b67",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "fix/mentions-other-machines",
+          "oid": "58ecf412542168dd42f49c4d7a3a9c1d813d4267",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "fix/mobile-agents-usage-publish",
+          "oid": "30102aaf7c4401fdf864598bd28428f272af58a6",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "fix/mobile-agents-usage-questions",
+          "oid": "a70d577e2aa14fa2e45ccb46064420414f8f80aa",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "fix/mobile-composer-background",
+          "oid": "9b645dc4ff701ff487678e6a3ccc4e1d26e01e81",
+          "integration_evidence": "exact head already verified integrated in remote cleanup"
+        },
+        {
+          "branch": "fix/mobile-composer-no-borders",
+          "oid": "330b9c917f20fc34dd742f52a04bee74520c53b8",
+          "integration_evidence": "exact head already verified integrated in remote cleanup"
+        },
+        {
+          "branch": "fix/mobile-docs-paths",
+          "oid": "30df9d1d4562347c723a41c20928fc24932c9144",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "fix/mobile-header-keyboard",
+          "oid": "2a30b3952efe02f9ee2640179b948cae5d9a34bd",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "fix/mobile-offline-task-git",
+          "oid": "b0188b8e3e5a0e5f40da39f6cbc2ec3ba3484c37",
+          "integration_evidence": "exact head already verified integrated in remote cleanup"
+        },
+        {
+          "branch": "fix/mobile-rocket-merged-only",
+          "oid": "dd9cd105e6eb167fc983791dd3ac68533f0a62d3",
+          "integration_evidence": "exact head already verified integrated in remote cleanup"
+        },
+        {
+          "branch": "fix/onboarding-opencode-auth",
+          "oid": "f28f40b59bbff63a5a6e81a3933f61cef664efb2",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "fix/rail-only-own-tasks-alfa",
+          "oid": "4a3f33d5e07a0b69d26967b743e5cfc39f61cbf8",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "fix/remote-row-open",
+          "oid": "23d93884bd2c842e92d61e24467c7f704b967333",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "fix/remove-task-header-actions-main",
+          "oid": "3985cde1822d1388e0dfcd8c5287788671ece147",
+          "integration_evidence": "exact head already verified integrated in remote cleanup"
+        },
+        {
+          "branch": "fix/review-375-integration",
+          "oid": "701ae7f7f928b6e88006e4f873a50cf69413bb2e",
+          "integration_evidence": "exact head already verified integrated in remote cleanup"
+        },
+        {
+          "branch": "fix/screen-sin-modo-control",
+          "oid": "f5a5ecbfdf010b28af50dd7a38fbc67971f9a695",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "fix/sender-task-other-machine",
+          "oid": "085ffbddcf6146b216c7fc07a1c101aeeec08e1a",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "fix/shared-engine-contract-compatibility",
+          "oid": "ff4f1a5f3036a0d9dadf5465c3e919ac241edf75",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "fix/space-saved-tabs",
+          "oid": "7497247e19c280d07f156306c9a20337be2b81d2",
+          "integration_evidence": "exact head already verified integrated in remote cleanup"
+        },
+        {
+          "branch": "fix/space-saved-tabs-main",
+          "oid": "e24e7bf6eeb5c920b09e73597ba7522affe5bd0f",
+          "integration_evidence": "exact head already verified integrated in remote cleanup"
+        },
+        {
+          "branch": "fix/storage-fleet",
+          "oid": "ff98cbb43f2ebac59e97c1c422a1fa0a1f18b77a",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "fix/storage-web-machines",
+          "oid": "fa8f850783a35070eb37c3bf6765f00a409dcf6f",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "fix/task-machine-dot-green-gray",
+          "oid": "d7746cd0dc03a0804e7c50ecf16b0e7c7d4bde73",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "fix/unified-task-git",
+          "oid": "cbb0f140f9906f068a29421e63b19e736bbcfb5a",
+          "integration_evidence": "exact head already verified integrated in remote cleanup"
+        },
+        {
+          "branch": "fix/web-auth-dev-integration",
+          "oid": "ccd1587dce671be1b64a17d84825aaf2a79f6fc7",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "fix/web-context-transient-tabs",
+          "oid": "fa8f850783a35070eb37c3bf6765f00a409dcf6f",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "fix/web-context-transient-views",
+          "oid": "71bc587636781708086ec07befbae6fd1b5c05f4",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "fix/web-provider-login",
+          "oid": "88051ce5156eb6862167b346841e59c27c8524f7",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "fix/web-team-engine-compatibility",
+          "oid": "8f6ebdccb005057ccc49859f1fa80a66afad5dde",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "fix/web-version-footer",
+          "oid": "4fb6e4c2ac327972a47aea070bfabcee257a469e",
+          "integration_evidence": "exact head already verified integrated in remote cleanup"
+        },
+        {
+          "branch": "local/desktop-0.2.89",
+          "oid": "6c6fa115997704cff30399c97c5c4f5498302d60",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "new-config",
+          "oid": "25d0f86f6ef30bec02874accc3a8b36008753a51",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "perf/defer-usage-account-card",
+          "oid": "b1d2f36dd32f7e450d43c33970643debbbe92aa2",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "pr-474",
+          "oid": "0d5c2c607f5b43454a15151c610b94cd3bf43e87",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "pr-475",
+          "oid": "8dfe7681aa61bbe767e431819cc45b5de5b9b7ba",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "pr-489",
+          "oid": "a31ca4d4ff6c9fc3789dee396a2ca45c59df4536",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "pr-495",
+          "oid": "90ef2a39fd3aff73d497c594c118f84e6517cd45",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "qa/danil-account-emails",
+          "oid": "28e3e2ee81485630e5e703e4c456cff3d823015d",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "qa/remote-visual-current-main",
+          "oid": "ec3d3703813d4ec92d94730ae215d5555f3bfd69",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "release/0.2.88",
+          "oid": "ea7ea80bd0c5f26c5df848d1702bc665228f3d87",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "release/0.2.89",
+          "oid": "4d5a46714a7949e623b00229f156019ea4c0aad3",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "release/web-376",
+          "oid": "7b4e90184f60974b3bac6b49c8e3c43c08aebd71",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "release/web-git-380",
+          "oid": "2a99b36c1d5f945f42d747f26a03fec122c0f6b4",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "review/github-account",
+          "oid": "b97803709f38e1c3af82875c1d07e4501614366b",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "review/sidebar-headers",
+          "oid": "f53113776d43d093711154b6203f99fefb4f87b7",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "review/storage-startup",
+          "oid": "aa7e235e9c7e6f773251e7ee21bfd1a3c231b63a",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "worktree-agent-ae9dcdf1d646da5ee",
+          "oid": "6e97b3aaf4c54fff6c1d56e4ef3b39ff6307cbd0",
+          "integration_evidence": "ancestor of origin/dev"
+        }
+      ],
+      "remaining": 111,
+      "kept_refs_unchanged": true,
+      "error_count": 0
+    },
+    "seldon-host": {
+      "deleted": [
+        {
+          "branch": "feat/external-orchestrators",
+          "oid": "cf6ca079fd66fa14f134575669904c91b793435c",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "feat/local-orchestrators",
+          "oid": "1f5e0b17a3f8aac01987570e10818d9b7c266ff3",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "feat/local-turn-executor",
+          "oid": "925f4477a2f48e1844e440e575c0e2e1b7a71eb7",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "feat/orchestration-budgets-pr",
+          "oid": "7b88b3dab37b1590123fbe15b7dc71ecbb070223",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "feat/radiant-enterprise-usage",
+          "oid": "d0261300887a47b3fbe892ecd25f68f9d53b5b64",
+          "integration_evidence": "exact head already verified integrated in remote cleanup"
+        },
+        {
+          "branch": "feat/vm-screen-control",
+          "oid": "b7dcf4712c3e437c9f7149d5020e72ffeeb096f3",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "fix/cargo-test-green",
+          "oid": "b6723e6415bbc69a1f17c2bcceb19cf7d2ea8c19",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "fix/e2e-linux-triage",
+          "oid": "e74a8547ad8c336c67452841c43d93d794b6e85a",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "fix/opencode-v2-oauth",
+          "oid": "a4b140a99734df74504f0ce60623fd048bf6b6bc",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "fix/relay-login-events-after-restart",
+          "oid": "36bdf63a0fda37b18d82a66d7627605d8c4138ec",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "fix/shell-only-title",
+          "oid": "64e3e6e2ff5da393a868cfd348fb91530997f108",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "fix/stop-task-processes-workspace-id",
+          "oid": "c1f6c027077d476f13f976291535b192a1a877a0",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "fix/sync-split-repos",
+          "oid": "a3e36d1bb77f4542d7adeda88a2a19e4c2681bb4",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "fix/team-vm-client-support",
+          "oid": "f63b38475eab8bcf1292e67dbc2ffcf5b68d0c44",
+          "integration_evidence": "ancestor of origin/dev"
+        },
+        {
+          "branch": "fix/workspace-login-events",
+          "oid": "62fa521b470ef731f5e66605dcf43253e234451d",
+          "integration_evidence": "ancestor of origin/dev"
+        }
+      ],
+      "remaining": 53,
+      "kept_refs_unchanged": true,
+      "error_count": 0
+    },
+    "computers": {
+      "deleted": [
+        {
+          "branch": "review/mcp-orchestration-defaults",
+          "oid": "49e9862d8e2c6f34e9d498806dd3d7a5abec890b",
+          "integration_evidence": "ancestor of origin/main"
+        }
+      ],
+      "remaining": 5,
+      "kept_refs_unchanged": true,
+      "error_count": 0
+    }
+  },
+  "worktrees": {
+    "removed": 45,
+    "removed_by_repository": {
+      "terminus": 13,
+      "seldon-host": 32,
+      "computers": 0
+    },
+    "heads_removed": [
+      {
+        "repository": "terminus",
+        "oid": "fa8f850783a35070eb37c3bf6765f00a409dcf6f"
+      },
+      {
+        "repository": "terminus",
+        "oid": "d8286dfc25862b84cc1cea8d3fa87e5e90749115"
+      },
+      {
+        "repository": "terminus",
+        "oid": "d4b3c617cfdc6bf2eefe6b5eeda03f96ca335a73"
+      },
+      {
+        "repository": "terminus",
+        "oid": "d8c15a38e50cfb9671df4dda66e1b253e37ccd64"
+      },
+      {
+        "repository": "terminus",
+        "oid": "57324102b5433ef2e091cf505ea48e5e40ec28c8"
+      },
+      {
+        "repository": "terminus",
+        "oid": "f38883c58420350c642b4ed86d2511a9de621e71"
+      },
+      {
+        "repository": "terminus",
+        "oid": "9fc44dc5f7ac7681c46da51a2fb6010b08674a54"
+      },
+      {
+        "repository": "terminus",
+        "oid": "529c49c5208b275c4c70541499932ad1b71d4080"
+      },
+      {
+        "repository": "terminus",
+        "oid": "ddb5854a2ba850f784dc8b0befa00cf5c455d376"
+      },
+      {
+        "repository": "terminus",
+        "oid": "e3569c188ba96d2ef675814da4d429b5f0693290"
+      },
+      {
+        "repository": "terminus",
+        "oid": "56160ec9d97c3c8e96a6b7bf727a356774303ec0"
+      },
+      {
+        "repository": "terminus",
+        "oid": "bac811ff74a31c795b729e8ad79e3b4dbfe77d00"
+      },
+      {
+        "repository": "terminus",
+        "oid": "6c7d1b98da0ca6bcc1f82bc105099b7a1cef0540"
+      },
+      {
+        "repository": "seldon-host",
+        "oid": "c575d0d334ac4c79839885e1598c0135a4a82e2f"
+      },
+      {
+        "repository": "seldon-host",
+        "oid": "baffa2bed8930a9b95347b9acd6b03668a2dd19b"
+      },
+      {
+        "repository": "seldon-host",
+        "oid": "63ad50cb709e937eab29feae2685cff7064ee04d"
+      },
+      {
+        "repository": "seldon-host",
+        "oid": "165975cfca15ca8688801793752110c57c2ec0ea"
+      },
+      {
+        "repository": "seldon-host",
+        "oid": "58a9f7d2a192d5c8c491e7aede21c5c1aded944c"
+      },
+      {
+        "repository": "seldon-host",
+        "oid": "44c326194aae2fa13240729d8f7a841ad2a91643"
+      },
+      {
+        "repository": "seldon-host",
+        "oid": "23380bc0d5b6ebfc7df0920df5dd8ef72c348926"
+      },
+      {
+        "repository": "seldon-host",
+        "oid": "8fdb2becd7517554d13fbd2c69840307fa5193c8"
+      },
+      {
+        "repository": "seldon-host",
+        "oid": "eccc2340f66a3303ab797a800b83ec4802929124"
+      },
+      {
+        "repository": "seldon-host",
+        "oid": "b8dd0c7dd136126db2020c3662c8d83039cc4d84"
+      },
+      {
+        "repository": "seldon-host",
+        "oid": "08cbc523ab8c101b40b7855c4c960dd465f2f981"
+      },
+      {
+        "repository": "seldon-host",
+        "oid": "45867e9c0aeb530ceb61fedbd469f352a71c7f17"
+      },
+      {
+        "repository": "seldon-host",
+        "oid": "139ee975aed50e8d94189777db22fad6bbef5f7f"
+      },
+      {
+        "repository": "seldon-host",
+        "oid": "0e9edc84b409498975afd862a88e626007b168f3"
+      },
+      {
+        "repository": "seldon-host",
+        "oid": "6ac685f78f25fb10de77454b3fc01b2fe2579d8b"
+      },
+      {
+        "repository": "seldon-host",
+        "oid": "65bbdd26c869b65d8d1e3172bce0a77235b52021"
+      },
+      {
+        "repository": "seldon-host",
+        "oid": "3ecb9a78e766148d07ef1b06b19b98509b6aacfe"
+      },
+      {
+        "repository": "seldon-host",
+        "oid": "b019c522e7f31151c340fec6d5a382c792b2533e"
+      },
+      {
+        "repository": "seldon-host",
+        "oid": "1b342b0ae2cdbc3798dea1e06f9d42a9f70dc3de"
+      },
+      {
+        "repository": "seldon-host",
+        "oid": "36e87109cc30fc73a7bd0f37ff12434c9cbd9ab4"
+      },
+      {
+        "repository": "seldon-host",
+        "oid": "3bfb247f3e246b33f6082517838104575ddda49d"
+      },
+      {
+        "repository": "seldon-host",
+        "oid": "2dc51cd724ecf02f7bd2703679941b79c1f1b1f8"
+      },
+      {
+        "repository": "seldon-host",
+        "oid": "c3e50ae62974ff35c80a57951caccdfdaf8c6e81"
+      },
+      {
+        "repository": "seldon-host",
+        "oid": "e567260b2ccd86555aff6c59956bb3f2222a5e2d"
+      },
+      {
+        "repository": "seldon-host",
+        "oid": "93eabf850954c5e0a5325c70f4da1a8c8b4b3b82"
+      },
+      {
+        "repository": "seldon-host",
+        "oid": "44c326194aae2fa13240729d8f7a841ad2a91643"
+      },
+      {
+        "repository": "seldon-host",
+        "oid": "a0b0358f61f55a5669e9577f0d593d9ccaa86e51"
+      },
+      {
+        "repository": "seldon-host",
+        "oid": "0f1a92df12695cc34c966789f60cc9e2324d98cb"
+      },
+      {
+        "repository": "seldon-host",
+        "oid": "933890021938d3defa13b1745879bf9a9d08abde"
+      },
+      {
+        "repository": "seldon-host",
+        "oid": "8953f792ad124825674027ad04353cd09c4267a4"
+      },
+      {
+        "repository": "seldon-host",
+        "oid": "2ca6b5a594d92d92ab653cf67ac608b8d61a8499"
+      },
+      {
+        "repository": "seldon-host",
+        "oid": "73f7b76c246833bdadd9a2164083b09d4efb3df1"
+      }
+    ],
+    "freed_bytes_observed": 5121564672,
+    "method": "git worktree remove without force; integrated, clean, no observed process references; open-task paths and unclassified ignored files preserved"
+  },
+  "cargo_clean": {
+    "targets_cleaned": 2,
+    "exit_codes": [
+      0,
+      0
+    ],
+    "process_references": 0,
+    "inspection_errors": 0,
+    "cargo_reported": [
+      "10150 files, 15.1 GiB",
+      "5845 files, 7.0 GiB"
+    ]
+  },
+  "preserved_source_cut": {
+    "branch": "release/rc1-reviewed-cut-751e85f3",
+    "oid": "751e85f351c8691d9c281083a4282bdb352737c0"
+  },
+  "limitations": [
+    "Cleanup receipts are maintenance evidence, not release QA certification.",
+    "Main and dev were not advanced by this maintenance.",
+    "No deployment or installation performed."
+  ]
+}
