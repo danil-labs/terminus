@@ -848,12 +848,13 @@ if (!roto) {
 
   let threadRows = [
     { ...filaDeAgente, id: "dm", title: "Holmes", chat_de_agente: true, agent_thread: false },
-    { ...filaDeAgente, id: "topic", title: "Release planning", chat_de_agente: true, agent_thread: true, pinned: false, updated_at: 100 },
+    { ...filaDeAgente, id: "topic", title: "Release planning", chat_de_agente: true, agent_thread: true, pinned: false, updated_at: 100, launcher_name: "Watson" },
     { ...filaDeAgente, id: "new-topic", title: "Independent topic", chat_de_agente: true, agent_thread: true, updated_at: 90 },
     { ...filaDeAgente, id: "archived-work", title: "Old investigation", last_message: "Historical finding", archived: true, chat_de_agente: false, launched_by: "dm", launcher_name: "Holmes" },
     { ...filaDeAgente, id: "dm-work", title: "DM task", chat_de_agente: false, launched_by: "dm", launcher_name: "Holmes" },
-    { ...filaDeAgente, id: "topic-work", title: "Topic task", last_message: "Topic task progress", chat_de_agente: false, pinned: true, launched_by: "topic", launcher_name: "Holmes" },
+    { ...filaDeAgente, id: "topic-work", title: "Topic task", last_message: "Topic task progress", chat_de_agente: false, pinned: true, launched_by: "topic", launcher_name: "Watson" },
     { ...filaDeAgente, id: "topic-work-2", title: "Second topic task", chat_de_agente: false, pinned: false, launched_by: "topic", launcher_name: "Holmes" },
+    { ...filaDeAgente, id: "8cnv428n", title: "Revisa seguridad escrituras alfa Inbox y Broadcasts", chat_de_agente: false, pinned: false, launched_by: "n8tc0emm", launcher_available: false, launcher_name: "tech-lead" },
     { ...filaDeAgente, id: "unrelated-work", title: "Other task", agent: null, chat_de_agente: false, launched_by: "other-chat", launcher_name: "Other agent" },
   ];
   const threadLoads = [];
@@ -897,6 +898,9 @@ if (!roto) {
   assert.equal(threadDoc.querySelector('[data-sidebar-tasks] [data-task-author]'), null, "el riel no agrupa por agente");
   assert.equal(sidebarTask("dm-work"), null, "el trabajo delegado se consulta desde su coordinador");
   assert.ok(sidebarTask("topic-work").querySelector("[data-session-agent]"), "la tarea delegada fijada conserva la tarjeta compartida");
+  assert.equal(sidebarTask("8cnv428n"), null, "la delegada de un padre archivado ausente no sube al riel");
+  assert.equal(sidebarTask("topic").querySelector("[data-session-opener]"), null, "un nombre de lanzador sin relación no inventa un origen");
+  assert.equal(sidebarTask("topic-work").querySelector("[data-session-opener]"), null, "la delegada fijada no muestra quién la abrió en el riel");
   const taskOrder = [...threadDoc.querySelectorAll('[data-sidebar-tasks] [data-sesion]')].map(row => row.dataset.sesion);
   assert.ok(taskOrder.indexOf("topic-work") < taskOrder.indexOf("topic"), "las fijadas van antes que las demás sin alterar sus turnos");
   const openPinnedTaskMenu = id => sidebarTask(id).querySelector('[data-session-actions] button[aria-haspopup="menu"]').click();
@@ -984,6 +988,7 @@ if (!roto) {
   [...threadDoc.querySelectorAll('button')].find(button => button.textContent === "Todas").click();
   await sleep(50);
   assert.ok(threadDoc.querySelector('[data-delegated-list] [data-sesion="topic-work"]'), "el desplegable conserva trabajo de turnos anteriores");
+  assert.match(threadDoc.querySelector('[data-delegated-list] [data-sesion="topic-work"] [data-session-opener]').getAttribute("aria-label"), /Watson/, "el origen sigue disponible al consultar las delegadas");
   assert.equal(threadDoc.querySelector('[data-delegated-list] [data-folder-chip]'), null, "las delegadas no repiten la carpeta de su madre");
   threadDoc.querySelector('[data-delegated-list] [data-sesion="topic-work"]').click();
   await sleep(200);
