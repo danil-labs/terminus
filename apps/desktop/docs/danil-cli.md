@@ -79,6 +79,10 @@ no acreditan por sí solos la interfaz exclusiva `DANIL_*` del motor del PR
 seldon-host #276, que permanece como integración separada. Su adopción requiere
 revisión de contrato y artefactos con manifiesto y checksums para las cuatro
 plataformas. Esta reconciliación no publica artefactos ni sustituye ese pin.
+Se conserva la excepción explícita de `dev`: el cliente declara el contrato
+`5f59d603`, mientras el motor fijado declara `93b1c32f`. El guard `contract`
+registra `MOTOR_PENDIENTE`; abrir la ventana no acredita los comandos posteriores
+al pin ni habilita una publicación.
 
 ## Evidencia y límites
 

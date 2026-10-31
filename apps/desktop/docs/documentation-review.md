@@ -1,5 +1,8 @@
 # Revisión documental: transición a Danil
 
+Los registros siguientes conservan evidencia histórica por fuente. La sección
+«Reconciliación con dev» registra el estado vigente del PR #541.
+
 Fecha: 2026-10-31. Base: `fa8f850`; código del cliente comprobado: `3e7649f9`.
 Plataforma: Linux x86_64. Alcance: documentación modificada por la transición
 CLI y marca, no una auditoría completa del monorepositorio.
@@ -99,3 +102,71 @@ y el instalador Linux del host (10/10) en directorios desechables.
 Este delta no cambia la UI ni añade un recorrido visual nativo. No acredita
 Windows/macOS nativos, instalación productiva, actualización instalada ni
 la adopción del motor nuevo por el cliente fijado. No hubo push ni publicación.
+
+## Reconciliación con dev
+
+Fecha: 2026-10-31. Fuente funcional: `cf0b07ce26484db51407de155eed044bd74dd607`.
+Padres: cliente `32ddf199` y `dev` `6352210830af16e1973b836a3cc222d90f2aed00`.
+Plataforma: Linux x86_64. Encargo explícito: resolver conflictos, verificar y
+actualizar el PR #541 en borrador contra `dev`, sin merge ni distribución.
+
+Se resolvieron los conflictos por intención: interfaz y catálogos recientes de
+`dev`, retirada de VersionFooter, onboarding vigente y título web Danil con
+los nuevos iconos. La prueba CLI combina selección root/engine/profile con
+machine y las órdenes recientes. Pin `4e10efc`, contrato, extensiones y puente
+coinciden byte por byte con `dev`; no se adoptó el motor del PR seldon-host #276.
+El cliente conserva la excepción `MOTOR_PENDIENTE`: contrato `5f59d603`, motor
+fijado `93b1c32f`. Esa diferencia no habilita publicación ni acredita comandos
+nuevos del motor.
+
+Medición: raíz/escritorio/móvil tienen 57/76/91 líneas de AGENTS.md. README,
+guía CLI, desarrollo, guards y README npm suman 675 líneas y 38,873 bytes.
+No se modificó la documentación autocargada frente a `dev`.
+
+| Criterio | Estado | Evidencia de la reconciliación |
+|---|---|---|
+| Instrucciones de raíz | pasa | Se respeta dev primero, DCO y Conventional Commits con skip ci. |
+| Alcance por ámbito | pasa | Guías de escritorio, front, scripts, pruebas y móvil leídas. |
+| Invariantes | pasa | Pin, contrato, extensiones y engine-client idénticos a dev. |
+| Arquitectura | pasa | Architect 5qgnqe1n aprobó reconciliación y corrección documental sin pendientes. |
+| Decisiones | pasa | Encargo explícito de resolución y push al PR existente; motor separado. |
+| Arranque | pasa | Ayuda cli-path ejecutada; QA construyó y abrió la ventana real. |
+| Límites operativos | pasa | Guía actualiza pin y excepción de contrato, sin acreditar motor exclusivo. |
+| Coherencia global | sin comprobar | Se revisa el delta; registros anteriores quedan identificados como históricos. |
+| Navegación | pasa | README y README npm conservan enlace a guía CLI. |
+| Presupuesto global | sin comprobar | Conteos medidos; no se auditó un presupuesto global. |
+| Controles | pasa | cli-path y cli-forward 8/8; forwarding de 29 raíces y checksums. |
+| Secretos | pasa | El delta documental usa identificadores públicos y no añade credenciales. |
+| Construcción | pasa | QA compiló ventana nativa en target separado, exit 0. |
+| Pruebas completas | pasa | CARGO_BUILD_JOBS=2 pnpm verify completo, exit 0, Linux, 1498 s; incluye cargo test --locked. |
+| Verificación | pasa | Corrida limpia única sin builds concurrentes; fmt/check/clippy/permisos/test pasan, sin SKIPPED. |
+| Estilo | pasa | Diff contra dev y corrección documental pasan git diff --check. |
+
+**14 pasan · 0 fallan · 2 sin comprobar.**
+
+QA c73f16b4 comprobó en GTK/WebKit real sobre Xvfb: marca Danil,
+navegación de Configuración, workspace e idioma español conservados al reiniciar
+ventana y motor, y danil/dn --help idénticos con exit 0. Informe reproducible:
+`/tmp/danil-pr541-qa-c73f16b4/evidence/report.md`; capturas y logs:
+`/tmp/danil-pr541-qa-c73f16b4/evidence.tar.gz`.
+
+La primera corrida se interrumpió intencionalmente con SIGTERM (exit 143)
+durante pruebas web al advertir compilaciones Vite concurrentes sobre dist;
+no fue un fallo atribuido al código. Se conserva su log en
+`/tmp/danil-reconcile-verify.log`. QA terminó antes del reintento limpio,
+registrado por separado en `/tmp/danil-reconcile-verify-clean.log`.
+
+No se verificaron Windows/macOS nativos, móvil nativo, proveedores reales,
+instalación productiva ni actualización instalada. QA observó la compuerta
+inicial de cuentas IA y pudo entrar al reabrir; no se atribuye regresión sin
+comparar con la base. No se ejecutaron Actions ni se publicó o desplegó.
+
+Resultado recogido: `pnpm verify` completo terminó con exit 0 en 1498 s,
+sin fallas ni pasos omitidos. Cargo fmt/check/clippy/test y permisos pasan.
+Los únicos cambios posteriores a la fuente funcional son esta evidencia y la
+aclaración de contrato en la guía CLI; se repiten sus guards documentales.
+Durante la verificación `dev` avanzó a `943b3c61` (PR #542, eliminación de
+columna derecha); no forma parte de la fuente verificada. `git merge-tree`
+confirma integración sin conflictos contra esa cabeza sin modificar fuentes.
+La mergeabilidad remota se comprueba después del push; no se acredita aquí la
+prueba funcional de un merge posterior con ese delta.
