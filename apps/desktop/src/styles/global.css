@@ -1071,7 +1071,7 @@
 .task-card-provider { display: inline-flex; flex: 0 0 16px; width: 16px; align-items: center; }
 .task-card-folder { flex: 1 1 0; max-width: 112px; min-width: 0; }
 .task-card-machine { flex: 1 1 0; max-width: 104px; min-width: 0; }
-.task-card-git { display: inline-flex; flex: 0 0 56px; width: 56px; min-width: 0; align-items: center; gap: 4px; overflow: hidden; }
+.task-card-git { display: inline-flex; flex: 1 1 0; max-width: 128px; min-width: 56px; align-items: center; gap: 4px; overflow: hidden; }
 .task-card-tail { display: inline-flex; flex-shrink: 0; align-items: center; gap: 5px; margin-left: auto; }
 .task-card-rocket { display: inline-flex; width: 18px; height: 18px; flex-shrink: 0; align-items: center; justify-content: center; }
 .task-card-rocket:empty { display: none; }
