@@ -5589,6 +5589,8 @@ export default function App() {
       : t("chat.continuation.focused_prompt", {
           path: context.path, prompt: context.last_prompt, reply: context.last_reply,
         });
+    const machine = machineOf(id)?.headers["x-terminus-machine"] ?? maquinaDeLaVentana();
+    setRunOn(workspace, machine);
     // Con agente, el borrador es el suyo, como al pulsar su fila en el riel:
     // la tarea nace con él y con el proveedor y modelo de su perfil.
     if (encargado) abrirBorradorDeAgente(proyecto, encargado);
@@ -6293,9 +6295,6 @@ export default function App() {
 
   const [carryModule, setCarryModule] = createSignal<CarryModule | null>(null);
   const [hojaDeLlevar, setHojaDeLlevar] = createSignal<{ key: string; check: CarryCheck; busy?: boolean } | null>(null);
-  let decidiendoLlevar = false;
-  /** Borradores que se mandan sin el trabajo sin subir: su máquina de origen está apagada. */
-  const sinTrabajo = new Set<string>();
   const maquinaDeLaVentana = () => capabilities().windowMachine?.()?.id ?? machines().find((m) => m.active)?.id ?? "local";
   async function moduloDeLlevar(): Promise<CarryModule> {
     const mod = carryModule() ?? (await import("../features/machines/carry"));
@@ -6329,12 +6328,12 @@ export default function App() {
    * la máquina elegida (o la primera encendida) y la hoja, aunque no haya nada
    * sin subir. La copia corre al enviar el primer mensaje.
    */
-  async function abrirLlevarCarpeta(id: string) {
+  async function abrirLlevarCarpeta(id: string, machine?: string) {
     const workspace = workspaceActivo();
     const carpeta = projectList().find((p) => p.id === id);
     if (!workspace || !carpeta) return;
     const mod = await moduloDeLlevar();
-    const source = mod.sourceOf(carpeta, maquinaDeLaVentana());
+    const source = machine || mod.sourceOf(carpeta, maquinaDeLaVentana());
     const elegida = runOn(workspace, carpeta);
     const target = elegida && elegida !== source ? elegida : machines().find((m) => m.id !== source && m.on && m.hosts !== false)?.id;
     if (!source || !target) {
@@ -6369,55 +6368,10 @@ export default function App() {
     const leida = await leerTarea(plan.check.project.id, task.id).catch(() => null);
     const ultimo = leida?.turns.filter((turn) => turn.role === "agent" && turn.text.trim()).at(-1)?.text ?? null;
     nuevaSesion(plan.check.project.id);
+    setRunOn(workspaceActivo(), plan.check.target);
     const draft = claveAbierta();
     mod.planCarry(draft, plan.check, plan.job, plan.state, result);
     setInput(mod.bringSummary(plan.check, ultimo, branch));
-  }
-
-  /**
-   * Antes del primer mensaje de una tarea en otra máquina: si hay trabajo sin
-   * subir o el proyecto falta allá, se abre la hoja y el mensaje espera en la
-   * caja. `plan` es que ya se eligió qué llevar y la copia corre al enviar.
-   */
-  async function decidirLlevar(draftKey: string): Promise<"none" | "sheet" | "plan" | "busy"> {
-    if (carryModule()?.carries()[draftKey]) return "plan";
-    if (sinTrabajo.delete(draftKey)) return "none";
-    const workspace = workspaceActivo();
-    const proyecto = projectList().find((p) => p.id === project());
-    // En la web la máquina de la tarea nueva puede ser la que lleva el workspace, sin elegir ninguna.
-    const target = draftMachine();
-    if (!workspace || !proyecto || !target || proyecto.kind !== "git") return "none";
-    if (decidiendoLlevar) return "busy";
-    decidiendoLlevar = true;
-    try {
-      const mod = await moduloDeLlevar();
-      const source = mod.sourceOf(proyecto, maquinaDeLaVentana());
-      // Con la máquina de la carpeta apagada (web o teléfono) solo se lleva lo que hay en el remoto.
-      if (source && source !== target && machines().find((m) => m.id === source)?.on === false) {
-        setAviso({
-          texto: t("work.failure.source_off", { machine: machineName(source) }),
-          boton: t("work.failure.without_work"),
-          ir: () => {
-            sinTrabajo.add(draftKey);
-            if (claveAbierta() === draftKey) void mandar(archivos());
-          },
-        });
-        return "sheet";
-      }
-      // Pedir la llave al destino lo enciende si está apagado: el borrador dice que se está encendiendo.
-      if (machines().find((m) => m.id === target)?.on === false) anotar(setEncendiendo, draftKey, target);
-      const check = source ? await mod.checkCarry({ workspace, project: proyecto, source, target }) : null;
-      if (!check) return "none";
-      setHojaDeLlevar({ key: draftKey, check });
-      return "sheet";
-    } catch (e) {
-      // No encendió: el mensaje se queda en la caja y se dice por qué.
-      setError(prosaDe(e));
-      return "sheet";
-    } finally {
-      anotar(setEncendiendo, draftKey, null);
-      decidiendoLlevar = false;
-    }
   }
 
   /** Manda si no hay turno corriendo; encola si lo hay. */
@@ -6466,8 +6420,8 @@ export default function App() {
     }
     const draftKey = claveAbierta();
     const generation = sessionGeneration;
-    const llevar = sessionId() ? "none" : await decidirLlevar(draftKey);
-    if (llevar === "sheet" || llevar === "busy") return false;
+    if (hojaDeLlevar()?.key === draftKey) return false;
+    const llevar = !sessionId() && !!carryModule()?.carries()[draftKey];
     setInput("");
     // Salen con el texto: el globo los pinta antes de que `send_message` vuelva.
     editarBorrador(draftKey, (b) => ({ ...b, archivos: adjuntosSinMandar(b.archivos, attachments) }));
@@ -6481,7 +6435,7 @@ export default function App() {
       permission_mode: modo() || null,
       attachments,
       space: escritorio(),
-    }, undefined, undefined, llevar === "plan" ? (clave) => (carryModule() as CarryModule).runCarry(clave) : undefined);
+    }, undefined, undefined, llevar ? (clave) => (carryModule() as CarryModule).runCarry(clave) : undefined);
     if (!sent && generation === sessionGeneration) {
       editarBorrador(draftKey, b => ({
         ...(b.input ? b : { ...b, input: message.text, task_mentions: message.task_mentions, recipients: message.recipients }),
@@ -8551,7 +8505,7 @@ export default function App() {
               spaces={opcionesDeMover()}
               onMoveToSpace={(p, id, i) => void moveToSpace(p, id, i)}
               onBringHere={(p, id) => void abrirTraer(p, id)}
-              onCarryFolder={machines().length > 1 ? (id) => void abrirLlevarCarpeta(id) : undefined}
+              onCarryFolder={machines().length > 1 ? (id, machine) => void abrirLlevarCarpeta(id, machine) : undefined}
               current={sessionId()}
               vivas={vivas()}
         /* Qué tareas esperan que apruebes algo, aparte de `vivas`: pesa
@@ -8702,15 +8656,15 @@ export default function App() {
         }}
       />
 
-      <Show when={hojaDeLlevar()}>
+      <Show when={hojaDeLlevar()} keyed>
         {(hoja) => (
           <Suspense fallback={null}>
             <CarrySheet
-              check={hoja().check}
-              busy={hoja().busy}
+              check={hoja.check}
+              busy={hoja.busy}
               onCancel={() => setHojaDeLlevar(null)}
               onConfirm={(choice, state) => {
-                const { key, check } = hoja();
+                const { key, check } = hoja;
                 const mod = carryModule();
                 mod?.planCarry(key, check, mod.jobFor(check, choice), state);
                 setHojaDeLlevar(null);

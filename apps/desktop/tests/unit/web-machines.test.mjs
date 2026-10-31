@@ -217,6 +217,8 @@ test("two machines show together and each command goes to the machine it names",
   assert.ok(await until(() => calls("cmp_mac", "prepare_session_continuation").length === 1), "the continuation is prepared on the task’s machine");
   assert.equal(calls("cmp_mac", "prepare_session_continuation")[0].args.id, "t1");
   assert.equal(calls("cmp_vm", "prepare_session_continuation").length, 0);
+  assert.ok(await until(() => doc.querySelector("textarea")?.value.includes("/lab/continuation.md")));
+  assert.equal(app.w.localStorage.getItem("harness.layout.machines.run_on"), JSON.stringify({ w: "cmp_mac" }), "la continuación conserva la máquina de su archivo de contexto");
   assert.deepEqual(app.fallos, []);
 });
 
