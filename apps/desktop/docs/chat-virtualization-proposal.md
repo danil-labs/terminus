@@ -45,6 +45,17 @@ archivados no se reprodujeron en ventana.
   carga páginas al llegar al extremo, abre `history_refs` con un toque y no descarta
   una respuesta si no puede comprobar su pregunta (`question_unverified`).
 
+## Evidencia
+
+Chromium headless (`tests/helpers/chat-lab.mjs`): 20 filas como máximo con 10,000
+bloques, contra 223 por tramos; heap 18 MB contra 72 MB tras diez ciclos; ancla
+a 0.47 px o menos con prepend y append concurrentes, sin remontar el nodo.
+Ventana WebKitGTK en Linux, QA con motor `58a9f7d`: primer mensaje en 31-34 s en
+tarea activa, la base no llega en 120 s; selección, foco, contenido largo, visual
+expandido y lectura guardada pasan sobre `08f2732e`. Un motor congelado se
+comporta igual que la base. Sin comprobar: Expo nativo, lector de pantalla,
+Windows y macOS, y cambio de pestaña o panel con carga en vuelo.
+
 ## Límites conocidos
 
 - Una reescritura de turnos antiguos que deje igual el turno frontera no se
@@ -53,6 +64,8 @@ archivados no se reprodujeron en ventana.
   Expo. Una señal aditiva de pendientes en `kind:"state"` la resolvería; no es bloqueante.
 - `questions` y `answers` enviados a `history_refs` no se expanden para calcular lo pendiente.
 - La búsqueda cubre lo cargado. No hay salto directo a una página desalojada.
+- Un mensaje de más de 8 KB llega por referencia: su texto se trae al montar la
+  fila y no ofrece el botón de copiar.
 - Las medidas no se invalidan al cambiar de ancho: una fila fuera de vista conserva su
   alto anterior hasta montarse y la lectura la sostiene el ancla.
 
