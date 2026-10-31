@@ -7,7 +7,10 @@ the catalog); the rest are development tools run by hand (`engine.mjs`,
 [tests/](../tests/AGENTS.md).
 
 - `verify.mjs` lists every step and stops at the first failure. Its catalog is
-  [docs/guards.md](../docs/guards.md).
+  [docs/guards.md](../docs/guards.md). Steps run side by side within a budget
+  from the machine's cores and free memory (`VERIFY_JOBS=1` runs them one at a
+  time), so a new step cannot depend on another step of its stage. Stages:
+  before the build, the vite builds, after the build, and `tests/perf` alone.
 - Every `.mjs` guard has a row in the catalog, and every `tests/unit/*.test.*`
   is a step of the chain.
 - A skip keeps its own exit code and is never reported as a pass.
