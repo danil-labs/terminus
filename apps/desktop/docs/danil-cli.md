@@ -55,22 +55,26 @@ Se conservan los enlaces `terminus://task`, el historial `::terminus-visual`,
 RPC, headers y selectores, storage móvil, esquema `terminus-mobile` y rutas
 `/terminus`. Las referencias a Terminus 0.2.74 identifican la versión anterior.
 
-La autoridad del contexto es el motor/CLI, no el launcher. La transición del
-motor debe aceptar `DANIL_CONNECTION`, `DANIL_WORKSPACE`, `DANIL_FOLDER`,
+La autoridad del contexto es el motor/CLI, no el launcher. La implementación local del
+motor/CLI (`feat/danil-cli-compatible`, `36cd8661`) acepta `DANIL_CONNECTION`, `DANIL_WORKSPACE`, `DANIL_FOLDER`,
 `DANIL_TASK`, `DANIL_PROFILE` y `DANIL_CLI` junto a sus equivalentes `TERMINUS_*`,
-emitir ambas familias y rechazar selectores contradictorios. Una carpeta vacía
+emite ambas familias y rechaza selectores contradictorios. Una carpeta vacía
 es distinta de una variable ausente. Las banderas explícitas conservan prioridad.
 
 **El motor fijado por este cliente sigue siendo `9bd80c15`.** Los launchers
 ya funcionan con él, pero ese pin todavía no acredita los nuevos alias de
 entorno, ayuda ni launchers de agentes del motor en desarrollo. La integración
 requiere revisar el commit del motor y disponer de manifiesto y checksums de
-las cuatro plataformas. Esta rama no publica ni cambia ese pin.
+las cuatro plataformas, además de comprobar la compatibilidad con el contrato
+congelado del cliente. El dev del motor ya tenía un hash de manifiesto distinto
+(`5f59d603`) al del cliente (`593c6503`) antes de esta implementación; esta rama
+no modifica ninguno de esos contratos, publica artefactos ni cambia el pin.
 
 ## Evidencia y límites
 
 Las pruebas del instalador usan directorios temporales y ejecutan su código
-real. El forwarding se comprueba en `tests/unit/cli-forward.test.mjs`.
+real. El E2E local del motor pasó 32 comprobaciones con un motor aislado y
+un agente sintético; no integra ese motor en la ventana distribuida. El forwarding se comprueba en `tests/unit/cli-forward.test.mjs`.
 `pnpm verify` incluye ambas pruebas; `--no-cargo` no acredita Rust.
 Los nombres Windows se comprueban también desde Linux, pero cmd, PowerShell y
 Git Bash requieren ejecución nativa. Actualización instalada, firma y reemplazo
