@@ -44,6 +44,7 @@ try {
     process.exit(0);
   }
   assert.match(dialog().textContent, /Task child/);
+  assert.match(dialog().textContent, /P1/);
   assert.match(dialog().textContent, /p2/);
   assert.match(dialog().textContent, /child\/ignored.txt/);
   const remove = () => [...dialog().querySelectorAll('button')].find(el => el.textContent.trim() === "Borrar la tarea");
@@ -62,7 +63,7 @@ try {
   await sleep(150);
   assert.ok(dialog(), "a rejection preserves the dialog");
   if (scenario === "partial") {
-    assert.match(dialog().querySelector('[role="alert"]').textContent, /p1 \/ t1/);
+    assert.match(dialog().querySelector('[role="alert"]').textContent, /P1 \/ Task t1/);
     assert.equal(remove().disabled, true);
     assert.ok(doc.querySelector('[data-sesion="t1"]'), "an unapplied root remains available");
     console.log("PASS: partial deletion retains the dialog and reports the failed task");
