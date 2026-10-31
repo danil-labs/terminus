@@ -8,28 +8,17 @@ import { Popover, PopoverContent, PopoverTrigger } from "../../ui/Popover";
 import Sessions, { type SessionRow } from "../projects/Sessions";
 import { DelegatedSkeleton } from "./DelegatedSkeleton";
 import { delegatedRailRows } from "./delegatedRail";
-import { buildTaskTree, type TaskBranch, type TaskTreeRow, taskDescendants } from "@terminus/tasks";
+import { type TaskTreeRow, taskDescendants } from "@terminus/tasks";
 import { taskPriority } from "@terminus/design";
 import { delegatedAttention } from "./delegatedRail";
 
 export { delegatedAttention } from "./delegatedRail";
+export { delegatedFamilies } from "@terminus/tasks";
 
 export type DelegatedListProps = Omit<ComponentProps<typeof Sessions>, "sessions" | "flat" | "card" | "hoverCardPlacement" | "includeArchived" | "groupByAuthor" | "groupByHandler">;
 
 export function delegatedDescendants(rows: SessionRow[], root: TaskTreeRow): SessionRow[] {
   return taskDescendants(rows, [root]);
-}
-
-export function delegatedFamilies(rows: SessionRow[]): Map<string, string[]> {
-  const families = new Map<string, string[]>();
-  const visit = (branches: TaskBranch<SessionRow>[], ancestors: string[]) => {
-    for (const branch of branches) {
-      for (const ancestor of ancestors) families.set(ancestor, [...(families.get(ancestor) ?? []), branch.tarea.id]);
-      visit(branch.hijas, [...ancestors, branch.tarea.id]);
-    }
-  };
-  visit(buildTaskTree(rows), []);
-  return families;
 }
 
 /**

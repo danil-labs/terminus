@@ -4,7 +4,7 @@
  * trabaja con `host/id`.
  */
 import type { AttentionState, WorkspaceAttention } from "@terminus/protocol";
-import { type CardTask, type TaskCard, taskCard } from "@terminus/tasks";
+import { type CardTask, delegatedAttention, type TaskCard, taskCard, withFamilyActivity } from "@terminus/tasks";
 import { type Task, taskKey } from "./engine";
 
 export type Marks = {
@@ -38,6 +38,13 @@ export function cardTask(task: Task, marks: Marks): CardTask & { key: string } {
     outcome: state === "failed" ? "failed" : task.outcome,
     sin_ver: state === "unseen",
   };
+}
+
+/** La entrada carga la atención de su familia: la receptora escondida no se ve aquí. */
+export function familyTasks(tasks: readonly Task[], delegated: readonly Task[], marks: Marks): Task[] {
+  const approving = [...marks.attention].filter(([, s]) => s === "approving").map(([k]) => k);
+  return withFamilyActivity(tasks, delegated, (task) => task.host, (rows) =>
+    delegatedAttention(rows.map((row) => cardTask(row, marks)), [...marks.live], approving));
 }
 
 export function cardOf(task: Task, marks: Marks, hideFolder = false, hideMachine = false): TaskCard {
