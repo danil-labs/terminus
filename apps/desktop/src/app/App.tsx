@@ -108,7 +108,7 @@ import BaseBranchPicker from "../features/projects/BaseBranchPicker";
 import { watchHandlerStatus, watchHandlerStatuses } from "../features/projects/handlerPresence";
 import { EmptyContext, ProjectPicker } from "../features/projects/Projects";
 import { bringHereLabel, canBringHere, carryOrigin, machineName, machineOf, machines, refetchMachines, remoteChildScope, runOn, senderTaskId, setRunOn, setTaskRowMachine } from "../features/machines/store";
-import { withRemoteLaunchers } from "@terminus/tasks";
+import { launcherOf, withRemoteLaunchers } from "@terminus/tasks";
 import type { CarriedBase, CarryCheck } from "../features/machines/carry";
 // Chunk aparte: solo lo carga quien crea una tarea, no la carga inicial.
 const MachinePicker = lazy(() =>
@@ -6809,7 +6809,7 @@ export default function App() {
       : undefined);
     const hasDelegation = createMemo(() => !!pp.sesion && (
       filaDe(pp.sesion)?.has_delegates
-      || Object.values(sesiones()).flat().some(row => (row.parent ?? row.launched_by) === pp.sesion)
+      || Object.values(sesiones()).flat().some(row => launcherOf(row) === pp.sesion)
       || [...(suyo()?.base ?? []), ...(suyo()?.vivo ?? [])].some(message => message.meta === "task_launched")
     ));
     const delegationScope = createMemo(() => pp.sesion && hasDelegation()

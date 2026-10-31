@@ -1066,15 +1066,17 @@
 .task-card-lines { container-type: inline-size; width: 100%; min-width: 0; --task-card-surface: var(--color-rail); }
 .task-card-lines[data-outside] { --task-card-surface: var(--color-surface); }
 .task-card-selected .task-card-lines { --task-card-surface: var(--color-neutral-200); }
-.task-card-metadata { display: flex; min-width: 0; align-items: center; gap: 5px; height: 16px; }
+.task-card-metadata { display: grid; grid-template-columns: 16px minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.3fr) 36px; min-width: 0; align-items: center; gap: 6px; height: 16px; }
+.task-card-metadata[data-no-folder], .task-card-metadata[data-no-machine] { grid-template-columns: 16px minmax(0, 1fr) minmax(0, 1.3fr) 36px; }
+.task-card-metadata[data-no-folder][data-no-machine] { grid-template-columns: 16px minmax(0, 1fr) 36px; }
 .task-card-metadata svg { flex-shrink: 0; }
-.task-card-provider { display: inline-flex; flex: 0 0 16px; width: 16px; align-items: center; }
-.task-card-folder { flex: 1 1 0; max-width: 112px; min-width: 0; }
-.task-card-machine { flex: 1 1 0; max-width: 104px; min-width: 0; }
-.task-card-git { display: inline-flex; flex: 0 0 56px; width: 56px; min-width: 0; align-items: center; gap: 4px; overflow: hidden; }
-.task-card-tail { display: inline-flex; flex-shrink: 0; align-items: center; gap: 5px; margin-left: auto; }
+.task-card-provider { display: inline-flex; align-items: center; }
+.task-card-slot { display: flex; min-width: 0; align-items: center; overflow: hidden; }
+.task-card-git { display: flex; min-width: 0; align-items: center; gap: 4px; overflow: hidden; }
+.task-card-tail { display: inline-flex; flex-shrink: 0; align-items: center; gap: 4px; margin-left: auto; }
 .task-card-rocket { display: inline-flex; width: 18px; height: 18px; flex-shrink: 0; align-items: center; justify-content: center; }
 .task-card-rocket:empty { display: none; }
+.task-card-time { white-space: nowrap; text-align: right; }
 .task-card-identity { position: relative; display: inline-flex; width: 24px; height: 24px; flex-shrink: 0; align-items: center; justify-content: center; }
 .task-card-orbit { position: absolute; inset: 1px; display: flex; align-items: center; justify-content: center; pointer-events: none; }
 [data-with-agent] .task-card-orbit { display: none; }
@@ -1082,4 +1084,3 @@
   [data-with-agent] .task-card-orbit { display: flex; }
 }
 .task-card-badge { position: absolute; top: -2px; right: -2px; display: inline-flex; width: 12px; height: 12px; align-items: center; justify-content: center; border-radius: 50%; background: var(--task-card-surface, var(--color-surface)); }
-.task-card-identity:not([data-with-agent]) .task-card-badge { inset: 0; margin: auto; }

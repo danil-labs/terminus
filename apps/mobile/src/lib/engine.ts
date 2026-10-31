@@ -45,6 +45,7 @@ import { readDetailText } from "@terminus/chat/historyDetail";
 import { readVisualHtml, type VisualPart, type VisualWhole, VISUAL_FILE, VISUAL_TREE } from "@terminus/chat/visual";
 import { arrangeSpaces, spaceOrder, type AccountWorkspace, groupWorkspaces, linkedAttention, onlyLinked, registryProjects, withRegistry } from "@terminus/computers";
 import { type ChatBackgroundView, chatBackgroundImageUrl, chatBackgroundView, isSingleAttention } from "@terminus/protocol";
+import type { TaskActivity } from "@terminus/design";
 import { type FlatRow, flattenTasks, launcherOf, REMOTE_CHILD_FEATURE, type RemoteScope, remoteLauncherOf } from "@terminus/tasks";
 import { AUTO_MODE } from "./composer.ts";
 import { type Host, HostError } from "./hosts.ts";
@@ -55,6 +56,8 @@ export type Task = SessionRow & {
   host: string;
   /** Hija remota: la `taskKey` de su coordinador en otra máquina (`mergeSnapshots`). */
   remote_launcher?: string | null;
+  /** La atención de la familia, si la entrada la carga (`withFamilyActivity`). */
+  delegated_activity?: TaskActivity;
   workspace: string;
   /** Id de la carpeta en su máquina; `""` es sin carpeta. */
   folder: string;

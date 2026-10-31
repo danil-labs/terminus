@@ -1,10 +1,9 @@
 import { invoke } from "../../lib/invoke.ts";
-import ArrowLeftRight from "lucide-solid/icons/arrow-left-right";
 import ChevronRight from "lucide-solid/icons/chevron-right";
-import CornerDownRight from "lucide-solid/icons/corner-down-right";
 import MoreVertical from "lucide-solid/icons/more-vertical";
 import Pin from "lucide-solid/icons/pin";
 import PinOff from "lucide-solid/icons/pin-off";
+import TriangleAlert from "lucide-solid/icons/triangle-alert";
 import { createEffect, createMemo, createSignal, For, type JSX, lazy, mapArray, on, onCleanup, Show, Suspense } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import { arrastrar, fueArrastre, tareaEnVuelo } from "../../lib/drag";
@@ -21,7 +20,6 @@ import { celebrateFinishedTask, FinishTaskButton } from "../../ui/FinishTaskButt
 import { KeyedList } from "../../ui/KeyedList";
 import { Input } from "../../ui/Input";
 import { Toast, ToastPortal } from "../../ui/Toast";
-import { RETARDO_TOOLTIP, TooltipContent, TooltipRoot, TooltipTrigger } from "../../ui/Tooltip";
 import { MarcaAgente } from "../../ui/icons";
 import {
   ITEM_DE_MENU,
@@ -48,7 +46,7 @@ import { canFinishTask, effectiveTaskGit, type GitStatus, sharesTaskGit, watchSe
 import { authorKey, authorKeys, isSubtask } from "./taskAuthors";
 import { descendientes, type Rama as RamaDeTareas, taskTree } from "./taskTree";
 import { rolledOutcome, type TaskActivity, taskPriority } from "@terminus/design";
-import { taskCard, buildTaskTree, launcherOf, sameAgent, taskIdentity, withTaskAncestors } from "@terminus/tasks";
+import { taskCard, buildTaskTree, taskIdentity, withTaskAncestors } from "@terminus/tasks";
 
 export function readableSessionTitle(title: string): string {
   if (!title.startsWith("/root/")) return title;
@@ -110,6 +108,8 @@ export type SessionRow = {
   /** El backend decide el pin; las conversaciones antiguas heredan el valor por omisión. */
   pinned?: boolean | null;
   launched_by?: string | null;
+  handoff_parent?: string | null;
+  handoff_issue?: "missing_source" | "contradictory" | "cycle" | null;
   launcher_available?: boolean;
   /** Hija de una delegación entre máquinas: su coordinador vive allá (`@terminus/tasks` `remote.ts`). */
   remote_parent?: unknown;
@@ -621,6 +621,7 @@ export default function Sessions(props: {
   const activas = createMemo<RamaDeTareas<SessionRow>[]>((previas) => props.flat || props.sidebar
     ? filteredSessions().map(tarea => ({ tarea, hijas: [] }))
     : taskTree(filteredSessions(), props.includeArchived ? null : false, previas, props.groupByHandler === true));
+  const hayMaquinas = createMemo(() => !props.hideMachine && props.sessions.some((row) => !!row.machine));
   const hideFolder = (row: SessionRow) => props.hideFolder && (props.folderGroup === undefined || projectOf(row) === props.folderGroup);
   const destinosDe = (row: SessionRow) => props.destinosDe?.(row) ?? props.destinos;
   const fijada = (row: SessionRow) => row.pinned ?? (row.chat_de_agente || row.inbox === true);
@@ -645,41 +646,10 @@ export default function Sessions(props: {
    */
   const gitDe = (row: SessionRow) => effectiveTaskGit(row, gitRows(), props.relatedSessions ?? props.sessions);
 
-  /** Una cara de 13 px con el nombre solo en el tooltip; antes de ella, su flecha si la lleva. */
-  const ChipDeCara = (c: {
-    name: string;
-    tip: string;
-    kind: "agent" | "opener" | "handoff";
-    icon?: typeof CornerDownRight;
-    working?: boolean;
-  }) => (
-    <TooltipRoot openDelay={RETARDO_TOOLTIP} placement="top" gutter={4}>
-      <TooltipTrigger
-        as="span"
-        data-session-agent={c.kind === "agent" ? "" : undefined}
-        data-session-opener={c.kind === "opener" ? "" : undefined}
-        data-session-handoff={c.kind === "handoff" ? "" : undefined}
-        class="inline-flex shrink-0 items-center gap-0.5"
-        aria-label={c.tip}
-      >
-        <Show when={c.icon}>{(icon) => <Dynamic component={icon()} size={12} aria-hidden="true" />}</Show>
-        <AstroAvatar
-          name={c.name}
-          status={c.working ? "working" : "asleep"}
-          body={profiles()[c.name]?.body}
-          avatar={profiles()[c.name]?.avatar}
-          size={13}
-        />
-      </TooltipTrigger>
-      <TooltipContent class="pointer-events-none">{c.tip}</TooltipContent>
-    </TooltipRoot>
-  );
-
   /**
    * La tarjeta del riel y de las delegadas: 52 px y siempre dos líneas. Línea 1:
    * el título y el hueco del estado, que al pasar el puntero es el menú. Línea 2:
-   * agente, proveedor, carpeta (solo raíz y sin agrupar por carpeta), PR, subtareas,
-   * borrador, quién la abrió, de quién la heredó, el cohete y la hora. Nada de lo
+   * proveedor, carpeta, máquina, Git, el cohete y la hora. Nada de lo
    * que la tarea pide; lo demás vive en la tarjeta flotante.
    */
   const FilaDelRiel = (r: {
@@ -701,19 +671,13 @@ export default function Sessions(props: {
     // La rama de quien comparte el árbol de su padre se dice en la fila del padre.
     const propioDeOtra = () => !!git().shared_with || sharesTaskGit(r.s, gitRows(), props.relatedSessions ?? props.sessions);
     const nombre = (agente: string) => displayName(agente, profiles()[agente]);
-    // Quién la abrió, si fue otro agente: el lanzador o el encargado de la madre.
-    const abridor = () => {
-      if (props.sidebar || !launcherOf(r.s)) return null;
-      const quien = r.s.launcher_name ?? r.s.parent_agent;
-      return quien && !sameAgent(quien, r.s.agent) ? quien : null;
-    };
-    const anterior = () => r.s.previous_agent && !sameAgent(r.s.previous_agent, r.s.agent) ? r.s.previous_agent : null;
     // Con un motor que no manda `last_turn_at`, la última vez que se movió.
     const cuando = () => r.s.last_turn_at ?? r.s.updated_at;
     // Memo: al hacer clic el menú se reinicia y, sin él, la ranura reescribe su clase.
     const abierto = createMemo(() => menu() === r.s.id);
-    // Sin rama no hay nada que decir en la tarjeta, salvo un PR que siga vivo.
-    const gitEnTarjeta = () => !propioDeOtra() && (git().kind === "kn" || git().kind === "branch" || (git().kind === "detached" && git().pull_known && !!git().pull));
+    // La sección dice kn, el PR o, sin PR, el nombre de la rama.
+    const conPr = () => (git().kind === "branch" || git().kind === "detached") && !!git().pull_known && !!git().pull;
+    const conGit = () => !propioDeOtra() && (git().kind === "kn" || git().kind === "branch" || conPr());
     const gitStyle = () => {
       const appearance = gitAppearance(git());
       return git().stale ? { ...appearance, color: "text-neutral-500" } : appearance;
@@ -732,26 +696,30 @@ export default function Sessions(props: {
             provisional={esProvisional(r.s.id)} archivada={!!r.s.archived} />
         </span>
       </div>
-      <div data-session-preview class={cn("task-card-metadata text-xs font-normal leading-4 text-neutral-500", r.apagada && "opacity-80 group-hover/session:opacity-100")}>
+      <div data-session-preview data-no-folder={hideFolder(r.s) ? "" : undefined} data-no-machine={hayMaquinas() ? undefined : ""} class={cn("task-card-metadata text-xs font-normal leading-4 text-neutral-500", r.apagada && "opacity-80 group-hover/session:opacity-100")}>
         <span data-session-provider class="task-card-provider" title={tarjeta().provider ?? r.s.provider} aria-label={tarjeta().provider ?? r.s.provider}><MarcaAgente id={r.s.provider} size={13} /></span>
-        <Show when={!hideFolder(r.s) && !launcherOf(r.s) && props.carpetaDe?.(r.s)}>{folder =>
-          <FolderChip id={projectOf(r.s)} name={folder()} untitled={tarjetaDelRiel()} class="task-card-folder text-xs text-neutral-500" />
-        }</Show>
-        <Show when={!props.hideMachine && r.s.machine}>{machine => <MachineChip machine={machine()} on={r.s.machine_on !== false} class="task-card-machine" />}</Show>
-        <Show when={gitEnTarjeta()}>
-          <span class="task-card-git">
-            <Show when={!propioDeOtra()}><Show when={git().kind === "kn" || !git().pull_known || !git().pull} fallback={<RailPull status={git()} />}>
-              <span data-session-pr class={cn("inline-flex shrink-0", gitStyle().color)} title={sessionGitDescription(git())} aria-label={sessionGitDescription(git())}><Dynamic component={gitStyle().icon} size={12} aria-hidden="true" /></span>
-            </Show></Show>
-            <Show when={abridor()}>{who => <ChipDeCara kind="opener" icon={CornerDownRight} name={who()} tip={t("projects.sessions.opened_by", { name: nombre(who()) })} />}</Show>
-            <Show when={anterior()}>{who => <ChipDeCara kind="handoff" icon={ArrowLeftRight} name={who()} tip={t("projects.sessions.handed_from", { name: nombre(who()) })} />}</Show>
+        <Show when={!hideFolder(r.s)}>
+          <span class="task-card-slot">
+            <Show when={props.carpetaDe?.(r.s)}>{folder =>
+              <FolderChip id={projectOf(r.s)} name={folder()} untitled={tarjetaDelRiel()} class="min-w-0 text-xs text-neutral-500" />
+            }</Show>
           </span>
         </Show>
-        <span class="task-card-tail">
-          <Show when={r.s.deferred}><span data-deferred class="shrink-0 text-neutral-500" title={t("projects.sessions.deferred")} aria-label={t("projects.sessions.deferred")}>⧗</span></Show>
-          <span class="task-card-rocket">{r.cohete()}</span>
-          <span data-session-time class="whitespace-nowrap text-[0.71875rem] tabular-nums">{shortTaskTime(cuando())}</span>
+        <Show when={hayMaquinas()}>
+          <span class="task-card-slot">
+            <Show when={r.s.machine}>{machine => <MachineChip machine={machine()} on={r.s.machine_on !== false} class="min-w-0" />}</Show>
+          </span>
+        </Show>
+        <span class="task-card-git">
+          <Show when={conGit()}><Show when={git().kind === "kn" || !conPr()} fallback={<RailPull status={git()} />}>
+              <span data-session-pr class={cn("inline-flex min-w-0 items-center gap-1", gitStyle().color)} title={sessionGitDescription(git())} aria-label={sessionGitDescription(git())}><Dynamic component={gitStyle().icon} size={12} aria-hidden="true" /><Show when={git().kind === "branch"}><span class="min-w-0 truncate">{git().branch}</span></Show></span>
+            </Show></Show>
+          <span class="task-card-tail">
+            <Show when={r.s.deferred}><span data-deferred class="shrink-0 text-neutral-500" title={t("projects.sessions.deferred")} aria-label={t("projects.sessions.deferred")}>⧗</span></Show>
+            <span class="task-card-rocket">{r.cohete()}</span>
+          </span>
         </span>
+        <span data-session-time class="task-card-time text-[0.71875rem] tabular-nums">{shortTaskTime(cuando())}</span>
       </div>
     </div>;
   };
@@ -808,6 +776,8 @@ export default function Sessions(props: {
       if (n && n !== f.s.title) props.onRenombrar(f.s.id, n);
     };
 
+    /** `missing_source` no se marca: borrar la fuente de una receptora fijada es legítimo. */
+    const handoffRoto = () => f.s.handoff_issue === "contradictory" || f.s.handoff_issue === "cycle";
     const marcaDeFijada = () => <span role="img" aria-label={t("projects.sessions.pinned")} title={t("projects.sessions.pinned")} class="shrink-0 text-neutral-500"><Pin size={12} /></span>;
     /**
      * Terminada y vista en la tarjeta del riel: sin marca, la fila se apaga
@@ -833,6 +803,7 @@ export default function Sessions(props: {
             apagada() && "text-neutral-500 group-hover/session:text-neutral-950",
           )}>
             <Show when={fijada(f.s) && !tarjetaDelRiel()}>{marcaDeFijada()}</Show>
+            <Show when={handoffRoto()}><span role="img" aria-label={t("projects.sessions.handoff_issue")} title={t("projects.sessions.handoff_issue")} class="shrink-0 text-warning-strong"><TriangleAlert size={12} /></span></Show>
             <Show when={contextual(f.s) && !tarjetaDelRiel()}><span class="shrink-0 text-caption font-normal text-neutral-500">{t("projects.sessions.context")}</span></Show>
             <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"><WithMentions>{f.s.subagent ? readableSessionTitle(title()) : title()}</WithMentions></span>
           </div>

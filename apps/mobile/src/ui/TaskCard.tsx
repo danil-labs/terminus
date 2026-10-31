@@ -118,9 +118,8 @@ function TaskCardView({
   const pull = cardPull(git);
   const chips = secondLine(card, pull);
   const [width, setWidth] = useState(320);
-  const gitWidth = 56;
-  const room = Math.max(0, width - 32 - 16 - 86 - 20 - gitWidth);
-  const sections = { folder: Math.min(112, Math.floor(room / 2)), machine: Math.min(104, Math.floor(room / 2)), git: gitWidth };
+  const room = Math.max(0, width - 32 - 16 - 86 - 20);
+  const sections = { folder: Math.floor(room * 0.3), machine: Math.floor(room * 0.3), git: Math.floor(room * 0.4) };
   const ready = online && canFinishTask(task, git, card.activity.viva || card.activity.aprobando);
   const branch = !git?.shared_with ? git?.branch : null;
   const kn = git?.kind === "kn" && !git.shared_with ? git.kn : null;

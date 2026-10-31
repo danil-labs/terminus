@@ -850,9 +850,10 @@ for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
 console.log(`  Hasta ${JOBS} pasos a la vez (VERIFY_JOBS lo cambia).\n`);
 
 if (steps.includes(engineStep)) await runStep(engineStep);
-const cargoLane = SKIP_RUST || failure ? Promise.resolve() : runInOrder(steps.filter(isCargoLane), Math.ceil(JOBS / 2));
 if (!failure) await runAll(beforeBuild);
 if (!failure) await runInOrder(steps.filter(isVite), JOBS);
+// `generate_context!` lee `dist/`: cargo antes de vite falla en un checkout limpio.
+const cargoLane = SKIP_RUST || failure ? Promise.resolve() : runInOrder(steps.filter(isCargoLane), Math.ceil(JOBS / 2));
 if (!failure) await runAll(afterBuild);
 await cargoLane;
 // Miden un techo de gasto; con otros pasos al lado medirían esa carga.
