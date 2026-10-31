@@ -9,7 +9,7 @@ import { TASK_AFTER_QUEUE, boot } from "../../tests/helpers/mount-guard.mjs";
 // El `request_id` llega por el evento y vive en `vivo`; cada relectura
 // reconstruye `base` del disco, y a la segunda vuelta no queda de dónde
 // copiarlo. Sin él la respuesta sale por `send_message`, que la rechaza.
-const PREGUNTA = {
+const QUESTION = {
   role: "agent",
   id: "t-preg",
   text: "¿Sigo?",
@@ -23,26 +23,26 @@ const PREGUNTA = {
     },
   ],
 };
-const hilos = {
+const threads = {
   s1: [{ role: "user", id: "u1", text: "Empieza" }],
   s2: [{ role: "user", id: "u2", text: "Otra cosa" }],
 };
-const contestadas = [];
-const enviadas = [];
-const canceladas = [];
-const PREGUNTA_VIVA = {
+const answered = [];
+const sentAnswers = [];
+const cancelledAnswers = [];
+const LIVE_QUESTION = {
   ...TASK_AFTER_QUEUE,
   list_live_sessions: [
     { ...TASK_AFTER_QUEUE.list_live_sessions[0], id: "s1", title: "Con pregunta" },
     { ...TASK_AFTER_QUEUE.list_live_sessions[0], id: "s2", title: "La otra" },
   ],
-  load_session: ({ id }) => ({ ...TASK_AFTER_QUEUE.load_session, id, turns: hilos[id] }),
+  load_session: ({ id }) => ({ ...TASK_AFTER_QUEUE.load_session, id, turns: threads[id] }),
   pending_requests: ({ session }) =>
     session === "s1"
       ? { questions: [{ id: "durable-req-1", revision: 3, request_id: "req-1", turn: "t-preg" }, { id: "durable-req-dos", revision: 1, request_id: "req-dos", turn: "t-dos" }], permissions: [] }
       : { questions: [], permissions: [] },
   answer_question: (args) => {
-    contestadas.push(args);
+    answered.push(args);
     return {
       role: "user",
       id: "t-resp",
@@ -54,11 +54,11 @@ const PREGUNTA_VIVA = {
     };
   },
   send_message: (args) => {
-    enviadas.push(args);
+    sentAnswers.push(args);
     throw "history.error.busy";
   },
   cancel_question: (args) => {
-    canceladas.push(args);
+    cancelledAnswers.push(args);
     return {
       role: "user",
       id: "t-cierre",
@@ -70,59 +70,59 @@ const PREGUNTA_VIVA = {
     };
   },
 };
-const conPregunta = await boot("listo", "pregunta-viva", PREGUNTA_VIVA);
-const docP = conPregunta.w.document;
+const withQuestion = await boot("listo", "pregunta-viva", LIVE_QUESTION);
+const docP = withQuestion.w.document;
 docP.querySelector('[data-sesion="s1"]')?.click();
 await sleep(150);
-conPregunta.emit("chat", { kind: "started", session: "s1", workspace: "w" });
-conPregunta.emit("question", {
+withQuestion.emit("chat", { kind: "started", session: "s1", workspace: "w" });
+withQuestion.emit("question", {
   workspace: "w",
   session: "s1",
   turno: "t-preg",
-  preguntas: PREGUNTA.questions,
+  preguntas: QUESTION.questions,
   request_id: "req-1",
 });
 await sleep(120);
 // Lo que hace el backend al preguntar: persiste el tramo y sigue esperando.
-hilos.s1 = [...hilos.s1, PREGUNTA];
-for (let vuelta = 0; vuelta < 2; vuelta++) {
+threads.s1 = [...threads.s1, QUESTION];
+for (let roundTrip = 0; roundTrip < 2; roundTrip++) {
   docP.querySelector('[data-sesion="s2"]')?.click();
   await sleep(150);
   docP.querySelector('[data-sesion="s1"]')?.click();
   await sleep(150);
 }
-const opcion = [...docP.querySelectorAll("button")].find((b) =>
+const option = [...docP.querySelectorAll("button")].find((b) =>
   b.getAttribute("aria-label")?.endsWith("Dale"),
 );
-if (!opcion) {
+if (!option) {
   console.error("Al volver a la tarea, la pregunta pendiente no ofrece sus opciones.");
   process.exit(1);
 }
 // El rechazo llega por una promesa que Solid no espera: sin recogerlo, Node
 // mata este guarda antes de decir qué falló.
-const rechazos = [];
-const anota = (e) => rechazos.push(e);
-process.on("unhandledRejection", anota);
-opcion.click();
+const rejections = [];
+const recordRejection = (e) => rejections.push(e);
+process.on("unhandledRejection", recordRejection);
+option.click();
 await sleep(200);
-process.off("unhandledRejection", anota);
-if (contestadas.length !== 1 || enviadas.length > 0) {
+process.off("unhandledRejection", recordRejection);
+if (answered.length !== 1 || sentAnswers.length > 0) {
   console.error(
     "Contestar tras ir y volver no usa el canal vivo: " +
-      `answer_question=${contestadas.length}, send_message=${enviadas.length}.`,
+      `answer_question=${answered.length}, send_message=${sentAnswers.length}.`,
   );
   process.exit(1);
 }
-assert.equal(contestadas[0].requestId, "durable-req-1");
-assert.equal(contestadas[0].revision, 3);
+assert.equal(answered[0].requestId, "durable-req-1");
+assert.equal(answered[0].revision, 3);
 
 // Esc cierra la pregunta sin contestarla y devuelve la caja de escribir.
 // Mientras el agente espere, esa caja no existe.
-conPregunta.emit("question", {
+withQuestion.emit("question", {
   workspace: "w",
   session: "s1",
   turno: "t-preg2",
-  preguntas: PREGUNTA.questions,
+  preguntas: QUESTION.questions,
   request_id: "req-2",
 });
 await sleep(150);
@@ -130,27 +130,27 @@ if (docP.querySelector("textarea")) {
   console.error("Con una pregunta delante, la caja de escribir sigue ahí.");
   process.exit(1);
 }
-const anclada = [...docP.querySelectorAll("button")].find((b) =>
+const pinnedRow = [...docP.querySelectorAll("button")].find((b) =>
   b.getAttribute("aria-label")?.endsWith("Dale"),
 );
-anclada?.dispatchEvent(
-  new conPregunta.w.KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+pinnedRow?.dispatchEvent(
+  new withQuestion.w.KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
 );
 await sleep(200);
-if (canceladas.length !== 1 || !docP.querySelector("textarea")) {
+if (cancelledAnswers.length !== 1 || !docP.querySelector("textarea")) {
   console.error(
     "Esc no cierra la pregunta: " +
-      `cancel_question=${canceladas.length}, caja=${!!docP.querySelector("textarea")}.`,
+      `cancel_question=${cancelledAnswers.length}, caja=${!!docP.querySelector("textarea")}.`,
   );
   process.exit(1);
 }
-assert.equal(canceladas[0].turn, "t-preg2");
+assert.equal(cancelledAnswers[0].turn, "t-preg2");
 // Y el botón hace lo mismo que la tecla.
-conPregunta.emit("question", {
+withQuestion.emit("question", {
   workspace: "w",
   session: "s1",
   turno: "t-preg3",
-  preguntas: PREGUNTA.questions,
+  preguntas: QUESTION.questions,
   request_id: "req-3",
 });
 await sleep(150);
@@ -158,15 +158,15 @@ await sleep(150);
   .find((b) => b.textContent?.trim().startsWith("Omitir"))
   ?.click();
 await sleep(200);
-if (canceladas.length !== 2 || !docP.querySelector("textarea")) {
+if (cancelledAnswers.length !== 2 || !docP.querySelector("textarea")) {
   console.error("El botón Omitir no cierra la pregunta.");
   process.exit(1);
 }
 
 // Dos preguntas: el paginador cuenta, un número elige y pasa a la
 // siguiente, n+1 abre «Otra» y ⌘↵ manda lo escrito.
-const DOS_PREGUNTAS = [
-  PREGUNTA.questions[0],
+const TWO_QUESTIONS = [
+  QUESTION.questions[0],
   {
     id: "q2",
     question: "¿Con qué color?",
@@ -176,52 +176,52 @@ const DOS_PREGUNTAS = [
     free_text: true,
   },
 ];
-conPregunta.emit("question", {
+withQuestion.emit("question", {
   workspace: "w",
   session: "s1",
   turno: "t-dos",
-  preguntas: DOS_PREGUNTAS,
+  preguntas: TWO_QUESTIONS,
   request_id: "req-dos",
 });
 await sleep(150);
-const tarjetaDos = docP.querySelector('[data-interruption="question"]');
-const teclaEnDos = (key, extra = {}) =>
-  (docP.activeElement && tarjetaDos.contains(docP.activeElement) ? docP.activeElement : tarjetaDos)
-    .dispatchEvent(new conPregunta.w.KeyboardEvent("keydown", { key, bubbles: true, ...extra }));
-assert.match(tarjetaDos.textContent, /1 de 2/);
-assert.match(tarjetaDos.textContent, /Respondidas 0\/2/);
-const encabezadoDePregunta = () => tarjetaDos.querySelector("p")?.previousElementSibling?.textContent;
-assert.equal(encabezadoDePregunta(), "El agente pregunta", "sin header va el texto del catálogo");
-teclaEnDos("2");
+const cardTwo = docP.querySelector('[data-interruption="question"]');
+const keyOnTwo = (key, extra = {}) =>
+  (docP.activeElement && cardTwo.contains(docP.activeElement) ? docP.activeElement : cardTwo)
+    .dispatchEvent(new withQuestion.w.KeyboardEvent("keydown", { key, bubbles: true, ...extra }));
+assert.match(cardTwo.textContent, /1 de 2/);
+assert.match(cardTwo.textContent, /Respondidas 0\/2/);
+const questionHeading = () => cardTwo.querySelector("p")?.previousElementSibling?.textContent;
+assert.equal(questionHeading(), "El agente pregunta", "sin header va el texto del catálogo");
+keyOnTwo("2");
 await sleep(50);
-assert.match(tarjetaDos.textContent, /¿Con qué color\?/, "un número elige y pasa a la siguiente");
-assert.equal(encabezadoDePregunta(), "Color", "el header de Claude va encima de la pregunta");
-assert.match(tarjetaDos.textContent, /Respondidas 1\/2/);
-teclaEnDos("3");
+assert.match(cardTwo.textContent, /¿Con qué color\?/, "un número elige y pasa a la siguiente");
+assert.equal(questionHeading(), "Color", "el header de Claude va encima de la pregunta");
+assert.match(cardTwo.textContent, /Respondidas 1\/2/);
+keyOnTwo("3");
 await sleep(50);
-const campoOtra = tarjetaDos.querySelector("textarea");
-assert.ok(campoOtra, "n+1 abre el campo de «Otra»");
-campoOtra.value = "Morado";
-campoOtra.dispatchEvent(new conPregunta.w.Event("input", { bubbles: true }));
+const otherField = cardTwo.querySelector("textarea");
+assert.ok(otherField, "n+1 abre el campo de «Otra»");
+otherField.value = "Morado";
+otherField.dispatchEvent(new withQuestion.w.Event("input", { bubbles: true }));
 await sleep(20);
-const antesDeDos = contestadas.length;
-campoOtra.dispatchEvent(
-  new conPregunta.w.KeyboardEvent("keydown", { key: "Enter", metaKey: true, bubbles: true }),
+const beforeTwo = answered.length;
+otherField.dispatchEvent(
+  new withQuestion.w.KeyboardEvent("keydown", { key: "Enter", metaKey: true, bubbles: true }),
 );
 await sleep(200);
-assert.equal(contestadas.length, antesDeDos + 1, "⌘↵ en la última manda las respuestas");
-assert.deepEqual(contestadas.at(-1).respuestas, [
+assert.equal(answered.length, beforeTwo + 1, "⌘↵ en la última manda las respuestas");
+assert.deepEqual(answered.at(-1).respuestas, [
   { turn: "t-dos", question: "q1", chosen: ["o2"], free_text: null },
   { turn: "t-dos", question: "q2", chosen: [], free_text: "Morado" },
 ]);
-assert.deepEqual(conPregunta.fallos, []);
+assert.deepEqual(withQuestion.failures, []);
 
 // Solo se monta la pestaña que se ve. Una pregunta de tres páginas contestada
 // a medias vuelve en la misma página, con lo elegido y lo escrito en «Otra»,
 // y lo plegado sigue plegado. Otra tarea con el mismo turno no lo hereda, otro
 // turno empieza vacío y cerrar la pestaña lo suelta todo. La traza se imprime:
 // es lo que se revisa en el log de la cadena.
-const TRES = [
+const THREE = [
   { id: "q1", question: "¿Sigo?", options: [{ value: "o1", label: "Dale" }, { value: "o2", label: "Para" }], multiple: false, free_text: false },
   {
     id: "q2",
@@ -232,23 +232,23 @@ const TRES = [
   },
   { id: "q3", question: "¿Qué nombre?", options: [{ value: "si", label: "El de siempre" }, { value: "no", label: "Otro nuevo" }], multiple: false, free_text: true },
 ];
-const conTres = (id) => [
+const withThree = (id) => [
   { role: "user", id: `u-${id}`, text: "Empieza" },
   { role: "agent", id: `t-antes-${id}`, text: "Revisé la carpeta.", tools: [{ name: "Bash", target: "ls -la", ok: true }] },
-  { role: "agent", id: "t-tres", text: "Antes de seguir", questions: TRES },
+  { role: "agent", id: "t-tres", text: "Antes de seguir", questions: THREE },
 ];
-const hilosTres = { p1: conTres("p1"), p2: conTres("p2"), p3: [{ role: "user", id: "u3", text: "Tres" }], p4: [{ role: "user", id: "u4", text: "Cuatro" }] };
-const atadurasTres = { p1: [{ id: "durable-req-p1", revision: 2, request_id: "req-p1", turn: "t-tres" }], p2: [{ id: "durable-req-p2", revision: 2, request_id: "req-p2", turn: "t-tres" }] };
-const contestadasTres = [];
-const titulos = { p1: "Pregunta uno", p2: "Pregunta dos", p3: "Tres", p4: "Cuatro" };
-const A_MEDIAS = {
+const threadsThree = { p1: withThree("p1"), p2: withThree("p2"), p3: [{ role: "user", id: "u3", text: "Tres" }], p4: [{ role: "user", id: "u4", text: "Cuatro" }] };
+const threeTies = { p1: [{ id: "durable-req-p1", revision: 2, request_id: "req-p1", turn: "t-tres" }], p2: [{ id: "durable-req-p2", revision: 2, request_id: "req-p2", turn: "t-tres" }] };
+const answeredThree = [];
+const titles = { p1: "Pregunta uno", p2: "Pregunta dos", p3: "Tres", p4: "Cuatro" };
+const HALF_ANSWERED = {
   ...TASK_AFTER_QUEUE,
-  list_live_sessions: Object.entries(titulos).map(([id, title]) => ({ ...TASK_AFTER_QUEUE.list_live_sessions[0], id, title })),
-  load_session: ({ id }) => ({ ...TASK_AFTER_QUEUE.load_session, id, turns: hilosTres[id] }),
-  pending_requests: ({ session }) => ({ questions: atadurasTres[session] ?? [], permissions: [] }),
+  list_live_sessions: Object.entries(titles).map(([id, title]) => ({ ...TASK_AFTER_QUEUE.list_live_sessions[0], id, title })),
+  load_session: ({ id }) => ({ ...TASK_AFTER_QUEUE.load_session, id, turns: threadsThree[id] }),
+  pending_requests: ({ session }) => ({ questions: threeTies[session] ?? [], permissions: [] }),
   answer_question: (args) => {
-    contestadasTres.push(args);
-    atadurasTres[args.session] = [];
+    answeredThree.push(args);
+    threeTies[args.session] = [];
     return {
       role: "user",
       id: `resp-${args.requestId}`,
@@ -258,223 +258,223 @@ const A_MEDIAS = {
     };
   },
 };
-const aMedias = await boot("listo", "preguntas-a-medias", A_MEDIAS);
-const docMedias = aMedias.w.document;
-const traza = [];
-const abrir = async (id) => {
+const halfAnswered = await boot("listo", "preguntas-a-medias", HALF_ANSWERED);
+const docMedias = halfAnswered.w.document;
+const trace = [];
+const openTaskTab = async (id) => {
   docMedias.querySelector(`[data-sesion="${id}"]`)?.click();
   await sleep(150);
 };
 // La tarjeta que se ve: las de pestañas montadas y escondidas no cuentan.
-const tarjeta = () =>
+const card = () =>
   [...docMedias.querySelectorAll('[data-interruption="question"]')].find((el) => !el.closest(".hidden, [hidden]"));
-const teclaEnLaTarjeta = async (key, extra = {}) => {
-  tarjeta().dispatchEvent(new aMedias.w.KeyboardEvent("keydown", { key, bubbles: true, ...extra }));
+const keyOnCard = async (key, extra = {}) => {
+  card().dispatchEvent(new halfAnswered.w.KeyboardEvent("keydown", { key, bubbles: true, ...extra }));
   await sleep(40);
 };
-const opcionM = (label) =>
-  [...tarjeta().querySelectorAll("button[data-option]")].find((b) => b.getAttribute("aria-label")?.endsWith(`. ${label}`));
+const optionM = (label) =>
+  [...card().querySelectorAll("button[data-option]")].find((b) => b.getAttribute("aria-label")?.endsWith(`. ${label}`));
 // La tira de pestañas también lleva `data-ventana`: la celda es la que tiene la conversación.
-const celdaM = () =>
+const cellM = () =>
   [...docMedias.querySelectorAll("[data-ventana]")].find(
     (el) => !el.classList.contains("hidden") && el.querySelector('[data-interruption="question"], textarea'),
   );
-const tramo = () =>
-  [...celdaM().querySelectorAll("button[aria-expanded]")].find(
+const segment = () =>
+  [...cellM().querySelectorAll("button[aria-expanded]")].find(
     (b) => !b.closest('section[aria-label="Preguntas"]') && b.querySelector("svg.lucide-chevron-right"),
   );
-const botonM = (label) => celdaM().querySelector(`button[aria-label="${label}"]`);
-const foto = (paso) => {
-  const el = tarjeta();
-  const vista = {
-    paso,
-    tramo: tramo()?.getAttribute("aria-expanded") ?? null,
-    plegada: !!botonM("Mostrar preguntas"),
+const buttonM = (label) => cellM().querySelector(`button[aria-label="${label}"]`);
+const snapshot = (stepName) => {
+  const el = card();
+  const viewEl = {
+    paso: stepName,
+    tramo: segment()?.getAttribute("aria-expanded") ?? null,
+    plegada: !!buttonM("Mostrar preguntas"),
     pagina: el?.textContent.match(/(\d) de 3/)?.[0] ?? null,
     respondidas: el?.textContent.match(/Respondidas \d\/3/)?.[0] ?? null,
     elegidas: el ? [...el.querySelectorAll('button[aria-pressed="true"]')].map((b) => b.getAttribute("aria-label")) : [],
     otra: el?.querySelector("textarea")?.value ?? null,
   };
-  traza.push(vista);
-  return vista;
+  trace.push(viewEl);
+  return viewEl;
 };
 
-await abrir("p1");
-assert.deepEqual(foto("p1 al abrir"), { paso: "p1 al abrir", tramo: "false", plegada: false, pagina: "1 de 3", respondidas: "Respondidas 0/3", elegidas: [], otra: null });
-await teclaEnLaTarjeta("1");
-opcionM("Azul").click();
+await openTaskTab("p1");
+assert.deepEqual(snapshot("p1 al abrir"), { paso: "p1 al abrir", tramo: "false", plegada: false, pagina: "1 de 3", respondidas: "Respondidas 0/3", elegidas: [], otra: null });
+await keyOnCard("1");
+optionM("Azul").click();
 await sleep(40);
-opcionM("Rojo").click();
+optionM("Rojo").click();
 await sleep(40);
-await teclaEnLaTarjeta("ArrowRight");
-await teclaEnLaTarjeta("3");
-const otraM = tarjeta().querySelector("textarea");
-assert.ok(otraM, "n+1 abre «Otra» en la tercera página");
-otraM.value = "Morado";
-otraM.dispatchEvent(new aMedias.w.Event("input", { bubbles: true }));
+await keyOnCard("ArrowRight");
+await keyOnCard("3");
+const otherM = card().querySelector("textarea");
+assert.ok(otherM, "n+1 abre «Otra» en la tercera página");
+otherM.value = "Morado";
+otherM.dispatchEvent(new halfAnswered.w.Event("input", { bubbles: true }));
 await sleep(40);
-assert.deepEqual(foto("p1 a medias"), { paso: "p1 a medias", tramo: "false", plegada: false, pagina: "3 de 3", respondidas: "Respondidas 3/3", elegidas: [], otra: "Morado" });
-const tarjetaDeP1 = tarjeta();
-tramo().click();
-botonM("Plegar preguntas").click();
+assert.deepEqual(snapshot("p1 a medias"), { paso: "p1 a medias", tramo: "false", plegada: false, pagina: "3 de 3", respondidas: "Respondidas 3/3", elegidas: [], otra: "Morado" });
+const cardOfP1 = card();
+segment().click();
+buttonM("Plegar preguntas").click();
 await sleep(40);
-assert.deepEqual(foto("p1 plegada").tramo, "true");
-assert.equal(tarjeta(), undefined, "plegar no escondió la tarjeta");
+assert.deepEqual(snapshot("p1 plegada").tramo, "true");
+assert.equal(card(), undefined, "plegar no escondió la tarjeta");
 
-await abrir("p2");
-assert.equal(tarjetaDeP1.isConnected, false, "la pestaña de p1 sigue montada detrás de p2");
+await openTaskTab("p2");
+assert.equal(cardOfP1.isConnected, false, "la pestaña de p1 sigue montada detrás de p2");
 assert.deepEqual(
-  foto("p2, mismo turno y mismos ids"),
+  snapshot("p2, mismo turno y mismos ids"),
   { paso: "p2, mismo turno y mismos ids", tramo: "false", plegada: false, pagina: "1 de 3", respondidas: "Respondidas 0/3", elegidas: [], otra: null },
   "lo elegido o lo plegado en una tarea aparece en otra",
 );
-await teclaEnLaTarjeta("2");
-await abrir("p3");
-await abrir("p4");
+await keyOnCard("2");
+await openTaskTab("p3");
+await openTaskTab("p4");
 
-await abrir("p1");
-const vuelta = foto("p1 al volver, plegada");
-assert.equal(vuelta.tramo, "true", "al remontar se plegó el tramo que estaba desplegado");
-assert.equal(vuelta.plegada, true, "al remontar se desplegó la pregunta plegada");
-botonM("Mostrar preguntas").click();
+await openTaskTab("p1");
+const roundTrip = snapshot("p1 al volver, plegada");
+assert.equal(roundTrip.tramo, "true", "al remontar se plegó el tramo que estaba desplegado");
+assert.equal(roundTrip.plegada, true, "al remontar se desplegó la pregunta plegada");
+buttonM("Mostrar preguntas").click();
 await sleep(40);
-assert.notEqual(tarjeta(), tarjetaDeP1, "p1 volvió sin remontarse");
+assert.notEqual(card(), cardOfP1, "p1 volvió sin remontarse");
 assert.deepEqual(
-  foto("p1 al volver"),
+  snapshot("p1 al volver"),
   { paso: "p1 al volver", tramo: "true", plegada: false, pagina: "3 de 3", respondidas: "Respondidas 3/3", elegidas: [], otra: "Morado" },
   "al remontar la tarjeta se perdió la página o «Otra»",
 );
-await teclaEnLaTarjeta("ArrowLeft");
-assert.deepEqual(foto("p1, página 2").elegidas, ["1. Azul", "3. Rojo"], "al remontar se perdió lo elegido en la segunda");
-await teclaEnLaTarjeta("ArrowLeft");
-assert.deepEqual(foto("p1, página 1").elegidas, ["1. Dale"], "al remontar se perdió lo elegido en la primera");
+await keyOnCard("ArrowLeft");
+assert.deepEqual(snapshot("p1, página 2").elegidas, ["1. Azul", "3. Rojo"], "al remontar se perdió lo elegido en la segunda");
+await keyOnCard("ArrowLeft");
+assert.deepEqual(snapshot("p1, página 1").elegidas, ["1. Dale"], "al remontar se perdió lo elegido en la primera");
 
-await abrir("p2");
-assert.deepEqual(foto("p2 al volver").respondidas, "Respondidas 1/3");
-await abrir("p1");
-await teclaEnLaTarjeta("Enter", { metaKey: true });
-await teclaEnLaTarjeta("Enter", { metaKey: true });
-await teclaEnLaTarjeta("Enter", { metaKey: true });
+await openTaskTab("p2");
+assert.deepEqual(snapshot("p2 al volver").respondidas, "Respondidas 1/3");
+await openTaskTab("p1");
+await keyOnCard("Enter", { metaKey: true });
+await keyOnCard("Enter", { metaKey: true });
+await keyOnCard("Enter", { metaKey: true });
 await sleep(200);
-assert.equal(contestadasTres.length, 1, "⌘↵ en la última no mandó las respuestas");
-assert.equal(contestadasTres[0].requestId, "durable-req-p1");
-assert.equal(contestadasTres[0].revision, 2);
-assert.deepEqual(contestadasTres[0].respuestas, [
+assert.equal(answeredThree.length, 1, "⌘↵ en la última no mandó las respuestas");
+assert.equal(answeredThree[0].requestId, "durable-req-p1");
+assert.equal(answeredThree[0].revision, 2);
+assert.deepEqual(answeredThree[0].respuestas, [
   { turn: "t-tres", question: "q1", chosen: ["o1"], free_text: null },
   { turn: "t-tres", question: "q2", chosen: ["a", "r"], free_text: null },
   { turn: "t-tres", question: "q3", chosen: [], free_text: "Morado" },
 ]);
-hilosTres.p1 = [...hilosTres.p1, { role: "user", id: "resp-durable-req-p1", text: "Hecho", answers: contestadasTres[0].respuestas.map((r) => ({ ...r, question_text: "", text: "Hecho", source: "persona", when: 0 })) }];
+threadsThree.p1 = [...threadsThree.p1, { role: "user", id: "resp-durable-req-p1", text: "Hecho", answers: answeredThree[0].respuestas.map((r) => ({ ...r, question_text: "", text: "Hecho", source: "persona", when: 0 })) }];
 // El registro de lo contestado se pliega y sigue plegado al volver.
-const registro = () => celdaM().querySelector('section[aria-label="Preguntas"] button[aria-expanded]');
-assert.equal(registro()?.getAttribute("aria-expanded"), "true", "el registro de preguntas no nace abierto");
-registro().click();
+const accountRegistry = () => cellM().querySelector('section[aria-label="Preguntas"] button[aria-expanded]');
+assert.equal(accountRegistry()?.getAttribute("aria-expanded"), "true", "el registro de preguntas no nace abierto");
+accountRegistry().click();
 await sleep(40);
-await abrir("p2");
-await abrir("p1");
-assert.equal(registro()?.getAttribute("aria-expanded"), "false", "al remontar se abrió el registro de preguntas plegado");
+await openTaskTab("p2");
+await openTaskTab("p1");
+assert.equal(accountRegistry()?.getAttribute("aria-expanded"), "false", "al remontar se abrió el registro de preguntas plegado");
 
 // El turno siguiente repite `q1..q3`.
-const OTRA_VEZ = { role: "agent", id: "t-otra", text: "Una más", questions: TRES };
-aMedias.emit("chat", { kind: "started", session: "p1", workspace: "w" });
-aMedias.emit("question", { workspace: "w", session: "p1", turno: "t-otra", preguntas: TRES, request_id: "req-p1b" });
+const AGAIN = { role: "agent", id: "t-otra", text: "Una más", questions: THREE };
+halfAnswered.emit("chat", { kind: "started", session: "p1", workspace: "w" });
+halfAnswered.emit("question", { workspace: "w", session: "p1", turno: "t-otra", preguntas: THREE, request_id: "req-p1b" });
 await sleep(150);
-hilosTres.p1 = [...hilosTres.p1, OTRA_VEZ];
-atadurasTres.p1 = [{ id: "durable-req-p1b", revision: 1, request_id: "req-p1b", turn: "t-otra" }];
+threadsThree.p1 = [...threadsThree.p1, AGAIN];
+threeTies.p1 = [{ id: "durable-req-p1b", revision: 1, request_id: "req-p1b", turn: "t-otra" }];
 assert.deepEqual(
-  foto("p1, turno nuevo"),
+  snapshot("p1, turno nuevo"),
   { paso: "p1, turno nuevo", tramo: "true", plegada: false, pagina: "1 de 3", respondidas: "Respondidas 0/3", elegidas: [], otra: null },
   "el turno nuevo heredó lo elegido en el anterior",
 );
-await teclaEnLaTarjeta("2");
-assert.equal(foto("p1, turno nuevo a medias").pagina, "2 de 3");
+await keyOnCard("2");
+assert.equal(snapshot("p1, turno nuevo a medias").pagina, "2 de 3");
 
 // Cerrar la pestaña suelta lo contestado a medias: reabrirla empieza de cero.
 docMedias.querySelector('button[aria-label="Cerrar «Pregunta uno»"]')?.click();
 await sleep(150);
 assert.equal(docMedias.querySelector('button[aria-label="Cerrar «Pregunta uno»"]'), null, "cerrar la pestaña no la cerró");
-await abrir("p1");
+await openTaskTab("p1");
 assert.deepEqual(
-  foto("p1 reabierta"),
+  snapshot("p1 reabierta"),
   { paso: "p1 reabierta", tramo: "false", plegada: false, pagina: "1 de 3", respondidas: "Respondidas 0/3", elegidas: [], otra: null },
   "cerrar la pestaña no soltó lo contestado a medias o lo desplegado",
 );
-console.log(`preguntas-a-medias: ${JSON.stringify(traza)}`);
-assert.deepEqual(aMedias.fallos, []);
-aMedias.w.close();
+console.log(`preguntas-a-medias: ${JSON.stringify(trace)}`);
+assert.deepEqual(halfAnswered.failures, []);
+halfAnswered.w.close();
 
 // Una tarea nueva nace con id provisional y Rust le da el suyo al contestar.
 // Lo desplegado en su primer turno sigue desplegado al dejar de verla y
 // volver, y cerrar su pestaña lo suelta.
-let creada = false;
-const turnosDeLaNueva = [
+let created = false;
+const newbornTurns = [
   { role: "user", id: "u-nueva", text: "Revisa la carpeta" },
   { role: "agent", id: "t-nueva", text: "Listo.", tools: [{ name: "Bash", target: "ls -la", ok: true }] },
 ];
-const NACE = {
+const NEWBORN = {
   ...TASK_AFTER_QUEUE,
   list_live_sessions: () => [
     { ...TASK_AFTER_QUEUE.list_live_sessions[0], id: "vieja", title: "Vieja" },
-    ...(creada ? [{ ...TASK_AFTER_QUEUE.list_live_sessions[0], id: "nueva", title: "Revisa la carpeta" }] : []),
+    ...(created ? [{ ...TASK_AFTER_QUEUE.list_live_sessions[0], id: "nueva", title: "Revisa la carpeta" }] : []),
   ],
   load_session: ({ id }) => ({
     ...TASK_AFTER_QUEUE.load_session,
     id,
-    turns: id === "nueva" ? (creada ? turnosDeLaNueva : []) : [{ role: "user", id: "u-vieja", text: "Vieja" }],
+    turns: id === "nueva" ? (created ? newbornTurns : []) : [{ role: "user", id: "u-vieja", text: "Vieja" }],
   }),
   send_message: () => {
-    creada = true;
+    created = true;
     return "nueva";
   },
 };
-const nace = await boot("listo", "tarea-que-nace", NACE);
-const docNace = nace.w.document;
-const celdaNace = () =>
+const newborn = await boot("listo", "tarea-que-nace", NEWBORN);
+const docNace = newborn.w.document;
+const newbornCell = () =>
   [...docNace.querySelectorAll("[data-ventana]")].find((el) => !el.classList.contains("hidden") && el.querySelector("textarea"));
-const tramoNace = () =>
-  [...(celdaNace()?.querySelectorAll("button[aria-expanded]") ?? [])].find(
+const newbornSegment = () =>
+  [...(newbornCell()?.querySelectorAll("button[aria-expanded]") ?? [])].find(
     (b) => !b.closest('section[aria-label="Preguntas"]') && b.querySelector("svg.lucide-chevron-right"),
   );
-const encargo = celdaNace().querySelector("textarea");
-encargo.value = "Revisa la carpeta";
-encargo.dispatchEvent(new nace.w.Event("input", { bubbles: true }));
-encargo.closest("form").dispatchEvent(new nace.w.Event("submit", { bubbles: true, cancelable: true }));
+const brief = newbornCell().querySelector("textarea");
+brief.value = "Revisa la carpeta";
+brief.dispatchEvent(new newborn.w.Event("input", { bubbles: true }));
+brief.closest("form").dispatchEvent(new newborn.w.Event("submit", { bubbles: true, cancelable: true }));
 await sleep(150);
-nace.emit("chat", { kind: "started", session: "nueva", workspace: "w" });
-nace.emit("chat", { kind: "tool", session: "nueva", workspace: "w", id: "ls", text: "Bash", target: "ls -la" });
-nace.emit("chat", { kind: "tool_done", session: "nueva", workspace: "w", id: "ls", text: "Bash", ok: true });
-nace.emit("chat", { kind: "delta", session: "nueva", workspace: "w", text: "Listo." });
-nace.emit("chat", { kind: "done", session: "nueva", workspace: "w", ok: true });
+newborn.emit("chat", { kind: "started", session: "nueva", workspace: "w" });
+newborn.emit("chat", { kind: "tool", session: "nueva", workspace: "w", id: "ls", text: "Bash", target: "ls -la" });
+newborn.emit("chat", { kind: "tool_done", session: "nueva", workspace: "w", id: "ls", text: "Bash", ok: true });
+newborn.emit("chat", { kind: "delta", session: "nueva", workspace: "w", text: "Listo." });
+newborn.emit("chat", { kind: "done", session: "nueva", workspace: "w", ok: true });
 await sleep(300);
-assert.equal(tramoNace()?.getAttribute("aria-expanded"), "false", "el primer turno de la tarea nueva no pinta su tramo");
-tramoNace().click();
+assert.equal(newbornSegment()?.getAttribute("aria-expanded"), "false", "el primer turno de la tarea nueva no pinta su tramo");
+newbornSegment().click();
 await sleep(40);
 docNace.querySelector('[data-sesion="vieja"]')?.click();
 await sleep(150);
-assert.equal(tramoNace(), undefined, "la tarea vieja no tiene tramo: la celda que se ve sigue siendo la nueva");
+assert.equal(newbornSegment(), undefined, "la tarea vieja no tiene tramo: la celda que se ve sigue siendo la nueva");
 docNace.querySelector('[data-sesion="nueva"]')?.click();
 await sleep(150);
-assert.equal(tramoNace()?.getAttribute("aria-expanded"), "true", "al volver a la tarea recién nacida se plegó su tramo");
+assert.equal(newbornSegment()?.getAttribute("aria-expanded"), "true", "al volver a la tarea recién nacida se plegó su tramo");
 [...docNace.querySelectorAll("button")]
   .find((b) => b.getAttribute("aria-label") === "Cerrar «Revisa la carpeta»")
   ?.click();
 await sleep(150);
 docNace.querySelector('[data-sesion="nueva"]')?.click();
 await sleep(150);
-assert.equal(tramoNace()?.getAttribute("aria-expanded"), "false", "cerrar la pestaña de la tarea nueva no soltó lo desplegado");
-assert.deepEqual(nace.fallos, []);
-nace.w.close();
+assert.equal(newbornSegment()?.getAttribute("aria-expanded"), "false", "cerrar la pestaña de la tarea nueva no soltó lo desplegado");
+assert.deepEqual(newborn.failures, []);
+newborn.w.close();
 
 // Lo elegido en la caja de una tarea abierta sobrevive a mirar otra, y un
 // gate que esta ventana no vio se repone preguntando por los pendientes.
 //
 // `session.json` guarda con qué corrió el último turno, no con qué va a
 // correr el siguiente; y el evento del permiso viaja una sola vez.
-const modos = [
+const modes = [
   { id: "manual", label: { clave: "agents.mode.manual" }, falta: null, por_omision: true },
   { id: "auto", label: { clave: "agents.mode.auto" }, falta: null, por_omision: false },
 ];
-const VENTANA = {
+const WINDOW_STATE = {
   ...TASK_AFTER_QUEUE,
   list_live_sessions: [
     { ...TASK_AFTER_QUEUE.list_live_sessions[0], id: "s1", title: "Con modo" },
@@ -487,56 +487,56 @@ const VENTANA = {
     permission_mode: "manual",
     turns: [],
   }),
-  list_permission_modes: modos,
+  list_permission_modes: modes,
   list_active_turns: ["s1"],
   pending_requests: ({ session }) =>
     session === "s1"
       ? { questions: [], permissions: [{ id: "durable-perm-1", revision: 4, request_id: "perm-1", tool: "Bash", target: "rm -rf" }] }
       : { questions: [], permissions: [] },
 };
-const ventana = await boot("listo", "estado-de-ventana", VENTANA);
-const docV = ventana.w.document;
-const modoActual = () =>
+const windowApp = await boot("listo", "estado-de-ventana", WINDOW_STATE);
+const docV = windowApp.w.document;
+const currentMode = () =>
   [...docV.querySelectorAll("[aria-label]")]
     .map((el) => el.getAttribute("aria-label"))
-    .find((etiqueta) => etiqueta.startsWith("Permisos: "));
+    .find((tagLabel) => tagLabel.startsWith("Permisos: "));
 docV.querySelector('[data-sesion="s1"]')?.click();
 await sleep(200);
-assert.equal(modoActual(), "Permisos: Manual");
-const cajaV = docV.querySelector("textarea");
-cajaV.focus();
-cajaV.dispatchEvent(
-  new ventana.w.KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true }),
+assert.equal(currentMode(), "Permisos: Manual");
+const composerV = docV.querySelector("textarea");
+composerV.focus();
+composerV.dispatchEvent(
+  new windowApp.w.KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true }),
 );
 await sleep(120);
-assert.equal(modoActual(), "Permisos: Automático", "shift+Tab cambia el modo");
+assert.equal(currentMode(), "Permisos: Automático", "shift+Tab cambia el modo");
 docV.querySelector('[data-sesion="s2"]')?.click();
 await sleep(200);
 docV.querySelector('[data-sesion="s1"]')?.click();
 await sleep(250);
-if (modoActual() !== "Permisos: Automático") {
-  console.error(`Volver a la tarea revierte lo elegido en su caja: ${modoActual()}.`);
+if (currentMode() !== "Permisos: Automático") {
+  console.error(`Volver a la tarea revierte lo elegido en su caja: ${currentMode()}.`);
   process.exit(1);
 }
 // Y el gate del permiso pendiente aparece sin que nadie repita su evento.
-ventana.w.dispatchEvent(new ventana.w.Event("focus"));
+windowApp.w.dispatchEvent(new windowApp.w.Event("focus"));
 await sleep(400);
 if (!docV.body.textContent.includes("Aprobar acción")) {
   console.error("Un permiso pendiente que esta ventana no vio no se repone.");
   process.exit(1);
 }
-assert.deepEqual(ventana.fallos, []);
-ventana.w.close();
+assert.deepEqual(windowApp.failures, []);
+windowApp.w.close();
 
 // Pasar a automático con un permiso a la vista lo aprueba, y solo si el
 // turno aceptó el cambio: sin él las peticiones siguientes se seguirían pidiendo.
-for (const cambio of ["acepta", "rechaza"]) {
-  const respuestas = [];
-  const auto = await boot("listo", `automatico-aprueba-${cambio}`, {
-    ...VENTANA,
-    set_permission_mode: cambio === "acepta" ? null : new Error("chat.mode.unsupported"),
+for (const changeKind of ["acepta", "rechaza"]) {
+  const responses = [];
+  const auto = await boot("listo", `automatico-aprueba-${changeKind}`, {
+    ...WINDOW_STATE,
+    set_permission_mode: changeKind === "acepta" ? null : new Error("chat.mode.unsupported"),
     respond_permission: (args) => {
-      respuestas.push(args);
+      responses.push(args);
       return {
         id: "t-decision", role: "user", text: "", author: null,
         permission: { request_id: args.requestId, tool: "Bash", target: "rm -rf", allow: args.allow, when: 1 },
@@ -549,80 +549,80 @@ for (const cambio of ["acepta", "rechaza"]) {
   auto.w.dispatchEvent(new auto.w.Event("focus"));
   await sleep(400);
   assert.ok(docA.body.textContent.includes("Aprobar acción"), "el gate pendiente está a la vista antes de cambiar de modo");
-  const cajaA = docA.querySelector("textarea");
-  cajaA.focus();
-  cajaA.dispatchEvent(new auto.w.KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true }));
+  const composerA = docA.querySelector("textarea");
+  composerA.focus();
+  composerA.dispatchEvent(new auto.w.KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true }));
   await sleep(300);
-  if (cambio === "acepta") {
+  if (changeKind === "acepta") {
     assert.deepEqual(
-      respuestas.map(({ session, requestId, revision, allow }) => ({ session, requestId, revision, allow })),
+      responses.map(({ session, requestId, revision, allow }) => ({ session, requestId, revision, allow })),
       [{ session: "s1", requestId: "durable-perm-1", revision: 4, allow: true }],
       "elegir automático con el turno vivo aprueba el permiso que esperaba",
     );
     assert.ok(!docA.body.textContent.includes("Aprobar acción"), "el gate aprobado deja de pedir respuesta");
   } else {
-    assert.deepEqual(respuestas, [], "si el turno no pasó a automático, lo pendiente sigue esperando a la persona");
+    assert.deepEqual(responses, [], "si el turno no pasó a automático, lo pendiente sigue esperando a la persona");
     assert.ok(docA.body.textContent.includes("Aprobar acción"));
   }
-  assert.deepEqual(auto.fallos, []);
+  assert.deepEqual(auto.failures, []);
   auto.w.close();
 }
 
 // Un motor anterior a los pendientes durables los lista sin `id` ni
 // `revision`: el gate se contesta igual, por su `request_id`.
 {
-  const respuestas = [];
-  const viejo = await boot("listo", "permiso-motor-sin-revision", {
-    ...VENTANA,
+  const responses = [];
+  const oldEngine = await boot("listo", "permiso-motor-sin-revision", {
+    ...WINDOW_STATE,
     pending_requests: ({ session }) =>
       session === "s1"
         ? { questions: [], permissions: [{ request_id: "perm-1", tool: "Bash", target: "rm -rf" }] }
         : { questions: [], permissions: [] },
     respond_permission: (args) => {
-      respuestas.push(args);
+      responses.push(args);
       return {
         id: "t-decision", role: "user", text: "", author: null,
         permission: { request_id: args.requestId, tool: "Bash", target: "rm -rf", allow: args.allow, when: 1 },
       };
     },
   });
-  const docO = viejo.w.document;
+  const docO = oldEngine.w.document;
   docO.querySelector('[data-sesion="s1"]')?.click();
   await sleep(200);
-  viejo.w.dispatchEvent(new viejo.w.Event("focus"));
+  oldEngine.w.dispatchEvent(new oldEngine.w.Event("focus"));
   await sleep(400);
   [...docO.querySelectorAll("button")].find((b) => b.textContent.trim() === "Aprobar y ejecutar")?.click();
   await sleep(300);
   assert.deepEqual(
-    respuestas.map(({ session, requestId, revision, allow }) => ({ session, requestId, revision, allow })),
+    responses.map(({ session, requestId, revision, allow }) => ({ session, requestId, revision, allow })),
     [{ session: "s1", requestId: "perm-1", revision: undefined, allow: true }],
     "sin revisión el permiso se aprueba por su request_id",
   );
   assert.ok(!docO.body.textContent.includes("Aprobar acción"), "el gate aprobado deja de pedir respuesta");
   assert.ok(!docO.body.textContent.includes("no indicó cómo contestarle"));
-  assert.deepEqual(viejo.fallos, []);
-  viejo.w.close();
+  assert.deepEqual(oldEngine.failures, []);
+  oldEngine.w.close();
 }
 
 // Lo nuevo del workspace arranca con su modo por defecto y lo que ya existe
 // conserva el suyo. El ajuste vive en General, antes del contexto.
 const defaultSaves = [];
-const conDefault = { workspaces: [{ id: "w", name: "W", context_root: null, default_permission_mode: "auto" }], active: "w" };
-const porDefecto = await boot("listo", "default-permission-mode", {
-  ...VENTANA,
-  list_workspaces: conDefault,
-  workspaces_startup: conDefault,
+const withDefault = { workspaces: [{ id: "w", name: "W", context_root: null, default_permission_mode: "auto" }], active: "w" };
+const defaultApp = await boot("listo", "default-permission-mode", {
+  ...WINDOW_STATE,
+  list_workspaces: withDefault,
+  workspaces_startup: withDefault,
   list_language_packs: [], list_bundled_language_packs: [],
   set_workspace_permission_mode: ({ id, mode }) => {
     defaultSaves.push([id, mode]);
-    return { ...conDefault.workspaces[0], default_permission_mode: mode };
+    return { ...withDefault.workspaces[0], default_permission_mode: mode };
   },
 });
-const defaultDoc = porDefecto.w.document;
+const defaultDoc = defaultApp.w.document;
 const defaultModeLabel = () =>
   [...defaultDoc.querySelectorAll("[aria-label]")]
     .map((el) => el.getAttribute("aria-label"))
-    .find((etiqueta) => etiqueta.startsWith("Permisos: "));
+    .find((tagLabel) => tagLabel.startsWith("Permisos: "));
 await sleep(150);
 assert.equal(defaultModeLabel(), "Permisos: Automático", "a new task starts with the workspace default");
 defaultDoc.querySelector('[data-sesion="s1"]')?.click();
@@ -641,16 +641,16 @@ assert.equal(defaultSelect.value, "auto");
 const contextHeading = [...defaultDoc.querySelectorAll("h3")].find((h) => h.textContent.trim() === "Contexto");
 assert.ok(contextHeading, "General shows the context section");
 assert.ok(
-  defaultSelect.compareDocumentPosition(contextHeading) & porDefecto.w.Node.DOCUMENT_POSITION_FOLLOWING,
+  defaultSelect.compareDocumentPosition(contextHeading) & defaultApp.w.Node.DOCUMENT_POSITION_FOLLOWING,
   "the default permissions setting goes before the context section",
 );
 defaultSelect.value = "manual";
-defaultSelect.dispatchEvent(new porDefecto.w.Event("change", { bubbles: true }));
+defaultSelect.dispatchEvent(new defaultApp.w.Event("change", { bubbles: true }));
 await sleep(80);
 assert.deepEqual(defaultSaves, [["w", "manual"]]);
 assert.equal(defaultModeLabel(), "Permisos: Manual", "the blank box follows the new default");
-assert.deepEqual(porDefecto.fallos, []);
-porDefecto.w.close();
+assert.deepEqual(defaultApp.failures, []);
+defaultApp.w.close();
 
 // Los árboles montados conservan sus relojes: el proceso no termina solo.
 process.exit(0);

@@ -38,7 +38,7 @@ try {
   assert.ok(dialog());
   if (scenario === "unsupported") {
     assert.match(dialog().textContent, /no admite el borrado/);
-    assert.equal(app.comandos.includes("task_lifecycle_preview"), false);
+    assert.equal(app.commands.includes("task_lifecycle_preview"), false);
     assert.equal([...dialog().querySelectorAll('button')].find(el => el.textContent.trim() === "Borrar la tarea").disabled, true);
     console.log("PASS: unsupported engine blocks deletion without legacy fallback");
     process.exit(0);
@@ -88,7 +88,7 @@ try {
   assert.equal(dialog(), null);
   assert.deepEqual(applications.map(args => args.consent), ['snapshot-1', 'snapshot-2']);
   assert.ok(applications.every(args => args.discard === true));
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
   console.log("PASS: grouped family review, stale consent, modal error, explicit reconfirmation, applied cleanup");
 } finally { app.w.close(); }
 

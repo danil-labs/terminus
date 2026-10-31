@@ -16,17 +16,17 @@ const PROYECTOS = [
   { id: "pc", name: "Finanzas", kind: "folder", working_directory: "/lab/c", sources: [] },
 ];
 
-const fila = (id, folder, space, extra = {}) => ({
+const rowEl = (id, folder, space, extra = {}) => ({
   id, folder, space, parent: null, title: `Tarea ${id}`, outcome: null, provider: "codex", model: null,
   refs: [], stage: null, esperando: false, updated_at: 1, created_at: 1, turns: 1, archived: false,
   chat_de_agente: false, ...extra,
 });
 
 /** Un servicio de espacios en memoria, con las reglas de `workspace/spaces.rs` que la ventana ve. */
-function servicio({ spaces, filas, archivos = {}, kn = {}, trabajando = [], atencion = [] }) {
+function servicio({ spaces, filas, archivos = {}, kn = {}, trabajando = [], atencion: attention = [] }) {
   const s = { spaces, filas, archivos, kn, trabajando, lapidas: {}, llamadas: [], fallaUnaVez: new Set() };
-  const viva = (id) => s.spaces.find((i) => i.id === id);
-  const ref = (id) => (viva(id) ? { id, name: viva(id).name } : { id, name: s.lapidas[id] ?? null, deleted: true });
+  const liveQuestion = (id) => s.spaces.find((i) => i.id === id);
+  const ref = (id) => (liveQuestion(id) ? { id, name: liveQuestion(id).name } : { id, name: s.lapidas[id] ?? null, deleted: true });
   const miembros = (id) => s.filas.filter((r) => r.space === id && !r.archived);
   const previa = (id) => ({
     space: ref(id),
@@ -38,40 +38,40 @@ function servicio({ spaces, filas, archivos = {}, kn = {}, trabajando = [], aten
       kn_pending: s.kn[r.id] ?? [],
     })),
   });
-  const noVisto = (ahora, vista) => ahora.tasks.some((t) => {
-    const v = vista.tasks.find((x) => x.folder === t.folder && x.task === t.task);
+  const noVisto = (ahora, viewEl) => ahora.tasks.some((t) => {
+    const v = viewEl.tasks.find((x) => x.folder === t.folder && x.task === t.task);
     if (!v) return true;
     return (t.working && !v.working)
       || t.files.some((f) => !v.files.some((x) => x.path === f.path && x.hash === f.hash))
       || t.kn_pending.some((p) => !v.kn_pending.includes(p));
   });
   const clon = (x) => structuredClone(x);
-  const anota = (cmd, fn) => (args) => {
+  const recordRejection = (cmd, fn) => (args) => {
     s.llamadas.push([cmd, clon(args ?? {})]);
     return fn(args ?? {});
   };
   s.respuestas = {
-    list_projects: anota("list_projects", () => clon(PROYECTOS)),
+    list_projects: recordRejection("list_projects", () => clon(PROYECTOS)),
     // La barra pide las vivas y las archivadas que tiene abiertas en pestaña.
-    list_live_sessions: anota("list_live_sessions", ({ project, open }) =>
+    list_live_sessions: recordRejection("list_live_sessions", ({ project, open }) =>
       clon(s.filas.filter((r) => r.folder === project && (!r.archived || (open ?? []).includes(r.id))))),
-    list_spaces: anota("list_spaces", () => clon(s.spaces)),
-    list_workspace_attention: () => clon([{ workspace: "w", tasks: atencion }]),
-    create_space: anota("create_space", ({ name, folders }) => {
+    list_spaces: recordRejection("list_spaces", () => clon(s.spaces)),
+    list_workspace_attention: () => clon([{ workspace: "w", tasks: attention }]),
+    create_space: recordRejection("create_space", ({ name, folders }) => {
       const i = { id: `i${s.spaces.length + 10}`, name, folders, created_at: 99, updated_at: 99 };
       s.spaces.push(i);
       return clon(i);
     }),
-    rename_space: anota("rename_space", ({ id, name }) => {
-      viva(id).name = name;
-      return clon(viva(id));
+    rename_space: recordRejection("rename_space", ({ id, name }) => {
+      liveQuestion(id).name = name;
+      return clon(liveQuestion(id));
     }),
-    set_space_folders: anota("set_space_folders", ({ id, folders }) => {
-      viva(id).folders = folders;
-      return clon(viva(id));
+    set_space_folders: recordRejection("set_space_folders", ({ id, folders }) => {
+      liveQuestion(id).folders = folders;
+      return clon(liveQuestion(id));
     }),
-    space_delete_preview: anota("space_delete_preview", ({ id }) => clon(previa(id))),
-    delete_space: anota("delete_space", ({ id, seen }) => {
+    space_delete_preview: recordRejection("space_delete_preview", ({ id }) => clon(previa(id))),
+    delete_space: recordRejection("delete_space", ({ id, seen }) => {
       const ahora = previa(id);
       if (noVisto(ahora, seen)) return { deleted: false, changed: clon(ahora), failures: [] };
       const failures = [];
@@ -87,32 +87,32 @@ function servicio({ spaces, filas, archivos = {}, kn = {}, trabajando = [], aten
         const vieja = previa(id);
         return { deleted: false, changed: clon({ ...vieja, tasks: vieja.tasks.map((t) => ({ ...t, working: true })) }), failures };
       }
-      s.lapidas[id] = viva(id).name;
+      s.lapidas[id] = liveQuestion(id).name;
       s.spaces = s.spaces.filter((i) => i.id !== id);
       return { deleted: true, changed: null, failures: [] };
     }),
-    move_task_to_space: anota("move_task_to_space", ({ id, space }) => {
+    move_task_to_space: recordRejection("move_task_to_space", ({ id, space }) => {
       s.filas.find((r) => r.id === id).space = space;
       return clon(ref(space));
     }),
-    archived_tasks: anota("archived_tasks", () => {
+    archived_tasks: recordRejection("archived_tasks", () => {
       const tasks = s.filas.filter((r) => r.archived);
       const ids = [...new Set(tasks.map((r) => r.space).filter(Boolean))];
       return clon({ tasks, spaces: ids.map(ref) });
     }),
-    set_task_archived: anota("set_task_archived", ({ id, archived, space }) => {
+    set_task_archived: recordRejection("set_task_archived", ({ id, archived, space }) => {
       const r = s.filas.find((x) => x.id === id);
       r.archived = archived;
       if (archived) return null;
-      if (!viva(r.space)) r.space = space ?? s.spaces[0].id;
+      if (!liveQuestion(r.space)) r.space = space ?? s.spaces[0].id;
       return clon(ref(r.space));
     }),
-    send_message: anota("send_message", (args) => {
+    send_message: recordRejection("send_message", (args) => {
       if (args.session) return args.session;
-      s.filas.push(fila("nueva", args.project || "pa", args.space ?? s.spaces[0].id, { title: "Nueva" }));
+      s.filas.push(rowEl("nueva", args.project || "pa", args.space ?? s.spaces[0].id, { title: "Nueva" }));
       return "nueva";
     }),
-    create_project: anota("create_project", () => clon(PROYECTOS[0])),
+    create_project: recordRejection("create_project", () => clon(PROYECTOS[0])),
   };
   return s;
 }
@@ -126,30 +126,30 @@ const sembrar = (prefs) => () => {
 const tira = (ids, activa) => ({ abiertas: ids.map((id) => ({ id, project: "pa", titulo: `Tarea ${id}` })), activa });
 
 /** `boot` arranca con el riel agrupado por carpeta: el orden de las carpetas es lo que se mira. */
-export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
-  const salida = process.env.TERMINUS_E2E_DIR ? join(process.env.TERMINUS_E2E_DIR, "spaces") : null;
-  if (salida) mkdirSync(salida, { recursive: true });
-  const guarda = (nombre, app, s) => {
-    if (!salida) return;
-    writeFileSync(join(salida, `${nombre}.html`), app.w.document.querySelector("#root")?.innerHTML ?? "");
-    writeFileSync(join(salida, `${nombre}.json`), JSON.stringify({ llamadas: s.llamadas, prefs: { ...app.w.localStorage } }, null, 2));
+export async function spaceScenarios({ boot, sleep, withTask: WITH_TASK }) {
+  const output = process.env.TERMINUS_E2E_DIR ? join(process.env.TERMINUS_E2E_DIR, "spaces") : null;
+  if (output) mkdirSync(output, { recursive: true });
+  const guarda = (nameText, app, s) => {
+    if (!output) return;
+    writeFileSync(join(output, `${nameText}.html`), app.w.document.querySelector("#root")?.innerHTML ?? "");
+    writeFileSync(join(output, `${nameText}.json`), JSON.stringify({ llamadas: s.llamadas, prefs: { ...app.w.localStorage } }, null, 2));
   };
   const base = (s, prefs) => ({
-    ...CON_TAREA,
+    ...WITH_TASK,
     ...s.respuestas,
     // Cada espacio guarda su vista del riel; sin guardar, todas agrupan por carpeta, que es lo de omisión.
     workspaces_startup: sembrar({ ...prefs }),
     list_workspaces: () => ({ workspaces: [{ id: "w", name: "Danil", context_root: null, lengua: "es" }], active: "w" }),
-    load_session: ({ id }) => ({ ...CON_TAREA.load_session, id }),
-    task_history: CON_TAREA.task_history,
+    load_session: ({ id }) => ({ ...WITH_TASK.load_session, id }),
+    task_history: WITH_TASK.task_history,
     save_queue: null,
   });
   const util = (app) => {
     const doc = app.w.document;
-    const tecla = (el, key) => el.dispatchEvent(new app.w.KeyboardEvent("keydown", { key, bubbles: true }));
+    const pressedKey = (el, key) => el.dispatchEvent(new app.w.KeyboardEvent("keydown", { key, bubbles: true }));
     return {
       doc,
-      tecla,
+      tecla: pressedKey,
       /** El disparador del menú de espacio en la franja; enseña el espacio elegido. */
       disparador: () => doc.querySelector("[data-title-bar] [data-space-menu]"),
       actual: () => doc.querySelector("[data-title-bar] [data-space-menu]")?.textContent.trim(),
@@ -164,7 +164,7 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
       cerrarEspacios: async () => {
         const lista = doc.querySelector("[data-space-list]");
         if (!lista) return;
-        tecla(lista, "Escape");
+        pressedKey(lista, "Escape");
         await sleep(80);
       },
       /** Los espacios de la lista, con cuál es el elegido y la señal de cada uno. */
@@ -184,9 +184,9 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
         lista.querySelector(`[data-space="${id}"]`).click();
       },
       /** Una entrada del menú de espacio por su texto: «Nuevo espacio», «Renombrar», «Eliminar…». */
-      accion: async (texto) => {
+      accion: async (textValue) => {
         const lista = await util(app).abrirEspacios();
-        return [...lista.querySelectorAll("button:not([data-space])")].find((b) => b.textContent.trim() === texto);
+        return [...lista.querySelectorAll("button:not([data-space])")].find((b) => b.textContent.trim() === textValue);
       },
       editorDeNombre: () => doc.querySelector('[data-title-bar] input[aria-label^="Nombre del espacio"]'),
       // Con el riel agrupado por carpeta: una cabecera por carpeta, tenga tareas o no.
@@ -197,18 +197,18 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
       caja: () =>
         [...doc.querySelectorAll("[data-ventana]")].find((el) => !el.classList.contains("hidden") && el.querySelector("textarea"))?.querySelector("textarea"),
       /** Elige un agente en «Filtrar y agrupar» de Personalizar; `null` es «Todos». */
-      filtrarPorAgente: async (nombre) => {
+      filtrarPorAgente: async (nameText) => {
         doc.querySelector("button[data-personalize]").click();
         await sleep(80);
-        const grupo = doc.querySelector('[role="menu"] [role="group"][aria-label="Agente"]');
-        assert.ok(grupo, "el menú de filtro ofrece agentes");
+        const groupEl = doc.querySelector('[role="menu"] [role="group"][aria-label="Agente"]');
+        assert.ok(groupEl, "el menú de filtro ofrece agentes");
         // El nombre y no la nota de al lado («desinstalado»).
-        [...grupo.querySelectorAll('[role="menuitemradio"]')].find((b) => b.children[1].textContent.trim() === (nombre ?? "Todos")).click();
+        [...groupEl.querySelectorAll('[role="menuitemradio"]')].find((b) => b.children[1].textContent.trim() === (nameText ?? "Todos")).click();
         await sleep(80);
-        tecla(doc.activeElement ?? doc.body, "Escape");
+        pressedKey(doc.activeElement ?? doc.body, "Escape");
         await sleep(80);
       },
-      boton: (texto) => [...doc.querySelectorAll("button")].find((b) => b.textContent.trim() === texto),
+      boton: (textValue) => [...doc.querySelectorAll("button")].find((b) => b.textContent.trim() === textValue),
     };
   };
 
@@ -220,7 +220,7 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
   {
     const s = servicio({
       spaces: [{ id: "i1", name: null, folders: ["pa", "pb", "pc"], created_at: 1, updated_at: 1 }],
-      filas: [fila("t1", "pa", "i1"), fila("t2", "pb", "i1"), fila("t0", "pc", "i1", { archived: true })],
+      filas: [rowEl("t1", "pa", "i1"), rowEl("t2", "pb", "i1"), rowEl("t0", "pc", "i1", { archived: true })],
     });
     const app = await boot("listo", "spaces-migrated", base(s, { "pestanas.w": tira(["t1", "t2"], "t2") }));
     await sleep(400);
@@ -255,7 +255,7 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
     await u.cerrarEspacios();
     assert.equal(u.doc.querySelector("[data-delete-space]"), null);
     guarda("migrado", app, s);
-    assert.deepEqual(app.fallos, []);
+    assert.deepEqual(app.failures, []);
     app.w.close();
   }
 
@@ -265,14 +265,14 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
         { id: "i1", name: "Origen", folders: ["pa"], created_at: 1, updated_at: 1 },
         { id: "i2", name: "Destino", folders: ["pb"], created_at: 2, updated_at: 2 },
       ],
-      filas: [fila("t1", "pa", "i1"), fila("t2", "pb", "i2")],
+      filas: [rowEl("t1", "pa", "i1"), rowEl("t2", "pb", "i2")],
     });
     const loaded = [];
     const app = await boot("listo", "task-links-across-spaces", {
       ...base(s, { "pestanas.w.i1": tira(["t1"], "t1"), "space.w": "i1" }),
       load_session: ({ id }) => {
         loaded.push(id);
-        return { ...CON_TAREA.load_session, id, turns: [{ role: "assistant", text: id === "t1"
+        return { ...WITH_TASK.load_session, id, turns: [{ role: "assistant", text: id === "t1"
           ? "[Otra tarea](terminus://task?workspace=w&folder=pb&task=t2) [Otro workspace](terminus://task?workspace=ajeno&folder=pb&task=t2)"
           : "Destino abierto." }] };
       },
@@ -294,7 +294,7 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
     assert.deepEqual(u.pestanas(), [], "abrir por enlace no conserva una pestaña");
     assert.equal(u.doc.querySelector('[data-preview-header] [role="button"] .truncate')?.textContent, "Tarea t2", "la tarea se abre como vista temporal en su espacio");
     assert.equal(loaded.filter((id) => id === "t2").length, 2, "se comprueba que existe antes de abrirla");
-    assert.deepEqual(app.fallos, []);
+    assert.deepEqual(app.failures, []);
     app.w.close();
   }
 
@@ -310,8 +310,8 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
         { id: "i2", name: "Facturación", folders: ["pb"], created_at: 2, updated_at: 2 },
       ],
       filas: [
-        fila("t1", "pa", "i1", { agent: "ada" }), fila("t2", "pb", "i1"), fila("t3", "pb", "i2"), fila("t4", "pa", "i2"),
-        fila("t5", "pc", null), fila("c1", "pa", null, { chat_de_agente: true, agent: "design" }),
+        rowEl("t1", "pa", "i1", { agent: "ada" }), rowEl("t2", "pb", "i1"), rowEl("t3", "pb", "i2"), rowEl("t4", "pa", "i2"),
+        rowEl("t5", "pc", null), rowEl("c1", "pa", null, { chat_de_agente: true, agent: "design" }),
       ],
       atencion: [{ session: "t3", project: "pb", state: "asked" }, { session: "t1", project: "pa", state: "failed" }],
     });
@@ -351,7 +351,7 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
     assert.ok(u.doc.querySelector('[data-sidebar-group="pb"] [data-sesion]'));
     // Volver a un escritorio monta solo la pestaña de delante, y en su celda: una
     // montada escondida gasta su lectura sin caja y reabre al final.
-    const pestana = (titulo) => [...u.doc.querySelectorAll('[data-tira] [role="tab"]')].find((el) => el.textContent.trim() === titulo);
+    const pestana = (titleText) => [...u.doc.querySelectorAll('[data-tira] [role="tab"]')].find((el) => el.textContent.trim() === titleText);
     pestana("Tarea t4").click();
     await sleep(300);
     pestana("Tarea t3").click();
@@ -364,8 +364,8 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
     const ojo = new app.w.MutationObserver((registros) => {
       for (const r of registros) for (const n of r.addedNodes) {
         if (n.nodeType !== 1) continue;
-        const hilos = [n, ...n.querySelectorAll('[data-chat-thread]')].filter((x) => x.matches('[data-chat-thread]'));
-        hilosMontados.push(...hilos);
+        const threads = [n, ...n.querySelectorAll('[data-chat-thread]')].filter((x) => x.matches('[data-chat-thread]'));
+        hilosMontados.push(...threads);
       }
     });
     ojo.observe(u.doc.body, { childList: true, subtree: true });
@@ -443,7 +443,7 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
     await sleep(300);
 
     guarda("mover-y-abrir", app, s);
-    assert.deepEqual(app.fallos, []);
+    assert.deepEqual(app.failures, []);
     app.w.close();
   }
 
@@ -460,7 +460,7 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
         { id: "i1", name: null, folders: ["pa"], created_at: 1, updated_at: 1 },
         { id: "i2", name: "Facturación", folders: ["pb"], created_at: 2, updated_at: 2 },
       ],
-      filas: [fila("t1", "pa", "i1"), fila("t4", "pb", "i2"), fila("t3", "pb", "i2")],
+      filas: [rowEl("t1", "pa", "i1"), rowEl("t4", "pb", "i2"), rowEl("t3", "pb", "i2")],
     });
     const partido = {
       columnas: [[{ pestanas: ["t4"], activa: "t4" }], [{ pestanas: ["t3"], activa: "t3" }]],
@@ -516,7 +516,7 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
     assert.equal(ventanas(), 1, "el atajo de partir abrió otra ventana");
     assert.deepEqual(u.pestanas(), ["Tarea t4", "Tarea t3"], "y movió pestañas");
     guarda("layout-changed", app, s);
-    assert.deepEqual(app.fallos, []);
+    assert.deepEqual(app.failures, []);
     app.w.close();
   }
 
@@ -531,7 +531,7 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
         { id: "i1", name: null, folders: ["pa"], created_at: 1, updated_at: 1 },
         { id: "i2", name: "Facturación", folders: ["pb"], created_at: 2, updated_at: 2 },
       ],
-      filas: [fila("t1", "pa", "i1"), fila("t4", "pb", "i2"), fila("t3", "pb", "i2"), fila("t5", "pb", "i2")],
+      filas: [rowEl("t1", "pa", "i1"), rowEl("t4", "pb", "i2"), rowEl("t3", "pb", "i2"), rowEl("t5", "pb", "i2")],
     });
     const app = await boot("listo", "spaces-reparto-temporal", base(s, {
       "pestanas.w.i1": tira(["t1"], "t1"),
@@ -547,8 +547,8 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
     await sleep(500);
     const u = util(app);
     const tiraDe = (v) => u.doc.querySelector(`[data-tira][data-ventana="${v}"]`);
-    const temporal = (v, titulo) =>
-      [...(tiraDe(v)?.querySelectorAll('[role="tab"]') ?? [])].find((el) => el.textContent.includes(titulo))?.closest(".italic") !== null;
+    const temporal = (v, titleText) =>
+      [...(tiraDe(v)?.querySelectorAll('[role="tab"]') ?? [])].find((el) => el.textContent.includes(titleText))?.closest(".italic") !== null;
     const idaYVuelta = async () => {
       await u.elegir("i1");
       await sleep(400);
@@ -565,7 +565,7 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
     assert.ok(temporal("0,0", "Tarea t5"), "la temporal volvió conservada");
     assert.deepEqual(u.pref("panels.w.i2").columnas, [[{ pestanas: ["t4", "t3", "t5"], activa: "t5" }]]);
     guarda("layout-temporary", app, s);
-    assert.deepEqual(app.fallos, []);
+    assert.deepEqual(app.failures, []);
     app.w.close();
   }
 
@@ -581,7 +581,7 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
         { id: "i2", name: "Facturación", folders: ["pb", "pc"], created_at: 2, updated_at: 2 },
         { id: "i3", name: "Móvil", folders: ["pc"], created_at: 3, updated_at: 3 },
       ],
-      filas: [fila("t1", "pa", "i1"), fila("t3", "pb", "i2"), fila("t6", "pb", "i2"), fila("t7", "pc", "i2")],
+      filas: [rowEl("t1", "pa", "i1"), rowEl("t3", "pb", "i2"), rowEl("t6", "pb", "i2"), rowEl("t7", "pc", "i2")],
       archivos: { t6: ["src/cobro.rs", "nuevo.txt"] },
       kn: { t7: ["notas/septiembre.md"] },
       trabajando: ["t3"],
@@ -594,40 +594,40 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
     const u = util(app);
     (await u.accion("Eliminar…")).click();
     await sleep(400);
-    const dialogo = () => u.doc.querySelector("[data-delete-space]");
-    assert.equal(dialogo()?.getAttribute("role"), "alertdialog");
+    const dialog = () => u.doc.querySelector("[data-delete-space]");
+    assert.equal(dialog()?.getAttribute("role"), "alertdialog");
     assert.equal(u.doc.activeElement?.textContent.trim(), "Cancelar", "el foco empieza en Cancelar");
-    const secciones = () => [...dialogo().querySelectorAll("[data-delete-section]")].map((el) => [el.dataset.deleteSection, [...el.querySelectorAll("[data-delete-row]")].map((r) => r.dataset.deleteRow)]);
+    const secciones = () => [...dialog().querySelectorAll("[data-delete-section]")].map((el) => [el.dataset.deleteSection, [...el.querySelectorAll("[data-delete-row]")].map((r) => r.dataset.deleteRow)]);
     assert.deepEqual(secciones(), [["working", ["t3"]], ["uncommitted", ["t6"]], ["unsaved", ["t7"]]]);
-    const confirmar = () => [...dialogo().querySelectorAll("button")].at(-1);
+    const confirmar = () => [...dialog().querySelectorAll("button")].at(-1);
     assert.equal(confirmar().textContent.trim(), "Descartar cambios y eliminar", "con cambios sin commitear, el botón lo dice");
     guarda("borrar-con-cambios", app, s);
 
     s.archivos.t7 = ["informe.pdf"];
     confirmar().click();
     await sleep(300);
-    const primera = s.llamadas.filter(([c]) => c === "delete_space")[0][1];
-    assert.deepEqual(primera.seen.tasks.map((t) => [t.task, t.files.length]), [["t3", 0], ["t6", 2], ["t7", 0]], "se manda lo que se vio");
-    assert.equal(primera.seen.discard, true);
-    const aviso = dialogo().querySelector("[data-delete-notice]");
+    const firstOne = s.llamadas.filter(([c]) => c === "delete_space")[0][1];
+    assert.deepEqual(firstOne.seen.tasks.map((t) => [t.task, t.files.length]), [["t3", 0], ["t6", 2], ["t7", 0]], "se manda lo que se vio");
+    assert.equal(firstOne.seen.discard, true);
+    const aviso = dialog().querySelector("[data-delete-notice]");
     assert.match(aviso?.textContent ?? "", /Hay cambios nuevos desde que abriste esto/);
     assert.equal(u.doc.activeElement, aviso, "el foco va al aviso");
-    assert.equal(dialogo().querySelector('[data-delete-row="t7"] [data-delete-mark]')?.textContent.trim(), "cambió");
-    assert.equal(dialogo().querySelector('[data-delete-row="t6"] [data-delete-mark]'), null, "lo ya visto no se marca");
+    assert.equal(dialog().querySelector('[data-delete-row="t7"] [data-delete-mark]')?.textContent.trim(), "cambió");
+    assert.equal(dialog().querySelector('[data-delete-row="t6"] [data-delete-mark]'), null, "lo ya visto no se marca");
     assert.ok(s.spaces.some((i) => i.id === "i2"), "nada se borró");
     guarda("borrar-cambios-nuevos", app, s);
 
     s.fallaUnaVez.add("t6");
     confirmar().click();
     await sleep(300);
-    const fallos = dialogo()?.querySelector("[data-delete-failures]");
-    assert.match(fallos?.textContent ?? "", /Hay un turno o una operación en curso/, "el fallo se lee dentro del diálogo");
-    assert.equal(dialogo().querySelector('[data-delete-section="working"]'), null, "tras un fallo se pinta la previa de ahora, no la que volvió");
+    const failures = dialog()?.querySelector("[data-delete-failures]");
+    assert.match(failures?.textContent ?? "", /Hay un turno o una operación en curso/, "el fallo se lee dentro del diálogo");
+    assert.equal(dialog().querySelector('[data-delete-section="working"]'), null, "tras un fallo se pinta la previa de ahora, no la que volvió");
     assert.equal(u.doc.querySelector('[data-sesion="t3"]'), null, "lo ya archivado sale del riel con el diálogo abierto");
     assert.equal(u.doc.querySelector("[data-space-toast]"), null);
     confirmar().click();
     await sleep(500);
-    assert.equal(dialogo(), null, "repetir continúa y termina");
+    assert.equal(dialog(), null, "repetir continúa y termina");
     assert.deepEqual((await u.espacios()).map((e) => e.id), ["i1", "i3"], "sale del menú");
     assert.equal(u.pref("space.w"), "i1", "el escritorio pasa a la que queda");
     assert.equal(u.pref("pestanas.w.i2"), null, "y su tira se olvida");
@@ -645,15 +645,15 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
     assert.doesNotMatch(fila7.textContent, /Desarchivar/, "Archivadas no ofrece desarchivar");
     guarda("archivadas", app, s);
     assert.equal(s.llamadas.some(([c, a]) => c === "set_task_archived" && a?.archived === false), false, "nadie desarchiva");
-    assert.deepEqual(app.fallos, []);
+    assert.deepEqual(app.failures, []);
     app.w.close();
   }
 
   {
     const legacy = [
-      fila("old-chat", "pa", null, { chat_de_agente: true }),
-      fila("old-thread", "pa", null, { chat_de_agente: true, agent_thread: true }),
-      fila("old-inbox", "pa", null, { chat_de_agente: true, agent_thread: true, inbox: true }),
+      rowEl("old-chat", "pa", null, { chat_de_agente: true }),
+      rowEl("old-thread", "pa", null, { chat_de_agente: true, agent_thread: true }),
+      rowEl("old-inbox", "pa", null, { chat_de_agente: true, agent_thread: true, inbox: true }),
     ].map((row) => ({ ...row, archived: true, pinned: false, agent: "design" }));
     const s = servicio({
       spaces: [{ id: "i1", name: null, folders: ["pa"], created_at: 1, updated_at: 1 }],
@@ -664,7 +664,7 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
       ...base(s, { "space.w": "i1" }),
       load_session: ({ id }) => {
         opened.push(id);
-        return { ...CON_TAREA.load_session, id };
+        return { ...WITH_TASK.load_session, id };
       },
     });
     await sleep(400);
@@ -681,7 +681,7 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
     assert.equal(u.doc.querySelector("[data-global-search]"), null, "elegir una archivada cierra el buscador");
     assert.ok(opened.includes("old-inbox"), "la bandeja archivada abre su conversación original");
     assert.equal(s.llamadas.some(([command, args]) => command === "set_task_archived" && args.archived === false), false);
-    assert.deepEqual(app.fallos, []);
+    assert.deepEqual(app.failures, []);
     app.w.close();
   }
 
@@ -689,7 +689,7 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
   {
     const s = servicio({
       spaces: [{ id: "i1", name: null, folders: ["pa"], created_at: 1, updated_at: 1 }],
-      filas: [fila("old-chat", "pa", "i1", { chat_de_agente: true, agent: "design", title: "Design" })],
+      filas: [rowEl("old-chat", "pa", "i1", { chat_de_agente: true, agent: "design", title: "Design" })],
     });
     const app = await boot("listo", "spaces-previous-agent-chat", base(s, {
       "space.w": "i1",
@@ -697,18 +697,18 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
     }));
     await sleep(500);
     const u = util(app);
-    const barra = u.doc.querySelector("[data-previous-agent-chat]");
-    assert.ok(barra, "el chat anterior pinta la barra donde iría la caja");
-    assert.match(barra.textContent, /chat anterior de design/);
+    const titleBar = u.doc.querySelector("[data-previous-agent-chat]");
+    assert.ok(titleBar, "el chat anterior pinta la barra donde iría la caja");
+    assert.match(titleBar.textContent, /chat anterior de design/);
     assert.equal(u.caja(), undefined, "y no la caja");
-    const seguir = [...barra.querySelectorAll("button")].find((b) => b.textContent.trim() === "Seguir con design");
+    const seguir = [...titleBar.querySelectorAll("button")].find((b) => b.textContent.trim() === "Seguir con design");
     assert.ok(seguir, "ofrece seguir con su agente");
     seguir.click();
     await sleep(300);
     assert.equal(u.doc.querySelector("[data-previous-agent-chat]"), null, "seguir sale del chat anterior");
     assert.ok(u.caja(), "y deja una caja para escribirle");
     assert.equal(s.llamadas.some(([c]) => c === "send_message"), false, "sin mandar nada por su cuenta");
-    assert.deepEqual(app.fallos, []);
+    assert.deepEqual(app.failures, []);
     app.w.close();
   }
 
@@ -719,7 +719,7 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
         { id: "i1", name: null, folders: ["pa"], created_at: 1, updated_at: 1 },
         { id: "i2", name: "Landing", folders: ["pb"], created_at: 2, updated_at: 2 },
       ],
-      filas: [fila("t1", "pa", "i1"), fila("t3", "pb", "i2"), fila("t4", "pb", "i2")],
+      filas: [rowEl("t1", "pa", "i1"), rowEl("t3", "pb", "i2"), rowEl("t4", "pb", "i2")],
     });
     const app = await boot("listo", "spaces-delete-clean", base(s, { "space.w": "i2" }));
     await sleep(500);
@@ -730,7 +730,7 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
     assert.equal(botones.at(-1).textContent.trim(), "Eliminar y archivar 2 tareas");
     assert.equal(u.doc.querySelector("[data-delete-section]"), null, "sin nada que avisar no hay secciones");
     guarda("borrar-normal", app, s);
-    assert.deepEqual(app.fallos, []);
+    assert.deepEqual(app.failures, []);
     app.w.close();
   }
 
@@ -741,29 +741,29 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
         { id: "i1", name: null, folders: ["pa"], created_at: 1, updated_at: 1 },
         { id: "i2", name: "Facturación", folders: ["pb"], created_at: 2, updated_at: 2 },
       ],
-      filas: [fila("t1", "pa", "i1"), fila("t3", "pb", "i2")],
+      filas: [rowEl("t1", "pa", "i1"), rowEl("t3", "pb", "i2")],
     });
     const app = await boot("listo", "spaces-rename", base(s, { "space.w": "i2" }));
     await sleep(500);
     const u = util(app);
     u.disparador().dispatchEvent(new app.w.MouseEvent("dblclick", { bubbles: true }));
     await sleep(50);
-    const caja = u.editorDeNombre();
-    assert.ok(caja, "el doble clic abre el nombre de la franja para escribir");
+    const composer = u.editorDeNombre();
+    assert.ok(composer, "el doble clic abre el nombre de la franja para escribir");
     assert.equal(u.disparador(), null, "en el lugar del disparador");
-    assert.equal(caja.value, "Facturación", "con el nombre de hoy");
-    caja.value = "Cobros";
-    caja.dispatchEvent(new app.w.Event("input", { bubbles: true }));
-    caja.setSelectionRange(1, 3);
+    assert.equal(composer.value, "Facturación", "con el nombre de hoy");
+    composer.value = "Cobros";
+    composer.dispatchEvent(new app.w.Event("input", { bubbles: true }));
+    composer.setSelectionRange(1, 3);
     app.emit("cli-changed", { workspace: "w", command: "task.send" });
     await sleep(350);
-    assert.equal(u.editorDeNombre(), caja, "un refresco del CLI conserva el editor del espacio");
-    assert.equal(u.doc.activeElement, caja);
-    assert.equal(caja.value, "Cobros");
-    assert.equal(caja.selectionStart, 1);
-    assert.equal(caja.selectionEnd, 3);
+    assert.equal(u.editorDeNombre(), composer, "un refresco del CLI conserva el editor del espacio");
+    assert.equal(u.doc.activeElement, composer);
+    assert.equal(composer.value, "Cobros");
+    assert.equal(composer.selectionStart, 1);
+    assert.equal(composer.selectionEnd, 3);
     assert.equal(s.llamadas.filter(([c]) => c === "rename_space").length, 0);
-    u.tecla(caja, "Enter");
+    u.tecla(composer, "Enter");
     await sleep(300);
     assert.deepEqual(
       s.llamadas.filter(([c]) => c === "rename_space").map(([, a]) => a),
@@ -782,7 +782,7 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
     assert.equal(u.actual(), "Cobros", "Escape deja el nombre como estaba");
     assert.equal(s.llamadas.filter(([c]) => c === "rename_space").length, 1, "Escape no renombra");
     guarda("renombrar", app, s);
-    assert.deepEqual(app.fallos, []);
+    assert.deepEqual(app.failures, []);
     app.w.close();
   }
 
@@ -798,7 +798,7 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
         { id: "i2", name: "Facturación", folders: ["pb", "pc"], created_at: 2, updated_at: 2 },
       ],
       // Cada carpeta lleva una tarea suya.
-      filas: [fila("t1", "pa", "i1"), fila("t2", "pc", "i1"), fila("t3", "pb", "i2"), fila("t4", "pc", "i2")],
+      filas: [rowEl("t1", "pa", "i1"), rowEl("t2", "pc", "i1"), rowEl("t3", "pb", "i2"), rowEl("t4", "pc", "i2")],
     });
     const app = await boot("listo", "spaces-folders", base(s, { "space.w": "i1" }));
     await sleep(500);
@@ -820,7 +820,7 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
     await sleep(400);
     assert.deepEqual(u.carpetasEnTareas(), ["pb", "pc"], "and stays in the other one");
     guarda("carpetas-por-espacio", app, s);
-    assert.deepEqual(app.fallos, []);
+    assert.deepEqual(app.failures, []);
     app.w.close();
   }
 
@@ -832,12 +832,12 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
   {
     const s = servicio({
       spaces: [{ id: "i1", name: null, folders: ["pa"], created_at: 1, updated_at: 1 }],
-      filas: [fila("t1", "pa", "i1"), fila("t2", "pa", "i1")],
+      filas: [rowEl("t1", "pa", "i1"), rowEl("t2", "pa", "i1")],
     });
     const retenidas = [];
     const app = await boot("listo", "spaces-slow-reconcile", {
       ...base(s, { "pestanas.w.i1": tira(["t1", "t2"], "t1"), "space.w": "i1" }),
-      load_session: ({ id }) => ({ ...CON_TAREA.load_session, id, turns: [{ role: "assistant", text: `Respuesta de ${id}` }] }),
+      load_session: ({ id }) => ({ ...WITH_TASK.load_session, id, turns: [{ role: "assistant", text: `Respuesta de ${id}` }] }),
       list_active_turns: () => new Promise((resolve) => retenidas.push(resolve)),
     });
     await sleep(300);
@@ -853,7 +853,7 @@ export async function spaceScenarios({ boot, sleep, CON_TAREA }) {
     await sleep(300);
     assert.equal(activa(), "Tarea t2", "the late startup open does not take the window back");
     guarda("reconciliacion-lenta", app, s);
-    assert.deepEqual(app.fallos, []);
+    assert.deepEqual(app.failures, []);
     app.w.close();
   }
 }

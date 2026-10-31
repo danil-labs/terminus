@@ -2,7 +2,7 @@
 /** Configuración: proveedores, integraciones, plugins, Radiant, lengua, agentes y workspaces. */
 import assert from "node:assert/strict";
 import { sleep } from "../../tests/helpers/jsdom-app.mjs";
-import { RESPUESTAS, boot } from "../../tests/helpers/mount-guard.mjs";
+import { RESPONSES, boot } from "../../tests/helpers/mount-guard.mjs";
 
 let providerWorkspace = "ws-a";
 let available = [{ key: "acme", name: "acme" }];
@@ -19,8 +19,8 @@ const providerInfo = (scope) => ({
     selected_area: null, selected_areas: selections.get(scope) ?? [], connected_at: 1 }, unverified: null,
 });
 const providers = await boot("listo", "provider-workspaces", {
-  ...RESPUESTAS,
-  list_workspaces: () => ({ ...RESPUESTAS.list_workspaces, active: providerWorkspace }),
+  ...RESPONSES,
+  list_workspaces: () => ({ ...RESPONSES.list_workspaces, active: providerWorkspace }),
   list_git_hosts: ({ scope }) => [providerInfo(scope)],
   check_git_host: ({ scope }) => providerInfo(scope),
   git_host_areas: ({ scope }) => (selections.get(scope) ?? []).map(({ key }) => ({ key, name: key })),
@@ -116,11 +116,11 @@ assert.deepEqual(selectedKeys("ws-b"), ["acme"]);
 assert.deepEqual(selectedKeys("ws-a"), ["other"]);
 assert.equal(authentications, 0);
 assert.ok(providerCalls.includes("ws-a") && providerCalls.includes("ws-b"));
-assert.deepEqual(providers.fallos, []);
+assert.deepEqual(providers.failures, []);
 let integrationStatus = { installed: true, enabled: false };
 let pendingIntegration = null;
 const integration = await boot("listo", 9, {
-  ...RESPUESTAS,
+  ...RESPONSES,
   agentsview_status: () => pendingIntegration ?? integrationStatus,
 });
 const integrationButton = () => integration.w.document.querySelector('button[aria-label="Analytics"]');
@@ -148,7 +148,7 @@ integrationStatus = { installed: true, enabled: true };
 integration.emit("agentsview-changed", true);
 await sleep(30);
 assert.ok(integrationButton());
-assert.deepEqual(integration.fallos, []);
+assert.deepEqual(integration.failures, []);
 let pluginWorkspace = "w";
 let officeInstalled = false;
 let officeEnabled = false;
@@ -159,7 +159,7 @@ const catalog = () => ({ workspace: pluginWorkspace, plugins: [
   { id: "libreoffice", installed: officeInstalled, enabled: officeEnabled, version: officeInstalled ? "26.2.6" : null, bytes: officeInstalled ? 800000000 : null, supported: true },
 ] });
 const plugins = await boot("listo", "plugins", {
-  ...RESPUESTAS,
+  ...RESPONSES,
   list_integrations: () => pendingCatalog ?? catalog(),
   install_integration: ({ id }) => { pluginCalls.push(["install", id]); officeInstalled = true; },
   set_integration_enabled: ({ id, workspace, enabled }) => {
@@ -210,7 +210,7 @@ await sleep(30);
 finishCatalog({ workspace: "w", plugins: [{ id: "libreoffice", installed: true, enabled: true, supported: true, version: "stale", bytes: 10 }] });
 await sleep(30);
 assert.ok(officeButton("Instalar"), "an old catalog cannot replace the new workspace");
-assert.deepEqual(plugins.fallos, []);
+assert.deepEqual(plugins.failures, []);
 /**
  * Configuración › Radiant: Cloud se confirma con un botón, el código del login se
  * ve mientras se espera al navegador, la cuenta sale de `/v1/me`, una URL HTTP no
@@ -219,7 +219,7 @@ assert.deepEqual(plugins.fallos, []);
 const CLOUD = "https://radiant.danil.ai";
 const radiantCalls = [];
 const radiant = { server: null, signed_in: false, workspace: null, login: null };
-const radiantCuenta = {
+const radiantAccount = {
   status: "ok", email: "ana@example.test", organization: "Danil", organizations: [], note: null,
   workspaces: [{ id: "eng", name: "Ingeniería" }, { id: "ops", name: "Operación" }], revocada: false,
 };
@@ -227,11 +227,11 @@ let radiantIdentityPending = null;
 let radiantWorkspacesPending = null;
 const radiantStatus = () => ({ cloud_server: CLOUD, ...radiant });
 const radiantIdentity = () => ({
-  status: radiantCuenta.status, email: radiantCuenta.email, name: null,
-  organization: radiantCuenta.organization, organizations: radiantCuenta.organizations, note: radiantCuenta.note,
+  status: radiantAccount.status, email: radiantAccount.email, name: null,
+  organization: radiantAccount.organization, organizations: radiantAccount.organizations, note: radiantAccount.note,
 });
-const SIN_GOBIERNO = { governed: null, stale: false, notice: null, summary: null };
-const GOBERNADO = () => ({
+const UNGOVERNED = { governed: null, stale: false, notice: null, summary: null };
+const GOVERNED = () => ({
   governed: {
     workspace_id: "eng", workspace_name: "Ingeniería", server: CLOUD, mode: "managed",
     locked: ["context_sources", "mcp_servers", "skills", "agents", "models"],
@@ -254,26 +254,26 @@ const GOBERNADO = () => ({
     issued_at: 1_900_000_000,
   },
 });
-let gobierno = SIN_GOBIERNO;
-const radiantSesiones = [];
+let governance = UNGOVERNED;
+const radiantSessions = [];
 const radiantApp = await boot("listo", "settings-radiant", {
-  radiant_governance_status: () => structuredClone(gobierno),
+  radiant_governance_status: () => structuredClone(governance),
   radiant_govern_enable: () => {
     radiantCalls.push(["govern"]);
-    gobierno = GOBERNADO();
-    return structuredClone(gobierno);
+    governance = GOVERNED();
+    return structuredClone(governance);
   },
   radiant_govern_disable: () => {
     radiantCalls.push(["ungovern"]);
-    gobierno = SIN_GOBIERNO;
-    return structuredClone(gobierno);
+    governance = UNGOVERNED;
+    return structuredClone(governance);
   },
   radiant_govern_refresh: () => {
     throw { what: { clave: "radiant.error.unreachable" }, detail: "connection_failed" };
   },
-  list_radiant_connections: () => structuredClone(GOBERNADO().summary.connections),
+  list_radiant_connections: () => structuredClone(GOVERNED().summary.connections),
   list_governed_mcp_logins: () =>
-    gobierno.governed ? [{ id: "atlassian", name: "Atlassian", sesiones: radiantSesiones.slice() }] : [],
+    governance.governed ? [{ id: "atlassian", name: "Atlassian", sesiones: radiantSessions.slice() }] : [],
   list_mcp_providers: () => [
     { id: "claude", label: "Claude Code", recibe: true, instalado: true, login: true },
     { id: "grok", label: "Grok", recibe: true, instalado: true, login: false,
@@ -288,7 +288,7 @@ const radiantApp = await boot("listo", "settings-radiant", {
     radiantCalls.push(["connect", id]);
     return null;
   },
-  ...RESPUESTAS,
+  ...RESPONSES,
   list_language_packs: [], list_bundled_language_packs: [],
   radiant_status: () => radiantStatus(),
   radiant_set_server: ({ server }) => {
@@ -307,20 +307,20 @@ const radiantApp = await boot("listo", "settings-radiant", {
   },
   get_radiant_identity: () => radiantIdentityPending ?? radiantIdentity(),
   // Objetos nuevos en cada llamada, como por IPC: el `For` del selector recrea sus opciones.
-  list_radiant_workspaces: () => radiantWorkspacesPending ?? structuredClone(radiantCuenta.workspaces),
+  list_radiant_workspaces: () => radiantWorkspacesPending ?? structuredClone(radiantAccount.workspaces),
   radiant_select_workspace: ({ id }) => {
     radiantCalls.push(["workspace", id]);
-    if (radiantCuenta.revocada) {
+    if (radiantAccount.revocada) {
       Object.assign(radiant, { signed_in: false, workspace: null });
       throw { what: { clave: "radiant.error.no_session" }, detail: "HTTP 401 session_revoked" };
     }
     radiant.workspace = { id, name: id === "eng" ? "Ingeniería" : "Operación" };
-    if (id === "ops") radiantCuenta.organization = "Danil Operación";
+    if (id === "ops") radiantAccount.organization = "Danil Operación";
     return radiantStatus();
   },
   radiant_select_organization: ({ id }) => {
     radiantCalls.push(["organization", id]);
-    Object.assign(radiantCuenta, { status: "ok", organization: id === "org_otra" ? "Otra" : "Danil", note: null });
+    Object.assign(radiantAccount, { status: "ok", organization: id === "org_otra" ? "Otra" : "Danil", note: null });
     return radiantStatus();
   },
   radiant_logout: () => {
@@ -331,13 +331,13 @@ const radiantApp = await boot("listo", "settings-radiant", {
 });
 const rDoc = radiantApp.w.document;
 const rPanel = () => rDoc.querySelector("#cfg-panel");
-const rBoton = (texto) => [...rPanel().querySelectorAll("button")].find((b) => b.textContent?.trim() === texto);
-const rElegir = async (select, valor) => {
-  select.value = valor;
+const rBoton = (textValue) => [...rPanel().querySelectorAll("button")].find((b) => b.textContent?.trim() === textValue);
+const rPick = async (select, valueText) => {
+  select.value = valueText;
   select.dispatchEvent(new radiantApp.w.Event("change", { bubbles: true }));
   await sleep(120);
 };
-const completarLogin = async () => {
+const completeLogin = async () => {
   Object.assign(radiant, { signed_in: true, login: null });
   radiantApp.emit("radiant", null);
   await sleep(120);
@@ -360,28 +360,28 @@ await sleep(80);
 assert.ok(rPanel().textContent.includes("WDJB-MJHT"), "el código se ve mientras se espera al navegador");
 assert.ok(rBoton("Cancelar"));
 assert.ok(rBoton("Servidor propio").disabled, "no se cambia de servidor con un login en vuelo");
-await completarLogin();
+await completeLogin();
 assert.ok(
   rPanel().textContent.includes(`Sesión iniciada como ana@example.test · Danil en ${CLOUD}.`),
   "la cuenta y la organización salen del servidor",
 );
 const rSelect = rPanel().querySelector('select[aria-label="Workspace de Danil Teams"]');
 assert.ok(rSelect, "con sesión se elige workspace remoto");
-await rElegir(rSelect, "ops");
+await rPick(rSelect, "ops");
 assert.deepEqual(radiantCalls.at(-1), ["workspace", "ops"]);
 assert.ok(
   rPanel().textContent.includes("ana@example.test · Danil Operación"),
   "elegir workspace cambia de organización y la cuenta se relee",
 );
-const rMostrado = () => {
+const rShown = () => {
   const select = rPanel().querySelector('select[aria-label="Workspace de Danil Teams"]');
   return [select.value, select.selectedOptions[0]?.textContent];
 };
-assert.deepEqual(rMostrado(), ["ops", "Operación"], "tras elegir, el selector enseña el workspace elegido");
+assert.deepEqual(rShown(), ["ops", "Operación"], "tras elegir, el selector enseña el workspace elegido");
 rBoton("Actualizar").click();
 await sleep(80);
-assert.deepEqual(rMostrado(), ["ops", "Operación"], "y lo sigue enseñando al actualizar la lista");
-radiantCuenta.organization = "Danil";
+assert.deepEqual(rShown(), ["ops", "Operación"], "y lo sigue enseñando al actualizar la lista");
+radiantAccount.organization = "Danil";
 rBoton("Servidor propio").click();
 await sleep(50);
 const rUrl = rPanel().querySelector('input[aria-label="Dirección del servidor"]');
@@ -398,69 +398,69 @@ assert.ok(!rPanel().textContent.includes("ana@example.test"), "cerrar sesión bo
 // Cuenta A, la sesión se revoca en el servidor y entra la cuenta B: nada de A se queda.
 rBoton("Iniciar sesión").click();
 await sleep(80);
-await completarLogin();
+await completeLogin();
 assert.ok(rPanel().textContent.includes("ana@example.test · Danil"));
-radiantCuenta.revocada = true;
-await rElegir(rPanel().querySelector('select[aria-label="Workspace de Danil Teams"]'), "eng");
+radiantAccount.revocada = true;
+await rPick(rPanel().querySelector('select[aria-label="Workspace de Danil Teams"]'), "eng");
 assert.ok(rPanel().textContent.includes(`Sin sesión en ${CLOUD}.`), "la revocación se ve como sesión cerrada");
 assert.ok(!rPanel().textContent.includes("ana@example.test"), "sin sesión no se enseña la cuenta anterior");
-Object.assign(radiantCuenta, { email: "bea@example.test", organization: "Otra", workspaces: [{ id: "legal", name: "Legal" }], revocada: false });
+Object.assign(radiantAccount, { email: "bea@example.test", organization: "Otra", workspaces: [{ id: "legal", name: "Legal" }], revocada: false });
 rBoton("Iniciar sesión").click();
 await sleep(80);
-await completarLogin();
+await completeLogin();
 assert.ok(rPanel().textContent.includes("bea@example.test · Otra"), "el login nuevo enseña su propia cuenta");
 assert.ok(!rPanel().textContent.includes("ana@example.test"));
-const opciones = [...rPanel().querySelectorAll('select[aria-label="Workspace de Danil Teams"] option')].map((o) => o.value).filter(Boolean);
-assert.deepEqual(opciones, ["legal"], "y los workspaces de su cuenta, no los de la anterior");
+const optionList = [...rPanel().querySelectorAll('select[aria-label="Workspace de Danil Teams"] option')].map((o) => o.value).filter(Boolean);
+assert.deepEqual(optionList, ["legal"], "y los workspaces de su cuenta, no los de la anterior");
 // Cloud con la cuenta y la lista en camino, y se pasa a un servidor propio que ya tiene sesión de otra cuenta.
-const PROPIO = "https://radiant.example.com";
+const OWN = "https://radiant.example.com";
 const rWorkspaces = () => rPanel().querySelector('select[aria-label="Workspace de Danil Teams"]');
-const rOpciones = () => [...rWorkspaces().querySelectorAll("option")].map((o) => o.value).filter(Boolean);
-const rPedirCuentaYLista = async (id) => {
-  const pedidas = {};
-  radiantIdentityPending = new Promise((entregar, fallar) => Object.assign(pedidas, { cuenta: { entregar, fallar } }));
-  radiantWorkspacesPending = new Promise((entregar, fallar) => Object.assign(pedidas, { lista: { entregar, fallar } }));
-  await rElegir(rWorkspaces(), id);
+const rOptions = () => [...rWorkspaces().querySelectorAll("option")].map((o) => o.value).filter(Boolean);
+const rRequestAccountAndList = async (id) => {
+  const requested = {};
+  radiantIdentityPending = new Promise((deliver, failNow) => Object.assign(requested, { cuenta: { entregar: deliver, fallar: failNow } }));
+  radiantWorkspacesPending = new Promise((deliver, failNow) => Object.assign(requested, { lista: { entregar: deliver, fallar: failNow } }));
+  await rPick(rWorkspaces(), id);
   rBoton("Actualizar").click();
   await sleep(50);
   radiantIdentityPending = null;
   radiantWorkspacesPending = null;
-  return pedidas;
+  return requested;
 };
-const deCloud = { cuenta: radiantIdentity(), lista: radiantCuenta.workspaces };
-const tardias = await rPedirCuentaYLista("legal");
+const fromCloud = { cuenta: radiantIdentity(), lista: radiantAccount.workspaces };
+const lateOnes = await rRequestAccountAndList("legal");
 radiant.workspace = null;
-Object.assign(radiantCuenta, { email: "dora@example.test", organization: "Propia", workspaces: [{ id: "casa", name: "Casa" }] });
+Object.assign(radiantAccount, { email: "dora@example.test", organization: "Propia", workspaces: [{ id: "casa", name: "Casa" }] });
 rBoton("Servidor propio").click();
 await sleep(50);
-const rPropio = rPanel().querySelector('input[aria-label="Dirección del servidor"]');
-rPropio.value = PROPIO;
-rPropio.dispatchEvent(new radiantApp.w.Event("input", { bubbles: true }));
+const rOwn = rPanel().querySelector('input[aria-label="Dirección del servidor"]');
+rOwn.value = OWN;
+rOwn.dispatchEvent(new radiantApp.w.Event("input", { bubbles: true }));
 rBoton("Usar este servidor").click();
 await sleep(120);
-assert.deepEqual(radiantCalls.at(-1), ["server", PROPIO]);
-assert.ok(rPanel().textContent.includes(`Sesión iniciada como dora@example.test · Propia en ${PROPIO}.`));
-tardias.cuenta.entregar(deCloud.cuenta);
-tardias.lista.entregar(deCloud.lista);
+assert.deepEqual(radiantCalls.at(-1), ["server", OWN]);
+assert.ok(rPanel().textContent.includes(`Sesión iniciada como dora@example.test · Propia en ${OWN}.`));
+lateOnes.cuenta.entregar(fromCloud.cuenta);
+lateOnes.lista.entregar(fromCloud.lista);
 await sleep(80);
 assert.ok(!rPanel().textContent.includes("bea@example.test"), "la cuenta de Cloud que llega tarde no entra en el servidor propio");
 assert.ok(rPanel().textContent.includes("dora@example.test · Propia"));
-assert.deepEqual(rOpciones(), ["casa"], "ni sus workspaces");
+assert.deepEqual(rOptions(), ["casa"], "ni sus workspaces");
 // Cuenta A con sus peticiones en camino, cierra sesión y entra la cuenta B: el fallo tardío de A no borra a B.
-const fallidas = await rPedirCuentaYLista("casa");
+const failedOnes = await rRequestAccountAndList("casa");
 rBoton("Cerrar sesión").click();
 await sleep(80);
-Object.assign(radiantCuenta, { email: "eva@example.test", workspaces: [{ id: "taller", name: "Taller" }] });
+Object.assign(radiantAccount, { email: "eva@example.test", workspaces: [{ id: "taller", name: "Taller" }] });
 rBoton("Iniciar sesión").click();
 await sleep(80);
-await completarLogin();
+await completeLogin();
 assert.ok(rPanel().textContent.includes("eva@example.test · Propia"));
-const caducada = { what: { clave: "radiant.error.no_session" }, detail: "HTTP 401 session_revoked" };
-fallidas.cuenta.fallar(caducada);
-fallidas.lista.fallar(caducada);
+const expired = { what: { clave: "radiant.error.no_session" }, detail: "HTTP 401 session_revoked" };
+failedOnes.cuenta.fallar(expired);
+failedOnes.lista.fallar(expired);
 await sleep(80);
 assert.ok(rPanel().textContent.includes("eva@example.test · Propia"), "el fallo tardío de la cuenta anterior no borra la nueva");
-assert.deepEqual(rOpciones(), ["taller"]);
+assert.deepEqual(rOptions(), ["taller"]);
 assert.ok(!rPanel().textContent.includes("No hay sesión en este servidor"), "ni enseña su error");
 rBoton("Danil Cloud").click();
 await sleep(120);
@@ -468,31 +468,31 @@ assert.deepEqual(radiantCalls.at(-1), ["server", CLOUD]);
 // Una cuenta en varias organizaciones elige una antes de ver workspaces.
 rBoton("Cerrar sesión").click();
 await sleep(80);
-Object.assign(radiantCuenta, {
+Object.assign(radiantAccount, {
   status: "organization_selection_required", email: "carla@example.test", organization: null,
   organizations: [{ id: "org_danil", name: "Danil" }, { id: "org_otra", name: "Otra" }],
   note: { clave: "radiant.identity.organization_selection_required" },
 });
 rBoton("Iniciar sesión").click();
 await sleep(80);
-await completarLogin();
+await completeLogin();
 assert.ok(rPanel().textContent.includes("Tu cuenta pertenece a varias organizaciones."), "lo que falta sale del catálogo");
 assert.equal(rPanel().querySelector('select[aria-label="Workspace de Danil Teams"]'), null, "sin organización no se ofrecen workspaces");
-const rOrganizacion = rPanel().querySelector('select[aria-label="Organización"]');
-assert.deepEqual([...rOrganizacion.querySelectorAll("option")].map((o) => o.value).filter(Boolean), ["org_danil", "org_otra"]);
-await rElegir(rOrganizacion, "org_otra");
+const rOrganization = rPanel().querySelector('select[aria-label="Organización"]');
+assert.deepEqual([...rOrganization.querySelectorAll("option")].map((o) => o.value).filter(Boolean), ["org_danil", "org_otra"]);
+await rPick(rOrganization, "org_otra");
 assert.deepEqual(radiantCalls.at(-1), ["organization", "org_otra"]);
 assert.ok(rPanel().textContent.includes("carla@example.test · Otra"), "la organización elegida queda en la cuenta");
 assert.equal(rPanel().querySelector('select[aria-label="Organización"]'), null);
 assert.ok(rPanel().querySelector('select[aria-label="Workspace de Danil Teams"]'));
 // Gobernar el workspace con el remoto elegido: lo instalado se resume y lo que falta se dice.
-const rGobierno = () => rPanel().querySelector('button[aria-label="Administrar este workspace con Danil Teams"]');
-assert.ok(rGobierno()?.disabled, "sin workspace remoto elegido no se gobierna");
+const rGovernance = () => rPanel().querySelector('button[aria-label="Administrar este workspace con Danil Teams"]');
+assert.ok(rGovernance()?.disabled, "sin workspace remoto elegido no se gobierna");
 radiant.workspace = { id: "eng", name: "Ingeniería" };
 radiantApp.emit("radiant", null);
 await sleep(120);
 assert.ok(rPanel().textContent.includes("Administrar este workspace con Danil Teams (Ingeniería)."));
-rGobierno().click();
+rGovernance().click();
 await sleep(120);
 assert.deepEqual(radiantCalls.at(-1), ["govern"]);
 assert.ok(rPanel().textContent.includes("Lo administra Danil Teams · workspace Ingeniería."), "el interruptor queda puesto");
@@ -512,58 +512,58 @@ rBoton("Iniciar sesión con Claude Code").click();
 await sleep(80);
 assert.deepEqual(radiantCalls.at(-1), ["mcp_login", "claude", "atlassian"]);
 assert.ok(rPanel().textContent.includes("Se abrió tu navegador para autorizar Atlassian."));
-radiantSesiones.push("claude");
+radiantSessions.push("claude");
 radiantApp.emit("mcp", null);
 await sleep(120);
 assert.equal(rBoton("Iniciar sesión con Claude Code"), undefined, "con sesión ya no se ofrece");
 assert.ok(rPanel().textContent.includes("Sesión iniciada"));
-gobierno = { ...GOBERNADO(), stale: true };
-gobierno.governed.last_error = "radiant.error.unreachable";
+governance = { ...GOVERNED(), stale: true };
+governance.governed.last_error = "radiant.error.unreachable";
 rBoton("Renovar").click();
 await sleep(60);
 radiantApp.emit("radiant", null);
 await sleep(120);
 assert.ok(rPanel().textContent.includes("Vencido"), "un gobierno sin renovar se marca vencido");
 assert.ok(rPanel().textContent.includes("No se pudo renovar."), "y se dice que lo instalado sigue");
-rGobierno().click();
+rGovernance().click();
 await sleep(120);
 assert.deepEqual(radiantCalls.at(-1), ["ungovern"]);
 assert.ok(!rPanel().textContent.includes("Lo administra Danil Teams"), "desactivar quita el gobierno de la pantalla");
-gobierno = { ...SIN_GOBIERNO, notice: "radiant.governance.notice.denied" };
+governance = { ...UNGOVERNED, notice: "radiant.governance.notice.denied" };
 radiantApp.emit("radiant", null);
 await sleep(120);
 assert.ok(rPanel().textContent.includes("Danil Teams dejó de conceder este workspace"), "un 403 se avisa");
-gobierno = SIN_GOBIERNO;
+governance = UNGOVERNED;
 radiant.workspace = null;
 // Cambiar de workspace de Terminus borra lo mostrado, y la respuesta tardía del anterior no entra.
-const cambiarDeWorkspace = () => radiantApp.w.dispatchEvent(new radiantApp.w.CustomEvent("harness:workspace"));
+const switchWorkspace = () => radiantApp.w.dispatchEvent(new radiantApp.w.CustomEvent("harness:workspace"));
 const carla = radiantIdentity();
-let entregarIdentidad;
-radiantIdentityPending = new Promise((resolve) => { entregarIdentidad = resolve; });
+let deliverIdentity;
+radiantIdentityPending = new Promise((resolve) => { deliverIdentity = resolve; });
 rBoton("Cerrar sesión").click();
 await sleep(80);
 rBoton("Iniciar sesión").click();
 await sleep(80);
-await completarLogin();
+await completeLogin();
 assert.ok(rPanel().textContent.includes(`Sesión iniciada en ${CLOUD}.`), "la identidad del primer workspace sigue en camino");
 radiantIdentityPending = null;
 Object.assign(radiant, { server: CLOUD, signed_in: true, workspace: null, login: null });
-Object.assign(radiantCuenta, { status: "ok", email: "bea@example.test", organization: "Otra", organizations: [], note: null, workspaces: [{ id: "legal", name: "Legal" }] });
-cambiarDeWorkspace();
+Object.assign(radiantAccount, { status: "ok", email: "bea@example.test", organization: "Otra", organizations: [], note: null, workspaces: [{ id: "legal", name: "Legal" }] });
+switchWorkspace();
 assert.ok(!rPanel().textContent.includes("Sesión iniciada"), "el cambio borra la sesión mostrada sin esperar al servicio");
 await sleep(120);
 assert.ok(rPanel().textContent.includes("bea@example.test · Otra"), "el workspace nuevo enseña su propia cuenta");
-entregarIdentidad(carla);
+deliverIdentity(carla);
 await sleep(80);
 assert.ok(!rPanel().textContent.includes("carla@example.test"), "la respuesta tardía del workspace anterior se descarta");
 assert.ok(rPanel().textContent.includes("bea@example.test · Otra"));
 Object.assign(radiant, { server: null, signed_in: false, workspace: null, login: null });
-cambiarDeWorkspace();
+switchWorkspace();
 await sleep(80);
 assert.equal(rBoton("Iniciar sesión"), undefined, "un workspace sin servidor elegido no hereda el del anterior");
 assert.equal(rPanel().querySelector("select"), null, "ni su cuenta ni sus workspaces remotos");
 assert.ok(!rPanel().textContent.includes("bea@example.test"));
-assert.deepEqual(radiantApp.fallos, []);
+assert.deepEqual(radiantApp.failures, []);
 /**
  * El selector de lengua dice la lengua que se acaba de poner, también
  * mientras el disco no ha terminado de guardarla. Si cambiar de lengua
@@ -572,11 +572,11 @@ assert.deepEqual(radiantApp.fallos, []);
 let savedLanguage = null;
 const languageSaves = [];
 const languageApp = await boot("listo", "language-select", {
-  ...RESPUESTAS,
+  ...RESPONSES,
   list_workspaces: () => ({ workspaces: [{ id: "w", name: "W", context_root: null, lengua: savedLanguage }], active: "w" }),
   list_language_packs: [], list_bundled_language_packs: [],
-  set_workspace_language: ({ lengua }) =>
-    new Promise((resolve) => languageSaves.push(() => { savedLanguage = lengua; resolve(null); })),
+  set_workspace_language: ({ lengua: language }) =>
+    new Promise((resolve) => languageSaves.push(() => { savedLanguage = language; resolve(null); })),
 });
 const languageDoc = languageApp.w.document;
 languageDoc.querySelector('button[aria-label="Configuración"]')?.click();
@@ -599,345 +599,345 @@ await pickLanguage("es");
 assert.equal(languageDoc.documentElement.lang, "es");
 assert.equal(languageSelect().value, "es");
 languageSaves.splice(0).forEach((save) => save());
-assert.deepEqual(languageApp.fallos, []);
+assert.deepEqual(languageApp.failures, []);
 /**
  * Configuración › Agentes contra un catálogo con estado: crear en otra
  * carpeta, agregar con mudanza, rechazo dentro del diálogo, quitar de
  * «todas», deshacer, y un deshacer que choca con un cambio hecho desde fuera.
  */
-const carpetasDelCatalogo = [
+const catalogFolders = [
   { id: "app", name: "Terminus App", kind: "folder", sources: [], portfolio: null },
   { id: "rad", name: "Radiant", kind: "folder", sources: [], portfolio: null },
   { id: "kn", name: "kn", kind: "folder", sources: [], portfolio: null },
 ];
-const idsDelCatalogo = carpetasDelCatalogo.map((p) => p.id);
-const nombreDeCarpeta = (id) => carpetasDelCatalogo.find((p) => p.id === id)?.name ?? id;
-const qaDelRepositorio = "/repo/app/.agents/agents/qa/agent.md";
-const qaDeRadiant = "/repo/rad/.agents/agents/qa/agent.md";
-let radiantDeclaraQa = false;
-const agentesPropios = [
+const catalogIds = catalogFolders.map((p) => p.id);
+const folderNameOf = (id) => catalogFolders.find((p) => p.id === id)?.name ?? id;
+const repositoryQa = "/repo/app/.agents/agents/qa/agent.md";
+const radiantQa = "/repo/rad/.agents/agents/qa/agent.md";
+let radiantDeclaresQa = false;
+const ownAgents = [
   { name: "giskard-po", scope: { kind: "project", id: "app" }, list: ["app"], display: "Giskard Product Owner", description: "Product Owner de Terminus." },
   { name: "notas-de-version", scope: { kind: "workspace" }, list: null, display: null, description: "Escribe las notas de versión." },
   { name: "qa", scope: { kind: "project", id: "kn" }, list: ["kn"], display: "QA de kn", description: "Prueba los flujos de kn." },
 ];
-const declaracion = (a) => {
+const declaration = (a) => {
   const base = a.scope.kind === "project" ? `/ws/projects/${a.scope.id}/agents/${a.name}` : `/ws/agents/${a.name}`;
   return { name: a.name, description: a.description, instructions: "Trabaja.", tools: [], model: null, origin: `${base}/agent.md`, folder: base, providers: ["claude"], own: true, own_scope: a.scope };
 };
-const perfilDe = (display) => ({ display_name: display, body: null, background: null, veil: 0.82, provider: null, model: null, effort: null, hidden: false });
-const cambiosDeCarpetas = [];
-const creados = [];
-const agentesApp = await boot("listo", "settings-agents", {
-  ...RESPUESTAS,
-  list_projects: () => structuredClone(carpetasDelCatalogo),
+const profileOf = (display) => ({ display_name: display, body: null, background: null, veil: 0.82, provider: null, model: null, effort: null, hidden: false });
+const folderChanges = [];
+const createdItems = [];
+const agentsApp = await boot("listo", "settings-agents", {
+  ...RESPONSES,
+  list_projects: () => structuredClone(catalogFolders),
   list_language_packs: [], list_bundled_language_packs: [],
   list_agent_profiles: {},
   // Clonado como lo entrega el IPC: el front reconcilia sobre lo que recibe.
   list_machine_agents: () => structuredClone({
-    own: agentesPropios
+    own: ownAgents
       .map((a) => ({
-        agent: declaracion(a),
-        profile: perfilDe(a.display),
-        folders: a.list === null ? idsDelCatalogo : idsDelCatalogo.filter((id) => a.list.includes(id)),
+        agent: declaration(a),
+        profile: profileOf(a.display),
+        folders: a.list === null ? catalogIds : catalogIds.filter((id) => a.list.includes(id)),
         all_folders: a.list === null,
-        blocked: a.name === "qa" ? [{ folder: "app", origin: qaDelRepositorio, repository: true }] : [],
+        blocked: a.name === "qa" ? [{ folder: "app", origin: repositoryQa, repository: true }] : [],
         catalog_taken: null,
       }))
       .sort((x, y) => x.agent.name.localeCompare(y.agent.name)),
     repository: [{
-      agent: { name: "qa", description: "Verifica que un cambio funcione.", instructions: "", tools: [], model: null, origin: qaDelRepositorio, folder: "/repo/app/.agents/agents/qa", providers: ["claude"], own: false, own_scope: null },
-      profile: perfilDe(null),
+      agent: { name: "qa", description: "Verifica que un cambio funcione.", instructions: "", tools: [], model: null, origin: repositoryQa, folder: "/repo/app/.agents/agents/qa", providers: ["claude"], own: false, own_scope: null },
+      profile: profileOf(null),
       folders: ["app"],
     }],
   }),
   change_agent_folders: ({ scope, name, change }) => {
-    cambiosDeCarpetas.push([name, scope, change]);
-    const a = agentesPropios.find((x) => x.name === name && JSON.stringify(x.scope) === JSON.stringify(scope));
-    const niega = (codigo, origin = "") => Promise.reject({
-      what: { clave: `settings.agents.error.${codigo}`, datos: { name, folder: change.folder ? nombreDeCarpeta(change.folder) : "", origin } },
-      detail: codigo,
+    folderChanges.push([name, scope, change]);
+    const a = ownAgents.find((x) => x.name === name && JSON.stringify(x.scope) === JSON.stringify(scope));
+    const denies = (codeText, origin = "") => Promise.reject({
+      what: { clave: `settings.agents.error.${codeText}`, datos: { name, folder: change.folder ? folderNameOf(change.folder) : "", origin } },
+      detail: codeText,
     });
-    if (!a) return niega("missing");
-    const actual = a.list ?? idsDelCatalogo;
+    if (!a) return denies("missing");
+    const current = a.list ?? catalogIds;
     if (change.kind === "add") {
-      if (actual.includes(change.folder)) return niega("already_active");
-      if (name === "qa" && change.folder === "app") return niega("shadowed_repository", qaDelRepositorio);
-      if (name === "qa" && change.folder === "rad" && radiantDeclaraQa) return niega("shadowed_repository", qaDeRadiant);
+      if (current.includes(change.folder)) return denies("already_active");
+      if (name === "qa" && change.folder === "app") return denies("shadowed_repository", repositoryQa);
+      if (name === "qa" && change.folder === "rad" && radiantDeclaresQa) return denies("shadowed_repository", radiantQa);
       a.scope = { kind: "workspace" };
-      a.list = [...actual, change.folder];
+      a.list = [...current, change.folder];
       return [...a.list];
     }
     if (change.kind === "remove") {
-      const quedan = actual.filter((id) => id !== change.folder);
-      if (quedan.length === 0) return niega("last_folder");
-      a.list = quedan;
-      return [...quedan];
+      const remaining = current.filter((id) => id !== change.folder);
+      if (remaining.length === 0) return denies("last_folder");
+      a.list = remaining;
+      return [...remaining];
     }
-    if (JSON.stringify(change.expected) !== JSON.stringify(a.list)) return niega("conflict");
+    if (JSON.stringify(change.expected) !== JSON.stringify(a.list)) return denies("conflict");
     a.list = change.folders;
     return structuredClone(a.list);
   },
   create_agent: ({ name, description, scope }) => {
-    creados.push([name, scope]);
+    createdItems.push([name, scope]);
     const a = { name, scope, list: [scope.id], display: null, description };
-    agentesPropios.push(a);
-    return { agent: declaracion(a), eclipsado_por: null };
+    ownAgents.push(a);
+    return { agent: declaration(a), eclipsado_por: null };
   },
   save_agent_profile: ({ name, displayName }) => {
-    const a = agentesPropios.find((x) => x.name === name);
+    const a = ownAgents.find((x) => x.name === name);
     if (a) a.display = displayName;
     return null;
   },
 });
-const agDoc = agentesApp.w.document;
-let avisosAlRiel = 0;
-agentesApp.w.addEventListener("harness:encargados", () => avisosAlRiel++);
-let avisosDePerfiles = 0;
-agentesApp.w.addEventListener("harness:profiles", () => avisosDePerfiles++);
-const tecla = (key) =>
-  agDoc.activeElement.dispatchEvent(new agentesApp.w.KeyboardEvent("keydown", { key, bubbles: true }));
-const botonCon = (raiz, texto) => [...raiz.querySelectorAll("button")].find((b) => b.textContent?.trim() === texto);
-const propia = (name) =>
+const agDoc = agentsApp.w.document;
+let railNotices = 0;
+agentsApp.w.addEventListener("harness:encargados", () => railNotices++);
+let profileNotices = 0;
+agentsApp.w.addEventListener("harness:profiles", () => profileNotices++);
+const pressedKey = (key) =>
+  agDoc.activeElement.dispatchEvent(new agentsApp.w.KeyboardEvent("keydown", { key, bubbles: true }));
+const buttonWith = (rootDir, textValue) => [...rootDir.querySelectorAll("button")].find((b) => b.textContent?.trim() === textValue);
+const ownItem = (name) =>
   [...agDoc.querySelectorAll('section[aria-labelledby="agents-own"] [role="list"] > [role="listitem"]')]
     .find((li) => [...li.querySelectorAll("span")].some((s) => s.textContent === name));
-const rotuloDeCarpetas = (name) => propia(name).querySelector('[role="group"] > span').textContent;
-const chips = (name) => [...propia(name).querySelectorAll('[role="group"] > span')].slice(1).map((s) => s.textContent);
-const quitarDe = (name, carpeta) => propia(name).querySelector(`button[aria-label="Quitar ${name} de ${carpeta}"]`);
-const menuDe = (name) => agDoc.querySelector(`[role="menu"][aria-label="Agregar ${name} a un proyecto"]`);
-const abrirMenuDe = async (name) => {
-  botonCon(propia(name), "Agregar a proyecto…").click();
+const foldersLabel = (name) => ownItem(name).querySelector('[role="group"] > span').textContent;
+const chips = (name) => [...ownItem(name).querySelectorAll('[role="group"] > span')].slice(1).map((s) => s.textContent);
+const removeFrom = (name, folder) => ownItem(name).querySelector(`button[aria-label="Quitar ${name} de ${folder}"]`);
+const menuOf = (name) => agDoc.querySelector(`[role="menu"][aria-label="Agregar ${name} a un proyecto"]`);
+const openMenuOf = async (name) => {
+  buttonWith(ownItem(name), "Agregar a proyecto…").click();
   await sleep(60);
-  return menuDe(name);
+  return menuOf(name);
 };
-const renglones = (menu) => [...menu.querySelectorAll('[role="menuitem"]')];
-const renglon = (menu, carpeta) => renglones(menu).find((r) => r.textContent.startsWith(carpeta));
-const dialogoDeMudanza = (name) =>
+const lineEls = (menu) => [...menu.querySelectorAll('[role="menuitem"]')];
+const lineEl = (menu, folder) => lineEls(menu).find((r) => r.textContent.startsWith(folder));
+const moveDialog = (name) =>
   [...agDoc.querySelectorAll('[role="dialog"],[role="alertdialog"]')]
     .find((d) => d.textContent.includes(`¿Pasar ${name} al catálogo del workspace?`));
-const panelDeAjustes = () => agDoc.querySelector("#cfg-panel");
+const settingsPanel = () => agDoc.querySelector("#cfg-panel");
 
 agDoc.querySelector('button[aria-label="Configuración"]')?.click();
 await sleep(100);
-const pestanas = [...agDoc.querySelectorAll('[role="tab"][id^="cfg-tab-"]')].map((b) => b.id);
-const proyectos = pestanas.indexOf("cfg-tab-projects");
-assert.deepEqual(pestanas.slice(proyectos, proyectos + 2), ["cfg-tab-projects", "cfg-tab-agents-skills"]);
+const tabs = [...agDoc.querySelectorAll('[role="tab"][id^="cfg-tab-"]')].map((b) => b.id);
+const projects = tabs.indexOf("cfg-tab-projects");
+assert.deepEqual(tabs.slice(projects, projects + 2), ["cfg-tab-projects", "cfg-tab-agents-skills"]);
 agDoc.querySelector("#cfg-tab-projects").click();
 // La página llega en su propio trozo: se espera a que pinte sus filas.
 for (let i = 0; i < 120 && !agDoc.querySelector("#cfg-panel [data-settings-project]"); i++) await sleep(25);
-const filasDeProyectos = [...agDoc.querySelectorAll("#cfg-panel [data-settings-project]")];
-assert.deepEqual(filasDeProyectos.map((f) => f.getAttribute("data-settings-project")), idsDelCatalogo, "Ajustes › Proyectos lista las carpetas del espacio");
-assert.ok(filasDeProyectos.every((f) => f.textContent.includes("Archivos") && f.textContent.includes("sin tareas")), "cada fila dice su tipo en palabras y que no tiene tareas");
-assert.doesNotMatch(panelDeAjustes().textContent, /\bgit\b/i, "la página no le habla de git a la persona");
+const projectRows = [...agDoc.querySelectorAll("#cfg-panel [data-settings-project]")];
+assert.deepEqual(projectRows.map((f) => f.getAttribute("data-settings-project")), catalogIds, "Ajustes › Proyectos lista las carpetas del espacio");
+assert.ok(projectRows.every((f) => f.textContent.includes("Archivos") && f.textContent.includes("sin tareas")), "cada fila dice su tipo en palabras y que no tiene tareas");
+assert.doesNotMatch(settingsPanel().textContent, /\bgit\b/i, "la página no le habla de git a la persona");
 agDoc.querySelector("#cfg-tab-agents-skills").click();
 // Agentes llega en su propio trozo: se espera a que pinte sus filas.
-for (let i = 0; i < 120 && !propia("giskard-po"); i++) await sleep(25);
+for (let i = 0; i < 120 && !ownItem("giskard-po"); i++) await sleep(25);
 
-assert.ok(propia("giskard-po"), "la sección lista los agentes propios");
+assert.ok(ownItem("giskard-po"), "la sección lista los agentes propios");
 assert.deepEqual(chips("giskard-po"), ["Terminus App"]);
-assert.equal(quitarDe("giskard-po", "Terminus App"), null, "la última carpeta no lleva ×");
-assert.equal(rotuloDeCarpetas("notas-de-version"), "Activo en todos los proyectos:");
+assert.equal(removeFrom("giskard-po", "Terminus App"), null, "la última carpeta no lleva ×");
+assert.equal(foldersLabel("notas-de-version"), "Activo en todos los proyectos:");
 assert.deepEqual(chips("notas-de-version"), ["Terminus App", "Radiant", "kn"]);
-assert.ok(quitarDe("notas-de-version", "kn"), "«todas» se ve carpeta por carpeta, cada una con ×");
-assert.equal(botonCon(propia("notas-de-version"), "Agregar a proyecto…"), undefined);
-const delRepo = agDoc.querySelector('section[aria-labelledby="agents-repository"]');
-assert.ok(delRepo?.textContent.includes("Declarado en:"), "los del repositorio se ven aparte y solo se leen");
-assert.equal(botonCon(delRepo, "Agregar a proyecto…"), undefined);
+assert.ok(removeFrom("notas-de-version", "kn"), "«todas» se ve carpeta por carpeta, cada una con ×");
+assert.equal(buttonWith(ownItem("notas-de-version"), "Agregar a proyecto…"), undefined);
+const fromRepo = agDoc.querySelector('section[aria-labelledby="agents-repository"]');
+assert.ok(fromRepo?.textContent.includes("Declarado en:"), "los del repositorio se ven aparte y solo se leen");
+assert.equal(buttonWith(fromRepo, "Agregar a proyecto…"), undefined);
 
 // Crear desde Configuración: el formulario del riel, con la carpeta elegible.
-botonCon(panelDeAjustes(), "Agregar nuevo agente").click();
+buttonWith(settingsPanel(), "Agregar nuevo agente").click();
 await sleep(80);
-const nuevo = [...agDoc.querySelectorAll('[role="dialog"]')].find((d) => d.textContent.includes("Nuevo agente"));
-assert.ok(nuevo, "«Agregar nuevo agente» abre el formulario de siempre");
-const carpetaNueva = nuevo.querySelector("select");
-assert.equal(carpetaNueva.value, "app", "sin carpeta abierta, nace en la primera");
-carpetaNueva.value = "rad";
-carpetaNueva.dispatchEvent(new agentesApp.w.Event("change", { bubbles: true }));
-const escribir = (campo, texto) => {
-  campo.value = texto;
-  campo.dispatchEvent(new agentesApp.w.InputEvent("input", { bubbles: true }));
+const newItem = [...agDoc.querySelectorAll('[role="dialog"]')].find((d) => d.textContent.includes("Nuevo agente"));
+assert.ok(newItem, "«Agregar nuevo agente» abre el formulario de siempre");
+const newFolder = newItem.querySelector("select");
+assert.equal(newFolder.value, "app", "sin carpeta abierta, nace en la primera");
+newFolder.value = "rad";
+newFolder.dispatchEvent(new agentsApp.w.Event("change", { bubbles: true }));
+const typeText = (inputField, textValue) => {
+  inputField.value = textValue;
+  inputField.dispatchEvent(new agentsApp.w.InputEvent("input", { bubbles: true }));
 };
-const [campoNombre, campoQueHace] = nuevo.querySelectorAll("input");
-escribir(campoNombre, "Revisor");
-escribir(campoQueHace, "Revisa antes de que aterrice.");
-escribir(nuevo.querySelector("textarea"), "Con criterio.");
-botonCon(nuevo, "Crear").click();
+const [nameInput, whatItDoesField] = newItem.querySelectorAll("input");
+typeText(nameInput, "Revisor");
+typeText(whatItDoesField, "Revisa antes de que aterrice.");
+typeText(newItem.querySelector("textarea"), "Con criterio.");
+buttonWith(newItem, "Crear").click();
 await sleep(150);
-assert.deepEqual(creados, [["revisor", { kind: "project", id: "rad" }]], "nace de proyecto en la carpeta elegida");
+assert.deepEqual(createdItems, [["revisor", { kind: "project", id: "rad" }]], "nace de proyecto en la carpeta elegida");
 assert.equal([...agDoc.querySelectorAll('[role="dialog"]')].some((d) => d.textContent.includes("Nuevo agente")), false);
 assert.deepEqual(chips("revisor"), ["Radiant"], "aparece en la lista sin reabrir Configuración");
 
 // Menú: marcadas, deshabilitadas con su razón, flechas, y Esc devuelve el foco.
-let menu = await abrirMenuDe("giskard-po");
+let menu = await openMenuOf("giskard-po");
 assert.ok(menu, "«Agregar a proyecto…» abre el menú de carpetas");
-assert.equal(renglon(menu, "Terminus App").getAttribute("aria-disabled"), "true");
-assert.ok(renglon(menu, "Terminus App").textContent.includes("Ya está aquí"));
-assert.equal(agDoc.activeElement, renglon(menu, "Radiant"), "el foco entra al primer renglón elegible");
-tecla("ArrowDown");
-assert.equal(agDoc.activeElement, renglon(menu, "kn"));
-tecla("Escape");
+assert.equal(lineEl(menu, "Terminus App").getAttribute("aria-disabled"), "true");
+assert.ok(lineEl(menu, "Terminus App").textContent.includes("Ya está aquí"));
+assert.equal(agDoc.activeElement, lineEl(menu, "Radiant"), "el foco entra al primer renglón elegible");
+pressedKey("ArrowDown");
+assert.equal(agDoc.activeElement, lineEl(menu, "kn"));
+pressedKey("Escape");
 await sleep(60);
-assert.equal(menuDe("giskard-po"), null, "Esc cierra el menú");
-assert.ok(panelDeAjustes(), "y no se lleva Configuración");
-assert.equal(agDoc.activeElement, botonCon(propia("giskard-po"), "Agregar a proyecto…"), "el foco vuelve al botón");
+assert.equal(menuOf("giskard-po"), null, "Esc cierra el menú");
+assert.ok(settingsPanel(), "y no se lleva Configuración");
+assert.equal(agDoc.activeElement, buttonWith(ownItem("giskard-po"), "Agregar a proyecto…"), "el foco vuelve al botón");
 
 // Agregar uno de proyecto a otra carpeta pide la mudanza; Cancelar va primero.
-menu = await abrirMenuDe("giskard-po");
-renglon(menu, "Radiant").click();
+menu = await openMenuOf("giskard-po");
+lineEl(menu, "Radiant").click();
 await sleep(80);
-assert.ok(dialogoDeMudanza("giskard-po"), "uno de proyecto pide pasar al catálogo");
+assert.ok(moveDialog("giskard-po"), "uno de proyecto pide pasar al catálogo");
 assert.equal(agDoc.activeElement?.textContent?.trim(), "Cancelar", "el foco empieza en Cancelar");
-tecla("Escape");
+pressedKey("Escape");
 await sleep(80);
-assert.equal(dialogoDeMudanza("giskard-po"), undefined);
-assert.ok(panelDeAjustes(), "Esc en el diálogo no cierra Configuración");
-assert.deepEqual(cambiosDeCarpetas, [], "cancelar no cambia nada");
-assert.equal(agDoc.activeElement, botonCon(propia("giskard-po"), "Agregar a proyecto…"));
-menu = await abrirMenuDe("giskard-po");
-renglon(menu, "Radiant").click();
+assert.equal(moveDialog("giskard-po"), undefined);
+assert.ok(settingsPanel(), "Esc en el diálogo no cierra Configuración");
+assert.deepEqual(folderChanges, [], "cancelar no cambia nada");
+assert.equal(agDoc.activeElement, buttonWith(ownItem("giskard-po"), "Agregar a proyecto…"));
+menu = await openMenuOf("giskard-po");
+lineEl(menu, "Radiant").click();
 await sleep(80);
-const avisosAntes = avisosAlRiel;
-botonCon(dialogoDeMudanza("giskard-po"), "Pasar al catálogo y agregar").click();
+const noticesBefore = railNotices;
+buttonWith(moveDialog("giskard-po"), "Pasar al catálogo y agregar").click();
 await sleep(150);
-assert.deepEqual(cambiosDeCarpetas.at(-1), ["giskard-po", { kind: "project", id: "app" }, { kind: "add", folder: "rad" }]);
-assert.equal(dialogoDeMudanza("giskard-po"), undefined);
+assert.deepEqual(folderChanges.at(-1), ["giskard-po", { kind: "project", id: "app" }, { kind: "add", folder: "rad" }]);
+assert.equal(moveDialog("giskard-po"), undefined);
 assert.deepEqual(chips("giskard-po"), ["Terminus App", "Radiant"]);
-assert.ok(quitarDe("giskard-po", "Radiant"), "ya en el catálogo, cada carpeta se puede quitar");
-assert.ok(panelDeAjustes().textContent.includes("giskard-po pasó al catálogo del workspace."));
-assert.ok(panelDeAjustes().textContent.includes("Ya está activo en Terminus App y en Radiant."));
-assert.ok(avisosAlRiel > avisosAntes, "el riel se entera");
+assert.ok(removeFrom("giskard-po", "Radiant"), "ya en el catálogo, cada carpeta se puede quitar");
+assert.ok(settingsPanel().textContent.includes("giskard-po pasó al catálogo del workspace."));
+assert.ok(settingsPanel().textContent.includes("Ya está activo en Terminus App y en Radiant."));
+assert.ok(railNotices > noticesBefore, "el riel se entera");
 
 // Rechazo: en el menú, con la razón; y el que llega del backend, dentro del diálogo.
-menu = await abrirMenuDe("qa");
-assert.equal(renglon(menu, "Terminus App").getAttribute("aria-disabled"), "true");
-assert.ok(renglon(menu, "Terminus App").textContent.includes("Gana el qa del repositorio de Terminus App"));
-const cambiosAntes = cambiosDeCarpetas.length;
-renglon(menu, "Terminus App").click();
+menu = await openMenuOf("qa");
+assert.equal(lineEl(menu, "Terminus App").getAttribute("aria-disabled"), "true");
+assert.ok(lineEl(menu, "Terminus App").textContent.includes("Gana el qa del repositorio de Terminus App"));
+const changesBefore = folderChanges.length;
+lineEl(menu, "Terminus App").click();
 await sleep(40);
-assert.equal(cambiosDeCarpetas.length, cambiosAntes, "un renglón deshabilitado no pide nada");
-tecla("Escape");
+assert.equal(folderChanges.length, changesBefore, "un renglón deshabilitado no pide nada");
+pressedKey("Escape");
 await sleep(60);
-radiantDeclaraQa = true;
-menu = await abrirMenuDe("qa");
-renglon(menu, "Radiant").click();
+radiantDeclaresQa = true;
+menu = await openMenuOf("qa");
+lineEl(menu, "Radiant").click();
 await sleep(80);
-botonCon(dialogoDeMudanza("qa"), "Pasar al catálogo y agregar").click();
+buttonWith(moveDialog("qa"), "Pasar al catálogo y agregar").click();
 await sleep(120);
-const rechazo = dialogoDeMudanza("qa")?.querySelector('[role="alert"]');
+const rejection = moveDialog("qa")?.querySelector('[role="alert"]');
 assert.equal(
-  rechazo?.textContent,
-  `No se agregó qa a Radiant. Ahí gana el qa del repositorio, que se declara en ${qaDeRadiant}.`,
+  rejection?.textContent,
+  `No se agregó qa a Radiant. Ahí gana el qa del repositorio, que se declara en ${radiantQa}.`,
   "el rechazo se lee dentro del diálogo, con quién gana y dónde",
 );
-botonCon(dialogoDeMudanza("qa"), "Cancelar").click();
+buttonWith(moveDialog("qa"), "Cancelar").click();
 await sleep(80);
 assert.deepEqual(chips("qa"), ["kn"]);
 
 // Quitar de «todas» la vuelve lista fija; Deshacer la devuelve a «todas».
-const perfilesAntes = avisosDePerfiles;
-quitarDe("notas-de-version", "kn").click();
+const profilesBefore = profileNotices;
+removeFrom("notas-de-version", "kn").click();
 await sleep(120);
-assert.deepEqual(cambiosDeCarpetas.at(-1), ["notas-de-version", { kind: "workspace" }, { kind: "remove", folder: "kn" }]);
-assert.equal(rotuloDeCarpetas("notas-de-version"), "Activo en:");
+assert.deepEqual(folderChanges.at(-1), ["notas-de-version", { kind: "workspace" }, { kind: "remove", folder: "kn" }]);
+assert.equal(foldersLabel("notas-de-version"), "Activo en:");
 assert.deepEqual(chips("notas-de-version"), ["Terminus App", "Radiant"]);
-assert.ok(botonCon(propia("notas-de-version"), "Agregar a proyecto…"), "vuelve «Agregar a proyecto…»");
-assert.ok(panelDeAjustes().textContent.includes("notas-de-version ya no está en kn."));
-assert.ok(panelDeAjustes().textContent.includes("Ahora está en una lista fija de proyectos: los nuevos no lo tendrán."));
+assert.ok(buttonWith(ownItem("notas-de-version"), "Agregar a proyecto…"), "vuelve «Agregar a proyecto…»");
+assert.ok(settingsPanel().textContent.includes("notas-de-version ya no está en kn."));
+assert.ok(settingsPanel().textContent.includes("Ahora está en una lista fija de proyectos: los nuevos no lo tendrán."));
 assert.equal(agDoc.activeElement?.getAttribute("aria-label"), "Quitar notas-de-version de Radiant", "el foco pasa a la vecina");
-botonCon(panelDeAjustes(), "Deshacer").click();
+buttonWith(settingsPanel(), "Deshacer").click();
 await sleep(150);
-assert.deepEqual(cambiosDeCarpetas.at(-1)[2], { kind: "restore", expected: ["app", "rad"], folders: null });
+assert.deepEqual(folderChanges.at(-1)[2], { kind: "restore", expected: ["app", "rad"], folders: null });
 assert.equal(
-  avisosDePerfiles - perfilesAntes,
+  profileNotices - profilesBefore,
   2,
   "quitar y deshacer releen las caras: el riel las lee por carpeta, y el que vuelve a una se pintaría sin su cara ni su fondo",
 );
-assert.equal(rotuloDeCarpetas("notas-de-version"), "Activo en todos los proyectos:");
+assert.equal(foldersLabel("notas-de-version"), "Activo en todos los proyectos:");
 assert.deepEqual(chips("notas-de-version"), ["Terminus App", "Radiant", "kn"]);
 
 // Un deshacer que choca con un cambio hecho desde fuera no lo pisa.
-quitarDe("giskard-po", "Radiant").click();
+removeFrom("giskard-po", "Radiant").click();
 await sleep(120);
-assert.ok(panelDeAjustes().textContent.includes("giskard-po ya no aparece en Radiant."));
-assert.equal(quitarDe("giskard-po", "Terminus App"), null);
-agentesPropios.find((a) => a.name === "giskard-po").list = ["app", "kn"];
-botonCon(panelDeAjustes(), "Deshacer").click();
+assert.ok(settingsPanel().textContent.includes("giskard-po ya no aparece en Radiant."));
+assert.equal(removeFrom("giskard-po", "Terminus App"), null);
+ownAgents.find((a) => a.name === "giskard-po").list = ["app", "kn"];
+buttonWith(settingsPanel(), "Deshacer").click();
 await sleep(150);
-assert.deepEqual(cambiosDeCarpetas.at(-1)[2], { kind: "restore", expected: ["app"], folders: ["app", "rad"] });
-assert.deepEqual(agentesPropios.find((a) => a.name === "giskard-po").list, ["app", "kn"], "no pisa el cambio de fuera");
+assert.deepEqual(folderChanges.at(-1)[2], { kind: "restore", expected: ["app"], folders: ["app", "rad"] });
+assert.deepEqual(ownAgents.find((a) => a.name === "giskard-po").list, ["app", "kn"], "no pisa el cambio de fuera");
 assert.ok(
-  [...panelDeAjustes().querySelectorAll('[role="alert"]')].some((a) =>
+  [...settingsPanel().querySelectorAll('[role="alert"]')].some((a) =>
     a.textContent.includes("giskard-po cambió mientras tanto. Revisa la lista y vuelve a intentarlo.")),
   "el conflicto se enseña",
 );
 assert.deepEqual(chips("giskard-po"), ["Terminus App", "kn"], "y la lista se relee");
 
 // Abrir perfil cierra Configuración y lo abre en su primera carpeta.
-botonCon(propia("giskard-po"), "Abrir perfil").click();
+buttonWith(ownItem("giskard-po"), "Abrir perfil").click();
 await sleep(100);
-assert.equal(agentesApp.comandos.includes("send_message"), false, "abrir el perfil no crea un chat persistente");
-assert.equal(panelDeAjustes(), null);
-assert.deepEqual(agentesApp.fallos, []);
+assert.equal(agentsApp.commands.includes("send_message"), false, "abrir el perfil no crea un chat persistente");
+assert.equal(settingsPanel(), null);
+assert.deepEqual(agentsApp.failures, []);
 /**
  * Renombrar un workspace es un gesto con nombre, vale para el que no está
  * activo, y cancelar cancela: Escape cierra el campo sin guardar y sin
  * llevarse por delante el diálogo de Configuración.
  */
-let espacios = {
+let spaces = {
   workspaces: [
     { id: "w", name: "Acme", context_root: null, sessions: 0 },
     { id: "w2", name: "Beta", context_root: null, sessions: 0 },
   ],
   active: "w",
 };
-const renombres = [];
-const cambiosDeWorkspace = [];
-const renombrar = await boot("listo", "workspace-rename", {
-  ...RESPUESTAS,
-  list_workspaces: () => espacios,
-  workspaces_startup: () => espacios,
+const renames = [];
+const workspaceChanges = [];
+const renameApp = await boot("listo", "workspace-rename", {
+  ...RESPONSES,
+  list_workspaces: () => spaces,
+  workspaces_startup: () => spaces,
   list_language_packs: [], list_bundled_language_packs: [],
-  set_active_workspace: ({ id }) => { cambiosDeWorkspace.push(id); },
+  set_active_workspace: ({ id }) => { workspaceChanges.push(id); },
   rename_workspace: ({ id, name }) => {
-    renombres.push([id, name]);
-    espacios = { ...espacios, workspaces: espacios.workspaces.map((w) => (w.id === id ? { ...w, name } : w)) };
-    return espacios.workspaces.find((w) => w.id === id);
+    renames.push([id, name]);
+    spaces = { ...spaces, workspaces: spaces.workspaces.map((w) => (w.id === id ? { ...w, name } : w)) };
+    return spaces.workspaces.find((w) => w.id === id);
   },
 });
 await sleep(300);
-renombrar.w.document.querySelector('[data-workspace-column] [data-workspace-tile="w"]')
-  ?.dispatchEvent(new renombrar.w.MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
+renameApp.w.document.querySelector('[data-workspace-column] [data-workspace-tile="w"]')
+  ?.dispatchEvent(new renameApp.w.MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
 await sleep(80);
-[...renombrar.w.document.querySelectorAll('[role="menuitem"]')]
+[...renameApp.w.document.querySelectorAll('[role="menuitem"]')]
   .find((b) => b.textContent?.trim() === "Administrar workspaces")?.click();
 await sleep(100);
-const lapiz = (name) =>
-  renombrar.w.document.querySelector(`button[aria-label="Cambiarle el nombre a «${name}»"]`);
-const campoDeNombre = (name) =>
-  renombrar.w.document.querySelector(`input[aria-label="Nuevo nombre de «${name}»"]`);
-assert.ok(lapiz("Beta"), "renombrar el workspace que no es el activo tiene que ser un gesto visible");
-assert.ok(lapiz("Acme"), "y el activo también");
-lapiz("Beta").click();
+const pencil = (name) =>
+  renameApp.w.document.querySelector(`button[aria-label="Cambiarle el nombre a «${name}»"]`);
+const nameField = (name) =>
+  renameApp.w.document.querySelector(`input[aria-label="Nuevo nombre de «${name}»"]`);
+assert.ok(pencil("Beta"), "renombrar el workspace que no es el activo tiene que ser un gesto visible");
+assert.ok(pencil("Acme"), "y el activo también");
+pencil("Beta").click();
 await sleep(50);
-assert.deepEqual(cambiosDeWorkspace, [], "pedir renombrar no cambia de cliente");
-const cancelado = campoDeNombre("Beta");
-assert.ok(cancelado, "el gesto abre el campo del nombre");
-cancelado.value = "Gamma";
-cancelado.dispatchEvent(new renombrar.w.InputEvent("input", { bubbles: true }));
-cancelado.dispatchEvent(new renombrar.w.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+assert.deepEqual(workspaceChanges, [], "pedir renombrar no cambia de cliente");
+const wasCancelled = nameField("Beta");
+assert.ok(wasCancelled, "el gesto abre el campo del nombre");
+wasCancelled.value = "Gamma";
+wasCancelled.dispatchEvent(new renameApp.w.InputEvent("input", { bubbles: true }));
+wasCancelled.dispatchEvent(new renameApp.w.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
 await sleep(50);
-assert.deepEqual(renombres, [], "Escape cancela sin guardar");
-assert.ok(lapiz("Beta"), "y Escape no se lleva por delante Configuración");
-lapiz("Beta").click();
+assert.deepEqual(renames, [], "Escape cancela sin guardar");
+assert.ok(pencil("Beta"), "y Escape no se lleva por delante Configuración");
+pencil("Beta").click();
 await sleep(50);
-const escrito = campoDeNombre("Beta");
-escrito.value = "Gamma";
-escrito.dispatchEvent(new renombrar.w.InputEvent("input", { bubbles: true }));
-escrito.dispatchEvent(new renombrar.w.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+const typed = nameField("Beta");
+typed.value = "Gamma";
+typed.dispatchEvent(new renameApp.w.InputEvent("input", { bubbles: true }));
+typed.dispatchEvent(new renameApp.w.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
 await sleep(150);
-assert.deepEqual(renombres, [["w2", "Gamma"]], "Enter guarda el que no es el activo");
-assert.deepEqual(cambiosDeWorkspace, [], "renombrar no cambia de cliente");
-assert.ok(lapiz("Gamma"), "la lista se relee con el nombre nuevo");
-assert.deepEqual(renombrar.fallos, []);
+assert.deepEqual(renames, [["w2", "Gamma"]], "Enter guarda el que no es el activo");
+assert.deepEqual(workspaceChanges, [], "renombrar no cambia de cliente");
+assert.ok(pencil("Gamma"), "la lista se relee con el nombre nuevo");
+assert.deepEqual(renameApp.failures, []);
 
 // Los árboles montados conservan sus relojes: el proceso no termina solo.
 process.exit(0);

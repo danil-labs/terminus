@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { cause, sleep } from "../../tests/helpers/jsdom-app.mjs";
-import { TASK_AFTER_QUEUE, SIN_AGRUPAR, abrirAnadirProyecto, abrirDesdeElBuscador, boot, bootPorCarpeta, buscarEnLaVentana, gitRow, keepActiveView, mount, task } from "../../tests/helpers/mount-guard.mjs";
+import { TASK_AFTER_QUEUE, UNGROUPED, openAddProject, openFromSearch, boot, bootByFolder, searchWindow, gitRow, keepActiveView, mount, task } from "../../tests/helpers/mount-guard.mjs";
 
 let gitLocalCalls = 0;
 // Cada árbol montado antes conserva sus relojes y llama a ESTE stub: su
@@ -31,9 +31,9 @@ const sidebarResponses = { ...TASK_AFTER_QUEUE,
 const sidebar = await boot("listo", 4, sidebarResponses);
 const row = id => sidebar.w.document.querySelector(`[data-sesion="${id}"]`);
 // La fila del riel dice el PR; la rama y el resto van en su `title` y en la tarjeta flotante.
-const gitDeFila = id => row(id)?.querySelector("[data-session-pr]")?.getAttribute("title") ?? "";
+const rowGit = id => row(id)?.querySelector("[data-session-pr]")?.getAttribute("title") ?? "";
 assert.match(row("p").textContent, /Tarea p.*#12/s);
-assert.match(gitDeFila("p"), /feature\/parent.*#12/);
+assert.match(rowGit("p"), /feature\/parent.*#12/);
 assert.ok(row("p").querySelector('[data-session-pr] svg.lucide-git-branch'));
 assert.equal(row("p").querySelector('[aria-label="Resultado entregado"]'), null,
   "el fallo delegado tiene prioridad sobre la entrega del coordinador en el indicador común");
@@ -41,9 +41,9 @@ assert.equal(row("own"), null, "la delegación no llena el sidebar");
 assert.equal(row("p").querySelectorAll('[aria-label="Fallo o interrupción"]').length, 1,
   "una subtarea fallida ocupa el único indicador del coordinador");
 // El riel no lista las subtareas; el buscador global sí las encuentra.
-await buscarEnLaVentana(sidebar, "Tarea");
-for (const hija of ["own", "shared", "local"]) {
-  assert.ok(sidebar.w.document.querySelector(`[data-global-search] [data-search-key="task:${hija}"]`), "la búsqueda conserva acceso a las subtareas");
+await searchWindow(sidebar, "Tarea");
+for (const childTask of ["own", "shared", "local"]) {
+  assert.ok(sidebar.w.document.querySelector(`[data-global-search] [data-search-key="task:${childTask}"]`), "la búsqueda conserva acceso a las subtareas");
 }
 sidebar.w.document.querySelector('[data-global-search] input[role="combobox"]').dispatchEvent(new sidebar.w.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
 await sleep(80);
@@ -57,13 +57,13 @@ gitRows.p = gitRow("renamed", { pull: { number: 12, state: "merged", head_sha: "
 sidebarResponses.list_live_sessions = sidebarResponses.list_live_sessions.map(s => ({ ...s, updated_at: 2 }));
 sidebar.emit("session", { project: "", session: "p", workspace: "w" });
 await sleep(350);
-assert.match(gitDeFila("p"), /renamed/);
+assert.match(rowGit("p"), /renamed/);
 assert.ok(row("p").querySelector('.text-brand-purple > svg.lucide-git-merge'));
 assert.doesNotMatch(row("p").textContent, /HEAD distinto/);
 rejectGit = true;
 sidebar.w.dispatchEvent(new sidebar.w.Event("focus"));
 await sleep(100);
-assert.match(gitDeFila("p"), /renamed.*#12/);
+assert.match(rowGit("p"), /renamed.*#12/);
 assert.doesNotMatch(row("p").textContent, /obsoleta|Integrado/);
 assert.equal(row("p").querySelector('svg.lucide-clock'), null);
 assert.match(row("p").innerHTML, /Último estado conocido/);
@@ -100,15 +100,15 @@ sidebar.emit("chat", { kind: "done", project: "", session: "p", workspace: "w", 
 await sleep(150);
 assert.doesNotMatch(tab("p").getAttribute("aria-label"), /sin leer/);
 keepActiveView(sidebar);
-await abrirDesdeElBuscador(sidebar, "Tarea own", "own");
+await openFromSearch(sidebar, "Tarea own", "own");
 assert.ok(tab("own").querySelector('[aria-label="Fallo o interrupción"].text-error-strong svg.lucide-circle-alert'));
 assert.ok(tab("own").querySelector("svg.lucide-git-pull-request-draft"));
 assert.equal(tab("own").querySelector("svg.lucide-git-pull-request"), null);
 assert.match(tab("own").title, /feature\/child.*#13/);
-await abrirDesdeElBuscador(sidebar, "Tarea shared", "shared");
+await openFromSearch(sidebar, "Tarea shared", "shared");
 assert.ok(tab("shared").querySelector("svg.lucide-git-branch"));
 assert.match(tab("shared").title, /compartidas con la tarea padre/);
-await abrirDesdeElBuscador(sidebar, "prueba", "native");
+await openFromSearch(sidebar, "prueba", "native");
 assert.equal(tab("native").querySelector("svg.lucide-git-branch"), null);
 assert.doesNotMatch(tab("native").textContent, /\/root\//);
 assert.doesNotMatch(tab("native").title, /feature\/parent|compartidas/);
@@ -153,7 +153,7 @@ for (const [kn, icon, color, label] of [
   // Git/kn conserva su sección y color; el detalle queda en la etiqueta.
   assert.ok(row("p").querySelector(`[data-session-pr].${color} svg.lucide-${icon}`), kn);
   if (kn === "draft") {
-    assert.match(gitDeFila("p"), /Cone/);
+    assert.match(rowGit("p"), /Cone/);
     assert.doesNotMatch(row("p").querySelector("[data-session-pr]").textContent, /Cone/);
   }
   assert.match(tab("p").title, label);
@@ -161,7 +161,7 @@ for (const [kn, icon, color, label] of [
 gitRows.p = gitRow(null, { kind: "kn", kn: "draft", alias: "gbsxhmdk" });
 sidebar.w.dispatchEvent(new sidebar.w.Event("focus"));
 await sleep(100);
-assert.match(gitDeFila("p"), /gbsxhmdk/);
+assert.match(rowGit("p"), /gbsxhmdk/);
 assert.doesNotMatch(row("p").textContent, /desconocido/);
 // La pestaña lleva checks y revisión; la tarjeta del riel, UNA señal por
 // prioridad: cambios pedidos › checks que fallan › en curso › aprobado › en verde.
@@ -251,14 +251,14 @@ for (let locales = -1; locales !== gitLocalCalls; ) {
 cause.run("delta", () => sidebar.emit("chat", { kind: "delta", session: "p", workspace: "w", text: "Sigue trabajando" }));
 await sleep(200);
 assert.equal(gitDeltaCalls, 0, "un delta del chat no refresca git");
-assert.deepEqual(sidebar.fallos, []);
+assert.deepEqual(sidebar.failures, []);
 assert.equal(sidebar.w.document.querySelector("[data-project-sessions]"), null);
 for (const modifier of ["metaKey", "ctrlKey", "native"]) {
   row("p").click();
   await sleep(100);
   keepActiveView(sidebar);
   assert.equal(tab("p").getAttribute("aria-selected"), "true");
-  const beforeClose = sidebar.comandos.length;
+  const beforeClose = sidebar.commands.length;
   if (modifier === "native") sidebar.emit("close-tab", null);
   else {
     const key = new sidebar.w.KeyboardEvent("keydown", { key: "w", [modifier]: true, bubbles: true, cancelable: true });
@@ -268,17 +268,17 @@ for (const modifier of ["metaKey", "ctrlKey", "native"]) {
   await sleep(100);
   assert.equal(tab("p"), undefined);
   assert.ok(row("p"));
-  assert.equal(sidebar.comandos.slice(beforeClose).some(c => ["request_close", "stop_turn", "delete_session"].includes(c)), false);
+  assert.equal(sidebar.commands.slice(beforeClose).some(c => ["request_close", "stop_turn", "delete_session"].includes(c)), false);
 }
 // Cerrar nunca cancela; salir usa el motor conectado y conserva el cliente ante errores.
 {
-  let vivos = [];
+  let liveOnes = [];
   let listError = false;
   let stopError = false;
   let stopScope;
-  const cierre = await boot("listo", "cierre-con-vivos", {
+  const closingApp = await boot("listo", "cierre-con-vivos", {
     ...TASK_AFTER_QUEUE,
-    list_live_turns: () => listError ? Promise.reject(new Error("list failed")) : vivos,
+    list_live_turns: () => listError ? Promise.reject(new Error("list failed")) : liveOnes,
     pending_requests: () => ({ questions: [], permissions: [{ id: "durable-r", revision: 1, request_id: "r", tool: "Write", target: "hola.txt" }] }),
     stop_turn: (_args, options) => {
       stopScope = options?.headers?.["x-terminus-workspace"];
@@ -289,101 +289,101 @@ for (const modifier of ["metaKey", "ctrlKey", "native"]) {
     tray_update: null,
     tray_notify: null,
   });
-  cierre.w.localStorage.setItem("harness.layout.close.live_turns", JSON.stringify("stop"));
-  cierre.emit("close-requested", null);
+  closingApp.w.localStorage.setItem("harness.layout.close.live_turns", JSON.stringify("stop"));
+  closingApp.emit("close-requested", null);
   await sleep(100);
-  assert.ok(cierre.comandos.includes("window_to_background"), "cerrar sin agentes conserva el cliente");
-  assert.equal(cierre.comandos.includes("quit_completely"), false);
-  vivos = [{ session: "p", workspace: "otro", project: "q", started_at: Date.now() }];
-  const antes = cierre.comandos.length;
-  cierre.emit("close-requested", null);
+  assert.ok(closingApp.commands.includes("window_to_background"), "cerrar sin agentes conserva el cliente");
+  assert.equal(closingApp.commands.includes("quit_completely"), false);
+  liveOnes = [{ session: "p", workspace: "otro", project: "q", started_at: Date.now() }];
+  const beforeImport = closingApp.commands.length;
+  closingApp.emit("close-requested", null);
   await sleep(150);
-  assert.equal(cierre.w.document.querySelector("[data-close-guard]"), null);
-  assert.ok(cierre.comandos.slice(antes).includes("window_to_background"));
-  assert.equal(cierre.comandos.slice(antes).includes("stop_turn"), false, "la preferencia antigua no cancela al cerrar");
-  cierre.emit("tray-quit", null);
-  cierre.emit("tray-quit", null);
+  assert.equal(closingApp.w.document.querySelector("[data-close-guard]"), null);
+  assert.ok(closingApp.commands.slice(beforeImport).includes("window_to_background"));
+  assert.equal(closingApp.commands.slice(beforeImport).includes("stop_turn"), false, "la preferencia antigua no cancela al cerrar");
+  closingApp.emit("tray-quit", null);
+  closingApp.emit("tray-quit", null);
   await sleep(150);
-  const dialogo = () => cierre.w.document.querySelector("[data-close-guard]");
-  const button = (text) => [...dialogo().querySelectorAll("button")].find(b => b.textContent.includes(text));
-  assert.ok(dialogo(), "salir explícitamente pregunta por las tareas del cliente");
-  assert.match(dialogo().textContent, /espera tu respuesta/);
-  assert.equal(cierre.comandos.includes("quit_completely"), false);
+  const dialog = () => closingApp.w.document.querySelector("[data-close-guard]");
+  const button = (text) => [...dialog().querySelectorAll("button")].find(b => b.textContent.includes(text));
+  assert.ok(dialog(), "salir explícitamente pregunta por las tareas del cliente");
+  assert.match(dialog().textContent, /espera tu respuesta/);
+  assert.equal(closingApp.commands.includes("quit_completely"), false);
   stopError = true;
   button("Detenerlas y salir").click();
   await sleep(150);
   assert.equal(stopScope, "otro", "la parada conserva el workspace del turno");
-  assert.ok(dialogo());
-  assert.match(dialogo().textContent, /No se pudo completar la salida/);
-  assert.equal(cierre.comandos.includes("quit_completely"), false, "una parada fallida no cierra el cliente");
+  assert.ok(dialog());
+  assert.match(dialog().textContent, /No se pudo completar la salida/);
+  assert.equal(closingApp.commands.includes("quit_completely"), false, "una parada fallida no cierra el cliente");
   button("Cancelar").click();
   listError = true;
-  const antesFallo = cierre.comandos.length;
-  cierre.emit("tray-quit", null);
+  const beforeFailure = closingApp.commands.length;
+  closingApp.emit("tray-quit", null);
   await sleep(150);
-  assert.ok(dialogo(), "una consulta fallida se muestra dentro del diálogo");
-  assert.equal(cierre.comandos.slice(antesFallo).includes("quit_completely"), false);
+  assert.ok(dialog(), "una consulta fallida se muestra dentro del diálogo");
+  assert.equal(closingApp.commands.slice(beforeFailure).includes("quit_completely"), false);
   button("Seguir en segundo plano").click();
   await sleep(150);
-  assert.equal(dialogo(), null);
-  assert.ok(cierre.comandos.slice(antesFallo).includes("window_to_background"));
+  assert.equal(dialog(), null);
+  assert.ok(closingApp.commands.slice(beforeFailure).includes("window_to_background"));
   listError = false;
   stopError = false;
-  cierre.emit("tray-quit", null);
+  closingApp.emit("tray-quit", null);
   await sleep(150);
   button("Detenerlas y salir").click();
   await sleep(150);
-  assert.equal(cierre.comandos.filter(c => c === "quit_completely").length, 1);
-  assert.deepEqual(cierre.fallos, []);
-  cierre.w.close();
+  assert.equal(closingApp.commands.filter(c => c === "quit_completely").length, 1);
+  assert.deepEqual(closingApp.failures, []);
+  closingApp.w.close();
   const idle = await boot("listo", "salir-sin-turnos", { ...TASK_AFTER_QUEUE, tray_update: null, quit_completely: null });
   idle.emit("tray-quit", null);
   idle.emit("tray-quit", null);
   await sleep(150);
-  assert.equal(idle.comandos.filter(c => c === "quit_completely").length, 1);
-  assert.equal(idle.comandos.includes("stop_turn"), false);
-  assert.deepEqual(idle.fallos, []);
+  assert.equal(idle.commands.filter(c => c === "quit_completely").length, 1);
+  assert.equal(idle.commands.includes("stop_turn"), false);
+  assert.deepEqual(idle.failures, []);
   idle.w.close();
 }
 // Abrir una tarea que ya contestaba con una herramienta en curso lanzaba
 // «Stale read from <Match>» en el hilo; Solid abortaba esa actualización
 // y la fila abierta de la barra se quedaba marcada para siempre.
-const seleccion = await boot("listo", "seleccion-viva", {
+const selectionApp = await boot("listo", "seleccion-viva", {
   ...TASK_AFTER_QUEUE,
   list_live_sessions: [task("viva", null, null), task("otra", null, null)],
   list_session_git: {},
   load_session: ({ id }) => ({ ...TASK_AFTER_QUEUE.load_session, id, turns: [{ role: "user", text: "Hazlo" }, { role: "agent", text: "Hecho.", duration_ms: 1000 }] }),
 });
-const filaDe = id => seleccion.w.document.querySelector(`[data-sesion="${id}"]`);
-const marcadas = () => [...seleccion.w.document.querySelectorAll('[data-sesion][aria-current="true"]')].map(el => el.dataset.sesion);
-seleccion.emit("chat", { kind: "started", session: "viva", workspace: "w", project: "" });
-seleccion.emit("chat", { kind: "tool", session: "viva", workspace: "w", project: "", text: "Bash", target: "ls", id: "item_1" });
+const rowOf = id => selectionApp.w.document.querySelector(`[data-sesion="${id}"]`);
+const marked = () => [...selectionApp.w.document.querySelectorAll('[data-sesion][aria-current="true"]')].map(el => el.dataset.sesion);
+selectionApp.emit("chat", { kind: "started", session: "viva", workspace: "w", project: "" });
+selectionApp.emit("chat", { kind: "tool", session: "viva", workspace: "w", project: "", text: "Bash", target: "ls", id: "item_1" });
 await sleep(50);
-filaDe("viva").click();
+rowOf("viva").click();
 await sleep(160);
-assert.deepEqual(marcadas(), ["viva"]);
-filaDe("otra").click();
+assert.deepEqual(marked(), ["viva"]);
+rowOf("otra").click();
 await sleep(160);
-assert.deepEqual(marcadas(), ["otra"], "la marca de la barra sigue a la tarea abierta");
-filaDe("viva").click();
+assert.deepEqual(marked(), ["otra"], "la marca de la barra sigue a la tarea abierta");
+rowOf("viva").click();
 await sleep(160);
-assert.deepEqual(marcadas(), ["viva"]);
-assert.deepEqual(seleccion.fallos, []);
-seleccion.w.close();
+assert.deepEqual(marked(), ["viva"]);
+assert.deepEqual(selectionApp.failures, []);
+selectionApp.w.close();
 const groupedResponses = {
   ...TASK_AFTER_QUEUE,
   list_projects: [{ id: "folder", name: "Carpeta", sources: [], portfolio: null }],
   list_live_sessions: ({ project }) => project === "folder" ? sidebarResponses.list_live_sessions : [],
   list_session_git: {},
 };
-const flat = await mount("listo", "5-flat", groupedResponses, undefined, SIN_AGRUPAR);
+const flat = await mount("listo", "5-flat", groupedResponses, undefined, UNGROUPED);
 assert.equal(flat.w.document.querySelector("[data-folder-group]"), null, "sin agrupar no hay filas de carpeta");
 // `p` falló (por su delegada) y no pide nada: su segunda línea es la normal.
 assert.equal(flat.w.document.querySelector('[data-sesion="p"] [data-session-request]'), null, "una fallida no enseña su último mensaje");
 assert.ok(flat.w.document.querySelector('[data-sesion="p"] [data-folder-chip="folder"]'), "la carpeta va como dato de la fila");
-assert.deepEqual(flat.fallos, []);
+assert.deepEqual(flat.failures, []);
 flat.w.close();
-const grouped = await bootPorCarpeta("listo", 5, groupedResponses);
+const grouped = await bootByFolder("listo", 5, groupedResponses);
 const guide = grouped.w.document.querySelector('[data-sidebar-group="folder"]');
 assert.ok(guide);
 assert.ok(guide.querySelector('[data-sesion="p"]'));
@@ -398,7 +398,7 @@ folderToggle.click(); await sleep(30);
 assert.equal(grouped.w.document.querySelector('[data-sidebar-group="folder"] [data-sesion]'), null);
 folderToggle.click(); await sleep(30);
 assert.ok(grouped.w.document.querySelector('[data-sidebar-group="folder"] [data-sesion="p"]'));
-assert.deepEqual(grouped.fallos, []);
+assert.deepEqual(grouped.failures, []);
 const newTaskClick = await boot("listo", "new-task-click", TASK_AFTER_QUEUE);
 let newTaskRequests = 0;
 newTaskClick.w.addEventListener("harness:tarea-nueva", () => newTaskRequests++);
@@ -419,22 +419,22 @@ for (const collapsed of [false, true]) {
   assert.ok(newTaskClick.w.document.querySelector("textarea"));
   // La caja flota: sin agente también va centrada mientras el hilo está vacío.
   // Se lee la clase que decide el sitio, no una medida que jsdom no hace.
-  const cajaCentrada = (doc) => {
-    const capas = [...doc.querySelectorAll("[class*='inset-0']")].filter((el) =>
+  const centeredComposer = (doc) => {
+    const layers = [...doc.querySelectorAll("[class*='inset-0']")].filter((el) =>
       /justify-(center|end)/.test(el.className),
     );
-    return capas.some((el) => el.className.includes("justify-center"));
+    return layers.some((el) => el.className.includes("justify-center"));
   };
-  assert.equal(cajaCentrada(newTaskClick.w.document), true, "la tarea nueva en blanco centra la caja");
-  const tareaNueva = newTaskClick.w.document.querySelector("[data-borrador]");
-  assert.ok(tareaNueva?.textContent.includes("Nueva tarea"), "la tarea nueva sin lanzar se ve en la tira");
-  tareaNueva.querySelector("button").click();
+  assert.equal(centeredComposer(newTaskClick.w.document), true, "la tarea nueva en blanco centra la caja");
+  const newTask = newTaskClick.w.document.querySelector("[data-borrador]");
+  assert.ok(newTask?.textContent.includes("Nueva tarea"), "la tarea nueva sin lanzar se ve en la tira");
+  newTask.querySelector("button").click();
   await sleep(50);
   assert.equal(newTaskClick.w.document.querySelector("[data-borrador]"), null, "cerrarla vuelve a la pestaña anterior");
   assert.ok(newTaskClick.w.document.querySelector('[role="tab"][aria-selected="true"]'));
 }
-assert.deepEqual(newTaskClick.fallos, []);
-assert.equal(newTaskClick.comandos.includes("delete_session"), false);
+assert.deepEqual(newTaskClick.failures, []);
+assert.equal(newTaskClick.commands.includes("delete_session"), false);
 const folders = [{ id: "p1", name: "Carpeta A", kind: "folder", portfolio: "g1", sources: [] }];
 let recentPreview = "";
 let recentChild = false;
@@ -446,7 +446,7 @@ let rejectClone;
 let cloneCancellations = 0;
 let holdRepositoryReply = false;
 let finishRepositoryReply;
-const sidebarControls = await bootPorCarpeta("listo", "sidebar-controls", {
+const sidebarControls = await bootByFolder("listo", "sidebar-controls", {
   ...TASK_AFTER_QUEUE,
   list_agent_profiles: { Giskard: { display_name: "Giskard PO", body: "moon" } },
   list_projects: () => structuredClone(folders),
@@ -556,7 +556,7 @@ await sleep(50);
 assert.deepEqual(taskRenames, [{ project: "", id: "recent", title: "Nombre confirmado" }], "confirmar guarda una sola vez durante el turno");
 sidebarControls.emit("chat", { kind: "done", workspace: "w", session: "recent", ok: true });
 assert.ok(controlsDoc.querySelector('[data-sesion="recent"]'));
-await abrirAnadirProyecto(sidebarControls);
+await openAddProject(sidebarControls);
 const repositorySearch = controlsDoc.querySelector('input[placeholder="Buscar proyecto"]');
 assert.ok(repositorySearch);
 const sourceButtons = [...controlsDoc.querySelectorAll('[role="dialog"] button')];
@@ -579,11 +579,11 @@ assert.equal(cloneRequest.url, "https://github.com/acme/app.git");
 finishClone({ id: "provider-clone", name: "App", kind: "git", sources: [] });
 await sleep(100);
 holdRepositoryReply = true;
-await abrirAnadirProyecto(sidebarControls);
+await openAddProject(sidebarControls);
 controlsDoc.dispatchEvent(new sidebarControls.w.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
 await sleep(50);
 holdRepositoryReply = false;
-await abrirAnadirProyecto(sidebarControls);
+await openAddProject(sidebarControls);
 finishRepositoryReply([{ name: "stale", slug: "stale", clone_url: "https://github.com/acme/stale.git" }]);
 await sleep(50);
 const newRepositorySearch = controlsDoc.querySelector('input[placeholder="Buscar proyecto"]');
@@ -602,15 +602,15 @@ folderName.closest("form").dispatchEvent(new sidebarControls.w.Event("submit", {
 await sleep(100);
 // Agrupando por carpeta, la recién creada aparece ya, sin tareas, y se sigue en «Nueva tarea» dentro de ella.
 for (let i = 0; i < 80 && !controlsDoc.querySelector('[data-folder-group="loose"] [data-folder-open]'); i++) await sleep(25);
-const sueltaEnElRiel = controlsDoc.querySelector('[data-sidebar-group="loose"]');
-assert.ok(sueltaEnElRiel, "una carpeta recién creada y sin tareas aparece en el riel");
-assert.equal(sueltaEnElRiel.querySelector("[data-folder-empty]")?.textContent, "Sin tareas todavía");
-assert.ok(sueltaEnElRiel.querySelector('button[aria-label="Nueva tarea en Carpeta suelta"]'), "con su «+»");
-assert.equal(sueltaEnElRiel.querySelector("[data-folder-open]").dataset.active, "true", "y marcada mientras se mira su «Nueva tarea»");
+const dropOnRail = controlsDoc.querySelector('[data-sidebar-group="loose"]');
+assert.ok(dropOnRail, "una carpeta recién creada y sin tareas aparece en el riel");
+assert.equal(dropOnRail.querySelector("[data-folder-empty]")?.textContent, "Sin tareas todavía");
+assert.ok(dropOnRail.querySelector('button[aria-label="Nueva tarea en Carpeta suelta"]'), "con su «+»");
+assert.equal(dropOnRail.querySelector("[data-folder-open]").dataset.active, "true", "y marcada mientras se mira su «Nueva tarea»");
 assert.match(controlsDoc.querySelector('button[aria-label="Proyecto"]')?.textContent ?? "", /Carpeta suelta/, "«Nueva tarea» queda en la carpeta recién creada");
-assert.deepEqual(sidebarControls.fallos, []);
+assert.deepEqual(sidebarControls.failures, []);
 const openClone = async () => {
-  await abrirAnadirProyecto(sidebarControls);
+  await openAddProject(sidebarControls);
   [...controlsDoc.querySelectorAll('[role="dialog"] button')].find(button => button.textContent.includes("Git URL")).click();
   await sleep(50);
   const input = controlsDoc.querySelector('[role="dialog"] input');
@@ -633,12 +633,12 @@ assert.equal(cloneCancellations, 0);
 // El clon escondido vive en el riel, con el nombre que va a tener la carpeta
 // y su avance. Sin `data-destino` ni fila de proyecto: no hay proyecto hasta
 // que git termina, y soltarle una tarea o abrirlo no llevaría a ningún sitio.
-const filaDelClon = [...controlsDoc.querySelectorAll("aside button")].find(button => button.textContent.includes("Clonando…") && button.textContent.includes("Recibiendo"));
-assert.ok(filaDelClon);
-assert.ok(filaDelClon.textContent.includes("repo"));
-assert.ok(filaDelClon.textContent.includes("42 %"));
-assert.equal(filaDelClon.closest("[data-destino]"), null);
-filaDelClon.click();
+const cloneRow = [...controlsDoc.querySelectorAll("aside button")].find(button => button.textContent.includes("Clonando…") && button.textContent.includes("Recibiendo"));
+assert.ok(cloneRow);
+assert.ok(cloneRow.textContent.includes("repo"));
+assert.ok(cloneRow.textContent.includes("42 %"));
+assert.equal(cloneRow.closest("[data-destino]"), null);
+cloneRow.click();
 await sleep(50);
 [...controlsDoc.querySelectorAll('[role="dialog"] button')].find(button => button.textContent === "Cancelar").click();
 await sleep(100);
@@ -656,7 +656,7 @@ await openClone();
 finishClone({ id: "clone", name: "Cloned", kind: "git", sources: [] });
 await sleep(100);
 assert.equal(controlsDoc.querySelector('[role="dialog"]'), null);
-assert.deepEqual(sidebarControls.fallos, []);
+assert.deepEqual(sidebarControls.failures, []);
 
 // Los árboles montados conservan sus relojes: el proceso no termina solo.
 process.exit(0);

@@ -97,7 +97,7 @@ test("storage keeps its machine and workspace and never waits for an offline VM"
   assert.ok(await until(() => app.w.document.querySelector('[data-machine-card="cmp_mac"]')?.querySelector("[data-machine-power]")?.textContent.includes("Apagada")), "the open panel follows relay state without interaction");
   assert.equal(calls("cmp_mac", "list_storage").length, measured, "a status transition does not scan storage");
   trigger.click();
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 /** The account's registry: `w` (and any other given) on the machines named. */
@@ -112,7 +112,7 @@ async function open(name, computers, relays, workspaces) {
   const app = await boot("listo", name, {}, undefined, {}, {
     web: true,
     workspaces,
-    antes: (w) => {
+    beforeImport: (w) => {
       globalThis.WebSocket = f.Socket;
       w.terminusWeb = { endpoint: "https://relay.test", computers, getToken: async () => "tok" };
     },
@@ -219,7 +219,7 @@ test("two machines show together and each command goes to the machine it names",
   assert.equal(calls("cmp_vm", "prepare_session_continuation").length, 0);
   assert.ok(await until(() => doc.querySelector("textarea")?.value.includes("/lab/continuation.md")));
   assert.equal(app.w.localStorage.getItem("harness.layout.machines.run_on"), JSON.stringify({ w: "cmp_mac" }), "la continuación conserva la máquina de su archivo de contexto");
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 test("the usage strip reads an account from its machine when the default machine has no account list", async () => {
@@ -238,7 +238,7 @@ test("the usage strip reads an account from its machine when the default machine
   assert.equal(calls("cmp_mac", "account_status").at(-1)?.args.id, "m1");
   assert.equal(calls("cmp_vm", "account_limits").length, 0);
   assert.equal(calls("cmp_vm", "account_status").length, 0);
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 test("a tab of one machine's task leaves the other machines' tasks in every folder", async () => {
@@ -250,7 +250,7 @@ test("a tab of one machine's task leaves the other machines' tasks in every fold
   assert.deepEqual(rows.map((r) => r.id).sort(), ["cmp_mac~t1", "cmp_vm~t1"], "the open tab does not send the folder's read to its machine alone");
   assert.deepEqual(calls("cmp_vm", "list_live_sessions").at(-1)?.args.open, ["t1"], "the VM gets its open task with its own id");
   assert.deepEqual(calls("cmp_mac", "list_live_sessions").at(-1)?.args.open, [], "the Mac gets none of another machine's");
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 test("workspaces join by id alone, never by name, and a project is one row with its machines", async () => {
@@ -272,7 +272,7 @@ test("workspaces join by id alone, never by name, and a project is one row with 
 
   const projects = await invoke("list_projects");
   assert.deepEqual(projects.map((p) => [p.id, p.name, p.machines]), [["p1", "Panel", ["cmp_vm", "cmp_mac"]], ["pv", "Solo VM", ["cmp_vm"]], ["pm", "Solo Mac", ["cmp_mac"]]]);
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 test("a new task is born on the machine chosen, with the same project id, and makes the workspace its own first", async () => {
@@ -313,7 +313,7 @@ test("a new task is born on the machine chosen, with the same project id, and ma
     after = await invoke("list_workspaces");
   }
   assert.deepEqual(after.workspaces.find((w) => w.id === "w2").machines, ["cmp_vm", "cmp_mac"]);
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 test("«Ejecutar en» disables, with the reason, a machine that cannot make the workspace its own, and offers a folder without remote while its machine is on", async () => {
@@ -352,7 +352,7 @@ test("«Ejecutar en» disables, with the reason, a machine that cannot make the 
   assert.equal(option("cmp_vm").disabled, false, "a folder without remote is carried from its machine while that one is on");
   assert.ok(!option("cmp_vm").textContent.includes("sin este proyecto"));
   assert.equal(option("cmp_old").disabled, true);
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 test("an action on a computer that is off and cannot be woken fails short and neutral", async () => {
@@ -384,7 +384,7 @@ test("an action on a computer that is off and cannot be woken fails short and ne
   assert.equal(calls("cmp_mac", "send_message").length, 0, "nothing tries to start a computer the relay cannot start");
   assert.equal(doc.querySelector('[data-machine-row="cmp_mac"]')?.dataset.state, "offline", "it stays off, not starting");
   assert.ok(!text().includes("Algo se rompió"), "no generic failure");
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 test("a machine with another engine contract needs an update and never breaks the panel", async () => {
@@ -410,7 +410,7 @@ test("a machine with another engine contract needs an update and never breaks th
   });
   assert.equal(calls("cmp_old", "send_message").length, 0);
   assert.ok(!(await invoke("machine_list")).some((m) => m.id === "cmp_old"), "it is not offered to run new tasks");
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 test("AI credentials with the same email keep separate cards and machine actions", async () => {
@@ -445,7 +445,7 @@ test("AI credentials with the same email keep separate cards and machine actions
   assert.equal(calls("cmp_vm", "remove_account").length, 0);
   await invoke("add_account", { provider: "claude", label: "" }, { headers: { "x-terminus-machine": "cmp_mac" } }).catch(() => {});
   assert.equal(calls("cmp_mac", "add_account").length, 1, "signing in on another machine goes to that machine");
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 test("one subscription shows both machine chips while Team keeps its own card and actions", async () => {
@@ -488,7 +488,7 @@ test("one subscription shows both machine chips while Team keeps its own card an
   mac.querySelector("[data-sign-out-yes]").click();
   assert.ok(await until(() => calls("cmp_mac", "remove_account").some((c) => c.args.id === "copy")));
   assert.equal(calls("cmp_vm", "remove_account").length, 0, "sign out removes only the selected machine's credential");
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 test("provider login from settings receives its link and code", async () => {
@@ -542,7 +542,7 @@ test("provider login from settings receives its link and code", async () => {
     { name: "account", payload: { account: "mac-new", kind: "confirm", text: "MAC-1234" } },
   ] });
   assert.ok(await until(() => doc.body.textContent.includes("MAC-1234")), "the chosen machine's login reaches the same dialog");
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 // Un cambio de contrato nunca deja sin uso máquinas enteras: como el teléfono,
@@ -555,7 +555,7 @@ test("an engine of the previous additive family stays in service", async () => {
   assert.ok(await until(() => text().includes("Panel actualizado")), "its panel is read as usual");
   assert.equal(doc.querySelector('[data-machine-row="cmp_vm"]')?.dataset.state, "online");
   assert.ok(calls("cmp_vm", "list_projects").length > 0);
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 test("a machine on another contract is not marked outdated by its hash", async () => {
@@ -568,7 +568,7 @@ test("a machine on another contract is not marked outdated by its hash", async (
   assert.equal(doc.querySelector('[data-machine-row="cmp_vm"]')?.dataset.state, "online");
   assert.equal(doc.querySelector('[data-machine-row="cmp_mac"]')?.dataset.state, "online", "another contract keeps working");
   assert.ok(calls("cmp_mac", "list_projects").length > 0);
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 test("a computer the relay cannot start answers off at once, never starting", async () => {
@@ -584,7 +584,7 @@ test("a computer the relay cannot start answers off at once, never starting", as
   });
   assert.equal(calls("cmp_own", "send_message").length, 1, "the relay was asked and refused");
   assert.equal(doc.querySelector('[data-machine-row="cmp_own"]')?.dataset.state, "offline", "it never shows as starting");
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 test("el composer web sigue las credenciales de la máquina elegida y de la tarea abierta", async () => {
@@ -607,6 +607,6 @@ test("el composer web sigue las credenciales de la máquina elegida y de la tare
   assert.ok(await until(() => doc.querySelector("[data-task-location]")));
   assert.equal(doc.querySelector("[data-task-git-actions]"), null);
   await sleep(100);
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
   app.w.close();
 });

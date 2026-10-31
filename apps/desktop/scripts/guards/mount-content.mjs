@@ -4,10 +4,10 @@ import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { dist, sleep } from "../../tests/helpers/jsdom-app.mjs";
-import { TASK_AFTER_QUEUE, RESPUESTAS, boot, bootPorCarpeta, task } from "../../tests/helpers/mount-guard.mjs";
+import { TASK_AFTER_QUEUE, RESPONSES, boot, bootByFolder, task } from "../../tests/helpers/mount-guard.mjs";
 
 // El CSS compilado debe devolver la forma que el preflight elimina.
-const PROSA = [
+const PROSE = [
   "**Once arreglos: el turno sobrevive al reinicio, y lo que borra pregunta antes**",
   "https://github.com/danil-labs/harness-app/pull/787",
   "",
@@ -41,171 +41,171 @@ const PROSA = [
   "```",
 ].join("\n");
 
-const prosa = await boot("listo", "markdown-como-se-escribio", {
+const proseApp = await boot("listo", "markdown-como-se-escribio", {
   ...TASK_AFTER_QUEUE,
   load_session: {
     ...TASK_AFTER_QUEUE.load_session,
-    turns: [{ role: "assistant", text: PROSA, artifacts: [] }],
+    turns: [{ role: "assistant", text: PROSE, artifacts: [] }],
   },
 });
-const docM = prosa.w.document;
+const docM = proseApp.w.document;
 docM.querySelector('[data-sesion="s1"]')?.click();
 await sleep(250);
-const respuesta = [...docM.querySelectorAll("article")].find((a) =>
+const reply = [...docM.querySelectorAll("article")].find((a) =>
   a.textContent.includes("Once arreglos"),
 );
-assert.ok(respuesta, "la respuesta del agente no llegó a pintarse");
+assert.ok(reply, "la respuesta del agente no llegó a pintarse");
 
 // jsdom no resuelve las capas de Tailwind; se comprueban las utilities compiladas.
-const hojaDeEstilos = readFileSync(
+const stylesheet = readFileSync(
   join(dist, "assets", readdirSync(join(dist, "assets")).find((f) => f.startsWith("index-") && f.endsWith(".css"))),
   "utf8",
 );
-const declara = (el, propiedad) => {
-  for (const clase of el?.classList ?? []) {
-    const css = hojaDeEstilos.replaceAll("\\", "");
-    const selector = `.${clase}`;
+const declares = (el, property) => {
+  for (const cssClass of el?.classList ?? []) {
+    const css = stylesheet.replaceAll("\\", "");
+    const selector = `.${cssClass}`;
     const body = css.split("}").find((rule) =>
       rule.slice(0, rule.indexOf("{")).split(",").includes(selector),
     )?.split("{").at(-1);
-    const regla = body?.match(new RegExp(`(?:^|;)${propiedad}:([^;]+)`));
-    if (regla) return regla[1];
+    const ruleEl = body?.match(new RegExp(`(?:^|;)${property}:([^;]+)`));
+    if (ruleEl) return ruleEl[1];
   }
   return null;
 };
 
 // El defecto que se reportó: el título y la URL de la línea siguiente,
 // pegados. En HTML ese salto vale un espacio, y el espacio tiene que estar.
-const parrafo = [...respuesta.querySelectorAll("p")].find((el) =>
+const paragraph = [...reply.querySelectorAll("p")].find((el) =>
   el.textContent.includes("Once arreglos"),
 );
 assert.match(
-  parrafo?.textContent ?? "",
+  paragraph?.textContent ?? "",
   /pregunta antes\s+https:\/\/github\.com/,
   "el salto de línea dentro de un párrafo se perdió entero, sin dejar el espacio",
 );
 
-const viñetas = respuesta.querySelector("ul");
-const numerada = respuesta.querySelector("ol");
-assert.equal(declara(viñetas, "list-style-type"), "disc");
-assert.equal(declara(numerada, "list-style-type"), "decimal");
-assert.equal(numerada.getAttribute("start"), "3");
-assert.equal(respuesta.querySelector("pre code").textContent, "const a = 1;\n");
+const bullets = reply.querySelector("ul");
+const numbered = reply.querySelector("ol");
+assert.equal(declares(bullets, "list-style-type"), "disc");
+assert.equal(declares(numbered, "list-style-type"), "decimal");
+assert.equal(numbered.getAttribute("start"), "3");
+assert.equal(reply.querySelector("pre code").textContent, "const a = 1;\n");
 // Una lista de tareas ya trae su casilla; la viñeta de al lado sobra.
-const tarea = [...respuesta.querySelectorAll("li")].find((el) =>
+const taskItem = [...reply.querySelectorAll("li")].find((el) =>
   el.querySelector('input[type="checkbox"]'),
 );
-assert.equal(declara(tarea, "list-style-type"), "none");
-assert.equal(tarea?.querySelector("input")?.disabled, true);
+assert.equal(declares(taskItem, "list-style-type"), "none");
+assert.equal(taskItem?.querySelector("input")?.disabled, true);
 
 // El preflight iguala los seis encabezados al texto del cuerpo.
-for (const nivel of ["h4", "h5", "h6"]) {
-  const titulo = respuesta.querySelector(nivel);
-  assert.ok(titulo, `el markdown trae un ${nivel} y no se pintó`);
-  assert.ok(declara(titulo, "font-weight"), `un ${nivel} se lee con el peso de un párrafo`);
-  assert.ok(declara(titulo, "font-size"), `un ${nivel} mide igual que un párrafo`);
+for (const level of ["h4", "h5", "h6"]) {
+  const titleText = reply.querySelector(level);
+  assert.ok(titleText, `el markdown trae un ${level} y no se pintó`);
+  assert.ok(declares(titleText, "font-weight"), `un ${level} se lee con el peso de un párrafo`);
+  assert.ok(declares(titleText, "font-size"), `un ${level} mide igual que un párrafo`);
 }
 
 // Y lo demás que el preflight deja sin forma propia.
-assert.ok(declara(respuesta.querySelector("blockquote"), "border-left-width"));
-assert.ok(declara(respuesta.querySelector("hr"), "border-top-width"));
-assert.ok(declara(respuesta.querySelector("table"), "border-collapse"));
-assert.ok(declara(respuesta.querySelector("strong"), "font-weight"));
-assert.ok(declara(respuesta.querySelector("em"), "font-style"));
-assert.ok(declara(respuesta.querySelector("pre"), "overflow"));
-assert.deepEqual(prosa.fallos, []);
-prosa.w.close();
+assert.ok(declares(reply.querySelector("blockquote"), "border-left-width"));
+assert.ok(declares(reply.querySelector("hr"), "border-top-width"));
+assert.ok(declares(reply.querySelector("table"), "border-collapse"));
+assert.ok(declares(reply.querySelector("strong"), "font-weight"));
+assert.ok(declares(reply.querySelector("em"), "font-style"));
+assert.ok(declares(reply.querySelector("pre"), "overflow"));
+assert.deepEqual(proseApp.failures, []);
+proseApp.w.close();
 
 // El visor de un diagrama se extiende a toda la ventana y vuelve: con su
 // botón y con Escape, y el foco regresa al botón que lo abrió.
-const diagrama = await boot("listo", "diagrama-en-toda-la-ventana", {
+const diagramApp = await boot("listo", "diagrama-en-toda-la-ventana", {
   ...TASK_AFTER_QUEUE,
   load_session: {
     ...TASK_AFTER_QUEUE.load_session,
     turns: [{ role: "assistant", text: "```mermaid\ngraph TD\n  A --> B\n```", artifacts: [] }],
   },
 });
-const docD = diagrama.w.document;
+const docD = diagramApp.w.document;
 docD.querySelector('[data-sesion="s1"]')?.click();
 await sleep(250);
-const extender = docD.querySelector('button[aria-label="Ver diagrama en toda la ventana"]');
-assert.ok(extender, "el diagrama no ofrece extenderse a toda la ventana");
-const capa = () => docD.querySelector('[role="dialog"][aria-modal="true"]');
-for (const cerrar of ["boton", "escape"]) {
-  extender.focus();
-  extender.click();
+const expandButton = docD.querySelector('button[aria-label="Ver diagrama en toda la ventana"]');
+assert.ok(expandButton, "el diagrama no ofrece extenderse a toda la ventana");
+const layer = () => docD.querySelector('[role="dialog"][aria-modal="true"]');
+for (const closeButton of ["boton", "escape"]) {
+  expandButton.focus();
+  expandButton.click();
   await sleep(50);
-  assert.ok(capa(), "extender no abrió la capa");
-  assert.ok(capa().classList.contains("fixed") && capa().classList.contains("inset-0"), "la capa no cubre la ventana");
-  assert.ok(capa().contains(docD.activeElement), "el foco se quedó detrás de la capa");
-  if (cerrar === "boton") {
-    capa().querySelector('button[aria-label="Salir de la vista en toda la ventana"]').click();
+  assert.ok(layer(), "extender no abrió la capa");
+  assert.ok(layer().classList.contains("fixed") && layer().classList.contains("inset-0"), "la capa no cubre la ventana");
+  assert.ok(layer().contains(docD.activeElement), "el foco se quedó detrás de la capa");
+  if (closeButton === "boton") {
+    layer().querySelector('button[aria-label="Salir de la vista en toda la ventana"]').click();
   } else {
-    docD.activeElement.dispatchEvent(new diagrama.w.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    docD.activeElement.dispatchEvent(new diagramApp.w.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
   }
   await sleep(50);
-  assert.equal(capa(), null, `cerrar con ${cerrar} dejó la capa puesta`);
-  assert.equal(docD.activeElement, extender, `cerrar con ${cerrar} no devolvió el foco`);
+  assert.equal(layer(), null, `cerrar con ${closeButton} dejó la capa puesta`);
+  assert.equal(docD.activeElement, expandButton, `cerrar con ${closeButton} no devolvió el foco`);
 }
-assert.deepEqual(diagrama.fallos, []);
-diagrama.w.close();
+assert.deepEqual(diagramApp.failures, []);
+diagramApp.w.close();
 
-let activos = ["s1"];
-let esperandoHija = true;
-const fondo = await boot("listo", "hija-en-segundo-plano", {
+let activeIds = ["s1"];
+let childWaiting = true;
+const backgroundApp = await boot("listo", "hija-en-segundo-plano", {
   ...TASK_AFTER_QUEUE,
   list_projects: [{ id: "p", name: "Proyecto", kind: "folder", working_directory: "/lab", sources: [] }],
   list_live_sessions: () => [task("s1", null, null)],
   load_session: ({ id }) => ({ ...TASK_AFTER_QUEUE.load_session, id, turns: [] }),
-  list_live_turns: () => activos.map((session) => ({
+  list_live_turns: () => activeIds.map((session) => ({
     session, workspace: "w", project: "p",
-    started_at: Date.now() - 3_640_000, background: esperandoHija,
+    started_at: Date.now() - 3_640_000, background: childWaiting,
   })),
-  list_active_turns: () => activos,
+  list_active_turns: () => activeIds,
 });
-const docFondo = fondo.w.document;
-const estadoDelTurno = () => docFondo.querySelector('[role="status"]');
-const rotulo = () => estadoDelTurno()?.getAttribute("aria-label") ?? null;
-const late = () => (estadoDelTurno()?.querySelector('span[aria-hidden="true"]')?.className ?? "").includes("danil-pulse");
-const reconciliar = async () => { fondo.w.dispatchEvent(new fondo.w.Event("focus")); await sleep(400); };
+const docFondo = backgroundApp.w.document;
+const turnState = () => docFondo.querySelector('[role="status"]');
+const labelText = () => turnState()?.getAttribute("aria-label") ?? null;
+const late = () => (turnState()?.querySelector('span[aria-hidden="true"]')?.className ?? "").includes("danil-pulse");
+const reconcile = async () => { backgroundApp.w.dispatchEvent(new backgroundApp.w.Event("focus")); await sleep(400); };
 docFondo.querySelector('[data-sesion="s1"]').click();
 await sleep(350);
 assert.equal(
-  rotulo(), "Libre · un subagente sigue en segundo plano",
+  labelText(), "Libre · un subagente sigue en segundo plano",
   "una ventana que no vio el evento `background` da por pensando a un agente parado",
 );
 assert.equal(late(), false, "la espera de una hija no lleva el punto que late");
 assert.doesNotMatch(
-  estadoDelTurno().textContent, /60m/,
+  turnState().textContent, /60m/,
   "el reloj del turno del padre no mide la espera de su hija",
 );
 // El agente vuelve a escribir: la señal se apaga por donde se encendió.
-esperandoHija = false;
-await reconciliar();
-assert.equal(rotulo(), "El agente está trabajando", "con el agente escribiendo vuelve el rótulo de pensar");
+childWaiting = false;
+await reconcile();
+assert.equal(labelText(), "El agente está trabajando", "con el agente escribiendo vuelve el rótulo de pensar");
 assert.ok(late(), "y con él su punto");
-assert.match(estadoDelTurno().textContent, /60m/, "y su reloj, que sí es del turno que se mira");
+assert.match(turnState().textContent, /60m/, "y su reloj, que sí es del turno que se mira");
 // Y la señal no sobrevive al turno: el que cierra sin que su `done` llegue a
 // esta ventana —un servicio que se releva— dejaba el rótulo de la hija puesto,
 // y el turno siguiente, sin hija ninguna, decía que el agente estaba libre.
-esperandoHija = true;
-await reconciliar();
-assert.equal(rotulo(), "Libre · un subagente sigue en segundo plano");
-activos = [];
-await reconciliar();
-assert.equal(rotulo(), null, "el turno cerrado no pinta estado");
-activos = ["s1"];
-esperandoHija = false;
-fondo.emit("chat", { kind: "started", session: "s1", workspace: "w" });
+childWaiting = true;
+await reconcile();
+assert.equal(labelText(), "Libre · un subagente sigue en segundo plano");
+activeIds = [];
+await reconcile();
+assert.equal(labelText(), null, "el turno cerrado no pinta estado");
+activeIds = ["s1"];
+childWaiting = false;
+backgroundApp.emit("chat", { kind: "started", session: "s1", workspace: "w" });
 await sleep(250);
-assert.equal(rotulo(), "El agente está trabajando", "el turno nuevo no hereda la espera del anterior");
-assert.deepEqual(fondo.fallos, []);
-fondo.w.close();
+assert.equal(labelText(), "El agente está trabajando", "el turno nuevo no hereda la espera del anterior");
+assert.deepEqual(backgroundApp.failures, []);
+backgroundApp.w.close();
 
 // Un primer turno que Rust niega deja su aviso en el blanco, y solo ahí: la
 // tarea nueva siguiente, de este proyecto o de otro, sale limpia.
-const unstarted = await bootPorCarpeta("listo", "first-turn-rejected", {
-  ...RESPUESTAS,
+const unstarted = await bootByFolder("listo", "first-turn-rejected", {
+  ...RESPONSES,
   // Una tarea por carpeta: sin tareas una carpeta no tiene cabecera en el riel.
   list_live_sessions: ({ project }) => project ? [{ ...TASK_AFTER_QUEUE.list_live_sessions[0], id: `t-${project}` }] : [],
   list_projects: [
@@ -235,7 +235,7 @@ unstartedDoc.querySelector('button[aria-label="Nueva tarea en calc"]').click();
 await sleep(150);
 assert.equal(ghost(), false, "and so does one in another project");
 assert.equal(unstartedDoc.body.textContent.includes(rejectedPrompt), false);
-assert.deepEqual(unstarted.fallos, []);
+assert.deepEqual(unstarted.failures, []);
 
 unstarted.w.close();
 
@@ -246,7 +246,7 @@ for (const settings of [true, false]) {
     let checks = 0;
     let finishDownload;
     const updater = await boot("listo", `update-latest-${settings}-${available}`, {
-      ...RESPUESTAS,
+      ...RESPONSES,
       "plugin:updater|check": () => { checks++; return latest; },
       // Rust vuelve a preguntar y baja la última; en Windows el plugin cerraría la app.
       update_install: () => {
@@ -303,7 +303,7 @@ for (const settings of [true, false]) {
         assert.deepEqual(installed, [278], "does not chain downloads");
       } finally { Date.now = clock; }
     }
-    assert.deepEqual(updater.fallos, []);
+    assert.deepEqual(updater.failures, []);
     updater.w.close();
   }
 }
@@ -312,7 +312,7 @@ let release = { rid: 277, currentVersion: "0.2.76", version: "0.2.77", rawJson: 
 let checks = 0;
 let resolveCheck;
 const notice = await boot("listo", "update-focus", {
-  ...RESPUESTAS,
+  ...RESPONSES,
   "plugin:updater|check": () => { checks++; return release; },
 });
 const clock = Date.now;

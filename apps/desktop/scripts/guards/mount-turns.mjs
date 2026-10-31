@@ -2,7 +2,7 @@
 /** Lanzar y seguir un turno: rama base, estado autoritativo, respuestas en vuelo e historia. */
 import assert from "node:assert/strict";
 import { sleep } from "../../tests/helpers/jsdom-app.mjs";
-import { TASK_AFTER_QUEUE, RESPUESTAS, boot, bootPorCarpeta, keepActiveView } from "../../tests/helpers/mount-guard.mjs";
+import { TASK_AFTER_QUEUE, RESPONSES, boot, bootByFolder, keepActiveView } from "../../tests/helpers/mount-guard.mjs";
 
 const branchSubmissions = [];
 let finishBranchRefresh;
@@ -11,14 +11,14 @@ const localBranches = { selected: "refs/heads/dev", fetched_at: null, branches: 
   { reference: "refs/heads/dev", name: "dev", remote: false, commit: "abc", ahead: 1, behind: 0 },
   { reference: "refs/remotes/origin/dev", name: "origin/dev", remote: true, commit: "def", ahead: null, behind: null },
 ] };
-const branchPicker = await bootPorCarpeta("listo", "task-base-picker", {
-  ...RESPUESTAS,
+const branchPicker = await bootByFolder("listo", "task-base-picker", {
+  ...RESPONSES,
   list_projects: [{ id: "git-project", name: "Laboratorio", kind: "git", working_directory: "/lab", sources: [] }],
   list_live_sessions: TASK_AFTER_QUEUE.list_live_sessions,
   load_session: TASK_AFTER_QUEUE.load_session,
   load_queue: [],
-  list_models: { ...RESPUESTAS.list_models, models: [
-    ...RESPUESTAS.list_models.models,
+  list_models: { ...RESPONSES.list_models, models: [
+    ...RESPONSES.list_models.models,
     { id: "gpt-alternate", label: "GPT Alternate", gratis: null, note: null, efforts: ["low", "high"], default_effort: "low" },
   ] },
   project_base_branches: ({ refresh, details }) => details
@@ -44,14 +44,14 @@ await sleep(100);
 assert.equal(typeof finishBranchDetails, "function");
 assert.equal(branchDoc.querySelector('button[aria-label="Rama base"]').textContent.trim(), "dev");
 assert.ok([...branchDoc.querySelectorAll("button")].some(button => button.textContent === "dev"));
-const mentionReads = branchPicker.comandos.filter(command => command === "list_mentions").length;
+const mentionReads = branchPicker.commands.filter(command => command === "list_mentions").length;
 const typingPrompt = branchDoc.querySelector("textarea");
 for (let index = 0; index < 100; index += 1) {
   typingPrompt.value = `Texto ${index}`;
   typingPrompt.dispatchEvent(new branchPicker.w.Event("input", { bubbles: true }));
 }
 await sleep(30);
-assert.equal(branchPicker.comandos.filter(command => command === "list_mentions").length, mentionReads);
+assert.equal(branchPicker.commands.filter(command => command === "list_mentions").length, mentionReads);
 [...branchDoc.querySelectorAll("button")].find(button => button.textContent.includes("Actualizar ramas")).click();
 await sleep(30);
 assert.equal(typeof finishBranchRefresh, "function");
@@ -102,12 +102,12 @@ defaultPrompt.dispatchEvent(new branchPicker.w.Event("input", { bubbles: true })
 defaultPrompt.closest("form").dispatchEvent(new branchPicker.w.Event("submit", { bubbles: true, cancelable: true }));
 await sleep(100);
 assert.equal(branchSubmissions[1]?.baseRef, null, "automatic default is resolved by the backend, not stored as a task override");
-assert.deepEqual(branchPicker.fallos, []);
+assert.deepEqual(branchPicker.failures, []);
 const deadBase = { selected: "refs/heads/borrada", fetched_at: null, branches: [
   { reference: "refs/heads/dev", name: "dev", remote: false, commit: "abc", ahead: null, behind: null },
 ] };
-const missingBase = await bootPorCarpeta("listo", "task-base-missing", {
-  ...RESPUESTAS,
+const missingBase = await bootByFolder("listo", "task-base-missing", {
+  ...RESPONSES,
   list_live_sessions: TASK_AFTER_QUEUE.list_live_sessions,
   list_projects: [{ id: "git-project", name: "Laboratorio", kind: "git", working_directory: "/lab", sources: [] }],
   project_base_branches: () => deadBase,
@@ -124,9 +124,9 @@ assert.ok([...missingDoc.querySelectorAll("span")].some(span => span.textContent
 missingButton.click();
 await sleep(100);
 assert.ok([...missingDoc.querySelectorAll("button")].some(button => button.textContent === "dev"));
-assert.deepEqual(missingBase.fallos, []);
+assert.deepEqual(missingBase.failures, []);
 const fastTurn = await boot("listo", "done-before-ack", {
-  ...RESPUESTAS,
+  ...RESPONSES,
   turn_authors: () => new Promise(() => {}),
   list_live_sessions: [{ ...TASK_AFTER_QUEUE.list_live_sessions[0], id: "fast-turn", project: null }],
   load_session: { ...TASK_AFTER_QUEUE.load_session, id: "fast-turn", turns: [
@@ -142,10 +142,10 @@ fastPrompt.value = "Prueba de cierre temprano";
 fastPrompt.dispatchEvent(new fastTurn.w.Event("input", { bubbles: true }));
 fastPrompt.closest("form").dispatchEvent(new fastTurn.w.Event("submit", { bubbles: true, cancelable: true }));
 await sleep(100);
-assert.equal(fastTurn.comandos.includes("send_message"), true);
+assert.equal(fastTurn.commands.includes("send_message"), true);
 assert.equal(fastTurn.w.document.querySelector('button[aria-label="Detener turno"]'), null);
 assert.ok(fastTurn.w.document.body.textContent.includes("Respuesta terminada antes del acuse"));
-assert.deepEqual(fastTurn.fallos, []);
+assert.deepEqual(fastTurn.failures, []);
 
 // Lo que llega con el turno ya cerrado no se pinta bajo «Trabajando», y la
 // fila vieja de que una tarea lanzada terminó ya no se pinta.
@@ -167,7 +167,7 @@ assert.equal(lateDoc.querySelector('button[aria-label="Abrir la tarea «Revisió
 lateNotice.emit("chat", { kind: "notice", session: "s1", workspace: "w", text: "La tarea «Otra» terminó." });
 await sleep(100);
 assert.doesNotMatch(lateDoc.body.textContent, /Trabajando/);
-assert.deepEqual(lateNotice.fallos, []);
+assert.deepEqual(lateNotice.failures, []);
 
 let activeTurns = [];
 let finishPendingTurn;
@@ -219,7 +219,7 @@ assert.equal(pendingDoc.querySelector('[data-sidebar-section="settled"]'), null,
 assert.equal(hiddenRow().querySelector('[aria-label$="Está trabajando"]'), null);
 // En la tarjeta del riel una entregada no lleva ícono: vista se apaga, sin ver lleva el punto verde.
 assert.ok(hiddenRow().dataset.apagada === "true" || hiddenRow().querySelector('[aria-label="Terminó y no la has abierto"]'), "recovering a missed done refreshes the hidden task result");
-assert.deepEqual(pendingTurnApp.fallos, []);
+assert.deepEqual(pendingTurnApp.failures, []);
 pendingTurnApp.w.close();
 
 let finishTranscript;
@@ -271,75 +271,75 @@ liveDoc.querySelector('button[aria-label="Detener turno"]').click();
 await sleep(60);
 assert.equal(liveDoc.querySelector('button[aria-label="Detener turno"]'), null);
 assert.ok(!liveDoc.body.textContent.includes("No se pudo detener"));
-assert.deepEqual(liveState.fallos, []);
+assert.deepEqual(liveState.failures, []);
 
 // El registro ve el cierre antes que el done: la cola retenida sin desenlace sale cuando el done llega.
 {
-  let activos = [];
-  const envios = [];
+  let activeIds = [];
+  const sends = [];
   const app = await boot("listo", "late-done-releases-queue", {
     ...TASK_AFTER_QUEUE,
-    list_active_turns: () => activos,
+    list_active_turns: () => activeIds,
     save_queue: null,
     load_queue: [],
     queue_ready: false,
-    send_message: (args) => { envios.push(args.prompt); return "s1"; },
+    send_message: (args) => { sends.push(args.prompt); return "s1"; },
   });
   const doc = app.w.document;
   doc.querySelector('[data-sesion="s1"]').click();
   await sleep(80);
-  activos = ["s1"];
+  activeIds = ["s1"];
   app.emit("chat", { kind: "started", session: "s1", workspace: "w" });
   await sleep(30);
-  const campo = doc.querySelector("textarea");
-  campo.value = "Pendiente";
-  campo.dispatchEvent(new app.w.Event("input", { bubbles: true }));
-  campo.closest("form").dispatchEvent(new app.w.Event("submit", { bubbles: true, cancelable: true }));
+  const inputField = doc.querySelector("textarea");
+  inputField.value = "Pendiente";
+  inputField.dispatchEvent(new app.w.Event("input", { bubbles: true }));
+  inputField.closest("form").dispatchEvent(new app.w.Event("submit", { bubbles: true, cancelable: true }));
   await sleep(50);
-  activos = [];
+  activeIds = [];
   app.w.dispatchEvent(new app.w.Event("focus"));
   await sleep(80);
-  assert.equal(envios.length, 0, "a turn closed without its outcome keeps the queue");
+  assert.equal(sends.length, 0, "a turn closed without its outcome keeps the queue");
   app.emit("chat", { kind: "done", session: "s1", workspace: "w", ok: true });
   await sleep(200);
-  assert.deepEqual(envios, ["Pendiente"], "the late done releases the queue");
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(sends, ["Pendiente"], "the late done releases the queue");
+  assert.deepEqual(app.failures, []);
   app.w.close();
 }
 // Y si la sesión vuelve a verse viva, el done ok es de otro turno: la cola sigue retenida.
 {
-  let activos = [];
-  const envios = [];
+  let activeIds = [];
+  const sends = [];
   const app = await boot("listo", "later-turn-keeps-draft", {
     ...TASK_AFTER_QUEUE,
-    list_active_turns: () => activos,
+    list_active_turns: () => activeIds,
     save_queue: null,
     load_queue: [],
     queue_ready: false,
-    send_message: (args) => { envios.push(args.prompt); return "s1"; },
+    send_message: (args) => { sends.push(args.prompt); return "s1"; },
   });
   const doc = app.w.document;
   doc.querySelector('[data-sesion="s1"]').click();
   await sleep(80);
-  activos = ["s1"];
+  activeIds = ["s1"];
   app.emit("chat", { kind: "started", session: "s1", workspace: "w" });
   await sleep(30);
-  const campo = doc.querySelector("textarea");
-  campo.value = "Pendiente";
-  campo.dispatchEvent(new app.w.Event("input", { bubbles: true }));
-  campo.closest("form").dispatchEvent(new app.w.Event("submit", { bubbles: true, cancelable: true }));
+  const inputField = doc.querySelector("textarea");
+  inputField.value = "Pendiente";
+  inputField.dispatchEvent(new app.w.Event("input", { bubbles: true }));
+  inputField.closest("form").dispatchEvent(new app.w.Event("submit", { bubbles: true, cancelable: true }));
   await sleep(50);
-  activos = [];
+  activeIds = [];
   app.w.dispatchEvent(new app.w.Event("focus"));
   await sleep(80);
-  activos = ["s1"];
+  activeIds = ["s1"];
   app.w.dispatchEvent(new app.w.Event("focus"));
   await sleep(80);
-  activos = [];
+  activeIds = [];
   app.emit("chat", { kind: "done", session: "s1", workspace: "w", ok: true });
   await sleep(200);
-  assert.deepEqual(envios, [], "a later turn's done does not release the draft of one that closed without outcome");
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(sends, [], "a later turn's done does not release the draft of one that closed without outcome");
+  assert.deepEqual(app.failures, []);
   app.w.close();
 }
 
@@ -362,7 +362,7 @@ assert.deepEqual(liveState.fallos, []);
     input.dispatchEvent(new escapeApp.w.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     await sleep(50);
     assert.deepEqual(stops, [{ project: "", session: "s1" }], "Escape reaches the viewed task");
-    assert.deepEqual(escapeApp.fallos, []);
+    assert.deepEqual(escapeApp.failures, []);
     escapeApp.w.close();
   }
 }
@@ -401,7 +401,7 @@ for (const attachment of ["/tmp/Captura México.png", "/tmp/notes.pdf"]) {
   await sleep(80);
   assert.equal(button(), null, "confirmed delivery removes the attachment from the queue");
   assert.equal(calls.length, 2);
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
   app.w.close();
 }
 
@@ -443,61 +443,61 @@ await sleep(100);
 steerReplies.list_active_turns = [];
 steerState.emit("chat", { kind: "done", session: "s1", workspace: "w", ok: true });
 await sleep(150);
-assert.equal(steerState.comandos.filter(command => command === "send_message").length, 0, "done before steering ACK must not dispatch the same message");
+assert.equal(steerState.commands.filter(command => command === "send_message").length, 0, "done before steering ACK must not dispatch the same message");
 acknowledgeSteer(null);
 await sleep(100);
 steerState.w.document.querySelector('[data-sesion="s1"]').click();
 await sleep(150);
 assert.equal(steerState.w.document.querySelector('button[title="Mandar ahora"]'), null);
-assert.equal(steerState.comandos.filter(command => command === "send_message").length, 0);
-assert.deepEqual(steerState.fallos, []);
+assert.equal(steerState.commands.filter(command => command === "send_message").length, 0);
+assert.deepEqual(steerState.failures, []);
 
 // El menú del proyecto no ofrece un historial de tareas, y nadie pide las
 // archivadas por proyecto.
-const historia = await bootPorCarpeta("listo", 6, {
+const historyApp = await bootByFolder("listo", 6, {
   ...TASK_AFTER_QUEUE,
   list_projects: [{ id: "p1", name: "Laboratorio", node: null, sources: [], working_directory: "/lab", created_at: 1, updated_at: 1, sessions: 1, kind: "folder" }],
 });
-historia.w.document.querySelector('button[aria-label="Acciones del proyecto «Laboratorio»"]')?.click();
+historyApp.w.document.querySelector('button[aria-label="Acciones del proyecto «Laboratorio»"]')?.click();
 await sleep(50);
-const acciones = [...historia.w.document.querySelectorAll('[role="menuitem"]')].map((b) => b.textContent?.trim());
-assert.ok(acciones.length > 0, "el menú del proyecto se abre");
-assert.equal(acciones.includes("Historial de tareas"), false, "el menú del proyecto ya no ofrece el historial");
+const actions = [...historyApp.w.document.querySelectorAll('[role="menuitem"]')].map((b) => b.textContent?.trim());
+assert.ok(actions.length > 0, "el menú del proyecto se abre");
+assert.equal(actions.includes("Historial de tareas"), false, "el menú del proyecto ya no ofrece el historial");
 await sleep(150);
-assert.equal(historia.comandos.includes("list_archived"), false, "la ventana no pide las archivadas por proyecto");
-assert.equal(historia.comandos.includes("list_sessions"), false, "la ventana no pide la lista completa");
-assert.deepEqual(historia.fallos, []);
-const pestanaDe = (app, titulo) => [...app.w.document.querySelectorAll(':is([role="tab"], [data-preview-header] [role="button"])')].find((tab) => tab.textContent?.includes(titulo));
+assert.equal(historyApp.commands.includes("list_archived"), false, "la ventana no pide las archivadas por proyecto");
+assert.equal(historyApp.commands.includes("list_sessions"), false, "la ventana no pide la lista completa");
+assert.deepEqual(historyApp.failures, []);
+const tabOfTitle = (app, titleText) => [...app.w.document.querySelectorAll(':is([role="tab"], [data-preview-header] [role="button"])')].find((tab) => tab.textContent?.includes(titleText));
 
-let archivadaEnDisco = false;
-const viva = { ...TASK_AFTER_QUEUE.list_live_sessions[0], archived: false };
-const archivar = await boot("listo", "archivar-cierra", {
+let archivedOnDisk = false;
+const liveQuestion = { ...TASK_AFTER_QUEUE.list_live_sessions[0], archived: false };
+const archiveApp = await boot("listo", "archivar-cierra", {
   ...TASK_AFTER_QUEUE,
   list_live_sessions: ({ open }) => [
-    ...(!archivadaEnDisco ? [viva] : open?.includes("s1") ? [{ ...viva, archived: true }] : []),
-    { ...viva, id: "s2", title: "Segunda tarea" },
+    ...(!archivedOnDisk ? [liveQuestion] : open?.includes("s1") ? [{ ...liveQuestion, archived: true }] : []),
+    { ...liveQuestion, id: "s2", title: "Segunda tarea" },
   ],
 });
-archivar.w.document.querySelector('[data-sesion="s1"]').click();
+archiveApp.w.document.querySelector('[data-sesion="s1"]').click();
 await sleep(150);
-keepActiveView(archivar);
-archivar.w.document.querySelector('[data-sesion="s2"]').click();
+keepActiveView(archiveApp);
+archiveApp.w.document.querySelector('[data-sesion="s2"]').click();
 await sleep(150);
-assert.ok(pestanaDe(archivar, "Una tarea"));
-archivadaEnDisco = true;
-archivar.emit("session", { project: "", session: "s1", workspace: "w" });
+assert.ok(tabOfTitle(archiveApp, "Una tarea"));
+archivedOnDisk = true;
+archiveApp.emit("session", { project: "", session: "s1", workspace: "w" });
 await sleep(500);
-assert.equal(pestanaDe(archivar, "Una tarea"), undefined, "archivar una tarea viva cierra su pestaña");
-assert.ok(pestanaDe(archivar, "Segunda tarea"), "la otra pestaña sigue");
-assert.equal(archivar.comandos.includes("list_sessions"), false);
-assert.deepEqual(archivar.fallos, []);
+assert.equal(tabOfTitle(archiveApp, "Una tarea"), undefined, "archivar una tarea viva cierra su pestaña");
+assert.ok(tabOfTitle(archiveApp, "Segunda tarea"), "la otra pestaña sigue");
+assert.equal(archiveApp.commands.includes("list_sessions"), false);
+assert.deepEqual(archiveApp.failures, []);
 const removedFromMenu = new Set();
 const menuActions = [];
 const fromAnotherTask = await boot("listo", "actions-from-another-task", {
   ...TASK_AFTER_QUEUE,
   list_live_sessions: () => ["s1", "s2", "s3"]
     .filter(id => !removedFromMenu.has(id))
-    .map(id => ({ ...viva, id, title: `Tarea ${id}` })),
+    .map(id => ({ ...liveQuestion, id, title: `Tarea ${id}` })),
   task_blockers: () => ({ unsaved: [], not_finished: false }),
   set_task_archived: args => { menuActions.push(["archive", args]); removedFromMenu.add(args.id); },
   machine_list: [{ id: "local", local: true, active: true, on: true, hosts: true, features: ["task_lifecycle_v1"] }],
@@ -536,7 +536,7 @@ deletionReview.querySelector('input[type="checkbox"]').click();
 await sleep(100);
 assert.equal(selectedTask(), "s1", "applying the reviewed deletion preserves the open task");
 assert.deepEqual(menuActions[1], ["delete", { project: "", id: "s3", action: "delete", consent: "reviewed-menu-family", discard: true }]);
-assert.deepEqual(fromAnotherTask.fallos, []);
+assert.deepEqual(fromAnotherTask.failures, []);
 let recreated = false;
 let rejectRecreation = true;
 const resumeCalls = [];
@@ -564,8 +564,8 @@ resumeButton().click();
 await sleep(150);
 assert.deepEqual(resumeCalls, [{ project: "", id: "s1" }, { project: "", id: "s1" }]);
 assert.ok(retired.w.document.querySelector("textarea"));
-assert.equal(retired.comandos.includes("send_message"), false);
-assert.deepEqual(retired.fallos, []);
+assert.equal(retired.commands.includes("send_message"), false);
+assert.deepEqual(retired.failures, []);
 
 // Los árboles montados conservan sus relojes: el proceso no termina solo.
 process.exit(0);

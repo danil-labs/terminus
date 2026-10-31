@@ -51,7 +51,7 @@ test("the web build uses the stored session, opens every computer and explains r
   let w;
   const app = await boot("listo", "web-gate", {}, undefined, { "sb-supabase-auth-token": session("stored") }, {
     web: true,
-    antes: (win) => {
+    beforeImport: (win) => {
       w = win;
       globalThis.WebSocket = fake.Socket;
       win.terminusWeb = { supabaseUrl: SUPABASE, supabaseKey: "public-anon-key" };
@@ -82,7 +82,7 @@ test("the web build uses the stored session, opens every computer and explains r
     assert.ok(w.document.querySelector("[data-license-retry]"), "and the retry");
     assert.equal(fake.sockets.length, 2, "it does not retry the sockets blindly");
     assert.equal(w.document.querySelectorAll("[data-web-gate]").length, 1, "one notice for every refused session");
-    assert.deepEqual(app.fallos, []);
+    assert.deepEqual(app.failures, []);
   } finally {
     globalThis.fetch = own;
   }
@@ -101,7 +101,7 @@ test("without a license the gate offers the trial and opens the app once it is a
   let w;
   const app = await boot("listo", "web-gate-license", {}, undefined, { "sb-supabase-auth-token": session("stored") }, {
     web: true,
-    antes: (win) => {
+    beforeImport: (win) => {
       w = win;
       globalThis.WebSocket = fake.Socket;
       win.terminusWeb = { supabaseUrl: SUPABASE, supabaseKey: "public-anon-key" };
@@ -119,7 +119,7 @@ test("without a license the gate offers the trial and opens the app once it is a
     await sleep(1200);
     assert.equal(gate(), null, "retrying asks again and opens the app");
     assert.equal(fake.sockets.length, 1);
-    assert.deepEqual(app.fallos, []);
+    assert.deepEqual(app.failures, []);
   } finally {
     globalThis.fetch = own;
   }

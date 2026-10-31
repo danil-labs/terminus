@@ -2,9 +2,9 @@
 /** El riel y la caja hablan con los agentes de cada carpeta: burbujas, borradores, menciones, hilos y bandeja. */
 import assert from "node:assert/strict";
 import { sleep } from "../../tests/helpers/jsdom-app.mjs";
-import { CON_TAREA, boot, bootPorCarpeta, buscarEnLaVentana, hablarDesdeLaCarpeta, keepActiveView } from "../../tests/helpers/mount-guard.mjs";
+import { WITH_TASK, boot, bootByFolder, searchWindow, talkFromFolder, keepActiveView } from "../../tests/helpers/mount-guard.mjs";
 
-const filaDeAgente = {
+const agentRow = {
   provider: "codex", model: "gpt-5.6", refs: [], created_at: 0, updated_at: 0, turns: 1,
   parent: null, subagent: null, esperando: false, stage: null,
   agent: "Holmes", parent_agent: null, last_message: "Listo.",
@@ -20,12 +20,12 @@ const bubbleResponses = {
     if (action === "resume") return { handler: "Watson", identity: "watson", released: true, quarantine: null, digest: "digest" };
     throw new Error("Unexpected handler action");
   },
-  ...CON_TAREA,
+  ...WITH_TASK,
   list_projects: [{ id: "p", name: "Proyecto", node: null, sources: [] }],
   list_live_sessions: [
-    { ...filaDeAgente, id: "s-chat", title: "Holmes", chat_de_agente: true },
-    { ...filaDeAgente, id: "s-task", title: "Una tarea", chat_de_agente: false },
-    { ...filaDeAgente, id: "s-plain", title: "Tarea suelta", agent: null, chat_de_agente: false },
+    { ...agentRow, id: "s-chat", title: "Holmes", chat_de_agente: true },
+    { ...agentRow, id: "s-task", title: "Una tarea", chat_de_agente: false },
+    { ...agentRow, id: "s-plain", title: "Tarea suelta", agent: null, chat_de_agente: false },
   ],
   list_agents: {
     agents: [{
@@ -50,7 +50,7 @@ const bubbleResponses = {
   } : null,
   close_mcp_app: null,
   load_session: ({ id }) => ({
-    ...CON_TAREA.load_session,
+    ...WITH_TASK.load_session,
     id,
     turns: [
       { role: "user", text: "¿Cómo vas?" },
@@ -70,7 +70,7 @@ const bubbleApp = await boot("listo", "agent-bubble", {
   ...bubbleResponses,
   list_live_sessions: [
     ...bubbleResponses.list_live_sessions,
-    { ...filaDeAgente, id: "s-transfer", title: "Revisar entrega", agent: "Watson", chat_de_agente: false },
+    { ...agentRow, id: "s-transfer", title: "Revisar entrega", agent: "Watson", chat_de_agente: false },
   ],
   list_agents: { ...bubbleResponses.list_agents, agents: [
     { ...bubbleResponses.list_agents.agents[0], own: true },
@@ -87,56 +87,56 @@ const bubbleDocument = bubbleApp.w.document;
 await sleep(80);
 // El riel solo lista tareas, de todas las carpetas en una lista: los agentes ya no tienen sección.
 assert.equal(bubbleDocument.querySelector("[data-sidebar-agents]"), null, "el riel no lista agentes");
-const filasDelRiel = () => [...bubbleDocument.querySelectorAll('[data-sidebar-tasks] [data-sesion]')].map((f) => f.dataset.sesion);
+const railRows = () => [...bubbleDocument.querySelectorAll('[data-sidebar-tasks] [data-sesion]')].map((f) => f.dataset.sesion);
 assert.ok(bubbleDocument.querySelector('[data-sidebar-tasks] [data-sesion="s-task"] [data-session-agent]'), "la tarea lleva la pastilla de su agente");
 assert.equal(bubbleDocument.querySelector("[data-sidebar-search]"), null, "el riel ya no lleva buscador: busca la franja");
-const halladas = () => [...bubbleDocument.querySelectorAll('[data-global-search] [data-search-key^="task:"]')].map((f) => f.dataset.searchKey.slice(5));
-const buscador = await buscarEnLaVentana(bubbleApp, "REVISAR");
-assert.deepEqual(halladas(), ["s-transfer"], "busca sin importar mayúsculas");
-await buscarEnLaVentana(bubbleApp, "revisár");
-assert.deepEqual(halladas(), ["s-transfer"], "ni acentos");
-await buscarEnLaVentana(bubbleApp, "watson");
-assert.deepEqual(halladas(), ["s-transfer"], "encuentra la tarea por el nombre de su agente");
-await buscarEnLaVentana(bubbleApp, "");
-const elegida = () => bubbleDocument.querySelector('[data-global-search] [role="option"][aria-selected="true"]')?.dataset.searchKey;
-const primera = elegida();
-assert.ok(primera, "sin texto enseña las recientes con la primera elegida");
-buscador.dispatchEvent(new bubbleApp.w.KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+const found = () => [...bubbleDocument.querySelectorAll('[data-global-search] [data-search-key^="task:"]')].map((f) => f.dataset.searchKey.slice(5));
+const searchBox = await searchWindow(bubbleApp, "REVISAR");
+assert.deepEqual(found(), ["s-transfer"], "busca sin importar mayúsculas");
+await searchWindow(bubbleApp, "revisár");
+assert.deepEqual(found(), ["s-transfer"], "ni acentos");
+await searchWindow(bubbleApp, "watson");
+assert.deepEqual(found(), ["s-transfer"], "encuentra la tarea por el nombre de su agente");
+await searchWindow(bubbleApp, "");
+const chosen = () => bubbleDocument.querySelector('[data-global-search] [role="option"][aria-selected="true"]')?.dataset.searchKey;
+const firstOne = chosen();
+assert.ok(firstOne, "sin texto enseña las recientes con la primera elegida");
+searchBox.dispatchEvent(new bubbleApp.w.KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
 await sleep(30);
-assert.notEqual(elegida(), primera, "↓ baja a la siguiente");
-buscador.dispatchEvent(new bubbleApp.w.KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true }));
+assert.notEqual(chosen(), firstOne, "↓ baja a la siguiente");
+searchBox.dispatchEvent(new bubbleApp.w.KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true }));
 await sleep(30);
-assert.equal(elegida(), primera, "↑ vuelve");
-buscador.dispatchEvent(new bubbleApp.w.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+assert.equal(chosen(), firstOne, "↑ vuelve");
+searchBox.dispatchEvent(new bubbleApp.w.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
 await sleep(80);
 assert.equal(bubbleDocument.querySelector("[data-global-search]"), null, "Escape cierra el buscador");
-assert.ok(filasDelRiel().includes("s-task") && filasDelRiel().includes("s-plain"), "el riel sigue con la lista entera");
+assert.ok(railRows().includes("s-task") && railRows().includes("s-plain"), "el riel sigue con la lista entera");
 
 // Los agentes están en el dock del pie: pulsar uno abre su chat, como su fila
 // de antes; el clic derecho ofrece ver sus tareas, que filtra la lista.
 const dock = () => bubbleDocument.querySelector('[role="group"][aria-label="Agentes"]');
 for (let i = 0; i < 80 && !dock(); i++) await sleep(25);
-const caraDe = (nombre) => [...(dock()?.querySelectorAll("[data-dock-agent]") ?? [])].find((b) => b.getAttribute("aria-label").startsWith(nombre));
-assert.ok(caraDe("Holmes"), "el dock enseña a Holmes");
-assert.match(caraDe("Holmes").getAttribute("aria-label"), /Despierto/, "su cara dice cómo está");
-assert.equal(caraDe("Holmes").getAttribute("title"), null, "el nombre va en un tooltip propio, no en `title`");
-caraDe("Holmes").dispatchEvent(new bubbleApp.w.PointerEvent("pointerenter", { bubbles: false, pointerType: "mouse" }));
-caraDe("Holmes").dispatchEvent(new bubbleApp.w.PointerEvent("pointermove", { bubbles: true, pointerType: "mouse" }));
+const faceOf = (nameText) => [...(dock()?.querySelectorAll("[data-dock-agent]") ?? [])].find((b) => b.getAttribute("aria-label").startsWith(nameText));
+assert.ok(faceOf("Holmes"), "el dock enseña a Holmes");
+assert.match(faceOf("Holmes").getAttribute("aria-label"), /Despierto/, "su cara dice cómo está");
+assert.equal(faceOf("Holmes").getAttribute("title"), null, "el nombre va en un tooltip propio, no en `title`");
+faceOf("Holmes").dispatchEvent(new bubbleApp.w.PointerEvent("pointerenter", { bubbles: false, pointerType: "mouse" }));
+faceOf("Holmes").dispatchEvent(new bubbleApp.w.PointerEvent("pointermove", { bubbles: true, pointerType: "mouse" }));
 await sleep(300);
 assert.match(bubbleDocument.querySelector('[role="tooltip"]')?.textContent ?? "", /Holmes.*Despierto/, "pasar por la cara enseña su nombre y su estado");
-caraDe("Holmes").dispatchEvent(new bubbleApp.w.PointerEvent("pointerleave", { bubbles: false, pointerType: "mouse" }));
-caraDe("Holmes").click();
+faceOf("Holmes").dispatchEvent(new bubbleApp.w.PointerEvent("pointerleave", { bubbles: false, pointerType: "mouse" }));
+faceOf("Holmes").click();
 await sleep(150);
 assert.match(bubbleDocument.querySelector("h1")?.textContent ?? "", /Holmes/, "pulsar la cara abre el chat con el agente");
-assert.ok(filasDelRiel().includes("s-plain"), "pulsar la cara no filtra la lista");
-caraDe("Holmes").dispatchEvent(new bubbleApp.w.MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
+assert.ok(railRows().includes("s-plain"), "pulsar la cara no filtra la lista");
+faceOf("Holmes").dispatchEvent(new bubbleApp.w.MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
 await sleep(120);
-const verSusTareas = [...bubbleDocument.querySelectorAll('[role="menuitem"]')].find((el) => el.textContent.trim() === "Ver sus tareas");
-assert.ok(verSusTareas, "el clic derecho ofrece ver sus tareas");
+const viewItsTasks = [...bubbleDocument.querySelectorAll('[role="menuitem"]')].find((el) => el.textContent.trim() === "Ver sus tareas");
+assert.ok(viewItsTasks, "el clic derecho ofrece ver sus tareas");
 assert.ok([...bubbleDocument.querySelectorAll('[role="menuitem"]')].some((el) => el.textContent.trim() === "Configuración del agente"));
-verSusTareas.dispatchEvent(new bubbleApp.w.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+viewItsTasks.dispatchEvent(new bubbleApp.w.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
 await sleep(120);
-assert.ok(filasDelRiel().includes("s-task") && !filasDelRiel().includes("s-plain"), "ver sus tareas filtra por el agente");
+assert.ok(railRows().includes("s-task") && !railRows().includes("s-plain"), "ver sus tareas filtra por el agente");
 assert.equal(bubbleDocument.querySelector("button[data-personalize] span"), null, "Personalizar no lleva contador de filtros");
 bubbleDocument.querySelector("button[data-personalize]").click();
 await sleep(80);
@@ -144,19 +144,19 @@ await sleep(80);
 await sleep(80);
 bubbleDocument.activeElement?.dispatchEvent(new bubbleApp.w.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
 await sleep(80);
-assert.ok(filasDelRiel().includes("s-plain"), "«Todos» en el menú de filtro quita el filtro");
+assert.ok(railRows().includes("s-plain"), "«Todos» en el menú de filtro quita el filtro");
 
 bubbleDocument.querySelector('[data-sidebar-tasks] [data-sesion="s-chat"]').click();
 await sleep(300);
-const globos = () => [...bubbleDocument.querySelectorAll("[data-bubble]")];
-assert.equal(globos().length, 0, "el chat persistente usa respuestas sin globo");
+const bubbles = () => [...bubbleDocument.querySelectorAll("[data-bubble]")];
+assert.equal(bubbles().length, 0, "el chat persistente usa respuestas sin globo");
 assert.match(bubbleDocument.querySelector("#root").textContent, /Voy bien/);
 assert.ok(bubbleDocument.querySelector(".bg-chat-user"), "el input de la persona lleva el tinte de marca");
 const appFrame = bubbleDocument.querySelector('iframe[sandbox="allow-scripts"]');
 assert.ok(appFrame, "la MCP App aparece con el registro de herramientas cerrado");
 const workToggle = appFrame.closest("article").querySelector("button[aria-expanded]");
 assert.equal(workToggle?.getAttribute("aria-expanded"), "false");
-const appReadsBeforeToggle = bubbleApp.comandos.filter((c) => c === "read_mcp_app").length;
+const appReadsBeforeToggle = bubbleApp.commands.filter((c) => c === "read_mcp_app").length;
 assert.equal(appReadsBeforeToggle, 1, "las herramientas sin metadatos de UI no intentan abrir una MCP App");
 assert.equal(bubbleDocument.querySelector("#root").textContent.includes("Abrir vista interactiva"), false,
   "una llamada normal no deja un botón de vista");
@@ -168,7 +168,7 @@ for (const expanded of ["true", "false"]) {
     "plegar las herramientas no desmonta ni duplica la MCP App");
 }
 assert.equal(bubbleDocument.querySelectorAll('iframe[sandbox="allow-scripts"]').length, 1);
-assert.equal(bubbleApp.comandos.filter((c) => c === "read_mcp_app").length, appReadsBeforeToggle,
+assert.equal(bubbleApp.commands.filter((c) => c === "read_mcp_app").length, appReadsBeforeToggle,
   "cambiar el pliegue no vuelve a consultar las herramientas");
 
 const editQueued = [...bubbleDocument.querySelectorAll("button")].find((button) =>
@@ -189,54 +189,54 @@ bubbleDocument
 await sleep(150);
 bubbleDocument.querySelector('[data-sesion="s-task"]').click();
 await sleep(300);
-assert.equal(globos().length, 0, "la tarea con arquetipo conserva las respuestas sin globo");
-const modelos = [...bubbleDocument.querySelectorAll('span[aria-label="Proveedor"]')].map((el) => el.textContent ?? "");
-assert.deepEqual(modelos, ["GPT-5.6", "Claude Sonnet 5"], "cada respuesta lleva el logo del agente y el modelo con su versión, incluido el traspaso");
+assert.equal(bubbles().length, 0, "la tarea con arquetipo conserva las respuestas sin globo");
+const models = [...bubbleDocument.querySelectorAll('span[aria-label="Proveedor"]')].map((el) => el.textContent ?? "");
+assert.deepEqual(models, ["GPT-5.6", "Claude Sonnet 5"], "cada respuesta lleva el logo del agente y el modelo con su versión, incluido el traspaso");
 assert.equal(
   bubbleDocument.querySelector("[data-answer-author]"),
   null,
   "el nombre del agente ya no firma la respuesta por encima",
 );
 assert.ok(bubbleDocument.querySelector(".bg-chat-user"), "el input de la persona lleva el tinte de marca en la tarea");
-const tabDeLaTarea = [...bubbleDocument.querySelectorAll(':is([role="tab"], [data-preview-header] [role="button"])')].find(tab => tab.textContent.includes("Una tarea"));
-assert.ok(tabDeLaTarea, "el título de la tarea distingue sus pestañas");
-assert.match(tabDeLaTarea.title, /^Una tarea(?: ·|$)/, "el título de la tarea manda también en la descripción de la pestaña");
-const avatarDelTab = tabDeLaTarea.querySelector(".astro-face");
-assert.equal(avatarDelTab?.querySelector("svg")?.dataset.astroStatus, "awake", "el avatar de la pestaña es estático");
-assert.equal(avatarDelTab?.dataset.astroWorking, undefined, "el tab no anima un trabajo ajeno");
-assert.ok(!avatarDelTab?.querySelector("svg")?.classList.contains("opacity-[0.62]"), "el tab no atenúa al agente dormido");
+const taskTabEl = [...bubbleDocument.querySelectorAll(':is([role="tab"], [data-preview-header] [role="button"])')].find(tab => tab.textContent.includes("Una tarea"));
+assert.ok(taskTabEl, "el título de la tarea distingue sus pestañas");
+assert.match(taskTabEl.title, /^Una tarea(?: ·|$)/, "el título de la tarea manda también en la descripción de la pestaña");
+const tabAvatar = taskTabEl.querySelector(".astro-face");
+assert.equal(tabAvatar?.querySelector("svg")?.dataset.astroStatus, "awake", "el avatar de la pestaña es estático");
+assert.equal(tabAvatar?.dataset.astroWorking, undefined, "el tab no anima un trabajo ajeno");
+assert.ok(!tabAvatar?.querySelector("svg")?.classList.contains("opacity-[0.62]"), "el tab no atenúa al agente dormido");
 assert.match(bubbleDocument.querySelector("header.bg-transparent")?.textContent ?? "", /Holmes/, "la cabecera conserva la identidad del agente");
-tabDeLaTarea.dispatchEvent(new bubbleApp.w.KeyboardEvent("keydown", { key: "Delete", bubbles: true }));
+taskTabEl.dispatchEvent(new bubbleApp.w.KeyboardEvent("keydown", { key: "Delete", bubbles: true }));
 await sleep(150);
 bubbleDocument.querySelector('[data-sesion="s-plain"]').click();
 await sleep(300);
-assert.equal(globos().length, 0, "una tarea sin arquetipo conserva su salida sin globos");
+assert.equal(bubbles().length, 0, "una tarea sin arquetipo conserva su salida sin globos");
 assert.ok(bubbleDocument.querySelector(".bg-chat-user"), "la tarea sin arquetipo pinta igual el input de la persona");
 bubbleDocument.querySelector('[data-sesion="s-transfer"]').click();
 await sleep(300);
-const tabTransferida = [...bubbleDocument.querySelectorAll(':is([role="tab"], [data-preview-header] [role="button"])')].find(tab => tab.textContent.includes("Revisar entrega"));
-assert.ok(tabTransferida, "la tarea recibida conserva su título al cambiar de responsable");
-assert.match(tabTransferida.title, /^Revisar entrega(?: ·|$)/);
-assert.equal(tabTransferida.querySelector(".astro-face")?.getAttribute("data-astro-working"), null);
-const cabeceraTransferida = bubbleDocument.querySelector("header.bg-transparent");
+const transferredTab = [...bubbleDocument.querySelectorAll(':is([role="tab"], [data-preview-header] [role="button"])')].find(tab => tab.textContent.includes("Revisar entrega"));
+assert.ok(transferredTab, "la tarea recibida conserva su título al cambiar de responsable");
+assert.match(transferredTab.title, /^Revisar entrega(?: ·|$)/);
+assert.equal(transferredTab.querySelector(".astro-face")?.getAttribute("data-astro-working"), null);
+const transferredHeader = bubbleDocument.querySelector("header.bg-transparent");
 assert.equal(bubbleDocument.querySelectorAll("header.bg-transparent").length, 1, "la tarea tiene una sola cabecera");
-assert.match(cabeceraTransferida.textContent, /Watson/, "la cabecera enseña al responsable de la nueva ejecución");
-cabeceraTransferida.querySelector("button").click();
+assert.match(transferredHeader.textContent, /Watson/, "la cabecera enseña al responsable de la nueva ejecución");
+transferredHeader.querySelector("button").click();
 // El perfil llega en su propio trozo: se espera a que pinte.
 for (let i = 0; i < 120 && !bubbleDocument.querySelector('button[aria-label="Volver a la conversación"]'); i++) await sleep(25);
 assert.match(bubbleDocument.querySelector('button[aria-label="Volver a la conversación"]')?.parentElement.parentElement.textContent ?? "", /Watson/, "la cabecera abre el perfil del responsable actual");
-const perfilCompleto = bubbleDocument.querySelector('button[aria-label="Volver a la conversación"]').parentElement.parentElement;
-for (const seccion of ["Perfil del agente", "Modelo", "Cara", "Fondo de la conversación", "Instrucciones", "Telegram"])
-  assert.ok(perfilCompleto.textContent.includes(seccion), `falta ${seccion} en el perfil abierto desde la cabecera`);
-assert.ok(perfilCompleto.querySelector('button[aria-label="La que sale de su nombre"]'), "el perfil conserva la edición de la cara");
-assert.ok([...perfilCompleto.querySelectorAll("button")].some(button => button.textContent.includes("Elegir imagen")), "el perfil conserva la edición del fondo");
-assert.ok(perfilCompleto.querySelector("textarea"), "las instrucciones del agente propio siguen editables");
-assert.ok(perfilCompleto.querySelector('input[aria-label="Token del bot"]'), "Telegram conserva la configuración del bot");
+const fullProfile = bubbleDocument.querySelector('button[aria-label="Volver a la conversación"]').parentElement.parentElement;
+for (const sectionEl of ["Perfil del agente", "Modelo", "Cara", "Fondo de la conversación", "Instrucciones", "Telegram"])
+  assert.ok(fullProfile.textContent.includes(sectionEl), `falta ${sectionEl} en el perfil abierto desde la cabecera`);
+assert.ok(fullProfile.querySelector('button[aria-label="La que sale de su nombre"]'), "el perfil conserva la edición de la cara");
+assert.ok([...fullProfile.querySelectorAll("button")].some(button => button.textContent.includes("Elegir imagen")), "el perfil conserva la edición del fondo");
+assert.ok(fullProfile.querySelector("textarea"), "las instrucciones del agente propio siguen editables");
+assert.ok(fullProfile.querySelector('input[aria-label="Token del bot"]'), "Telegram conserva la configuración del bot");
 const policyButton = text => [...bubbleDocument.querySelectorAll("button")].find(b => b.textContent.trim() === text);
 for (let i = 0; i < 80 && !policyButton("Liberar cuarentena"); i++) await sleep(25);
-assert.ok(perfilCompleto.textContent.includes("notes"));
-assert.ok(perfilCompleto.textContent.includes("notes-server"));
-assert.ok(!perfilCompleto.textContent.includes("UNAPPROVED_SENTINEL"), "list's unapproved slot reason is not effective availability");
+assert.ok(fullProfile.textContent.includes("notes"));
+assert.ok(fullProfile.textContent.includes("notes-server"));
+assert.ok(!fullProfile.textContent.includes("UNAPPROVED_SENTINEL"), "list's unapproved slot reason is not effective availability");
 policyButton("Liberar cuarentena").click();
 await sleep(50);
 policyButton("Confirmar").click();
@@ -254,11 +254,11 @@ assert.deepEqual(resumed.request, { action: "resume", operation: "handler-op" })
 assert.equal(resumed.workspace, released.workspace);
 assert.equal(resumed.project, released.project);
 assert.equal(policyButton("Liberar cuarentena").disabled, false);
-assert.deepEqual(bubbleApp.fallos, []);
+assert.deepEqual(bubbleApp.failures, []);
 bubbleApp.w.close();
 
 const agentSends = [];
-const draftApp = await bootPorCarpeta("listo", "agent-task-draft", {
+const draftApp = await bootByFolder("listo", "agent-task-draft", {
   ...bubbleResponses,
   list_projects: [{ id: "p", name: "Proyecto", kind: "folder", working_directory: "/lab", sources: [] }],
   list_agents: { ...bubbleResponses.list_agents, agents: [
@@ -270,7 +270,7 @@ const draftApp = await bootPorCarpeta("listo", "agent-task-draft", {
 });
 const draftDoc = draftApp.w.document;
 await sleep(80);
-await hablarDesdeLaCarpeta(draftApp, "p", "Holmes");
+await talkFromFolder(draftApp, "p", "Holmes");
 assert.match(draftDoc.querySelector("h1")?.textContent ?? "", /Holmes/);
 assert.equal(draftDoc.querySelector("h1")?.closest("header")?.querySelector("[data-astro-status]")?.dataset.astroStatus, "awake", "a new agent task opens with the agent awake and without the pulse");
 assert.match(draftDoc.body.textContent, /Revisa cambios del proyecto/);
@@ -280,12 +280,12 @@ assert.equal(draftDoc.querySelector('button[aria-label="Rama base"]'), null, "un
 const draftField = draftDoc.querySelector("textarea");
 draftField.value = "Revisa el cambio de login";
 draftField.dispatchEvent(new draftApp.w.Event("input", { bubbles: true }));
-await hablarDesdeLaCarpeta(draftApp, "p", "Watson");
+await talkFromFolder(draftApp, "p", "Watson");
 assert.equal(draftDoc.querySelector("textarea").value, "", "Watson no recibe el borrador sin enviar de Holmes");
 const watsonField = draftDoc.querySelector("textarea");
 watsonField.value = "Documenta el despliegue";
 watsonField.dispatchEvent(new draftApp.w.Event("input", { bubbles: true }));
-await hablarDesdeLaCarpeta(draftApp, "p", "Holmes");
+await talkFromFolder(draftApp, "p", "Holmes");
 assert.equal(draftDoc.querySelector("textarea").value, "Revisa el cambio de login", "volver al agente conserva su encargo");
 draftDoc.querySelector("textarea").dispatchEvent(new draftApp.w.KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
 await sleep(150);
@@ -299,13 +299,13 @@ const activeDraftRow = draftDoc.querySelector('[data-sidebar-tasks] [data-sesion
 assert.equal(activeDraftRow.querySelectorAll("[data-session-agent]").length, 1, "la identidad activa se pinta una sola vez");
 assert.ok(activeDraftRow.querySelector('[data-session-status] [data-task-orbit] [data-astro-status="working"]'), "la cara activa va dentro del arco a la derecha del título");
 assert.equal(activeDraftRow.querySelector('[data-session-preview] [data-session-agent]'), null, "la segunda línea no duplica la cara activa");
-assert.deepEqual(draftApp.fallos, []);
+assert.deepEqual(draftApp.failures, []);
 draftApp.w.close();
 
 // El menú de `@` separa los del repositorio de los tuyos, no enseña a los
 // ocultos y marca al tuyo que el repositorio tapa sin dejar elegirlo.
 const holmes = bubbleResponses.list_agents.agents[0];
-const mentionAgentsApp = await bootPorCarpeta("listo", "agent-mentions", {
+const mentionAgentsApp = await bootByFolder("listo", "agent-mentions", {
   ...bubbleResponses,
   list_projects: [{ id: "p", name: "Proyecto", kind: "folder", working_directory: "/lab", sources: [] }],
   list_agents: { ...bubbleResponses.list_agents, agents: [
@@ -321,7 +321,7 @@ const mentionAgentsApp = await bootPorCarpeta("listo", "agent-mentions", {
 });
 const mentionAgentsDoc = mentionAgentsApp.w.document;
 await sleep(80);
-await hablarDesdeLaCarpeta(mentionAgentsApp, "p", "Holmes");
+await talkFromFolder(mentionAgentsApp, "p", "Holmes");
 const agentsField = mentionAgentsDoc.querySelector("textarea");
 agentsField.value = "@";
 agentsField.selectionStart = agentsField.selectionEnd = 1;
@@ -335,24 +335,24 @@ assert.match(menuLines[1], /^Tuyos ?Watson/, menuLines.join(" | "));
 assert.equal(menuLines.filter(line => line.includes("Holmes")).length, 1, "el tuyo que el repositorio tapa no sale");
 assert.equal(menuLines.some(line => /Tapado|Encargado/.test(line)), false, "las filas dicen «Agente», sin «Tapado»");
 assert.equal(menuLines.some(line => line.includes("Hudson")), false, "un agente oculto no sale en el menú, como en el riel");
-assert.deepEqual(mentionAgentsApp.fallos, []);
+assert.deepEqual(mentionAgentsApp.failures, []);
 mentionAgentsApp.w.close();
 
 let threadRows = [
-  { ...filaDeAgente, id: "dm", title: "Holmes", chat_de_agente: true, agent_thread: false },
-  { ...filaDeAgente, id: "topic", title: "Release planning", chat_de_agente: true, agent_thread: true, pinned: false, updated_at: 100, launcher_name: "Watson" },
-  { ...filaDeAgente, id: "new-topic", title: "Independent topic", chat_de_agente: true, agent_thread: true, updated_at: 90 },
-  { ...filaDeAgente, id: "archived-work", title: "Old investigation", last_message: "Historical finding", archived: true, chat_de_agente: false, launched_by: "dm", launcher_name: "Holmes" },
-  { ...filaDeAgente, id: "dm-work", title: "DM task", chat_de_agente: false, launched_by: "dm", launcher_name: "Holmes" },
-  { ...filaDeAgente, id: "topic-work", title: "Topic task", last_message: "Topic task progress", chat_de_agente: false, pinned: true, launched_by: "topic", launcher_name: "Watson" },
-  { ...filaDeAgente, id: "topic-work-2", title: "Second topic task", chat_de_agente: false, pinned: false, launched_by: "topic", launcher_name: "Holmes" },
-  { ...filaDeAgente, id: "8cnv428n", title: "Revisa seguridad escrituras alfa Inbox y Broadcasts", chat_de_agente: false, pinned: false, launched_by: "n8tc0emm", launcher_available: false, launcher_name: "tech-lead" },
-  { ...filaDeAgente, id: "unrelated-work", title: "Other task", agent: null, chat_de_agente: false, launched_by: "other-chat", launcher_name: "Other agent" },
+  { ...agentRow, id: "dm", title: "Holmes", chat_de_agente: true, agent_thread: false },
+  { ...agentRow, id: "topic", title: "Release planning", chat_de_agente: true, agent_thread: true, pinned: false, updated_at: 100, launcher_name: "Watson" },
+  { ...agentRow, id: "new-topic", title: "Independent topic", chat_de_agente: true, agent_thread: true, updated_at: 90 },
+  { ...agentRow, id: "archived-work", title: "Old investigation", last_message: "Historical finding", archived: true, chat_de_agente: false, launched_by: "dm", launcher_name: "Holmes" },
+  { ...agentRow, id: "dm-work", title: "DM task", chat_de_agente: false, launched_by: "dm", launcher_name: "Holmes" },
+  { ...agentRow, id: "topic-work", title: "Topic task", last_message: "Topic task progress", chat_de_agente: false, pinned: true, launched_by: "topic", launcher_name: "Watson" },
+  { ...agentRow, id: "topic-work-2", title: "Second topic task", chat_de_agente: false, pinned: false, launched_by: "topic", launcher_name: "Holmes" },
+  { ...agentRow, id: "8cnv428n", title: "Revisa seguridad escrituras alfa Inbox y Broadcasts", chat_de_agente: false, pinned: false, launched_by: "n8tc0emm", launcher_available: false, launcher_name: "tech-lead" },
+  { ...agentRow, id: "unrelated-work", title: "Other task", agent: null, chat_de_agente: false, launched_by: "other-chat", launcher_name: "Other agent" },
 ];
 const threadLoads = [];
 const pinChanges = [];
 let threadProjects = bubbleResponses.list_projects;
-const threadApp = await bootPorCarpeta("listo", "agent-threads", {
+const threadApp = await bootByFolder("listo", "agent-threads", {
   ...bubbleResponses,
   list_projects: () => threadProjects,
   list_delegated_sessions: ({ id }) => threadRows.filter(row => row.launched_by === id).map(row => ({ ...row, folder: "p" })),
@@ -370,7 +370,7 @@ const threadApp = await bootPorCarpeta("listo", "agent-threads", {
   list_session_git: () => ({ "topic-work": { kind: "branch", branch: "feature/release", alias: "Orion", repository: "/lab", shared_with: null, pull: null } }),
   load_session: ({ id }) => {
     threadLoads.push(id);
-    return { ...CON_TAREA.load_session, ...threadRows.find(row => row.id === id), id,
+    return { ...WITH_TASK.load_session, ...threadRows.find(row => row.id === id), id,
       turns: id === "topic" ? [
         { role: "system", id: "topic-launch", text: "", meta: "task_launched",
           from_task: { folder: "p", task: "topic-work", title: "Topic task", provider: "codex" } },
@@ -495,20 +495,20 @@ threadDoc.querySelector('[data-task-coordinator]').click();
 await sleep(200);
 assert.equal(threadLoads.at(-1), "topic", "la tarea delegada regresa al coordinador");
 assert.equal(threadDoc.querySelector("textarea"), null, "el tema anterior no abre turnos nuevos");
-await hablarDesdeLaCarpeta(threadApp, "p", "Holmes");
+await talkFromFolder(threadApp, "p", "Holmes");
 assert.equal(threadDoc.querySelector('[role="dialog"]'), null, "una conversación nueva abre el borrador del agente");
 assert.match(threadDoc.querySelector("h1")?.textContent ?? "", /Holmes/);
 assert.ok(threadDoc.querySelector("textarea"), "la conversación nueva tiene composer");
-assert.equal(threadApp.comandos.includes("create_agent_thread"), false);
+assert.equal(threadApp.commands.includes("create_agent_thread"), false);
 threadProjects = structuredClone(threadProjects);
 threadApp.emit("cli-changed", { workspace: null, command: "task send" });
 await sleep(350);
 assert.ok(sidebarTask("dm"), "refrescar conserva el historial antiguo entre las tareas");
-assert.deepEqual(threadApp.fallos, []);
+assert.deepEqual(threadApp.failures, []);
 threadApp.w.close();
 
 // Una Bandeja antigua sigue accesible y cada mensaje conserva su remitente.
-const inboxRows = [...threadRows.filter(row => row.id === "dm" || row.id === "topic"), { ...filaDeAgente, id: "inbox", title: "Bandeja", chat_de_agente: true, agent_thread: true, inbox: true }];
+const inboxRows = [...threadRows.filter(row => row.id === "dm" || row.id === "topic"), { ...agentRow, id: "inbox", title: "Bandeja", chat_de_agente: true, agent_thread: true, inbox: true }];
 const inboxLoads = [];
 const inboxTurns = [
   { role: "system", meta: "recibido", text: "Mensaje de @Watson. Salto 1." },
@@ -523,7 +523,7 @@ const inboxApp = await boot("listo", "agent-inbox", {
   load_session: ({ id }) => {
     inboxLoads.push(id);
     const row = inboxRows.find(r => r.id === id);
-    return { ...CON_TAREA.load_session, ...row, id, turns: id === "inbox" ? inboxTurns : [] };
+    return { ...WITH_TASK.load_session, ...row, id, turns: id === "inbox" ? inboxTurns : [] };
   },
 });
 inboxApp.w.scrollTo = () => {};
@@ -533,7 +533,7 @@ assert.equal(inboxDoc.querySelector('[data-sidebar-tasks] [data-sesion="inbox"]'
 assert.equal(inboxDoc.querySelector('[data-agent-inbox]'), null, "la Bandeja no tiene una sección aparte");
 inboxDoc.querySelector('[data-sidebar-tasks] [data-sesion="inbox"]').click();
 await sleep(300);
-assert.equal(inboxApp.comandos.includes("open_agent_inbox"), false);
+assert.equal(inboxApp.commands.includes("open_agent_inbox"), false);
 assert.equal(inboxLoads.at(-1), "inbox");
 assert.equal(inboxDoc.querySelector("textarea"), null, "la Bandeja anterior no inicia turnos nuevos");
 assert.equal(inboxDoc.querySelector('[data-agent-thread]'), null, "no quedan temas anidados bajo los agentes");
@@ -548,7 +548,7 @@ assert.ok(inboxDoc.querySelectorAll('[data-sender="system"]').length >= 2, "y lo
 taskSigned.click();
 await sleep(200);
 assert.equal(inboxLoads.at(-1), "login", "el título de la tarea la abre");
-assert.deepEqual(inboxApp.fallos, []);
+assert.deepEqual(inboxApp.failures, []);
 inboxApp.w.close();
 
 // Los árboles montados conservan sus relojes: el proceso no termina solo.

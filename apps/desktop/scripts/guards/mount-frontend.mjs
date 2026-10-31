@@ -24,7 +24,7 @@
  */
 import assert from "node:assert/strict";
 import { sleep } from "../../tests/helpers/jsdom-app.mjs";
-import { CON_TAREA, boot, keepActiveView } from "../../tests/helpers/mount-guard.mjs";
+import { WITH_TASK, boot, keepActiveView } from "../../tests/helpers/mount-guard.mjs";
 
 /**
  * **El esqueleto de `Setup` es el síntoma exacto**, no una pantalla más.
@@ -34,14 +34,14 @@ import { CON_TAREA, boot, keepActiveView } from "../../tests/helpers/mount-guard
  * `Skeleton` que ya estaba pintado. Eso es lo que se vio en producción: tres
  * barras grises y ni un error.
  */
-const enElEsqueleto = (html) => html.includes("setup-card") && html.includes("aria-busy");
+const inSkeleton = (html) => html.includes("setup-card") && html.includes("aria-busy");
 
 const t0 = Date.now();
 const normal = await boot("listo", 1);
 
-const roto = normal.fallos.length > 0 || !normal.pintado.trim() || enElEsqueleto(normal.pintado);
+const broken = normal.failures.length > 0 || !normal.painted.trim() || inSkeleton(normal.painted);
 
-if (!roto) {
+if (!broken) {
   await sleep(1600);
   const storage = normal.w.document.querySelector('button[aria-label="Máquinas"]');
   if (normal.storageQueries.length || !storage) {
@@ -71,25 +71,25 @@ if (!roto) {
     );
     process.exit(1);
   }
-  const selectorSeparado = normal.w.document.querySelector('select[title="Quién responde"]');
-  const modelo = normal.w.document.querySelector('button[title="Con qué modelo responde"]');
-  modelo?.dispatchEvent(new normal.w.MouseEvent("click", { bubbles: true }));
+  const separateSelector = normal.w.document.querySelector('select[title="Quién responde"]');
+  const modelButton = normal.w.document.querySelector('button[title="Con qué modelo responde"]');
+  modelButton?.dispatchEvent(new normal.w.MouseEvent("click", { bubbles: true }));
   await sleep(50);
-  const gruposDeModelos = [...normal.w.document.querySelectorAll('[role="group"]')]
-    .map((grupo) => grupo.getAttribute("aria-label"));
-  const notaDelModelo = normal.w.document.querySelector('[role="option"]')?.getAttribute("title");
-  assert.equal(notaDelModelo, "en esta computadora, con Ollama", "a model note from the app goes through the catalogue");
-  if (selectorSeparado || modelo?.getAttribute("aria-label") !== "Modelo: GPT-5.6") {
+  const modelGroups = [...normal.w.document.querySelectorAll('[role="group"]')]
+    .map((groupEl) => groupEl.getAttribute("aria-label"));
+  const modelNote = normal.w.document.querySelector('[role="option"]')?.getAttribute("title");
+  assert.equal(modelNote, "en esta computadora, con Ollama", "a model note from the app goes through the catalogue");
+  if (separateSelector || modelButton?.getAttribute("aria-label") !== "Modelo: GPT-5.6") {
     console.error(
-      `El chat no arrancó en el modelo usable del selector único: modelo=${JSON.stringify(modelo?.getAttribute("aria-label"))}, grupos=${JSON.stringify(gruposDeModelos)}.`,
+      `El chat no arrancó en el modelo usable del selector único: modelo=${JSON.stringify(modelButton?.getAttribute("aria-label"))}, grupos=${JSON.stringify(modelGroups)}.`,
     );
     process.exit(1);
   }
 
-  modelo.click();
-  const campo = normal.w.document.querySelector("textarea");
-  campo.value = "Empieza la tarea";
-  campo.dispatchEvent(new normal.w.InputEvent("input", { bubbles: true }));
+  modelButton.click();
+  const inputField = normal.w.document.querySelector("textarea");
+  inputField.value = "Empieza la tarea";
+  inputField.dispatchEvent(new normal.w.InputEvent("input", { bubbles: true }));
   await sleep(10);
   normal.w.document.querySelector('button[aria-label="Preguntar"]')?.click();
   await sleep(100);
@@ -100,18 +100,18 @@ if (!roto) {
     console.error("Tras mandar el primer mensaje el compositor no recuperó el foco.");
     process.exit(1);
   }
-  const modeloTrasEmpezar = normal.w.document.querySelector(
+  const modelAfterStart = normal.w.document.querySelector(
     'button[aria-label="Modelo: GPT-5.6"]',
   );
-  modeloTrasEmpezar?.dispatchEvent(new normal.w.MouseEvent("click", { bubbles: true }));
+  modelAfterStart?.dispatchEvent(new normal.w.MouseEvent("click", { bubbles: true }));
   await sleep(50);
-  if (modeloTrasEmpezar?.disabled || !normal.w.document.querySelector('[role="group"]')) {
+  if (modelAfterStart?.disabled || !normal.w.document.querySelector('[role="group"]')) {
     console.error(
       "El modelo no se puede elegir para el siguiente turno mientras el actual responde.",
     );
     process.exit(1);
   }
-  modeloTrasEmpezar?.dispatchEvent(new normal.w.MouseEvent("click", { bubbles: true }));
+  modelAfterStart?.dispatchEvent(new normal.w.MouseEvent("click", { bubbles: true }));
 
   /**
    * **La barra de arriba conduce las dos columnas.**
@@ -121,36 +121,36 @@ if (!roto) {
    * de recuperar el historial se va con ella y no queda nada en pantalla que lo
    * diga.
    */
-  const ocultar = normal.w.document.querySelector(
+  const hideButton = normal.w.document.querySelector(
     'button[aria-label="Ocultar el historial"]',
   );
-  ocultar?.click();
+  hideButton?.click();
   await sleep(50);
-  const mostrar = normal.w.document.querySelector(
+  const showButton = normal.w.document.querySelector(
     'button[aria-label="Mostrar el historial"]',
   );
-  if (!ocultar || !mostrar) {
+  if (!hideButton || !showButton) {
     console.error(
-      `La barra de ventana no conduce el historial: ocultar=${!!ocultar}, mostrar=${!!mostrar}.`,
+      `La barra de ventana no conduce el historial: ocultar=${!!hideButton}, mostrar=${!!showButton}.`,
     );
     process.exit(1);
   }
-  mostrar.click();
+  showButton.click();
   await sleep(50);
 
   // Abre el panel de archivos de la tarea para ejecutar también su render.
-  const arbol = normal.w.document.querySelector('button[aria-label="Archivos de la tarea"]');
-  if (!arbol) {
+  const treeButton = normal.w.document.querySelector('button[aria-label="Archivos de la tarea"]');
+  if (!treeButton) {
     console.error("Con una tarea abierta no aparece el botón de sus archivos.");
     process.exit(1);
   }
-  arbol.click();
+  treeButton.click();
   await sleep(300);
-  const tirador = normal.w.document.querySelector('[role="separator"][aria-label="Ancho del panel de archivos"]');
-  const panelDeArchivos = normal.w.document.querySelector("[data-task-files]");
-  if (!tirador || !panelDeArchivos || normal.fallos.length > 0) {
-    console.error(`El panel de archivos de la tarea no montó: tirador=${!!tirador}, tarjeta=${!!panelDeArchivos}.`);
-    for (const f of normal.fallos.slice(0, 3)) {
+  const resizeHandle = normal.w.document.querySelector('[role="separator"][aria-label="Ancho del panel de archivos"]');
+  const filesPanel = normal.w.document.querySelector("[data-task-files]");
+  if (!resizeHandle || !filesPanel || normal.failures.length > 0) {
+    console.error(`El panel de archivos de la tarea no montó: tirador=${!!resizeHandle}, tarjeta=${!!filesPanel}.`);
+    for (const f of normal.failures.slice(0, 3)) {
       for (const l of String(f).split("\n").slice(0, 6)) console.error(`      ${l}`);
     }
     process.exit(1);
@@ -162,33 +162,33 @@ if (!roto) {
    * columna abierta se veían los dos juegos, el del chasis a mitad de
    * pantalla. En macOS no se ve: ahí el semáforo es nativo.
    */
-  const semaforo = await boot(
+  const trafficLight = await boot(
     "listo",
     "window-controls",
-    CON_TAREA,
+    WITH_TASK,
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
   );
   // Una columna cerrada mide cero y esconde lo suyo, pero sus nodos siguen en
   // el documento: contar por selector da dos con la columna cerrada. jsdom no
   // calcula geometría, y lo único que queda para filtrarlos es su ancho en
   // línea.
-  const semaforos = () =>
-    [...semaforo.w.document.querySelectorAll('button[aria-label="Cerrar Danil"]')]
-      .filter((boton) => !boton.closest('[style*="width: 0px"]')).length;
+  const trafficLights = () =>
+    [...trafficLight.w.document.querySelectorAll('button[aria-label="Cerrar Danil"]')]
+      .filter((buttonEl) => !buttonEl.closest('[style*="width: 0px"]')).length;
   // El tirador es lo único que distingue abierta de cerrada: la cabecera de la
   // columna sigue en el documento colapsada, y su botón de cerrar con ella.
-  const columnaAbierta = () =>
-    Boolean(semaforo.w.document.querySelector('[role="separator"][aria-label="Ancho del panel de archivos"]'));
-  assert.equal(columnaAbierta(), false, "la columna nace cerrada");
-  assert.equal(semaforos(), 1, "con la columna cerrada el semáforo es el del chasis");
-  semaforo.w.document.querySelector('[data-sesion="s1"]').click();
+  const columnOpen = () =>
+    Boolean(trafficLight.w.document.querySelector('[role="separator"][aria-label="Ancho del panel de archivos"]'));
+  assert.equal(columnOpen(), false, "la columna nace cerrada");
+  assert.equal(trafficLights(), 1, "con la columna cerrada el semáforo es el del chasis");
+  trafficLight.w.document.querySelector('[data-sesion="s1"]').click();
   await sleep(150);
-  semaforo.w.document.querySelector('[aria-label="Archivos de la tarea"]').click();
+  trafficLight.w.document.querySelector('[aria-label="Archivos de la tarea"]').click();
   await sleep(300);
-  assert.equal(columnaAbierta(), true, "el conmutador tiene que abrir el panel de archivos");
-  assert.equal(semaforos(), 1, "con la columna abierta el semáforo no se duplica");
-  assert.deepEqual(semaforo.fallos, []);
-  semaforo.w.close();
+  assert.equal(columnOpen(), true, "el conmutador tiene que abrir el panel de archivos");
+  assert.equal(trafficLights(), 1, "con la columna abierta el semáforo no se duplica");
+  assert.deepEqual(trafficLight.failures, []);
+  trafficLight.w.close();
 
   /**
    * **Lo que el hilo anuncia se lee en el centro, como una pestaña más.**
@@ -205,9 +205,9 @@ if (!roto) {
   const watchedTrees = new Map();
   let externalPaths = ["src/example.ts"];
   const treeResponses = {
-    ...CON_TAREA,
-    list_live_sessions: [CON_TAREA.list_live_sessions[0], { ...CON_TAREA.list_live_sessions[0], id: "s2", title: "Segunda tarea" }],
-    load_session: ({ id }) => ({ ...CON_TAREA.load_session, id }),
+    ...WITH_TASK,
+    list_live_sessions: [WITH_TASK.list_live_sessions[0], { ...WITH_TASK.list_live_sessions[0], id: "s2", title: "Segunda tarea" }],
+    load_session: ({ id }) => ({ ...WITH_TASK.load_session, id }),
     list_task_trees: [{ key: "work", name: "Workspace", path: "/lab", kind: "git", branch: "dev", missing: false, dirty_before: null }],
     watch_task_tree: ({ session, changes }) => { watchedTrees.set(session, changes); return session; },
     unwatch_task_tree: ({ id }) => { watchedTrees.delete(id); },
@@ -217,9 +217,9 @@ if (!roto) {
     },
     tree_folder: ({ path, offset }) => {
       const total = path === ".venv" ? 450 : 0;
-      const hasta = Math.min(total, offset + 300);
-      const paths = Array.from({ length: hasta - offset }, (_, i) => `${path}/m${String(offset + i).padStart(4, "0")}.py`);
-      return { paths, folders: [], next: hasta < total ? hasta : null, total };
+      const until = Math.min(total, offset + 300);
+      const paths = Array.from({ length: until - offset }, (_, i) => `${path}/m${String(offset + i).padStart(4, "0")}.py`);
+      return { paths, folders: [], next: until < total ? until : null, total };
     },
     tree_git_status: [],
     tree_summary: { base: "HEAD", files: [], added: 0, removed: 0 },
@@ -256,16 +256,16 @@ if (!roto) {
   await sleep(300);
   const venv = () => [...treeDocument.querySelectorAll('button[aria-expanded]')].find((button) => button.textContent.trim() === ".venv");
   assert.ok(venv(), "a heavy ignored folder shows folded");
-  const enVenv = () => [...treeDocument.querySelectorAll("button[data-ruta]")].filter((b) => b.dataset.ruta.startsWith(".venv/")).length;
-  assert.equal(enVenv(), 0, "a folded folder lists nothing until it is opened");
+  const inVenv = () => [...treeDocument.querySelectorAll("button[data-ruta]")].filter((b) => b.dataset.ruta.startsWith(".venv/")).length;
+  assert.equal(inVenv(), 0, "a folded folder lists nothing until it is opened");
   venv().click();
   await sleep(150);
-  assert.equal(enVenv(), 300, "opening a folded folder loads its first page");
-  const mas = [...treeDocument.querySelectorAll("button")].find((b) => b.textContent.includes("Mostrar más"));
-  assert.ok(mas, "a folded folder offers its next page");
-  mas.click();
+  assert.equal(inVenv(), 300, "opening a folded folder loads its first page");
+  const moreButton = [...treeDocument.querySelectorAll("button")].find((b) => b.textContent.includes("Mostrar más"));
+  assert.ok(moreButton, "a folded folder offers its next page");
+  moreButton.click();
   await sleep(150);
-  assert.equal(enVenv(), 450, "the next page is appended");
+  assert.equal(inVenv(), 450, "the next page is appended");
   assert.equal([...treeDocument.querySelectorAll("button")].some((b) => b.textContent.includes("Mostrar más")), false);
   venv().click();
   await sleep(50);
@@ -311,10 +311,10 @@ if (!roto) {
   await sleep(850);
   assert.equal([...treeDocument.querySelectorAll("button")].some((button) => button.textContent.trim() === "testsync.md"), false);
 
-  assert.equal(treeApp.fallos.length, 0);
+  assert.equal(treeApp.failures.length, 0);
   treeApp.w.close();
 
-  const closeAllViews = await boot("listo", "close-all-retained-views", CON_TAREA);
+  const closeAllViews = await boot("listo", "close-all-retained-views", WITH_TASK);
   const closeAllDoc = closeAllViews.w.document;
   closeAllDoc.querySelector('[data-sesion="s1"]').click();
   await sleep(150);
@@ -330,10 +330,10 @@ if (!roto) {
   closeAllAction.dispatchEvent(new closeAllViews.w.KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
   await sleep(150);
   assert.equal(closeAllDoc.querySelector('[data-tira] [role="tab"], [data-preview]'), null, "cerrar todas no reabre la tarea propietaria de un documento");
-  assert.deepEqual(closeAllViews.fallos, []);
+  assert.deepEqual(closeAllViews.failures, []);
   closeAllViews.w.close();
 
-  console.log(`El front monta — ${normal.pintado.length} bytes en #root, ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+  console.log(`El front monta — ${normal.painted.length} bytes en #root, ${((Date.now() - t0) / 1000).toFixed(1)}s`);
   process.exit(0);
 }
 
@@ -346,17 +346,17 @@ if (!roto) {
  * excepción sí llega a `window.onerror` con su mensaje.
  */
 const manual = await boot("falta", 3);
-const entrar = [...manual.w.document.querySelectorAll(".setup-actions button")].at(-1);
-if (entrar) {
-  entrar.dispatchEvent(new manual.w.MouseEvent("click", { bubbles: true }));
+const enterButton = [...manual.w.document.querySelectorAll(".setup-actions button")].at(-1);
+if (enterButton) {
+  enterButton.dispatchEvent(new manual.w.MouseEvent("click", { bubbles: true }));
   await sleep(500);
 }
 
 console.error("\n  El front no monta. `App` no llegó a pintarse.\n");
-const lanzado = [...manual.fallos, ...normal.fallos];
-if (lanzado.length) {
+const thrown = [...manual.failures, ...normal.failures];
+if (thrown.length) {
   console.error("  Lo que lanzó al primer render:\n");
-  for (const f of lanzado.slice(0, 3)) {
+  for (const f of thrown.slice(0, 3)) {
     for (const l of String(f).split("\n").slice(0, 6)) console.error(`      ${l}`);
     console.error("");
   }

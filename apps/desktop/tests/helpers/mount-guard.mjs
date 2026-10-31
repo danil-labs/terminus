@@ -13,7 +13,7 @@ export { mount };
  * proyectos, sin fuentes, sin sesiones—. La primera superficie no sirve y la
  * segunda sí: el arranque tiene que elegir la usable, no la primera fila.
  */
-export const RESPUESTAS = {
+export const RESPONSES = {
   // La ventana ya tiene motor: el lanzador deja pasar a la app.
   launcher_state: { phase: "ready", blank_0274: false },
   // La medida de arranque: la manda `App` en cuanto monta, en todos los casos.
@@ -79,8 +79,8 @@ export const RESPUESTAS = {
  * arranque —sin proyectos, sin fuentes, sin sesiones— y es lo que hace que este
  * guarda pruebe el estado más pobre que la app tiene que aguantar.
  */
-export const CON_TAREA = {
-  ...RESPUESTAS,
+export const WITH_TASK = {
+  ...RESPONSES,
   list_live_sessions: [
     {
       id: "s1",
@@ -117,14 +117,14 @@ export const CON_TAREA = {
   session_usage: null,
 };
 
-export const SIN_USABLE = {
-  ...RESPUESTAS,
+export const NO_USABLE = {
+  ...RESPONSES,
   list_models: { provider: "claude", models: [], fallback: false },
-  list_surfaces: [RESPUESTAS.list_surfaces[0]],
+  list_surfaces: [RESPONSES.list_surfaces[0]],
 };
 
-export const boot = (entorno, version, respuestas = RESPUESTAS, userAgent) =>
-  mount(entorno, version, respuestas, userAgent);
+export const boot = (environment, version, responses = RESPONSES, userAgent) =>
+  mount(environment, version, responses, userAgent);
 
 export const keepActiveView = (app) => {
   const header = app.w.document.querySelector('[data-preview-header] [role="button"]');
@@ -132,35 +132,35 @@ export const keepActiveView = (app) => {
 };
 
 /** El riel agrupado por carpeta, que es su vista por omisión: una carpeta tiene cabecera y se abre su vista. */
-export const SIN_AGRUPAR = { "harness.layout.sidebar.view.w": JSON.stringify({ group: "none" }) };
-export const bootPorCarpeta = async (entorno, version, respuestas = RESPUESTAS) => {
-  const app = await mount(entorno, version, respuestas);
+export const UNGROUPED = { "harness.layout.sidebar.view.w": JSON.stringify({ group: "none" }) };
+export const bootByFolder = async (environment, version, responses = RESPONSES) => {
+  const app = await mount(environment, version, responses);
   // La cabecera de carpeta llega en su propio trozo: se espera a que pinte.
   for (let i = 0; i < 80 && !app.w.document.querySelector("[data-folder-open]"); i++) await sleep(25);
   return app;
 };
 
 /** El buscador global, abierto desde la lupa de la franja y con `texto` escrito. */
-export async function buscarEnLaVentana(app, texto) {
+export async function searchWindow(app, textValue) {
   const doc = app.w.document;
   if (!doc.querySelector("[data-global-search]")) doc.querySelector("[data-title-bar] [data-global-search-open]").click();
   await sleep(80);
-  const campo = doc.querySelector('[data-global-search] input[role="combobox"]');
-  campo.value = texto;
-  campo.dispatchEvent(new app.w.Event("input", { bubbles: true }));
+  const inputField = doc.querySelector('[data-global-search] input[role="combobox"]');
+  inputField.value = textValue;
+  inputField.dispatchEvent(new app.w.Event("input", { bubbles: true }));
   await sleep(80);
-  return campo;
+  return inputField;
 }
 
 /** Abre una tarea desde el buscador global, el mismo gesto que su fila del riel. */
-export async function abrirDesdeElBuscador(app, texto, id) {
-  await buscarEnLaVentana(app, texto);
+export async function openFromSearch(app, textValue, id) {
+  await searchWindow(app, textValue);
   app.w.document.querySelector(`[data-global-search] [data-search-key="task:${id}"]`).click();
   await sleep(160);
 }
 
 /** Añadir un proyecto se abre desde el selector de la caja de una tarea nueva. */
-export async function abrirAnadirProyecto(app) {
+export async function openAddProject(app) {
   const doc = app.w.document;
   doc.querySelector('button[aria-label="Nueva tarea"]').click();
   await sleep(50);
@@ -171,14 +171,14 @@ export async function abrirAnadirProyecto(app) {
 }
 
 /** Abre la vista de la carpeta desde su cabecera y empieza a hablar con uno de sus agentes. */
-export async function hablarDesdeLaCarpeta(app, carpeta, nombre) {
+export async function talkFromFolder(app, folder, nameText) {
   const doc = app.w.document;
-  for (let i = 0; i < 80 && !doc.querySelector(`[data-folder-group="${carpeta}"] [data-folder-open]`); i++) await sleep(25);
-  doc.querySelector(`[data-folder-group="${carpeta}"] [data-folder-open]`).click();
+  for (let i = 0; i < 80 && !doc.querySelector(`[data-folder-group="${folder}"] [data-folder-open]`); i++) await sleep(25);
+  doc.querySelector(`[data-folder-group="${folder}"] [data-folder-open]`).click();
   await sleep(120);
-  const agente = [...doc.querySelectorAll("li > button")].find((b) => b.querySelector(".astro-face") && b.textContent.trim().startsWith(nombre));
-  assert.ok(agente, `la vista de la carpeta lista a ${nombre}`);
-  agente.click();
+  const agentEntry = [...doc.querySelectorAll("li > button")].find((b) => b.querySelector(".astro-face") && b.textContent.trim().startsWith(nameText));
+  assert.ok(agentEntry, `la vista de la carpeta lista a ${nameText}`);
+  agentEntry.click();
   await sleep(100);
 }
 
@@ -187,17 +187,17 @@ export async function hablarDesdeLaCarpeta(app, carpeta, nombre) {
  * ocupada por otra tarea y cola lista. Es el estado que pisan los guardas que siguen.
  */
 export const TASK_AFTER_QUEUE = {
-  ...CON_TAREA,
+  ...WITH_TASK,
   send_message: () => "s1",
   folder_holder: { project: "", session: "other-task", title: "Other task" },
   queue_ready: () => true,
   save_queue: null,
   load_session: {
-    ...CON_TAREA.load_session,
-    turns: [...CON_TAREA.load_session.turns, { role: "agent", id: "second", text: "Otra respuesta" }],
+    ...WITH_TASK.load_session,
+    turns: [...WITH_TASK.load_session.turns, { role: "agent", id: "second", text: "Otra respuesta" }],
   },
   list_live_sessions: [{
-    ...CON_TAREA.list_live_sessions[0],
+    ...WITH_TASK.list_live_sessions[0],
     result_revision: createHash("sha256").update("1:second:Otra respuesta").digest("hex"),
   }],
 };

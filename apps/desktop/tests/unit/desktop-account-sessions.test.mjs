@@ -26,7 +26,7 @@ test("a workspace of the account that only another machine has lists with the wi
   assert.ok(doc.querySelector('[data-workspace-column] [data-workspace-tile="w"]'), "next to the window's own");
   assert.ok(doc.querySelector('[data-sesion="t1"]'), "and the window stays in its own");
   assert.equal(relayCalls("cmp_vm", "send_message").length, 0, "reading wakes nothing");
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 test("a tab of another machine's task never moves this computer's reads, and an off machine without a copy never holds them", async () => {
@@ -48,7 +48,7 @@ test("a tab of another machine's task never moves this computer's reads, and an 
   assert.ok(doc.querySelector('[data-sesion="t1"]') && doc.querySelector('[data-sesion="cmp_vm~t1"]'), "both lists stay");
   assert.equal(relayCalls("cmp_vm2", "list_live_sessions").every((c) => !(c.args.open ?? []).length), true, "the off VM gets no other machine's tab");
   assert.deepEqual(relayCalls("cmp_vm2", "send_message"), [], "reading wakes nothing");
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 test("this computer's tasks paint without waiting for a VM that does not answer", async () => {
@@ -62,7 +62,7 @@ test("this computer's tasks paint without waiting for a VM that does not answer"
   assert.ok(Date.now() - started < 8_000, "nothing waited on the VM");
   assert.ok(relayCalls("cmp_vm", "list_live_sessions").length > 0, "the VM was asked");
   assert.equal(f.relays.cmp_vm.sockets.length, 1);
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 test("a VM that stops answering, or turns off without a copy, keeps its last slice: never an invented empty list", async () => {
@@ -87,7 +87,7 @@ test("a VM that stops answering, or turns off without a copy, keeps its last sli
   const cache = JSON.parse(app.w.localStorage.getItem("harness:shell-cache") ?? "null");
   const rows = cache ? Object.values(JSON.parse(cache.workspaces.w.snapshot).sessions).flat() : [];
   assert.ok(!cache || rows.some((r) => r.id === "cmp_vm~t1"), "the sidebar photo keeps the VM's rows too");
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 test("a machine renamed in the account changes live, without reconnecting the others", async () => {
@@ -109,7 +109,7 @@ test("a machine renamed in the account changes live, without reconnecting the ot
   assert.ok(doc.querySelector('[data-hover-machine="cmp_vm"]')?.parentElement.textContent.includes("VM de trabajo"), "the new name shows");
   assert.equal(f.relays.cmp_vm.sockets.length, 1, "the renamed machine was not reconnected");
   assert.equal(f.relays.cmp_mac.sockets.length, 1, "nor the others");
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 test("with one session per account, the open workspace talks as its own account", async () => {
@@ -131,7 +131,7 @@ test("with one session per account, the open workspace talks as its own account"
   assert.deepEqual(listed, ["Bearer tok-u_fdb"], "its computers, not the default account's");
   assert.equal(native("danil_connect_status").length, 0, "the sessions say who this computer is");
   assert.ok(relayCalls("cmp_vm", "list_projects").length > 0, "the account's VM is in the window");
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 test("a workspace whose account is signed out here keeps the window local", async () => {
@@ -144,8 +144,8 @@ test("a workspace whose account is signed out here keeps the window local", asyn
   });
   assert.equal(listed.length, 0, "no other account's computers");
   assert.equal(f.relays.cmp_vm.sockets.length, 0);
-  assert.ok(!app.comandos.includes("account_relay_token"), "no token of another account is asked for");
-  assert.deepEqual(app.fallos, []);
+  assert.ok(!app.commands.includes("account_relay_token"), "no token of another account is asked for");
+  assert.deepEqual(app.failures, []);
 });
 
 // Un cambio de contrato nunca deja sin uso máquinas enteras: como el teléfono,
@@ -161,7 +161,7 @@ test("a VM whose engine speaks another contract keeps adding its tasks", async (
   f.relays.cmp_vm.hello("otro-contrato");
   await reread(app);
   assert.ok(doc.querySelector('[data-sesion="cmp_vm~t1"]'), "an engine on another contract still adds its tasks");
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 test("when the relay stops the sessions for lack of a Terminus license, the VM keeps its rows and nothing reconnects in a loop", async () => {
@@ -179,7 +179,7 @@ test("when the relay stops the sessions for lack of a Terminus license, the VM k
   assert.equal(f.relays.cmp_vm.calls.length, asked, "nothing more is asked of the VM");
   assert.ok(doc.querySelector('[data-sesion="cmp_vm~t1"]'), "its rows stay");
   assert.ok(doc.querySelector('[data-sesion="t1"]'), "this computer is untouched");
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 test("a machine just connected to the account adds its slice live, without reconnecting the others", async () => {
@@ -198,5 +198,5 @@ test("a machine just connected to the account adds its slice live, without recon
   await reread(app);
   assert.ok(doc.querySelector('[data-sesion="cmp_mac~t1"]'), "the new machine's tasks join");
   assert.equal(f.relays.cmp_vm.sockets.length, 1, "the VM was not reconnected");
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });

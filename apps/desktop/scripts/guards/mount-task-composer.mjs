@@ -3,13 +3,13 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { sleep } from "../../tests/helpers/jsdom-app.mjs";
-import { CON_TAREA, RESPUESTAS, SIN_USABLE, boot, task } from "../../tests/helpers/mount-guard.mjs";
+import { WITH_TASK, RESPONSES, NO_USABLE, boot, task } from "../../tests/helpers/mount-guard.mjs";
 
 const mentionSends = [];
 const target = { kind: "task", projectId: "project", sessionId: "login-task" };
 const secondTarget = { ...target, sessionId: "other-login" };
 const mentionApp = await boot("listo", "task-mentions", {
-  ...RESPUESTAS,
+  ...RESPONSES,
   list_projects: [{ id: "scoring", name: "Revamp de scoring", node: null, sources: [], portfolio: "pf", created_at: 1, updated_at: 1, sessions: 0, kind: "folder" }],
   list_task_mentions: [
     { target, title: "Corregir login", projectName: "App", alias: "vega", branch: "fix/login", available: true, archived: false, updatedAt: 10 },
@@ -85,24 +85,24 @@ assert.deepEqual(mentionSends[0].taskMentions[0].target, secondTarget);
 const sentMention = mentionSends[0].taskMentions[0];
 assert.equal(mentionSends[0].prompt.slice(sentMention.start, sentMention.end), sentMention.text);
 assert.deepEqual(mentionSends[0].sources, []);
-assert.deepEqual(mentionApp.fallos, []);
+assert.deepEqual(mentionApp.failures, []);
 mentionApp.w.close();
 
 const queuedSends = [];
-const inyectados = [];
+const injected = [];
 const queueFiles = new Map();
 const queuedApp = await boot("listo", "background-queue", {
-  ...CON_TAREA,
+  ...WITH_TASK,
   list_live_sessions: [
-    CON_TAREA.list_live_sessions[0],
-    { ...CON_TAREA.list_live_sessions[0], id: "s2", title: "Segunda tarea" },
-    { ...CON_TAREA.list_live_sessions[0], id: "s3", title: "Buzón del arquitecto" },
+    WITH_TASK.list_live_sessions[0],
+    { ...WITH_TASK.list_live_sessions[0], id: "s2", title: "Segunda tarea" },
+    { ...WITH_TASK.list_live_sessions[0], id: "s3", title: "Buzón del arquitecto" },
   ],
-  load_session: ({ id }) => ({ ...CON_TAREA.load_session, id }),
+  load_session: ({ id }) => ({ ...WITH_TASK.load_session, id }),
   load_queue: ({ session }) => queueFiles.get(session) ?? [],
   save_queue: ({ session, queued }) => { queueFiles.set(session, queued); },
   send_message: (args) => { queuedSends.push(args); return args.session; },
-  inject_message: (args) => { inyectados.push(args); },
+  inject_message: (args) => { injected.push(args); },
 });
 const queueDocument = queuedApp.w.document;
 const selectQueuedTask = async (id) => {
@@ -142,48 +142,48 @@ assert.equal(queuedSends.length, 2, "returning does not resend the consumed queu
 queuedApp.emit("chat", { kind: "started", session: "s1", workspace: "w" });
 await queueText("Cambia de enfoque");
 await queueText("Y mira el log");
-const caja = queueDocument.querySelector("textarea");
-caja.focus();
-caja.dispatchEvent(new queuedApp.w.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+const composer = queueDocument.querySelector("textarea");
+composer.focus();
+composer.dispatchEvent(new queuedApp.w.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
 await sleep(250);
-if (inyectados.length !== 2) {
-  console.error(`El Enter de más no manda lo encolado al turno vivo: inject_message=${inyectados.length}.`);
+if (injected.length !== 2) {
+  console.error(`El Enter de más no manda lo encolado al turno vivo: inject_message=${injected.length}.`);
   process.exit(1);
 }
 assert.deepEqual(
-  inyectados.map((i) => i.prompt),
+  injected.map((i) => i.prompt),
   ["Cambia de enfoque", "Y mira el log"],
 );
 // Y sin cola no se toca: Enter con la caja vacía no manda nada.
-caja.dispatchEvent(new queuedApp.w.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+composer.dispatchEvent(new queuedApp.w.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
 await sleep(150);
-assert.equal(inyectados.length, 2, "sin nada encolado el Enter de más no inventa un envío");
+assert.equal(injected.length, 2, "sin nada encolado el Enter de más no inventa un envío");
 assert.equal(queuedSends.length, 2);
 
 // Una entrega encolada la vacía la ventana, y con ella el sobre. Rust la
 // dejó en el `.cola.json` del buzón con quién la manda y dónde se contesta;
 // sin devolver el remitente aterriza firmada como de la persona (PR #800).
-const entrega = {
+const delivery = {
   id: "d1", text: "Revisa el acceso", provider: "codex", model: null, effort: null,
   permission_mode: null, attachments: [], agent: "arquitecto",
   reply_to: { folder: "p", task: "t9" }, hops: 2,
 };
-queueFiles.set("s3", [entrega, { ...entrega, id: "d2", agent: null, reply_to: null, hops: null, text: "Y esto lo escribo yo" }]);
+queueFiles.set("s3", [delivery, { ...delivery, id: "d2", agent: null, reply_to: null, hops: null, text: "Y esto lo escribo yo" }]);
 await selectQueuedTask("s3");
-const mandarCola = [...queueDocument.querySelectorAll("button")].find((b) => b.textContent.trim() === "mandar");
-assert.ok(mandarCola, "una cola leída del disco espera a que alguien la suelte");
-mandarCola.click();
+const sendQueue = [...queueDocument.querySelectorAll("button")].find((b) => b.textContent.trim() === "mandar");
+assert.ok(sendQueue, "una cola leída del disco espera a que alguien la suelte");
+sendQueue.click();
 await sleep(200);
 assert.equal(queuedSends.length, 3);
 assert.equal(queuedSends[2].prompt, "Revisa el acceso", "un lote no mezcla remitentes");
 assert.equal(queuedSends[2].fromAgent, "arquitecto", "la entrega encolada conserva quién la manda");
-assert.deepEqual(queueFiles.get("s3"), [{ ...entrega, id: "d2", agent: null, reply_to: null, hops: null, text: "Y esto lo escribo yo" }],
+assert.deepEqual(queueFiles.get("s3"), [{ ...delivery, id: "d2", agent: null, reply_to: null, hops: null, text: "Y esto lo escribo yo" }],
   "lo que no salió sigue en su cola, no se pierde ni se cuela en el lote ajeno");
-assert.equal(queuedApp.fallos.length, 0);
+assert.equal(queuedApp.failures.length, 0);
 queuedApp.w.close();
 
 const cloudIcons = await boot("listo", "cloud-folder-icons", {
-  ...RESPUESTAS,
+  ...RESPONSES,
   list_projects: [
     { id: "cloud-folder", name: "Nube", sources: [], kind: "folder", cloud: "google_drive" },
     { id: "cloud-git", name: "Git en nube", sources: [], kind: "git", cloud: "one_drive" },
@@ -195,24 +195,24 @@ for (let i = 0; i < 80 && cloudIcons.w.document.querySelectorAll("[data-folder-g
 assert.deepEqual([...cloudIcons.w.document.querySelectorAll("[data-folder-group]")].map((el) => el.dataset.folderGroup),
   ["cloud-folder", "cloud-git", "local-folder"], "una carpeta sin tareas aparece en el riel");
 for (const [id, name] of [["cloud-folder", "Nube"], ["cloud-git", "Git en nube"], ["local-folder", "Local"]]) {
-  const grupo = cloudIcons.w.document.querySelector(`[data-sidebar-group="${id}"]`);
-  assert.equal(grupo.querySelector("[data-folder-open]").textContent.trim(), name, "sin contador junto al nombre");
-  assert.equal(grupo.querySelector("[data-folder-empty]")?.textContent, "Sin tareas todavía");
-  assert.ok(grupo.querySelector(`button[aria-label="Nueva tarea en ${name}"]`), "su «+» empieza una tarea en ella");
+  const groupEl = cloudIcons.w.document.querySelector(`[data-sidebar-group="${id}"]`);
+  assert.equal(groupEl.querySelector("[data-folder-open]").textContent.trim(), name, "sin contador junto al nombre");
+  assert.equal(groupEl.querySelector("[data-folder-empty]")?.textContent, "Sin tareas todavía");
+  assert.ok(groupEl.querySelector(`button[aria-label="Nueva tarea en ${name}"]`), "su «+» empieza una tarea en ella");
 }
 assert.equal(cloudIcons.w.document.querySelector("[data-sidebar-empty]"), null, "con carpetas a la vista no dice que no hay nada");
 assert.doesNotMatch(cloudIcons.w.document.body.textContent, /google_drive|one_drive/);
-assert.deepEqual(cloudIcons.fallos, []);
+assert.deepEqual(cloudIcons.failures, []);
 const forkCalls = [];
 let forkSessionActive = false;
 let rejectFork;
 let resolveFork;
 let copied = null;
 const forkResponses = {
-  ...CON_TAREA,
+  ...WITH_TASK,
   list_active_turns: () => forkSessionActive ? ["s1"] : [],
   load_session: {
-    ...CON_TAREA.load_session,
+    ...WITH_TASK.load_session,
     turns: [
       { role: "user", id: "u1", text: "Primera pregunta" },
       { role: "agent", id: "a1", native_id: "native-a1", text: "Primera respuesta" },
@@ -235,16 +235,16 @@ const forkApp = await boot("listo", 901, forkResponses);
 const forkDoc = forkApp.w.document;
 forkDoc.querySelector('[data-sesion="s1"]').click();
 await sleep(150);
-const [copiarPregunta, copiarRespuesta] = forkDoc.querySelectorAll('button[aria-label="Copiar"]');
-copiarPregunta.click();
+const [copyQuestion, copyReply] = forkDoc.querySelectorAll('button[aria-label="Copiar"]');
+copyQuestion.click();
 await sleep(20);
 assert.equal(copied, "Primera pregunta", "a sent message copies its own text");
-copiarRespuesta.click();
+copyReply.click();
 await sleep(20);
 assert.equal(copied, "Primera respuesta");
 assert.equal(forkDoc.querySelectorAll('button[aria-label="Copiado"]').length, 1,
   "copying a reply marks only its own button");
-assert.equal(copiarRespuesta.getAttribute("aria-label"), "Copiado");
+assert.equal(copyReply.getAttribute("aria-label"), "Copiado");
 forkSessionActive = true;
 forkApp.emit("chat", { kind: "started", session: "s1", workspace: "w" });
 await sleep(30);
@@ -290,31 +290,31 @@ assert.ok(draftModel && !draftModel.disabled);
 draftModel.click();
 await sleep(30);
 assert.ok(forkDoc.querySelector('[role="group"]'));
-assert.deepEqual(forkApp.fallos, []);
+assert.deepEqual(forkApp.failures, []);
 
-const conTarea = await boot("listo", 2, CON_TAREA);
-const sessionPreview = conTarea.w.document.querySelector('[data-sesion="s1"] [data-session-preview]');
+const taskApp = await boot("listo", 2, WITH_TASK);
+const sessionPreview = taskApp.w.document.querySelector('[data-sesion="s1"] [data-session-preview]');
 // Sin nada que pedirte, la segunda línea es carpeta, agente y PR: ni el mensaje ni el modelo.
 assert.ok(sessionPreview, "la fila del riel tiene segunda línea");
 assert.doesNotMatch(sessionPreview.textContent, /La última respuesta de esta tarea/);
 assert.doesNotMatch(sessionPreview.textContent, /gpt-5.6/);
 
-conTarea.w.document.querySelector('[data-sesion="s1"]')?.click();
+taskApp.w.document.querySelector('[data-sesion="s1"]')?.click();
 await sleep(150);
-const fila = conTarea.w.document.querySelector('button[title="informe.md"]');
-fila?.click();
+const rowEl = taskApp.w.document.querySelector('button[title="informe.md"]');
+rowEl?.click();
 await sleep(150);
-const enLaTira = [...conTarea.w.document.querySelectorAll(':is([role="tab"], [data-preview-header] [role="button"])')].some(
+const inTabStrip = [...taskApp.w.document.querySelectorAll(':is([role="tab"], [data-preview-header] [role="button"])')].some(
   (t) => t.textContent?.trim() === "informe.md",
 );
 // Y que además **se pinte**: una pestaña sin visor detrás deja el centro en
 // blanco, que es lo mismo que no haberla abierto.
-const visor = conTarea.w.document.querySelector(".preview-path");
-if (!fila || !enLaTira || !visor || conTarea.fallos.length > 0) {
+const viewer = taskApp.w.document.querySelector(".preview-path");
+if (!rowEl || !inTabStrip || !viewer || taskApp.failures.length > 0) {
   console.error(
-    `Abrir un artefacto no lo pone en la tira del centro: fila=${!!fila}, pestaña=${enLaTira}, visor=${!!visor}.`,
+    `Abrir un artefacto no lo pone en la tira del centro: fila=${!!rowEl}, pestaña=${inTabStrip}, visor=${!!viewer}.`,
   );
-  for (const f of conTarea.fallos.slice(0, 3)) {
+  for (const f of taskApp.failures.slice(0, 3)) {
     for (const l of String(f).split("\n").slice(0, 6)) console.error(`      ${l}`);
   }
   process.exit(1);
@@ -323,96 +323,96 @@ if (!fila || !enLaTira || !visor || conTarea.fallos.length > 0) {
 // **Y cerrar esa pestaña devuelve la conversación**, que es la otra mitad: la
 // conversación se esconde en vez de desmontarse, así que si no vuelve, lo que
 // queda es un centro en blanco sin nada que lo diga.
-conTarea.w.document.hasFocus = () => true;
-conTarea.w.dispatchEvent(new conTarea.w.Event("focus"));
-CON_TAREA.load_session.turns.push({ role: "agent", id: "second", text: "Otra respuesta" });
-CON_TAREA.list_live_sessions[0].result_revision = createHash("sha256").update("1:second:Otra respuesta").digest("hex");
-conTarea.emit("session", { project: "", session: "s1", workspace: "w" });
+taskApp.w.document.hasFocus = () => true;
+taskApp.w.dispatchEvent(new taskApp.w.Event("focus"));
+WITH_TASK.load_session.turns.push({ role: "agent", id: "second", text: "Otra respuesta" });
+WITH_TASK.list_live_sessions[0].result_revision = createHash("sha256").update("1:second:Otra respuesta").digest("hex");
+taskApp.emit("session", { project: "", session: "s1", workspace: "w" });
 await sleep(350);
-const chatTab = [...conTarea.w.document.querySelectorAll(':is([role="tab"], [data-preview-header] [role="button"])')].find(el => el.getAttribute("aria-label")?.includes("sin leer"));
+const chatTab = [...taskApp.w.document.querySelectorAll(':is([role="tab"], [data-preview-header] [role="button"])')].find(el => el.getAttribute("aria-label")?.includes("sin leer"));
 assert.equal(chatTab, undefined);
-const fileTab = [...conTarea.w.document.querySelectorAll(':is([role="tab"], [data-preview-header] [role="button"])')].find(el => el.textContent.includes("informe.md"));
+const fileTab = [...taskApp.w.document.querySelectorAll(':is([role="tab"], [data-preview-header] [role="button"])')].find(el => el.textContent.includes("informe.md"));
 assert.equal(fileTab.querySelector("svg.lucide-mail"), null);
 assert.equal(fileTab.querySelector("svg.lucide-git-branch"), null);
-conTarea.w.document
+taskApp.w.document
   .querySelector('button[aria-label="Cerrar «informe.md»"]')
   ?.click();
 await sleep(100);
-assert.equal(conTarea.w.document.querySelector('[role="tab"][aria-label*="sin leer"]'), null);
-const volvio =
-  !conTarea.w.document.querySelector(".preview-path") &&
-  !!conTarea.w.document.querySelector("textarea");
-if (!volvio || conTarea.fallos.length > 0) {
+assert.equal(taskApp.w.document.querySelector('[role="tab"][aria-label*="sin leer"]'), null);
+const returned =
+  !taskApp.w.document.querySelector(".preview-path") &&
+  !!taskApp.w.document.querySelector("textarea");
+if (!returned || taskApp.failures.length > 0) {
   console.error("Cerrar la pestaña del artefacto no devuelve la conversación.");
-  for (const f of conTarea.fallos.slice(0, 3)) {
+  for (const f of taskApp.failures.slice(0, 3)) {
     for (const l of String(f).split("\n").slice(0, 6)) console.error(`      ${l}`);
   }
   process.exit(1);
 }
 
-const estadoVivo = () => conTarea.w.document.querySelector('[role="status"][aria-label="El agente está trabajando"]');
-conTarea.emit("chat", { kind: "started", session: "s1", workspace: "w" });
+const liveStatus = () => taskApp.w.document.querySelector('[role="status"][aria-label="El agente está trabajando"]');
+taskApp.emit("chat", { kind: "started", session: "s1", workspace: "w" });
 await sleep(100);
-assert.ok(estadoVivo());
-const verboInicial = estadoVivo().querySelector(".min-w-0 > span").textContent;
-conTarea.emit("chat", { kind: "tool", session: "s1", workspace: "w", id: "status-command", text: "Bash", target: "pnpm verify" });
+assert.ok(liveStatus());
+const initialVerb = liveStatus().querySelector(".min-w-0 > span").textContent;
+taskApp.emit("chat", { kind: "tool", session: "s1", workspace: "w", id: "status-command", text: "Bash", target: "pnpm verify" });
 await sleep(100);
-assert.equal(estadoVivo().querySelector(".min-w-0 > span").textContent, verboInicial);
+assert.equal(liveStatus().querySelector(".min-w-0 > span").textContent, initialVerb);
 // El comando no sale en el rótulo de espera: lo enseña su fila del registro.
-assert.match(estadoVivo().textContent, /Ejecutando/);
-assert.doesNotMatch(estadoVivo().textContent, /pnpm verify/);
+assert.match(liveStatus().textContent, /Ejecutando/);
+assert.doesNotMatch(liveStatus().textContent, /pnpm verify/);
 // El verbo lo mueve el tic de un segundo de TurnStatus: en un runner cargado el de los 4 s llega tarde.
 await sleep(4100);
-for (let i = 0; i < 30 && estadoVivo().querySelector(".min-w-0 > span").textContent === verboInicial; i++) {
+for (let i = 0; i < 30 && liveStatus().querySelector(".min-w-0 > span").textContent === initialVerb; i++) {
   await sleep(200);
 }
-assert.notEqual(estadoVivo().querySelector(".min-w-0 > span").textContent, verboInicial);
-assert.match(estadoVivo().textContent, /Ejecutando/);
-assert.doesNotMatch(estadoVivo().textContent, /pnpm verify/);
-conTarea.emit("chat", { kind: "tool_done", session: "s1", workspace: "w", id: "status-command", text: "Bash", ok: true });
+assert.notEqual(liveStatus().querySelector(".min-w-0 > span").textContent, initialVerb);
+assert.match(liveStatus().textContent, /Ejecutando/);
+assert.doesNotMatch(liveStatus().textContent, /pnpm verify/);
+taskApp.emit("chat", { kind: "tool_done", session: "s1", workspace: "w", id: "status-command", text: "Bash", ok: true });
 await sleep(100);
-assert.ok(estadoVivo());
-assert.doesNotMatch(estadoVivo().textContent, /Ejecutando/);
-conTarea.emit("chat", { kind: "done", session: "s1", workspace: "w", ok: true });
+assert.ok(liveStatus());
+assert.doesNotMatch(liveStatus().textContent, /Ejecutando/);
+taskApp.emit("chat", { kind: "done", session: "s1", workspace: "w", ok: true });
 await sleep(100);
-assert.equal(estadoVivo(), null);
+assert.equal(liveStatus(), null);
 
-const envios = [];
-let rechazarPorOcupada = false;
-let disponible = false;
-CON_TAREA.send_message = args => {
-  envios.push(args);
-  if (rechazarPorOcupada) throw "history.error.busy";
+const sends = [];
+let rejectAsBusy = false;
+let queueAvailable = false;
+WITH_TASK.send_message = args => {
+  sends.push(args);
+  if (rejectAsBusy) throw "history.error.busy";
   return "s1";
 };
-conTarea.emit("chat", { kind: "started", session: "other-task", workspace: "w" });
-CON_TAREA.folder_holder = { project: "", session: "other-task", title: "Other task" };
-CON_TAREA.queue_ready = () => disponible;
-CON_TAREA.save_queue = null;
-const escribirEnCola = async text => {
-  const campo = conTarea.w.document.querySelector('textarea');
-  assert.ok(campo);
-  campo.value = text;
-  campo.dispatchEvent(new conTarea.w.Event("input", { bubbles: true }));
-  campo.closest("form").dispatchEvent(new conTarea.w.Event("submit", { bubbles: true, cancelable: true }));
+taskApp.emit("chat", { kind: "started", session: "other-task", workspace: "w" });
+WITH_TASK.folder_holder = { project: "", session: "other-task", title: "Other task" };
+WITH_TASK.queue_ready = () => queueAvailable;
+WITH_TASK.save_queue = null;
+const typeQueued = async text => {
+  const inputField = taskApp.w.document.querySelector('textarea');
+  assert.ok(inputField);
+  inputField.value = text;
+  inputField.dispatchEvent(new taskApp.w.Event("input", { bubbles: true }));
+  inputField.closest("form").dispatchEvent(new taskApp.w.Event("submit", { bubbles: true, cancelable: true }));
   await sleep(100);
-  assert.equal(campo.value, "");
+  assert.equal(inputField.value, "");
 };
-conTarea.emit("chat", { kind: "started", session: "s1", workspace: "w" });
-conTarea.emit("chat", { kind: "tool", session: "s1", workspace: "w", id: "queue-tool", text: "Bash", target: "pnpm verify" });
+taskApp.emit("chat", { kind: "started", session: "s1", workspace: "w" });
+taskApp.emit("chat", { kind: "tool", session: "s1", workspace: "w", id: "queue-tool", text: "Bash", target: "pnpm verify" });
 await sleep(100);
-conTarea.emit("chat", { kind: "model", session: "s1", workspace: "w", text: "claude-sonnet-5" });
+taskApp.emit("chat", { kind: "model", session: "s1", workspace: "w", text: "claude-sonnet-5" });
 await sleep(50);
-assert.ok(conTarea.w.document.querySelector('button[aria-label="Modelo: claude-sonnet-5"]'));
-conTarea.emit("chat", { kind: "model", session: "another-session", workspace: "w", text: "other-model" });
+assert.ok(taskApp.w.document.querySelector('button[aria-label="Modelo: claude-sonnet-5"]'));
+taskApp.emit("chat", { kind: "model", session: "another-session", workspace: "w", text: "other-model" });
 await sleep(50);
-assert.equal(conTarea.w.document.querySelector('button[aria-label="Modelo: other-model"]'), null);
-await escribirEnCola("Haz los símbolos Git");
+assert.equal(taskApp.w.document.querySelector('button[aria-label="Modelo: other-model"]'), null);
+await typeQueued("Haz los símbolos Git");
 // Y la actividad de la tarea no se lo quita a quien escribe en otro campo:
 // editando un mensaje de la cola, cada delta devolvía el foco al compositor y
 // se perdía lo tecleado.
 {
-  const doc = conTarea.w.document;
+  const doc = taskApp.w.document;
   const editar = [...doc.querySelectorAll("button")].find((b) =>
     (b.getAttribute("aria-label") ?? "").startsWith("Editar el mensaje"),
   );
@@ -422,60 +422,60 @@ await escribirEnCola("Haz los símbolos Git");
   }
   editar.click();
   await sleep(100);
-  const enCola = doc.activeElement;
-  if (enCola?.tagName !== "TEXTAREA" || enCola.value !== "Haz los símbolos Git") {
+  const queuedField = doc.activeElement;
+  if (queuedField?.tagName !== "TEXTAREA" || queuedField.value !== "Haz los símbolos Git") {
     console.error("Abrir el editor de un mensaje en cola ya no enfoca su campo.");
     process.exit(1);
   }
-  conTarea.emit("chat", { kind: "delta", session: "s1", workspace: "w", text: "llega actividad" });
-  conTarea.emit("chat", { kind: "tool", session: "s1", workspace: "w", id: "foco-tool", text: "Bash", target: "ls" });
+  taskApp.emit("chat", { kind: "delta", session: "s1", workspace: "w", text: "llega actividad" });
+  taskApp.emit("chat", { kind: "tool", session: "s1", workspace: "w", id: "foco-tool", text: "Bash", target: "ls" });
   await sleep(150);
-  if (doc.activeElement !== enCola) {
+  if (doc.activeElement !== queuedField) {
     console.error(
       `La actividad de la tarea le quitó el foco a quien escribía: quedó en ${doc.activeElement?.tagName} ${JSON.stringify(doc.activeElement?.value ?? "")}.`,
     );
     process.exit(1);
   }
-  enCola.dispatchEvent(new conTarea.w.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  queuedField.dispatchEvent(new taskApp.w.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
   await sleep(100);
 }
-conTarea.emit("chat", { kind: "delta", session: "s1", workspace: "w", text: "Estoy trabajando" });
-await escribirEnCola("Cuando termines manda el PR");
-assert.equal(envios.length, 0);
-conTarea.emit("chat", { kind: "done", session: "s1", workspace: "w", ok: true });
+taskApp.emit("chat", { kind: "delta", session: "s1", workspace: "w", text: "Estoy trabajando" });
+await typeQueued("Cuando termines manda el PR");
+assert.equal(sends.length, 0);
+taskApp.emit("chat", { kind: "done", session: "s1", workspace: "w", ok: true });
 await sleep(200);
-assert.equal(envios.length, 1, "another live task in the same folder does not block dispatch");
-assert.equal(envios[0].prompt, "Haz los símbolos Git\n\nCuando termines manda el PR");
-assert.equal(envios[0].session, "s1");
-await escribirEnCola("Esto va después del lote");
-assert.equal(envios.length, 1);
-conTarea.emit("chat", { kind: "done", session: "s1", workspace: "w", ok: false });
+assert.equal(sends.length, 1, "another live task in the same folder does not block dispatch");
+assert.equal(sends[0].prompt, "Haz los símbolos Git\n\nCuando termines manda el PR");
+assert.equal(sends[0].session, "s1");
+await typeQueued("Esto va después del lote");
+assert.equal(sends.length, 1);
+taskApp.emit("chat", { kind: "done", session: "s1", workspace: "w", ok: false });
 await sleep(150);
-assert.equal(envios.length, 1, "un fallo no despacha el lote pendiente");
-for (const button of conTarea.w.document.querySelectorAll('button[aria-label^="Quitar el mensaje "]')) button.click();
+assert.equal(sends.length, 1, "un fallo no despacha el lote pendiente");
+for (const button of taskApp.w.document.querySelectorAll('button[aria-label^="Quitar el mensaje "]')) button.click();
 await sleep(50);
-rechazarPorOcupada = true;
-await escribirEnCola("Conserva este mensaje");
-assert.equal(envios.length, 2);
-assert.doesNotMatch(conTarea.w.document.body.textContent, /Hay un turno o una operación en curso/);
-await escribirEnCola("Y este también");
-assert.equal(envios.length, 2);
+rejectAsBusy = true;
+await typeQueued("Conserva este mensaje");
+assert.equal(sends.length, 2);
+assert.doesNotMatch(taskApp.w.document.body.textContent, /Hay un turno o una operación en curso/);
+await typeQueued("Y este también");
+assert.equal(sends.length, 2);
 await sleep(1100);
-assert.equal(envios.length, 2, "no reintenta mientras siga ocupada");
-rechazarPorOcupada = false;
-disponible = true;
+assert.equal(sends.length, 2, "no reintenta mientras siga ocupada");
+rejectAsBusy = false;
+queueAvailable = true;
 await sleep(1200);
-assert.equal(envios.length, 3);
-assert.equal(envios[2].prompt, "Conserva este mensaje\n\nY este también");
-conTarea.emit("chat", { kind: "done", session: "s1", workspace: "w", ok: true });
+assert.equal(sends.length, 3);
+assert.equal(sends[2].prompt, "Conserva este mensaje\n\nY este también");
+taskApp.emit("chat", { kind: "done", session: "s1", workspace: "w", ok: true });
 await sleep(100);
 
-const sinUsable = await boot("listo", 3, SIN_USABLE);
-const selectorInventado = sinUsable.w.document.querySelector('button[title="Con qué modelo responde"]');
-const salida = [...sinUsable.w.document.querySelectorAll("button")].some(
+const noUsable = await boot("listo", 3, NO_USABLE);
+const inventedSelector = noUsable.w.document.querySelector('button[title="Con qué modelo responde"]');
+const output = [...noUsable.w.document.querySelectorAll("button")].some(
   (b) => b.textContent?.trim() === "Conectar una cuenta",
 );
-if (sinUsable.fallos.length > 0 || selectorInventado || !salida) {
+if (noUsable.failures.length > 0 || inventedSelector || !output) {
   console.error(
     "Sin superficies usables, el chat tiene que quedar sin selector de modelos y ofrecer conectar una cuenta.",
   );
@@ -489,7 +489,7 @@ for (const [platform, userAgent] of [
   const attachmentCopies = [];
   const attachmentSends = [];
   const attachmentApp = await boot("listo", `attachment-drop-${platform}`, {
-    ...CON_TAREA,
+    ...WITH_TASK,
     list_live_sessions: [task("image-a", null, null), task("image-b", null, null), task("image-c", null, null)],
     send_message: (args) => { attachmentSends.push(args); return args.session; },
     prepare_attachments: ({ paths }) => {
@@ -526,7 +526,7 @@ for (const [platform, userAgent] of [
   assert.equal(attachmentSends.length, 2);
   assert.equal(attachmentSends[1].prompt, "");
   assert.ok(attachmentSends[1].attachments.some(path => path.endsWith("report.pdf")));
-  assert.deepEqual(attachmentApp.fallos, []);
+  assert.deepEqual(attachmentApp.failures, []);
   attachmentApp.w.close();
 }
 
