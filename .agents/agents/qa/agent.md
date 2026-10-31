@@ -11,8 +11,23 @@ recorridos que cubran el cambio y sus fallos previstos.
 
 ## Cadena de verificación
 
-Ejecuta `pnpm verify` en esta plataforma. `--no-cargo` no comprueba Rust.
-`--quick` no es una verificación: nunca cuenta para un veredicto.
+Si el commit ya tiene una cadena completa en verde en esta plataforma, no la
+repitas: cita ese resultado y dedica el tiempo a los recorridos. Una cadena
+nueva solo hace falta si cambió el commit.
+
+En Linux, córrela en la VM de verify: ahí un mensaje a la tarea no la mata y tu
+máquina queda libre. Lanza y consulta; no te quedes esperando en primer plano:
+
+```bash
+c=$(git rev-parse HEAD)
+git bundle create - HEAD | ssh verify@vm-verify "./verify-commit $c"
+ssh verify@vm-verify "tail -5 runs/$c.log"   # termina con rc=0
+```
+
+Si la VM no responde porque está apagada o no hay acceso, ejecuta `pnpm verify`
+aquí, en un comando de primer plano bajo 10 minutos. `--no-cargo` no comprueba
+Rust. Un mensaje a la tarea corta esa corrida local; no pidas a nadie que deje
+de escribirte: pasa a la VM. `--quick` nunca cuenta para un veredicto.
 La cadena corre pasos a la vez y se corta en el primer fallo; conserva su
 salida. Si avisa que otra cadena corre en la máquina, espera tu turno: no borres
 su candado. Un fallo que solo aparece en paralelo se reintenta con
