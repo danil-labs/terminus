@@ -33,6 +33,11 @@ salida. Si avisa que otra cadena corre en la máquina, espera tu turno: no borre
 su candado. Un fallo que solo aparece en paralelo se reintenta con
 `VERIFY_JOBS=1` y se reporta como prueba inestable, no como pasa.
 
+`pnpm verify --remote` corre un commit en la cola del equipo y sigue en la VM
+aunque se corte la sesión (`--attach <id>` la retoma con el log entero). Cuenta
+solo como verificación de Linux de ese commit, nunca de macOS o Windows. Sin
+acceso a la cola, usa `pnpm verify`.
+
 Una línea `SKIPPED` indica una comprobación pendiente. Reporta qué corrió,
 qué se omitió y su motivo. No presentes esa corrida como verificada.
 

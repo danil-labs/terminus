@@ -3,8 +3,8 @@
  * Cola de verificación de una máquina: recibe repo, commit y comando, y corre uno a la vez.
  *
  * Nada de aquí conoce un repo concreto; lo que se puede correr sale de `repos.json`.
- * Escucha solo en loopback: el acceso lo da quien expone el puerto (`tailscale serve`
- * o un túnel de SSM). La máquina no guarda secretos: el commit llega como `git bundle`.
+ * Escucha solo en loopback: el acceso lo da el túnel que llega al puerto (Tailscale
+ * SSH o SSM). La máquina no guarda secretos: el commit llega como `git bundle`.
  *
  *   VERIFY_QUEUE_HOME=/var/lib/verify-queue node server.mjs
  */
@@ -116,13 +116,13 @@ export function createQueue({ home, config, diskPercent = defaultDiskPercent, ru
     for (const old of stale) git(checkout, ["update-ref", "-d", `refs/verify/${old}`]);
   }
 
-  async function submit({ repo, commit, command, bundle, submittedBy }) {
+  async function submit({ repo, commit, command, bundle }) {
     checkRequest(repo, commit, command);
     receive(repo, commit, bundle);
     const id = `${Date.now()}-${randomBytes(4).toString("hex")}`;
     mkdirSync(runDir(id));
     writeFileSync(logPath(id), "");
-    const run = { id, repo, commit, command, state: "queued", exitCode: null, submittedBy: submittedBy ?? null, createdAt: new Date().toISOString(), startedAt: null, finishedAt: null, targetRebuilt: false };
+    const run = { id, repo, commit, command, state: "queued", exitCode: null, createdAt: new Date().toISOString(), startedAt: null, finishedAt: null, targetRebuilt: false };
     saveRun(run);
     pruneRuns();
     drain();
@@ -281,7 +281,7 @@ async function handle(queue, request, response) {
         if (size > MAX_BUNDLE_BYTES) request.destroy(new Error("bundle demasiado grande"));
       });
       await pipeline(request, createWriteStream(incoming));
-      const run = await queue.submit({ repo, commit, command, bundle: size ? incoming : null, submittedBy: request.headers["tailscale-user-login"] });
+      const run = await queue.submit({ repo, commit, command, bundle: size ? incoming : null });
       return send(response, 201, { id: run.id, position: queue.position(run.id) });
     } finally {
       rmSync(incoming, { force: true });

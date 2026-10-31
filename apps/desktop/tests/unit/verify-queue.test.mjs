@@ -215,6 +215,44 @@ test("sin acceso da un error claro que manda a la cadena local", { skip }, async
   assert.match(output, /`pnpm verify`/);
 });
 
+/** Un ssh que solo hace lo que el cliente le pide: reenviar `-L` hacia la cola. */
+function fakeSsh(dir, queuePort) {
+  const path = join(dir, "ssh");
+  writeFileSync(path, `#!/usr/bin/env node
+const net = require("node:net");
+const [, port] = process.argv[process.argv.indexOf("-L") + 1].split(":");
+net.createServer((client) => {
+  const queue = net.connect(${queuePort}, "127.0.0.1");
+  client.pipe(queue).pipe(client);
+  client.on("error", () => {});
+  queue.on("error", () => {});
+}).listen(Number(port), "127.0.0.1");
+`, { mode: 0o755 });
+  return path;
+}
+
+test("un host sin puerto llega a la cola por túnel SSH", { skip }, async (t) => {
+  const { dir, repo, home } = workspace(t);
+  const host = await serve(t, createQueue({ home, config, diskPercent: () => 10 }));
+  commit(repo, "echo por-tunel");
+  const { code, output } = await client(repo, "vm-verify", [], { VERIFY_REMOTE_SSH: fakeSsh(dir, host.split(":")[1]) });
+  assert.equal(code, 0, output);
+  assert.match(output, /por-tunel/);
+});
+
+test("sin permiso de SSH no intenta encender la máquina", { skip }, async (t) => {
+  const { dir, repo } = workspace(t);
+  const ssh = join(dir, "ssh");
+  const aws = join(dir, "aws");
+  writeFileSync(ssh, "#!/bin/sh\necho 'verify@vm-verify: Permission denied (tailscale).' >&2\nexit 255\n", { mode: 0o755 });
+  writeFileSync(aws, `#!/bin/sh\ntouch ${join(dir, "called")}\n`, { mode: 0o755 });
+  commit(repo, "true");
+  const { code, output } = await client(repo, "vm-verify", [], { VERIFY_REMOTE_SSH: ssh, VERIFY_REMOTE_AWS: aws });
+  assert.equal(code, 2);
+  assert.match(output, /No hay acceso a la cola/);
+  assert.equal(existsSync(join(dir, "called")), false);
+});
+
 test("la máquina apagada se enciende con las credenciales de quien lanza", { skip }, async (t) => {
   const { dir, repo, home } = workspace(t);
   const aws = join(dir, "aws");

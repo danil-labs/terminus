@@ -3,15 +3,20 @@
  *
  * El servidor es `verify-queue/server.mjs`. Lo que viaja es un commit, nunca el árbol
  * de trabajo, y la corrida sigue en la máquina aunque este proceso muera.
+ * La cola escucha en loopback: `VERIFY_REMOTE_HOST=máquina` llega por túnel SSH y
+ * `VERIFY_REMOTE_HOST=host:puerto` usa un puerto ya abierto, como un túnel de SSM.
  */
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { mkdtempSync, openAsBlob, rmSync } from "node:fs";
+import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 
 const REPO = "terminus";
-const DEFAULT_HOST = "terminus-verify-equipo:8787";
+const DEFAULT_HOST = "vm-verify";
+const SSH_USER = "verify";
+const QUEUE_PORT = 8787;
 const DEFAULT_INSTANCE = "i-0af42d5cff6d4aa8a";
 const DEFAULT_REGION = "us-east-1";
 const COMMAND_TIMEOUT_MS = 60_000;
@@ -19,6 +24,7 @@ const BUNDLE_TIMEOUT_MS = 5 * 60_000;
 const HEALTH_TIMEOUT_MS = 5_000;
 const POLL_TIMEOUT_MS = 30_000;
 const UPLOAD_TIMEOUT_MS = 10 * 60_000;
+const TUNNEL_TIMEOUT_MS = 15_000;
 const WAKE_TIMEOUT_MS = 4 * 60_000;
 const LOST_AFTER_MS = 2 * 60_000;
 const POLL_MS = 2_000;
@@ -28,7 +34,7 @@ class RemoteError extends Error {}
 const accessHelp = (host) =>
   `No hay acceso a la cola en ${host}.\n` +
   "  La cola es para el equipo de Danil dentro de su tailnet. Sin ese acceso, verifica en local con `pnpm verify`.\n" +
-  "  Con acceso, comprueba Tailscale, o enciende la máquina si esta sesión no tiene credenciales de AWS.";
+  `  Con acceso, comprueba Tailscale con \`ssh ${SSH_USER}@${host}\`. Si la máquina está apagada, encenderla pide credenciales de AWS en esta sesión.`;
 
 function parse(argv) {
   const options = { noCargo: false, commit: null, attach: null, cancel: null, status: false };
@@ -71,6 +77,44 @@ async function health(base) {
   }
 }
 
+const freePort = () =>
+  new Promise((resolve, reject) => {
+    const probe = createServer();
+    probe.once("error", reject);
+    probe.listen(0, "127.0.0.1", () => {
+      const { port } = probe.address();
+      probe.close(() => resolve(port));
+    });
+  });
+
+/** Un puerto ya abierto, o un túnel SSH que se reabre si cae: la corrida no depende de él. */
+async function openLink(host) {
+  if (host.includes(":")) return { base: `http://${host}`, up: async () => {}, denied: () => false };
+  const port = await freePort();
+  const local = `127.0.0.1:${port}:127.0.0.1:${QUEUE_PORT}`;
+  let tunnel = null;
+  let errors = "";
+  process.once("exit", () => tunnel?.kill());
+  return {
+    base: `http://127.0.0.1:${port}`,
+    denied: () => /permission denied|not allowed|tailnet policy/i.test(errors),
+    async up() {
+      if (tunnel) return;
+      errors = "";
+      const child = spawn(process.env.VERIFY_REMOTE_SSH ?? "ssh", ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "-o", "ExitOnForwardFailure=yes", "-o", "StrictHostKeyChecking=accept-new", "-N", "-L", local, `${SSH_USER}@${host}`], { stdio: ["ignore", "ignore", "pipe"], windowsHide: true });
+      tunnel = child;
+      child.stderr.on("data", (chunk) => { errors += chunk; });
+      child.once("error", () => { tunnel = null; });
+      child.once("close", () => { tunnel = null; });
+      const deadline = Date.now() + TUNNEL_TIMEOUT_MS;
+      while (tunnel === child && Date.now() < deadline) {
+        if (await health(`http://127.0.0.1:${port}`)) return;
+        await sleep(200);
+      }
+    },
+  };
+}
+
 /** Enciende con las credenciales de quien lanza: la máquina no guarda ninguna. */
 function wake() {
   const aws = process.env.VERIFY_REMOTE_AWS ?? "aws";
@@ -80,15 +124,18 @@ function wake() {
   return result.status === 0;
 }
 
-async function connect(base, host) {
-  const first = await health(base);
+async function connect(link, host) {
+  await link.up();
+  const first = await health(link.base);
   if (first) return first;
+  if (link.denied()) throw new RemoteError(accessHelp(host));
   console.log(`  La cola no responde en ${host}; intento encender la máquina.`);
   if (!wake()) throw new RemoteError(accessHelp(host));
   const deadline = Date.now() + WAKE_TIMEOUT_MS;
   while (Date.now() < deadline) {
     await sleep(POLL_MS * 2);
-    const answer = await health(base);
+    await link.up();
+    const answer = await health(link.base);
     if (answer) return answer;
   }
   throw new RemoteError(accessHelp(host));
@@ -123,7 +170,8 @@ function resumeHint(id) {
   console.error(`\n  La corrida ${id} sigue en la máquina. Retómala con \`pnpm verify --remote --attach ${id}\`.`);
 }
 
-async function follow(base, id) {
+async function follow(link, id) {
+  const { base } = link;
   let offset = 0;
   let lastPosition = null;
   let lastContact = Date.now();
@@ -145,6 +193,7 @@ async function follow(base, id) {
         resumeHint(id);
         throw new RemoteError("Se perdió la conexión con la cola.");
       }
+      await link.up();
     }
     await sleep(POLL_MS);
   }
@@ -162,21 +211,23 @@ function report(run, platform, host) {
 
 export async function runRemote(argv) {
   const host = process.env.VERIFY_REMOTE_HOST ?? DEFAULT_HOST;
-  const base = `http://${host}`;
   try {
     const options = parse(argv);
+    const link = await openLink(host);
+    const { base } = link;
     if (options.cancel) {
+      await link.up();
       const run = await json(base, `/runs/${options.cancel}/cancel`, { method: "POST" });
       console.log(`  Corrida ${run.id}: ${run.state}.`);
       return 0;
     }
-    const { platform, runs } = await connect(base, host);
+    const { platform, runs } = await connect(link, host);
     if (options.status) {
       if (!runs.length) console.log("  La cola está vacía.");
       for (const run of runs) console.log(`  ${run.id} ${run.state} ${run.repo} ${run.commit.slice(0, 10)} «${run.command}»`);
       return 0;
     }
-    if (options.attach) return report(await follow(base, options.attach), platform, host);
+    if (options.attach) return report(await follow(link, options.attach), platform, host);
 
     if (!options.commit && git(["status", "--porcelain"])) throw new RemoteError("Hay cambios sin commit y la corrida solo lleva commits. Haz commit, o nombra uno con --commit <sha>.");
     const commit = git(["rev-parse", "--verify", `${options.commit ?? "HEAD"}^{commit}`]);
@@ -189,7 +240,7 @@ export async function runRemote(argv) {
         process.exit(130);
       });
     }
-    return report(await follow(base, id), platform, host);
+    return report(await follow(link, id), platform, host);
   } catch (error) {
     const known = error instanceof RemoteError;
     console.error(`\n  ${known ? error.message : accessHelp(host)}${known ? "" : `\n  (${error.message})`}\n`);
