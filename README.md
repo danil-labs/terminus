@@ -1,13 +1,13 @@
-# Terminus
+# Danil
 
-A desktop agentic development environment. Terminus runs terminal agents
+A desktop agentic development environment. Danil runs terminal agents
 (Claude Code, Codex and others) against your organization's repositories and
 answers in plain language — for people who need those answers but don't write
 code.
 
 **[terminus.danil.ai](https://terminus.danil.ai)**
 
-This repository holds the **Terminus window**: the desktop app (Tauri + SolidJS)
+This repository holds the **Danil window**: the desktop app (Tauri + SolidJS)
 and its release tooling. The **engine** that runs projects, tasks and agents,
 `seldon-runtime`, is a proprietary binary by Danil; it is not in this
 repository and is downloaded pinned by version and SHA-256.
@@ -46,6 +46,15 @@ While the certificate builds reputation, SmartScreen may warn the first time:
 **More info → Run anyway**. The macOS app is signed and notarized with the same
 company's Developer ID. The `npx` path also verifies the minisign signature the
 app uses to update itself. Its code is in [`apps/desktop/npx/`](apps/desktop/npx).
+
+## Operational CLI
+
+`danil` is the primary command; `dn` is its official abbreviation. These are
+the only operational command names. The physical desktop executable keeps its
+distribution identity and forwards CLI calls internally. The npm command above
+installs the desktop app; it is not the operational CLI.
+See [CLI installation and compatibility](apps/desktop/docs/danil-cli.md)
+for explicit launcher installation, collision checks and engine dependencies.
 
 ## Build from source
 

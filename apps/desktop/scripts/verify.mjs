@@ -53,6 +53,7 @@ const rustSteps = [
 const steps = [
   ...(SKIP_RUST ? [] : [engineStep]),
   cliStep,
+  ["Los launchers Danil conservan el CLI y rechazan colisiones", process.execPath, ["--test", join(root, "tests/unit/cli-path.test.mjs")], root],
   ["El buscador de proyectos combina repositorios sin duplicarlos", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/project-repositories.test.ts")], root],
   ["Todo el código es revisable", process.execPath, [join(root, "scripts/guards/reviewable.mjs")], root],
   [

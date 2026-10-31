@@ -1,5 +1,9 @@
 # Development
 
+La marca visible es Danil. La instalación y compatibilidad de `danil` y `dn`
+están en [danil-cli.md](danil-cli.md). El empaquetado conserva `Terminus` y
+el binario `terminus` para actualizar las instalaciones existentes.
+
 ## Daily loop
 
 ```sh
