@@ -2,13 +2,10 @@ import type { HandlerTarget } from "../features/settings/HandlerPolicy";
 import { deliver, type JournalEvent, listen } from "../lib/serviceEvents";
 import { open } from "@tauri-apps/plugin-dialog";
 import ArrowLeft from "lucide-solid/icons/arrow-left";
-import Check from "lucide-solid/icons/check";
 import Columns2 from "lucide-solid/icons/columns-2";
-import Copy from "lucide-solid/icons/copy";
 import FolderOpen from "lucide-solid/icons/folder-open";
 import PanelLeftClose from "lucide-solid/icons/panel-left-close";
 import PanelLeftOpen from "lucide-solid/icons/panel-left-open";
-import PanelRightOpen from "lucide-solid/icons/panel-right-open";
 import Search from "lucide-solid/icons/search";
 import {
   batch,
@@ -63,7 +60,6 @@ import {
   anexarDeltas,
   anexarImagen,
   type ChatEvent,
-  type ChatExportado,
   clave,
   mcpCallFromName,
   mensajesDelHilo,
@@ -80,8 +76,6 @@ import {
 const VisorDeArchivo = lazy(() => import("../features/code/FileViewer"));
 import { avisarDeLosArboles } from "../features/code/refresh";
 import { arbolesDe, contiene, ubicar } from "../features/code/treeKind";
-import type { Tipo } from "../features/code/FileTree";
-const ColumnaDeTrabajo = lazy(() => import("../features/code/WorkTreeColumn"));
 import TaskFilesRow, { taskFilesWidth } from "../features/code/TaskFilesRow";
 import { moviendoHueco } from "../lib/sites";
 const TaskFilesCard = lazy(() => import("../features/code/TaskFiles"));
@@ -173,7 +167,6 @@ import WorkspaceColumn from "../features/shell/WorkspaceColumn";
 import Sitio from "../features/sites/Site";
 import { VELO_DE_FONDO } from "../lib/chat-background";
 import { fondoDeChat, fondoPropio, imagenDelWorkspace, veloDeFondo } from "../lib/chat-background-store";
-import { copyText } from "../lib/clipboard";
 import { capabilities, openMachineScreen } from "../lib/platform";
 import { pedirElCampo } from "../lib/focus";
 import { lastRoster, rememberRoster } from "../lib/handlerRoster";
@@ -1717,33 +1710,10 @@ export default function App() {
   const [folder, setFolder] = createSignal<string | null>(null);
 
   const sidebar = createSidebar();
-  const carpetaDelProyecto = () =>
-    carpetaDeTrabajo(projectList().find((p) => p.id === project()) ?? {});
-  // Lo único que el panel derecho tiene para enseñar: la previsualización de
-  // la carpeta de trabajo antes de empezar la tarea. Con tarea, sus archivos
-  // viven dentro de ella (`archivosDeTarea`), también en el chat de un agente.
-  // Es la regla que deshabilita el conmutador, y la que impide que un estado
-  // recordado abra una columna vacía.
-  const columnaConContenido = () => !paginaDeAgente() && !sessionId() && Boolean(carpetaDelProyecto());
-  // Abierta o cerrada es preferencia de esta máquina, igual que el historial
-  // (`lib/prefs.ts`). Sin recordarla, cada tarea nueva y cada cambio de
-  // proyecto reabrían la columna que se acababa de cerrar. La llave nombra la
-  // columna entera.
-  const [arbolQuerido, setArtOpen] = createPref<boolean | null>(
-    "shell.right.open",
-    null,
-  );
-  // Sin decidir es lo único que deja abrirse a la previsualización de la
-  // carpeta antes de empezar la tarea (`code/TaskPreview.tsx`). Cerrarla
-  // escribe `false`, y con eso deja de reaparecer sola.
-  const arbolDePartida = () => !sessionId() && Boolean(carpetaDelProyecto());
-  const artOpen = () =>
-    columnaConContenido() && (arbolQuerido() ?? arbolDePartida());
+  // Los archivos viven dentro de la tarea (`archivosDeTarea`); sin tarea no hay nada que enseñar.
   const alternarElArbol = () => {
     const id = sessionId();
-    if (id) { archivosDeTarea.toggle(id); return; }
-    if (artOpen()) setArtOpen(false);
-    else if (columnaConContenido()) setArtOpen(true);
+    if (id) archivosDeTarea.toggle(id);
   };
 
   onMount(() => {
@@ -2026,45 +1996,6 @@ export default function App() {
       setFolder(await invoke<string>("session_folder", { project: p, id }, deLaTarea(id)));
     } catch {
       setFolder(null);
-    }
-  }
-
-  // Sin tarea abierta, el panel enseña la carpeta de trabajo del proyecto.
-  const rutaDelPanel = () => folder() ?? carpetaDelProyecto() ?? null;
-
-  const maquinaDeLaCarpeta = () => {
-    const id = sessionId();
-    const lugar = projectList().find((p) => p.id === project());
-    return id
-      ? deLaTarea(id)?.headers["x-terminus-machine"] ?? maquinaDeLaVentana()
-      : runOn(workspaceActivo(), lugar) ?? (lugar?.machines?.includes(maquinaDeLaVentana()) ? maquinaDeLaVentana() : lugar?.machines?.[0] ?? maquinaDeLaVentana());
-  };
-  const carpetaLocal = () => capabilities().nativeWindow && maquinaDeLaCarpeta() === maquinaDeLaVentana();
-  const nombreDeAbrirCarpeta = () => carpetaLocal()
-    ? t("shell.folder.open")
-    : t("shell.folder.view_on", { name: machineName(maquinaDeLaCarpeta()) });
-
-  function abrirCarpeta() {
-    if (!carpetaLocal()) {
-      setArtOpen(true);
-      return;
-    }
-    const f = rutaDelPanel();
-    if (f) void invoke("open_external", { target: f }).catch((e) => setError(prosaDe(e)));
-  }
-
-  // La confirmación es el icono durante un instante: un aviso aparte para un
-  // gesto de un clic es la glosa que el sistema visual descarta.
-  const [rutaCopiada, setRutaCopiada] = createSignal(false);
-  async function copiarRuta() {
-    const f = rutaDelPanel();
-    if (!f) return;
-    try {
-      await copyText(f);
-      setRutaCopiada(true);
-      setTimeout(() => setRutaCopiada(false), 1500);
-    } catch (e) {
-      setError(prosaDe(e));
     }
   }
 
@@ -5416,44 +5347,6 @@ export default function App() {
   }
 
   /**
-   * Crear un archivo o una carpeta en la vista previa, sin escribirle al
-   * agente: la tarea nace vacía con su copia de trabajo, como la del primer
-   * mensaje (`create_empty_session`), y lo nuevo se crea dentro. Ese primer
-   * mensaje sigue después en esta misma tarea y le pone el título.
-   */
-  async function crearEnTareaVacia(tipo: Tipo, ruta: string) {
-    const proyecto = project();
-    const claveBorrador = claveAbierta();
-    // La tarea nace en la máquina elegida, y lo que se crea dentro va a la misma.
-    const enSuMaquina = draftOptions();
-    const { session } = await invoke<{ session: string; folder: string }>("create_empty_session", {
-      provider: agent(),
-      project: proyecto,
-      title: ruta.slice(ruta.lastIndexOf("/") + 1),
-      baseRef: draftBases()[claveBorrador] ?? null,
-      agent: hablandoCon()?.name ?? null,
-      space: escritorio(),
-    }, enSuMaquina);
-    let arbol = "";
-    try {
-      const arboles = await invoke<ArbolEnTarea[]>("list_task_trees", { project: proyecto, session }, enSuMaquina);
-      arbol = arboles[0]?.key ?? "";
-      const donde = { project: proyecto, session, tree: arbol, path: ruta };
-      await (tipo === "archivo" ? invoke("tree_create_file", donde, enSuMaquina) : invoke("tree_create_folder", donde, enSuMaquina));
-    } catch (e) {
-      // Sin lo que se pidió crear, la tarea vacía no tiene por qué estar.
-      await invoke("delete_session", { project: proyecto, id: session, force: false }, enSuMaquina).catch(() => {});
-      throw e;
-    }
-    void refreshSessions([proyecto]);
-    // La persona ya mira otra cosa: la tarea queda en la lista, sin quitarle la vista.
-    if (claveAbierta() !== claveBorrador) return;
-    adoptarNacida(session, { provisional: null, proyecto, titulo: "", claveBorrador });
-    await abrirSesion(proyecto, session);
-    if (tipo === "archivo" && sessionId() === session) abrirArchivo(arbol, ruta, false);
-  }
-
-  /**
    * El servidor que levantó una tarea, pestaña más del centro. Se abre
    * la tarea primero: `pestanas.abrir` mete la de contenido detrás de
    * las de su tarea, o dejaría un hueco al cerrarla (`lib/tabs.ts`).
@@ -5538,40 +5431,12 @@ export default function App() {
   function abrirPorRel(rel: string) {
     const f = folder();
     if (!f) {
-      // Revelar escribe la preferencia igual que el conmutador: con ella en
-      // cerrada, abrir transitoriamente dejaría el gesto sin nada que enseñar.
-      // Sin nada que enseñar no la toca: si no, la columna se abriría sola después.
-      if (columnaConContenido()) setArtOpen(true);
       return;
     }
     // El separador es el de la carpeta: `rel` viaja con barras normales.
     const sep = f.includes("\\") ? "\\" : "/";
     void abrirRuta(f + sep + rel.split("/").join(sep), rel);
   }
-
-  /**
-   * La conversación, como artefacto de la tarea. Escribe siempre el
-   * mismo archivo: exportar dos veces deja dos versiones de la misma
-   * cadena, no dos archivos (`workspace/artifacts.rs` · `CHAT_EXPORT`). Después
-   * se abre el artefacto: el acto tiene que verse.
-   */
-
-  /**
-   * No atrapa el fallo: lo pinta quien tiene el botón (`WorkTreeColumn.tsx`),
-   * que es donde se está mirando. El árbol recuenta por `harness:copia`,
-   * como al guardar un archivo desde su pestaña.
-   */
-  async function exportarChat() {
-    const id = sessionId();
-    if (!id) return;
-    const salida = await invoke<ChatExportado>("export_chat", {
-      project: project(),
-      id,
-    }, deLaTarea(id));
-    abrirArtefacto(salida.rel, salida.path);
-    window.dispatchEvent(new CustomEvent("harness:copia"));
-  }
-
 
   async function forkDesde(turno: string, mode: "full" | "focused", encargado: string | null) {
     const workspace = workspaceActivo();
@@ -6788,8 +6653,6 @@ export default function App() {
       return t("projects.split.alone");
     return t("projects.split.detach", { key: atajoDePartir(false) });
   };
-  const nombreDelArbol = () =>
-    artOpen() ? t("shell.work_tree.close") : t("shell.work_tree.open");
 
   /**
    * La conversación de UNA tarea, para poder montar más de una: se
@@ -6800,16 +6663,6 @@ export default function App() {
   const [threadSearchTargets, setThreadSearchTargets] = createSignal(new Map<string, ThreadSearchTarget>());
   const [delegatedToolbarTargets, setDelegatedToolbarTargets] = createSignal(new Map<string, () => JSX.Element>());
   const consumo = createUsage({ agents, agent, busy, reload: cuentasTocadas });
-  // La ventana de arriba a la derecha lleva el conmutador del árbol en su fila de herramientas.
-  const esquina = () => ventanas()
-    .filter((sitio) => sitio.fila === 0)
-    .reduce<SitioDePanel | null>((a, b) => (!a || b.col > a.col ? b : a), null);
-  const esquinaConTarea = () => {
-    const sitio = esquina();
-    // La tarea nueva también: su barra de herramientas ya lleva el conmutador.
-    return !!sitio && !tapadoPorElProyecto(sitio) && (paneles.activeTabAt(sitio) === null ||
-      pestanas.open().find(p => p.id === paneles.activeTabAt(sitio))?.clase === "tarea");
-  };
   // Una sola ventana: sus pestañas van en la franja de la ventana, entre la navegación y los controles.
   const tiraDeLaVentana = () => (
           <div
@@ -6865,19 +6718,19 @@ export default function App() {
       <FolderOpen size={16} />
     </BotonConAtajo>
   );
+  // La tarea nueva aún no tiene archivos que abrir: el botón ocupa su lugar apagado, con su porqué.
   const botonDelArbol = () => (
     <BotonConAtajo
       variant="ghost"
       size="icon"
       class="relative size-7 shrink-0 text-neutral-500"
-      disabled={!columnaConContenido()}
-      onClick={() => setArtOpen(true)}
+      disabled
       aria-pressed={false}
-      aria-label={nombreDelArbol()}
+      aria-label={t("code.panel.toggle")}
       accion="workTree"
-      etiqueta={columnaConContenido() ? nombreDelArbol() : t("shell.work_tree.no_session")}
+      etiqueta={t("shell.work_tree.no_session")}
     >
-      <PanelRightOpen size={16} />
+      <FolderOpen size={16} />
     </BotonConAtajo>
   );
   const PanelDeChat = (pp: {
@@ -7117,7 +6970,6 @@ export default function App() {
       machine={draftMachine() ?? undefined}
       on={machines().find(m => m.id === draftMachine())?.on !== false}
       onScreen={abrirPantalla}
-      onFiles={columnaConContenido() ? () => setArtOpen(true) : undefined}
       project={proyectoDeLaCelda()?.name}
       path={carpetaDeTrabajo(proyectoDeLaCelda() ?? {}) || undefined} /></Suspense></Show>}>{(id) => {
       return <Suspense fallback={null}><TaskLocation
@@ -7608,12 +7460,7 @@ export default function App() {
             </For>
           </div>
         </Show>
-        {/* Solo con la columna cerrada: abierta, su conmutador vive en la
-            cabecera del panel derecho (`features/shell/RightPanelHeader.tsx`). */}
         <div ref={controlesDerechos} class="relative z-40 ml-auto flex shrink-0 items-center gap-3">
-        <Show when={!artOpen() && !paginaDeAgente() && !esquinaConTarea()}>
-          {botonDelArbol()}
-        </Show>
         </div>
       </div>
       </Show>
@@ -7665,7 +7512,7 @@ export default function App() {
               tools={<>
                 <Show keyed when={delegatedToolbarTargets().get(`${workspaceActivo()}/${task()?.session ?? ""}`)} fallback={<DelegatedNone />}>{render => render()}</Show>
                 <UsageTool usage={consumo} agent={agenteDeLaVentana()} onGestionarCuentas={() => setSettings("proveedores-ia")} />
-                <Show when={task()?.session} fallback={<Show when={!artOpen() && !paginaDeAgente()}>{botonDelArbol()}</Show>}>
+                <Show when={task()?.session} fallback={<Show when={!paginaDeAgente()}>{botonDelArbol()}</Show>}>
                   {botonDeArchivos(() => task()?.session ?? "")}
                 </Show>
               </>} />;
@@ -8561,76 +8408,6 @@ export default function App() {
             <Conversacion />
           </div>
 
-          {/* El ancho se recuerda como número de píxeles, por
-              `lib/prefs.ts`, igual que el historial —no como fracción
-              del grupo (`harness.split.artefactos`), que daba anchos
-              distintos según el tamaño de ventana. La clave vieja queda
-              huérfana en `localStorage`: su formato no se lee como
-              píxeles. */}
-
-          {/* 300 y 420 son el mínimo y el ancho de partida
-              (`rightMinSize`/`rightDefaultSize`): por debajo de 300 la
-              fila del árbol deja de caber. */}
-
-          {/* El tope es 560: un archivo se abre como pestaña del centro,
-              a ancho entero, y esta columna solo enseña un árbol de
-              rutas —no hace falta más ancho para elegir en él. */}
-
-          {/* `ColumnaLateral` clampa el ancho recordado al montar: sin
-              eso, un ancho guardado en 900 se quedaría ahí para
-              siempre —el tope solo se aplica al arrastrar— tapando la
-              conversación sin explicación. */}
-          <ColumnaLateral
-            lado="right"
-            colapsada={!artOpen()}
-            clave="artefactos.width"
-            ancho={420}
-            min={300}
-            max={560}
-            etiqueta={t("shell.column.work_tree_width")}
-          >
-            <Suspense fallback={null}><ColumnaDeTrabajo
-              folderActions={
-                <>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    class="size-7 shrink-0 text-neutral-500"
-                    disabled={carpetaLocal() ? !rutaDelPanel() : !columnaConContenido()}
-                    onClick={abrirCarpeta}
-                    aria-label={nombreDeAbrirCarpeta()}
-                    title={nombreDeAbrirCarpeta()}
-                  >
-                    <FolderOpen size={16} />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    class="size-7 shrink-0 text-neutral-500"
-                    disabled={!rutaDelPanel()}
-                    onClick={() => void copiarRuta()}
-                    aria-label={rutaCopiada() ? t("shell.folder.copied") : t("shell.folder.copy")}
-                    title={rutaCopiada() ? t("shell.folder.copied") : t("shell.folder.copy")}
-                  >
-                    <Show when={rutaCopiada()} fallback={<Copy size={16} />}>
-                      <Check size={16} />
-                    </Show>
-                  </Button>
-                </>
-              }
-              project={project()}
-              session={sessionId()}
-              baseRef={draftBases()[claveAbierta()]}
-              tabs={pestanas.open()}
-              visible={artOpen()}
-              onExportarChat={exportarChat}
-              onCrearSinTarea={project() ? crearEnTareaVacia : undefined}
-              onAbrirArchivo={abrirArchivo}
-              onArchivoMovido={archivoMovido}
-              onArchivoBorrado={archivoBorrado}
-              onClose={() => setArtOpen(false)}
-            /></Suspense>
-          </ColumnaLateral>
           </div>
         </div>
       </Show>

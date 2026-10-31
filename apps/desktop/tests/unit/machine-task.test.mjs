@@ -130,7 +130,7 @@ test("la ventana de una tarea local dice su máquina, su proyecto y su rama", as
   assert.deepEqual(app.fallos, []);
 });
 
-test("la tarea nueva lleva la barra de una tarea: ubicación, herramientas apagadas con su porqué y carpeta encendida", async () => {
+test("la tarea nueva lleva la barra de una tarea: ubicación, herramientas apagadas con su porqué y carpeta apagada, sin columna derecha", async () => {
   const app = await boot("listo", "machine-task-draft-bar", responses({
     list_live_sessions: ({ project }) => (project === "p1" ? [row("t1")] : []),
     load_session: ({ id }) => session(id, [turn(0, "Hola local"), turn(1, "Respuesta local")]),
@@ -150,9 +150,9 @@ test("la tarea nueva lleva la barra de una tarea: ubicación, herramientas apaga
   const delegadas = doc.querySelector('[data-delegated-trigger="toolbar"]');
   assert.equal(delegadas?.getAttribute("aria-disabled"), "true");
   assert.equal(delegadas.title, "Aún no hay tareas delegadas");
-  boton("Cerrar el árbol de trabajo").click();
-  await sleep(100);
-  assert.equal(boton("Ver el árbol de trabajo")?.disabled, false, "la carpeta existe: su icono no se apaga");
+  // Sin tarea no hay archivos: no hay columna derecha y el icono de carpeta queda apagado.
+  assert.equal(doc.querySelector("[data-conversacion]")?.nextElementSibling, null, "la tarea nueva no abre columna derecha");
+  assert.equal(boton("Archivos de la tarea")?.disabled, true);
   // Una tarea real sin delegadas conserva el hueco, y su búsqueda sí funciona.
   await openTask(app, "t1");
   assert.equal(doc.querySelector('[data-delegated-trigger="toolbar"]')?.getAttribute("aria-disabled"), "true");
