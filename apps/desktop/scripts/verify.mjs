@@ -19,6 +19,11 @@ const OTHER_PLATFORMS =
       ? "macOS and Linux"
       : "Windows and macOS";
 
+if (process.argv.includes("--remote")) {
+  const { runRemote } = await import("./verify-remote.mjs");
+  process.exit(await runRemote(process.argv.slice(2)));
+}
+
 const SKIP_RUST = process.argv.includes("--no-cargo");
 const QUICK = process.argv.includes("--quick");
 const BASE = process.argv.find((argument) => argument.startsWith("--base="))?.slice(7) ?? "origin/dev";
@@ -116,6 +121,8 @@ const steps = [
     ["--test", "--experimental-strip-types", join(root, "tests/unit/pool.test.ts")],
     root,
   ],
+  ["La cola remota corre uno a la vez, limpia entre corridas y devuelve el exit real", process.execPath, ["--test", join(root, "tests/unit/verify-queue.test.mjs")], root],
+  ["El barrido de target no toca lo que un cargo usa", process.execPath, ["--test", join(root, "tests/unit/sweep-targets.test.mjs")], root],
   [
     "A saved chat background that no longer exists paints nothing",
     process.execPath,
