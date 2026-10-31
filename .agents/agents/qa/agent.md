@@ -12,7 +12,11 @@ recorridos que cubran el cambio y sus fallos previstos.
 ## Cadena de verificación
 
 Ejecuta `pnpm verify` en esta plataforma. `--no-cargo` no comprueba Rust.
-Detente en el primer fallo y conserva su salida.
+`--quick` no es una verificación: nunca cuenta para un veredicto.
+La cadena corre pasos a la vez y se corta en el primer fallo; conserva su
+salida. Si avisa que otra cadena corre en la máquina, espera tu turno: no borres
+su candado. Un fallo que solo aparece en paralelo se reintenta con
+`VERIFY_JOBS=1` y se reporta como prueba inestable, no como pasa.
 
 Una línea `SKIPPED` indica una comprobación pendiente. Reporta qué corrió,
 qué se omitió y su motivo. No presentes esa corrida como verificada.

@@ -29,6 +29,9 @@ import type {
   SlashMenu,
   Space,
   TaskBlockers,
+  TaskTree,
+  TreeContent,
+  TreeFiles,
   Startup,
   Turn,
   Workspace,
@@ -757,6 +760,28 @@ export async function readVisual(host: Host, workspace: string, folder: string, 
     if (detail === "invalid_visual_file" || detail === "visual_too_large" || detail === "visual_read_failed") throw new HostError(detail);
     throw error;
   }
+}
+
+// --- Los archivos de la tarea -----------------------------------------------------
+
+/** Los árboles de la tarea: su copia de trabajo y los que declare. Los que ya no están en disco no se enseñan. */
+export async function taskTrees(host: Host, workspace: string, folder: string, session: string): Promise<TaskTree[]> {
+  const answer = await host.call<TaskTree[]>("list_task_trees", workspace, { project: folder, session });
+  return (answer.value ?? []).filter((tree) => !tree.missing);
+}
+
+/** Las rutas de un árbol de la tarea. */
+export async function treeFiles(host: Host, workspace: string, folder: string, session: string, tree: string): Promise<TreeFiles> {
+  const answer = await host.call<TreeFiles>("tree_files", workspace, { project: folder, session, tree });
+  if (!answer.value) throw new HostError("operation_failed");
+  return answer.value;
+}
+
+/** Un archivo de un árbol de la tarea: texto, o su imagen en `data_url`. */
+export async function treeFile(host: Host, workspace: string, folder: string, session: string, tree: string, path: string): Promise<TreeContent> {
+  const answer = await host.call<TreeContent>("tree_show", workspace, { project: folder, session, tree, path });
+  if (!answer.value) throw new HostError("operation_failed");
+  return answer.value;
 }
 
 // --- Cuentas de IA ---------------------------------------------------------------
