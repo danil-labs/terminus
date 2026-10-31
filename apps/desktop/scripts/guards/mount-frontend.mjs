@@ -2728,7 +2728,13 @@ if (!roto) {
       .map(id => ({ ...viva, id, title: `Tarea ${id}` })),
     task_blockers: () => ({ unsaved: [], not_finished: false }),
     set_task_archived: args => { menuActions.push(["archive", args]); removedFromMenu.add(args.id); },
-    delete_session: args => { menuActions.push(["delete", args]); removedFromMenu.add(args.id); },
+    machine_list: [{ id: "local", local: true, active: true, on: true, hosts: true, features: ["task_lifecycle_v1"] }],
+    task_lifecycle_preview: args => ({ members: [{ project: args.project, id: args.id, title: `Tarea ${args.id}`, working: false, files: [], inspection: { status: "complete" } }], consent: "reviewed-menu-family" }),
+    task_lifecycle_apply: args => {
+      menuActions.push(["delete", args]);
+      removedFromMenu.add(args.id);
+      return { status: "complete", applied: [{ project: args.project, id: args.id }], failures: [] };
+    },
   });
   const menuDoc = fromAnotherTask.w.document;
   const selectedTask = () => menuDoc.querySelector('[data-sesion][aria-current="true"]')?.getAttribute("data-sesion");
@@ -2750,7 +2756,14 @@ if (!roto) {
   menuDoc.querySelector('[role="alertdialog"] button').click();
   await sleep(100);
   assert.equal(selectedTask(), "s1", "confirmar el borrado conserva la tarea abierta");
-  assert.deepEqual(menuActions[1], ["delete", { project: "", id: "s3", force: false }]);
+  assert.equal(menuActions.length, 1, "the first confirmation only opens the family review");
+  const deletionReview = menuDoc.querySelector('[role="dialog"]');
+  assert.ok(deletionReview);
+  deletionReview.querySelector('input[type="checkbox"]').click();
+  [...deletionReview.querySelectorAll('button')].find(button => button.textContent.trim() === "Borrar la tarea").click();
+  await sleep(100);
+  assert.equal(selectedTask(), "s1", "applying the reviewed deletion preserves the open task");
+  assert.deepEqual(menuActions[1], ["delete", { project: "", id: "s3", action: "delete", consent: "reviewed-menu-family", discard: true }]);
   assert.deepEqual(fromAnotherTask.fallos, []);
   let recreated = false;
   let rejectRecreation = true;

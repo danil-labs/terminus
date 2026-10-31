@@ -1,3 +1,4 @@
+import type { DeleteTarget } from "../features/projects/DeleteTaskDialog";
 import type { HandlerTarget } from "../features/settings/HandlerPolicy";
 import { deliver, type JournalEvent, listen } from "../lib/serviceEvents";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -78,6 +79,7 @@ import { avisarDeLosArboles } from "../features/code/refresh";
 import { arbolesDe, contiene, ubicar } from "../features/code/treeKind";
 import TaskFilesRow, { taskFilesWidth } from "../features/code/TaskFilesRow";
 import { moviendoHueco } from "../lib/sites";
+const DeleteTaskDialog = lazy(() => import("../features/projects/DeleteTaskDialog"));
 const TaskFilesCard = lazy(() => import("../features/code/TaskFiles"));
 import { createTaskFiles } from "../lib/taskFiles";
 import { esDeCodigo } from "../features/code/workdirKind";
@@ -4983,50 +4985,50 @@ export default function App() {
     if (p) void activarPestana(p);
   }
 
-  /** La tarea cuyo borrado espera a que se decida qué hacer con sus archivos. */
-  const [borradoConTrabajo, setBorradoConTrabajo] = createSignal<
-    { project: string; id: string; files: string[] } | null
-  >(null);
+  const [deleteTarget, setDeleteTarget] = createSignal<DeleteTarget | null>(null);
 
-  async function borrarSesion(proyecto: string, id: string, force = false) {
-    // Borrar desde la vista del proyecto no debe echarte de ella: `nuevaSesion`
-    // la cierra —es la acción de ir a escribir— y aquí solo se está usando para
-    // soltar la conversación que se acaba de borrar.
-    const vista = proyectoAbierto();
-    try {
-      // En Windows un Tinymist vivo bloquea la carpeta de la tarea.
-      await apagarVistasDe(id);
-      await invoke("delete_session", { project: proyecto, id, force }, deLaTarea(id));
-      // Borrada, no tiene pestaña ni hilo ni borrador que conservar.
-      const vecina = pestanas.close(id);
-      // Igual que al cerrar la pestaña: el panel que la enseñaba se cierra.
-      const quedan = new Set(pestanas.open().map((x) => x.id));
-      paneles.sync([...quedan]);
+  const [deletingEditors, setDeletingEditors] = createSignal<{ workspace: string | null; ids: string[] } | null>(null);
+  const editorDeletionLocked = (id: string) => deletingEditors()?.workspace === workspaceActivo() && deletingEditors()?.ids.includes(id) === true;
+
+  function deleteTask(project: string, id: string) {
+    const machine = deLaTarea(id)?.headers["x-terminus-machine"] ?? machines().find(item => item.local || item.active)?.id;
+    const target = machines().find(item => item.id === machine);
+    const folderNames = new Map(projectList().map(folder => [folder.id, folder.name]));
+    setDeleteTarget({
+      machineName: machine ? machineName(machine) : t("shell.machines.this_computer"),
+      folderName: folder => folderNames.get(folder) || folder || t("shell.sidebar.view.no_folder"),
+      project, id, workspace: workspaceActivo(),
+      supported: target?.features?.includes("task_lifecycle_v1") === true,
+      options: opcionesDeLaTarea(id, workspaceActivo()),
+      panelId: task => machine ? senderTaskId(machine, task) : task,
+    });
+  }
+
+  function deletedTaskMembers(members: { project: string; id: string }[]) {
+    const view = proyectoAbierto();
+    const ids = members.map(member => member.id);
+    const activeRemoved = ids.includes(sessionId() ?? "");
+    const tabIds = pestanas.open().filter(tab => ids.includes(tab.id) || ids.includes(tab.session)).map(tab => tab.id);
+    const neighbor = pestanas.closeMany(tabIds);
+    paneles.sync(pestanas.open().map(tab => tab.id));
+    for (const id of ids) {
       soltarHilo(id);
       soltarBorrador(id);
       olvidarPestana(id);
-      if (id === sessionId()) {
-        // Desde la vista del proyecto no se salta a otra conversación: se
-        // suelta la borrada y la vista se queda. Desde la tira, a la vecina.
-        if (!vista && vecina) void activarPestana(vecina);
-        else {
-          irAlBlanco();
-          setProyectoAbierto(vista);
-        }
-      }
-      void refreshSessions([proyecto]);
-      return true;
-    } catch (e) {
-      // El árbol tiene archivos que no están en Git. No se deja en disco sin
-      // dueño: se enseñan y decide la persona (`worktrees::retirar_con`).
-      if (claveDe(e) === "worktrees.error.work_in_tree") {
-        const detalle = e && typeof e === "object" && "detail" in e ? String(e.detail) : "";
-        setBorradoConTrabajo({ project: proyecto, id, files: detalle.split("\n").filter(Boolean) });
-        return false;
-      }
-      setError(prosaDe(e));
-      return false;
+      archivosDeTarea.forget(id);
     }
+    if (activeRemoved) {
+      if (!view && neighbor) void activarPestana(neighbor);
+      else { irAlBlanco(); setProyectoAbierto(view); }
+    }
+    void refreshSessions([...new Set(members.map(member => member.project))]);
+  }
+
+  function dirtyTaskFiles(id: string): string[] {
+    const tabIds = pestanas.open().filter(tab => tab.id === id || tab.session === id).map(tab => tab.id);
+    const tabs = pestanas.dirtyTabsToClose(tabIds).map(tab => tab.ruta);
+    const panel = archivosDeTarea.panel(id);
+    return [...new Set([...tabs, ...panel.tabs.filter(tab => panel.dirty.includes(tab.id)).map(tab => tab.path)])];
   }
 
   /**
@@ -6794,7 +6796,7 @@ export default function App() {
       carpetaDe: () => projectList().find(item => item.id === folder)?.name,
       destinos: projectList().filter(item => item.id !== folder).map(item => ({ id: item.id, name: item.name })),
       onPick: id => { void abrirSesion(folder, id); },
-      onDelete: id => void borrarSesion(folder, id),
+      onDelete: id => void deleteTask(folder, id),
       onMove: (id, destination) => void moverSesion(folder, id, destination),
       onEtapa: (id, stage) => void etaparSesion(folder, id, stage),
       onRenombrar: (id, title) => void renombrarSesion(folder, id, title),
@@ -7092,7 +7094,7 @@ export default function App() {
               projectOf: row => folderOf(row.id), destinosDe: row => projectList().filter(item => item.id !== folderOf(row.id)).map(item => ({ id: item.id, name: item.name })),
               de: de(), current: null, vivas: vivas(), aprobando: permissions().map(item => item.session),
               destinos: projectList().filter(item => item.id !== de()).map(item => ({ id: item.id, name: item.name })),
-              onDelete: id => void borrarSesion(folderOf(id), id),
+              onDelete: id => void deleteTask(folderOf(id), id),
               onMove: (id, destination) => void moverSesion(folderOf(id), id, destination),
               onEtapa: (id, stage) => void etaparSesion(folderOf(id), id, stage),
               onRenombrar: (id, title) => void renombrarSesion(folderOf(id), id, title),
@@ -7729,7 +7731,7 @@ export default function App() {
                 onPointerDown={() => { const d = sitio(); if (d) mandarVentana(d); }}>
                 <Suspense fallback={null}>
                   <TaskFilesCard project={p.project} session={p.session} files={archivosDeTarea}
-                    visible={visible()}
+                    visible={visible()} readOnly={editorDeletionLocked(p.session)}
                     expandedOnly={paneles.isSplit() || compacta()}
                     onSaved={() => window.dispatchEvent(new CustomEvent("harness:copia"))}
                     onMoved={archivoMovido} onRemoved={archivoBorrado} />
@@ -7781,7 +7783,7 @@ export default function App() {
               onNueva={() => nuevaSesion(p().id)}
               onAbrir={(id) => void abrirSesion(p().id, id)}
               onHablarCon={(name) => hablarConEncargado(p().id, name)}
-              onDelete={(id) => void borrarSesion(p().id, id)}
+              onDelete={(id) => void deleteTask(p().id, id)}
               onMove={(id, a) => void moverSesion(p().id, id, a)}
               onEtapa={(id, etapa) => void etaparSesion(p().id, id, etapa)}
               onPin={(id, pinned) => fijarSesion(p().id, id, pinned)}
@@ -7881,6 +7883,7 @@ export default function App() {
                         <Suspense fallback={null}><VisorDeArchivo
                           project={a().project}
                           session={a().session}
+                          readOnly={editorDeletionLocked(a().session)}
                           base={a().base}
                           arbol={a().arbol}
                           ruta={a().ruta}
@@ -8121,34 +8124,13 @@ export default function App() {
         )}
       </Show>
 
-      <Show when={borradoConTrabajo()}>{(b) => (
-        <Dialog open onOpenChange={(abierto) => { if (!abierto) setBorradoConTrabajo(null); }}>
-          <DialogContent class="flex flex-col gap-3">
-            <DialogTitle class="text-sm font-semibold">{t("projects.sessions.delete_work_title")}</DialogTitle>
-            <p class="m-0 text-ui text-neutral-700">{t("projects.sessions.delete_work")}</p>
-            <ul class="m-0 flex max-h-[40vh] list-none flex-col overflow-y-auto p-0">
-              <For each={b().files}>{(f) => (
-                <li class="shrink-0 truncate font-mono text-caption text-neutral-500" title={f}>{f}</li>
-              )}</For>
-            </ul>
-            <div class="flex justify-end gap-2">
-              <Button variant="outline" size="sm" onClick={() => setBorradoConTrabajo(null)}>
-                {t("projects.sessions.keep")}
-              </Button>
-              <Button
-                variant="danger"
-                size="sm"
-                onClick={() => {
-                  const a = b();
-                  setBorradoConTrabajo(null);
-                  void borrarSesion(a.project, a.id, true);
-                }}
-              >
-                {t("projects.sessions.delete")}
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+      <Show when={deleteTarget()}>{target => (
+        <DeleteTaskDialog target={target()} dirty={dirtyTaskFiles}
+          prepare={async ids => { for (const id of ids) await apagarVistasDe(id); }}
+          isCurrent={() => target().workspace === workspaceActivo()}
+          lock={ids => setDeletingEditors(ids.length ? { workspace: target().workspace, ids } : null)}
+          onDeleted={members => { if (target().workspace === workspaceActivo()) deletedTaskMembers(members); }}
+          onClose={() => setDeleteTarget(null)} />
       )}</Show>
 
       {/* Cancelar va primero: es el que recibe el foco, y Enter por inercia no
@@ -8383,7 +8365,7 @@ export default function App() {
               onAbrirProyecto={(id, machine) => { abrirProyecto(id); enLaMaquinaDelGrupo(machine); }}
               /* El proyecto viaja en el mismo gesto que abre el borrador. */
               onNuevaTareaEn={(id, machine) => { nuevaSesion(id); enLaMaquinaDelGrupo(machine); }}
-              onDelete={(p, id) => borrarSesion(p, id)}
+              onDelete={(p, id) => deleteTask(p, id)}
               onMove={(p, id, a) => void moverSesion(p, id, a)}
               onEtapa={(p, id, etapa) => void etaparSesion(p, id, etapa)}
               onPin={fijarSesion}
