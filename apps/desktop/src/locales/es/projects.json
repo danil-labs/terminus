@@ -17,6 +17,7 @@
   "projects.threads.invalid_provider": "El proveedor del agente no está disponible. Selecciona otro en su perfil.",
   "projects.threads.inbox": "Bandeja anterior",
   "projects.sessions.launched_by_agent": "Agente",
+  "projects.sessions.handoff_issue": "El origen de este handoff es inconsistente; la tarea sigue disponible aquí.",
   "projects.sessions.launched_by_you": "Mis tareas",
   "projects.sessions.launcher_unknown": "Autor desconocido",
   "projects.sessions.pin_named": "Fijar «{title}»",

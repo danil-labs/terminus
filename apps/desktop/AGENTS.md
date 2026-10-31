@@ -17,6 +17,7 @@ area guide before editing an area: [front](src/AGENTS.md),
 pnpm install
 pnpm verify              # guards, front build and Rust on this platform
 pnpm verify --no-cargo  # the same chain without Rust
+pnpm verify --quick     # guards, linter, tsc and the tests of this diff; not a merge gate
 pnpm window:build           # debug window with the front embedded
 pnpm engine:download        # engine pinned in seldon-runtime.lock
 pnpm engine:start           # engine with throwaway data + window

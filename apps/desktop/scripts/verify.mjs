@@ -7,6 +7,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 
 import { SKIPPED_EXIT_CODE, walkFiles } from "./git.mjs";
+import { changedFiles, classify, stepFiles, testReader, touches } from "./verify-scope.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const backend = join(root, "src-tauri");
@@ -19,6 +20,8 @@ const OTHER_PLATFORMS =
       : "Windows y macOS";
 
 const SKIP_RUST = process.argv.includes("--no-cargo");
+const QUICK = process.argv.includes("--quick");
+const BASE = process.argv.find((argument) => argument.startsWith("--base="))?.slice(7) ?? "origin/dev";
 const rustBuild = { command: "cargo", env: process.env };
 
 function undocumentedGuards() {
@@ -56,6 +59,7 @@ const steps = [
   ...(SKIP_RUST ? [] : [engineStep]),
   cliStep,
   ["El buscador de proyectos combina repositorios sin duplicarlos", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/project-repositories.test.ts")], root],
+  ["El alcance de --quick sale del diff y duda hacia la cadena completa", process.execPath, ["--test", join(root, "tests/unit/verify-scope.test.mjs")], root],
   ["Todo el código es revisable", process.execPath, [join(root, "scripts/guards/reviewable.mjs")], root],
   [
     "Un guarda sin git lo dice, y no mata la cadena",
@@ -697,6 +701,43 @@ if (undocumented.length) {
   }
 }
 
+const isVite = (step) => step[0].startsWith("Empaqueta ");
+const REQUIRES_DIST = /scripts\/guards\/(?:mount-frontend|missing-classes|theme-inversion)\.mjs$/;
+const isAlwaysQuick = ([, , args]) =>
+  !rustSteps.some((step) => step[2] === args) &&
+  args.some((arg) => /node_modules\/(?:@biomejs\/biome\/bin\/biome|typescript\/bin\/tsc)$|scripts\/icons\.mjs$|scripts\/guards\//.test(arg) && !REQUIRES_DIST.test(arg));
+
+/** El plan de `--quick`: `reason` dice por qué corre todo; `plan` es el subconjunto de pasos cuando no. */
+function quickScope() {
+  const diff = changedFiles(root, BASE);
+  if (diff.reason) return { reason: diff.reason };
+  const groups = classify(diff.files);
+  if (groups.full.length) return { reason: `se tocó ${groups.full.slice(0, 5).join(", ")}${groups.full.length > 5 ? "…" : ""}` };
+  const reachOf = testReader(root);
+  const rust = groups.rust.length > 0;
+  const plan = new Set(steps.filter(isAlwaysQuick));
+  const changed = [...groups.code, ...groups.tests];
+  const reached = new Set();
+  let build = false;
+  for (const step of steps) {
+    if (plan.has(step) || isVite(step) || rustSteps.includes(step) || step[2].some((arg) => REQUIRES_DIST.test(arg))) continue;
+    const files = stepFiles(step[2]);
+    if (!files.length) continue;
+    const reach = reachOf(files);
+    for (const file of reach.files) reached.add(file);
+    if (touches(reach, changed) || (step === cliStep && rust)) {
+      plan.add(step);
+      build ||= reach.needsBuild;
+    }
+  }
+  const orphan = groups.tests.find((file) => !reached.has(file.slice("apps/desktop/".length)));
+  if (orphan) return { reason: `ninguna prueba alcanza ${orphan}` };
+  if (build || (rust && !SKIP_RUST)) for (const step of steps.filter(isVite)) plan.add(step);
+  if (rust) for (const step of rustSteps) plan.add(step);
+  if (plan.has(cliStep)) plan.add(engineStep);
+  return { plan, count: diff.files.length, mergeBase: diff.mergeBase.slice(0, 8) };
+}
+
 const outputOf = (e) => [e?.stdout, e?.stderr].map((s) => (s ?? "").toString()).join("").trimEnd();
 
 const GIB = 1024 ** 3;
@@ -790,7 +831,6 @@ async function takeLock() {
   }
 }
 
-const startedAt = Date.now();
 let failure = null;
 const skipped = [];
 const JOBS = budget();
@@ -829,14 +869,17 @@ async function runInOrder(list, weight) {
 }
 
 const isCargoLane = (step) => rustSteps.includes(step) && step !== engineStep;
-const isVite = (step) => step[0].startsWith("Empaqueta ");
 const isPerf = ([, , args]) => args.some((arg) => typeof arg === "string" && arg.includes("tests/perf/"));
 const firstBuild = steps.findIndex(isVite);
-const beforeBuild = steps.slice(0, firstBuild).filter((step) => step !== engineStep);
-const afterBuild = steps.slice(firstBuild).filter((step) => !isVite(step) && !isCargoLane(step) && (!isPerf(step) || step[0].startsWith("La carga inicial")));
-const measured = steps.slice(firstBuild).filter((step) => isPerf(step) && !afterBuild.includes(step));
+const scope = QUICK ? quickScope() : {};
+const omitted = scope.plan ? steps.filter((step) => !scope.plan.has(step)) : [];
+const planned = (step) => !omitted.includes(step);
+const beforeBuild = steps.slice(0, firstBuild).filter((step) => step !== engineStep && planned(step));
+const afterBuild = steps.slice(firstBuild).filter((step) => !isVite(step) && !isCargoLane(step) && (!isPerf(step) || step[0].startsWith("La carga inicial")) && planned(step));
+const measured = steps.slice(firstBuild).filter((step) => isPerf(step) && !afterBuild.includes(step) && planned(step));
 
 const releaseLock = await takeLock();
+const startedAt = Date.now();
 for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
   process.on(signal, () => {
     for (const child of running) killGroup(child);
@@ -845,13 +888,16 @@ for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
     process.exit(1);
   });
 }
-console.log(`  Hasta ${JOBS} pasos a la vez (VERIFY_JOBS lo cambia).\n`);
+console.log(`  Hasta ${JOBS} pasos a la vez (VERIFY_JOBS lo cambia).`);
+if (scope.reason) console.log(`  --quick corre la cadena completa: ${scope.reason}.`);
+if (scope.plan) console.log(`  --quick contra ${BASE} (${scope.mergeBase}): ${scope.count} archivos cambiados, ${steps.length - omitted.length} de ${steps.length} pasos. NO es una verificación completa.`);
+console.log("");
 
-if (steps.includes(engineStep)) await runStep(engineStep);
+if (steps.includes(engineStep) && planned(engineStep)) await runStep(engineStep);
 if (!failure) await runAll(beforeBuild);
-if (!failure) await runInOrder(steps.filter(isVite), JOBS);
+if (!failure) await runInOrder(steps.filter((step) => isVite(step) && planned(step)), JOBS);
 // `generate_context!` lee `dist/`: cargo antes de vite falla en un checkout limpio.
-const cargoLane = SKIP_RUST || failure ? Promise.resolve() : runInOrder(steps.filter(isCargoLane), Math.ceil(JOBS / 2));
+const cargoLane = SKIP_RUST || failure ? Promise.resolve() : runInOrder(steps.filter((step) => isCargoLane(step) && planned(step)), Math.ceil(JOBS / 2));
 if (!failure) await runAll(afterBuild);
 await cargoLane;
 // Miden un techo de gasto; con otros pasos al lado medirían esa carga.
@@ -881,7 +927,7 @@ const seconds = ((Date.now() - startedAt) / 1000).toFixed(0);
 
 if (skipped.length) {
   const one = skipped.length === 1;
-  const skippedCount = `${skipped.length} de ${steps.length} pasos ${one ? "NO corrió" : "NO corrieron"}`;
+  const skippedCount = `${skipped.length} de ${steps.length - omitted.length} pasos ${one ? "NO corrió" : "NO corrieron"}`;
   console.log(`\n  Corrido en ${PLATFORM}, ${seconds}s — y ${skippedCount}: esto NO es una verificación.`);
   console.log(`  Lo que ${one ? "ese guarda caza" : "esos guardas cazan"} sigue sin comprobar:`);
   for (const [name, reason] of skipped) {
@@ -889,8 +935,14 @@ if (skipped.length) {
     for (const line of reason.split("\n")) console.log(`      ${line}`);
   }
   console.log("");
-} else {
+} else if (!omitted.length) {
   console.log(`\n  Verificado en ${PLATFORM}${SKIP_RUST ? " (cadena sin Rust)" : ""}, ${seconds}s.`);
+}
+if (omitted.length) {
+  console.log(`\n  --quick en ${PLATFORM}, ${seconds}s: esto NO es una verificación completa; antes de mergear corre \`pnpm verify\`.`);
+  console.log(`  Saltaron ${omitted.length} pasos:`);
+  for (const [name] of omitted) console.log(`    ${name}`);
+  console.log("");
 }
 if (SKIP_RUST) {
   console.log("  Sin comprobar en esta corrida: cargo fmt, check, clippy y test.");
