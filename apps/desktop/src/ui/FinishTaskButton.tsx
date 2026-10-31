@@ -44,7 +44,7 @@ export function FinishTaskButton(props: {
   description: string;
   busy: boolean;
   onFinish: (rect: DOMRect) => void;
-  /** La tarjeta del riel lo pone junto al título, antes del estado. */
+  /** La tarjeta del riel lo pone en línea con la hora, en una línea de 16 px. */
   compact?: boolean;
 }) {
   return <Button
