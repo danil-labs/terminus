@@ -1,6 +1,6 @@
 import { folderByKey } from "../../lib/folderIcon";
 import { RADIUS, TEXT } from "@terminus/design";
-import { applySidebarView, folderCounts, groupKey, groupLabel, isPinned, type SidebarView } from "@terminus/tasks";
+import { applySidebarView, groupCardOptions, workStateOf, folderCounts, groupKey, groupLabel, isPinned, type SidebarView } from "@terminus/tasks";
 import { router } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Platform, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
@@ -92,13 +92,14 @@ export default function Home() {
   const kept = view.folders.filter((f) => (counts.get(f) ?? 0) > 0);
   const effective: SidebarView = kept.length === view.folders.length ? view : { ...view, folders: kept };
   const folderIdOf = (key: string) => snapshot?.folders.find((f) => f.key === key)?.id ?? key.slice(key.indexOf("/") + 1);
+  const git = useTaskGit(hostOf, tasks);
   const groups = applySidebarView(tasks.map((task) => ({ ...cardTask(task, marks), task })), { ...effective, folders: effective.folders.map(folderIdOf) }, {
     live: marks.live,
     approving: [...marks.attention].filter(([, s]) => s === "approving").map(([k]) => k),
     folderOf: (row) => row.task.folder,
     machineOf: (row) => row.task.host,
+    workStateOf: (row) => workStateOf(effectiveGit(git, row.task, snapshot?.tasks ?? [])),
   });
-  const git = useTaskGit(hostOf, groups.flatMap((group) => group.tasks.map(({ task }) => task)));
   const groupFolderName = (id: string) => snapshot?.folders.find((f) => f.id === id)?.name ?? id;
   const machineName = (id: string) => hosts.find((h) => h.id === id)?.label ?? id;
   const agents = (snapshot?.agents ?? []).filter((a) => a.places.some((p) => inSpace(`${p.host}/${p.folder}`)));
@@ -314,7 +315,7 @@ export default function Home() {
                     render={(onLongPress) => (
                       <TaskCard
                         task={task}
-                        card={cardOf(task, marks, effective.group === "folder")}
+                        card={cardOf(task, marks, groupCardOptions(group).hideFolder, groupCardOptions(group).hideMachine)}
                         git={effectiveGit(git, task, snapshot?.tasks ?? [])}
                         folderOf={(key) => folderByKey(snapshot?.folders ?? [], key)}
                         when={shortWhen(task.last_turn_at ?? task.updated_at, lang)}

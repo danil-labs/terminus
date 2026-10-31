@@ -410,7 +410,7 @@ export default function TaskScreen() {
 
   const folderRow = snapshot?.folders.find((f) => f.host === params.host && f.id === folder) ?? null;
   const gitBook = useTaskGit(hostOf, [{ host: params.host, workspace, folder, id }]);
-  const git = effectiveGit(gitBook, { id, host: params.host, workspace }, snapshot?.tasks ?? []);
+  const git = effectiveGit(gitBook, { id, host: params.host, workspace, folder }, snapshot?.tasks ?? []);
   const visible = useMemo(() => needle ? lines.filter((line) => lineMatches(line, needle)) : lines, [lines, needle]);
   const first = webWindow.scope === webScope ? visible.findIndex((line) => line.key === webWindow.first) : -1;
   const webStart = first < 0 ? Math.max(0, visible.length - TAIL_PAGE_SIZE) : first;

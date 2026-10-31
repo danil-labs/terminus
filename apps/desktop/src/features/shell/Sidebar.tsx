@@ -1,3 +1,4 @@
+import { groupCardOptions, workStateOf } from "@terminus/tasks";
 import History from "lucide-solid/icons/history";
 import Plus from "lucide-solid/icons/plus";
 import SquarePen from "lucide-solid/icons/square-pen";
@@ -28,6 +29,7 @@ import { watchHandlerStatuses } from "../projects/handlerPresence";
 import type { ModelChoices } from "../projects/NewAgent";
 import { watchProfiles } from "../projects/profiles";
 import Sessions, { type SessionRow } from "../projects/Sessions";
+import { effectiveTaskGit, observedSessionGit } from "../projects/taskGit";
 import type { Etapa } from "../projects/TaskStage";
 import {
   agentOptions,
@@ -255,6 +257,14 @@ export default function Sidebar(props: {
       live: props.vivas,
       approving: props.aprobando,
       folderOf: (row) => carpetaDe(row.id),
+      workStateOf: (row) => {
+        const project = carpetaDe(row.id);
+        if (row.machine && !row.workspace) return "unknown";
+        const candidates = relacionadas().filter(other => carpetaDe(other.id) === project
+          && other.workspace === row.workspace && other.machine === row.machine);
+        const rows = observedSessionGit(project, row.machine ? { workspace: row.workspace!, machine: row.machine } : undefined);
+        return workStateOf(effectiveTaskGit(row, rows, candidates));
+      },
     });
     // Por carpeta, en el orden del riel (la principal primero) y «sin carpeta» al final.
     const orden = (g: SidebarGroup<SessionRow>) => {
@@ -372,10 +382,11 @@ export default function Sidebar(props: {
    * sitios —expandida y en el desplegable—; una variable contendría un solo
    * nodo del DOM y colocarlo dos veces lo movería del primero al segundo.
    */
-  const Historial = (p: { filas: SessionRow[]; sinCarpeta?: boolean }) => (
+  const Historial = (p: { filas: SessionRow[]; sinCarpeta?: boolean; sinMaquina?: boolean }) => (
     <Sessions sidebar
       draggedTask={props.draggedTask}
       hideFolder={p.sinCarpeta}
+      hideMachine={p.sinMaquina}
       sessions={p.filas}
       relatedSessions={relacionadas()}
       groupByAuthor={false}
@@ -540,7 +551,7 @@ export default function Sidebar(props: {
               when={g().tasks.length > 0}
               fallback={<p class="m-0 py-0.5 pl-7 text-caption text-neutral-500" data-folder-empty="">{t("shell.sidebar.folder_empty")}</p>}
             >
-              <Historial filas={g().tasks} sinCarpeta={g().kind === "folder" && !!g().key} />
+              <Historial filas={g().tasks} sinCarpeta={groupCardOptions(g()).hideFolder} sinMaquina={groupCardOptions(g()).hideMachine} />
             </Show>
           </Show>
         </section>

@@ -8,8 +8,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { cardPull, type TaskGit, taskCard } from "@terminus/tasks";
 import { secondLine } from "../src/lib/cardLine.ts";
-import { effectiveGit, gitAsks, gitAsksKey, staleGit, withGitAnswer } from "../src/lib/taskGit.ts";
+import { effectiveGit, gitBookKey, gitAsks, gitAsksKey, staleGit, withGitAnswer } from "../src/lib/taskGit.ts";
 
+const scope = { host: "vm", workspace: "w", folder: "p" };
 const row = { id: "t1", title: "Tarea", esperando: false, folder: "p1", agent: "Ada", provider: "claude", machine: "vm", machine_on: true, last_message: "¿Sigo?" };
 const card = (extra: Record<string, unknown> = {}) => taskCard({ ...row, ...extra }, { live: [], approving: [] });
 const git = (extra: Partial<TaskGit> = {}, checks?: "failure"): TaskGit => ({
@@ -64,27 +65,64 @@ test("git: una llamada por máquina, workspace y carpeta con sus tareas visibles
   assert.equal(gitAsksKey(asks), gitAsksKey([...asks].reverse()));
 });
 
-test("git leído: por host/id; lo que no se pudo releer queda viejo, no se borra", () => {
-  const one = withGitAnswer({}, "vm", { a: git(), junk: 3 });
-  assert.deepEqual(Object.keys(one), ["vm/a"]);
-  assert.equal(withGitAnswer(one, "vm", { a: git() }), one, "lo mismo no cambia el libro");
-  const unknown = withGitAnswer(one, "vm", { a: { ...git(), kind: "unknown", pull: null } });
-  assert.equal(unknown["vm/a"].stale, true);
-  assert.equal(unknown["vm/a"].pull?.number, 7);
-  const off = staleGit(one, "vm", ["a", "zz"]);
-  assert.equal(off["vm/a"].stale, true);
-  assert.equal(cardPull(off["vm/a"])?.tone, "muted");
-  assert.equal(staleGit(off, "vm", ["a"]), off);
+test("git leído: por máquina, workspace, carpeta e id; lo que no se pudo releer queda viejo, no se borra", () => {
+  const one = withGitAnswer({}, scope, { a: git(), junk: 3 });
+  assert.deepEqual(Object.keys(one), [gitBookKey(scope, "a")]);
+  assert.equal(withGitAnswer(one, scope, { a: git() }), one, "lo mismo no cambia el libro");
+  const unknown = withGitAnswer(one, scope, { a: { ...git(), kind: "unknown", pull: null } });
+  assert.equal(unknown[gitBookKey(scope, "a")].stale, true);
+  assert.equal(unknown[gitBookKey(scope, "a")].pull?.number, 7);
+  const off = staleGit(one, scope, ["a", "zz"]);
+  assert.equal(off[gitBookKey(scope, "a")].stale, true);
+  assert.equal(cardPull(off[gitBookKey(scope, "a")])?.tone, "muted");
+  assert.equal(staleGit(off, scope, ["a"]), off);
 });
 
 test("una rama compartida se resuelve dentro de la máquina y workspace elegidos", () => {
-  const child = { host: "mac", workspace: "w", id: "child", parent: "parent", subagent: "a" };
-  const parent = { host: "mac", workspace: "w", id: "parent" };
+  const child = { host: "mac", workspace: "w", folder: "p", id: "child", parent: "parent", subagent: "a" };
+  const parent = { host: "mac", workspace: "w", folder: "p", id: "parent" };
   const own = git({ shared_with: "parent", pull: null });
   const merged = git({ pull: { number: 8, state: "merged", head_sha: "abc" } });
-  const book = { "mac/child": own, "mac/parent": merged, "vm/parent": git() };
+  const book = withGitAnswer({}, { ...scope, host: "mac" }, { child: own, parent: merged });
   assert.equal(effectiveGit(book, child, [child, parent]).pull?.state, "merged");
   assert.equal(effectiveGit(book, child, [child, { ...parent, host: "vm" }]).pull, null);
   assert.equal(effectiveGit(book, child, [child, { ...parent, workspace: "other" }]).pull, null);
+  assert.equal(effectiveGit(book, child, [child, { ...parent, folder: "other" }]).pull, null);
   assert.equal(effectiveGit({}, child, [child]).stale, true);
+});
+
+test("work grouping and repeated view toggles preserve the Git request identity", async () => {
+  const { applySidebarView, DEFAULT_SIDEBAR_VIEW, workStateOf } = await import("@terminus/tasks");
+  const candidates = [
+    { id: "a", host: "mac", workspace: "w", folder: "p", esperando: false },
+    { id: "b", host: "mac", workspace: "w", folder: "p", esperando: false },
+  ];
+  let book = withGitAnswer({}, { host: "mac", workspace: "w", folder: "p" }, {
+    a: git({ kind: "branch", pull: { number: 1, state: "open", head_sha: "abc" } }),
+    b: git({ kind: "kn", kn: "draft" }),
+  });
+  const key = gitAsksKey(gitAsks(candidates));
+  for (const group of ["folder", "status", "none", "agent", "machine", "status"] as const) {
+    const groups = applySidebarView(candidates, { ...DEFAULT_SIDEBAR_VIEW, group }, {
+      live: [], approving: [], workStateOf: task => workStateOf(effectiveGit(book, task, candidates)),
+    });
+    assert.equal(gitAsksKey(gitAsks(groups.flatMap(group => group.tasks))), key);
+    assert.equal(gitAsksKey(gitAsks(candidates)), key);
+    book = withGitAnswer(book, { host: "mac", workspace: "w", folder: "p" }, { a: git({ kind: "kn", kn: "saved" }) });
+  }
+});
+
+test("Git observations from another workspace or folder cannot overwrite the same task id", () => {
+  const a = { host: "mac", workspace: "w", folder: "p", id: "a" };
+  const other = { ...a, workspace: "other" };
+  const third = { ...a, folder: "other" };
+  let book = withGitAnswer({}, a, { a: git({ kind: "kn", kn: "saved" }) });
+  book = withGitAnswer(book, other, { a: git({ kind: "kn", kn: "draft" }) });
+  book = withGitAnswer(book, third, { a: git({ kind: "branch" }) });
+  assert.equal(effectiveGit(book, a, [a, other, third]).kn, "saved");
+  assert.equal(effectiveGit(book, other, [a, other, third]).kn, "draft");
+  assert.equal(effectiveGit(book, third, [a, other, third]).kind, "branch");
+  book = staleGit(book, other, ["a"]);
+  assert.equal(effectiveGit(book, other, [other]).stale, true);
+  assert.equal(effectiveGit(book, a, [a]).stale, false);
 });
