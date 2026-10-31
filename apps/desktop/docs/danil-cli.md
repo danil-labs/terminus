@@ -1,7 +1,7 @@
 # CLI de Danil
 
 `danil` es el comando principal. `dn` es la abreviación oficial del mismo CLI.
-`terminus` se conserva por compatibilidad. Los launchers reenvían argumentos,
+Son los únicos nombres operativos instalables. Los launchers reenvían argumentos,
 entrada, salida, señales y código de salida al ejecutable seleccionado.
 No crean otro motor ni otro almacén de datos.
 
@@ -40,29 +40,40 @@ Para retirar únicamente los launchers propios, usa `uninstall --bin-dir
 <directorio-absoluto-canónico>`, con `--dry-run` si quieres inspeccionar primero.
 No retira el ejecutable ni modifica datos o credenciales.
 
-`npx @danil-labs/terminus`, `terminus` y `danil-terminus` del paquete npm son
-instaladores de la app. No instales ese paquete globalmente para obtener el
-CLI operativo: su bin `terminus` puede ocultar el CLI que ya tienes.
+`npx @danil-labs/terminus` resuelve el único bin del paquete,
+`danil-terminus`, que instala la app. El paquete no expone un bin `terminus`
+ni instala el CLI operativo. Las versiones ya publicadas no cambian con esta
+implementación local.
 
 ## Compatibilidad e integración del motor
 
 La ventana conserva `productName: Terminus`, el binario físico `terminus`,
 `ai.danil.terminus`, llavero, `engine.json`, candados, pubkey, updater y nombres
-de descarga. Cambiar la marca visible no mueve datos ni instala otra app.
+de descarga. Su forwarding es un mecanismo interno de distribución: no se
+instala ni anuncia ese ejecutable físico como tercer comando operativo.
+El binario físico del motor también permanece en su directorio privado.
+Los instaladores del host no deben añadir un wrapper `seldon-runtime` al PATH;
+la conexión conserva la sintaxis existente mediante `danil danil connect`.
+Con una instalación en una ruta personalizada, pasa `--data` con la carpeta
+de datos que muestra el instalador. Este helper no selecciona perfiles de
+`engine.json`.
+Cambiar la marca visible no mueve datos ni instala otra app.
 Los paquetes internos `@terminus/*` también conservan sus nombres.
 
 Se conservan los enlaces `terminus://task`, el historial `::terminus-visual`,
 RPC, headers y selectores, storage móvil, esquema `terminus-mobile` y rutas
 `/terminus`. Las referencias a Terminus 0.2.74 identifican la versión anterior.
 
-La autoridad del contexto es el motor/CLI, no el launcher. La implementación local del
-motor/CLI (`feat/danil-cli-compatible`, `36cd8661`) acepta `DANIL_CONNECTION`, `DANIL_WORKSPACE`, `DANIL_FOLDER`,
-`DANIL_TASK`, `DANIL_PROFILE` y `DANIL_CLI` junto a sus equivalentes `TERMINUS_*`,
-emite ambas familias y rechaza selectores contradictorios. Una carpeta vacía
-es distinta de una variable ausente. Las banderas explícitas conservan prioridad.
+La autoridad del contexto es el motor/CLI, no el launcher. El alcance autorizado
+para el motor usa exclusivamente `DANIL_CONNECTION`, `DANIL_WORKSPACE`,
+`DANIL_FOLDER`, `DANIL_TASK`, `DANIL_PROFILE`, `DANIL_CLI` y
+`DANIL_CREDENTIAL`. El contexto antiguo `TERMINUS_*` se rechaza explícitamente,
+incluso al combinarlo con banderas, para impedir que una tarea pierda su caller
+y se ejecute como persona. Una carpeta vacía es distinta de una variable ausente.
+El entorno de los procesos nuevos debe filtrar también los nombres antiguos.
 
 **El motor fijado por este cliente sigue siendo `9bd80c15`.** Los launchers
-ya funcionan con él, pero ese pin todavía no acredita los nuevos alias de
+ya funcionan con él, pero ese pin todavía no acredita la interfaz exclusiva de
 entorno, ayuda ni launchers de agentes del motor en desarrollo. La integración
 requiere revisar el commit del motor y disponer de manifiesto y checksums de
 las cuatro plataformas, además de comprobar la compatibilidad con el contrato
@@ -73,9 +84,12 @@ no modifica ninguno de esos contratos, publica artefactos ni cambia el pin.
 ## Evidencia y límites
 
 Las pruebas del instalador usan directorios temporales y ejecutan su código
-real. El E2E local del motor pasó 32 comprobaciones con un motor aislado y
-un agente sintético; no integra ese motor en la ventana distribuida. El forwarding se comprueba en `tests/unit/cli-forward.test.mjs`.
+real. `cli-path` pasó 6/6 y `cli-forward` 2/2 en Linux; este último comprobó
+26 órdenes raíz del motor fijado y su checksum. La resolución local de npx
+con el paquete de un solo bin mostró la ayuda del instalador sin instalar la app.
 `pnpm verify` incluye ambas pruebas; `--no-cargo` no acredita Rust.
+La evidencia del motor de compatibilidad anterior no acredita la nueva interfaz
+exclusiva. Esta fase requiere sus propias pruebas de autoridad y aislamiento.
 Los nombres Windows se comprueban también desde Linux, pero cmd, PowerShell y
 Git Bash requieren ejecución nativa. Actualización instalada, firma y reemplazo
 de ejecutables en uso requieren su propio recorrido. No se deducen de guards

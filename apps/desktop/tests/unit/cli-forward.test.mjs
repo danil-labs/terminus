@@ -7,7 +7,7 @@ import { dirname, join, relative, resolve } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
-const main = process.env.TERMINUS_CLI_TEST_MAIN ?? fileURLToPath(new URL("../../src-tauri/src/main.rs", import.meta.url));
+const main = process.env.DANIL_CLI_TEST_MAIN ?? fileURLToPath(new URL("../../src-tauri/src/main.rs", import.meta.url));
 const windows = process.platform === "win32";
 const triple = { win32: "x86_64-pc-windows-msvc", darwin: `${process.arch === "arm64" ? "aarch64" : "x86_64"}-apple-darwin`, linux: "x86_64-unknown-linux-gnu" }[process.platform];
 const sidecar = fileURLToPath(new URL(`../../src-tauri/binaries/seldon-runtime-${triple}${windows ? ".exe" : ""}`, import.meta.url));
@@ -37,7 +37,7 @@ fn check_console() {
     #[link(name="kernel32")] extern "system" { fn GetConsoleWindow() -> *mut std::ffi::c_void; }
     let present = !unsafe { GetConsoleWindow() }.is_null();
     if std::env::args().any(|arg| arg == "--probe") { println!("{present}"); std::process::exit(0); }
-    let expected = std::env::var("TERMINUS_CLI_TEST_INTERACTIVE").as_deref() == Ok("1");
+    let expected = std::env::var("DANIL_CLI_TEST_INTERACTIVE").as_deref() == Ok("1");
     if present != expected { eprintln!("unexpected console: {present}"); std::process::exit(99); }
 }
 fn main() {
@@ -62,7 +62,7 @@ fn main() {
       const pe = readFileSync(binary);
       const optionalHeader = pe.readUInt32LE(0x3c) + 24;
       assert.equal(pe.readUInt16LE(optionalHeader + 68), 2, "el wrapper debe ser un PE de subsistema Windows");
-      if (process.env.TERMINUS_CLI_TEST_INTERACTIVE === "1") {
+      if (process.env.DANIL_CLI_TEST_INTERACTIVE === "1") {
         assert.equal(execFileSync(engine, ["--probe"], { encoding: "utf8" }).trim(), "true", "el padre debe tener consola real");
         assert.equal(run(["task", "--interactive"], { stdio: "inherit" }).status, 23);
       }

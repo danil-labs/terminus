@@ -112,7 +112,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   try {
     const args = process.argv.slice(2);
     if (args.includes("--help")) {
-      console.log("Danil CLI launchers (same operational CLI as terminus)\nnode scripts/cli-path.mjs install --target ABSOLUTE_EXECUTABLE --bin-dir ABSOLUTE_DIRECTORY [--dry-run]\nnode scripts/cli-path.mjs uninstall --bin-dir ABSOLUTE_DIRECTORY [--dry-run]\nChecks danil/dn PATH collisions. Never edits shell profiles or installs the desktop app.");
+      console.log("Danil CLI launchers (danil and dn)\nnode scripts/cli-path.mjs install --target ABSOLUTE_EXECUTABLE --bin-dir ABSOLUTE_DIRECTORY [--dry-run]\nnode scripts/cli-path.mjs uninstall --bin-dir ABSOLUTE_DIRECTORY [--dry-run]\nChecks danil/dn PATH collisions. Never edits shell profiles or installs the desktop app.");
     } else {
       const action = args.shift();
       const options = { action };

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -21,6 +21,7 @@ test("launchers preserve args, pipes and exit code; reinstall, retarget and unin
   configure({ ...config, dryRun: true });
   assert.equal(existsSync(binDir), false);
   configure(config);
+  assert.deepEqual(readdirSync(binDir).sort(), process.platform === "win32" ? ["danil", "danil.cmd", "dn", "dn.cmd"] : ["danil", "dn"]);
   const before = readFileSync(join(binDir, "danil"), "utf8");
   configure(config);
   assert.equal(readFileSync(join(binDir, "danil"), "utf8"), before);

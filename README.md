@@ -49,9 +49,10 @@ app uses to update itself. Its code is in [`apps/desktop/npx/`](apps/desktop/npx
 
 ## Operational CLI
 
-`danil` is the primary command; `dn` is its official abbreviation. Both run
-the same operational CLI as the compatible `terminus` command. The npm
-command above installs the desktop app; it is not the operational CLI.
+`danil` is the primary command; `dn` is its official abbreviation. These are
+the only operational command names. The physical desktop executable keeps its
+distribution identity and forwards CLI calls internally. The npm command above
+installs the desktop app; it is not the operational CLI.
 See [CLI installation and compatibility](apps/desktop/docs/danil-cli.md)
 for explicit launcher installation, collision checks and engine dependencies.
 
