@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { chmodSync, closeSync, existsSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
-import { delimiter, dirname, isAbsolute, join, resolve } from "node:path";
+import { delimiter, dirname, extname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const MARK = "danil-cli-launcher:v1 ";
@@ -39,7 +39,7 @@ function existing(path) {
   }
 }
 
-export function configure({ action, target, binDir, pathValue = process.env.PATH ?? "", platform = process.platform, dryRun = false }) {
+export function configure({ action, target, binDir, pathValue = process.env.PATH ?? "", platform = process.platform, pathExt = process.env.PATHEXT ?? ".COM;.EXE;.BAT;.CMD;.VBS;.VBE;.JS;.JSE;.WSF;.WSH;.MSC", dryRun = false }) {
   if (!["install", "uninstall"].includes(action)) throw new Error("Expected install or uninstall");
   if (!isAbsolute(binDir)) throw new Error("--bin-dir must be absolute");
   const directory = resolve(binDir);
@@ -62,12 +62,15 @@ export function configure({ action, target, binDir, pathValue = process.env.PATH
   });
   if (action === "install") {
     const separator = platform === "win32" ? ";" : delimiter;
-    const dirs = new Set([directory, ...pathValue.split(separator).filter((part) => platform !== "win32" || part).map((part) => resolve(part || process.cwd()))]);
+    const extensions = new Set([...pathExt.toLowerCase().split(";"), ".ps1"]);
+    const dirs = new Set([directory, ...(platform === "win32" ? [process.cwd()] : []), ...pathValue.split(separator).filter((part) => platform !== "win32" || part).map((part) => resolve(part || process.cwd()))]);
     for (const dir of dirs) {
       let names;
       try { names = readdirSync(dir); } catch (error) { if (error.code === "ENOENT") continue; throw error; }
       for (const name of names) {
-        const base = platform === "win32" ? name.toLowerCase().replace(/\.(exe|com|bat|cmd|ps1)$/i, "") : name;
+        const lower = name.toLowerCase();
+        const extension = extname(lower);
+        const base = platform === "win32" ? (extensions.has(extension) ? lower.slice(0, -extension.length) : lower) : name;
         if (!NAMES.includes(base)) continue;
         const path = join(dir, name);
         const expected = changes.find((change) => change.path === path);

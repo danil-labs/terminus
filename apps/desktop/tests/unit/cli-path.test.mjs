@@ -68,6 +68,10 @@ test("PATH collisions, including Windows extensions and case, prevent installati
   writeFileSync(join(dir, "Dn.EXE"), "foreign");
   assert.throws(() => configure({ action: "install", target: process.execPath, binDir, pathValue, platform: "win32" }), /PATH collision/);
   assert.equal(existsSync(binDir), false);
+  rmSync(join(dir, "Dn.EXE"));
+  writeFileSync(join(dir, "dn.custom"), "foreign");
+  assert.throws(() => configure({ action: "install", target: process.execPath, binDir, pathValue, platform: "win32", pathExt: ".EXE;.CUSTOM" }), /PATH collision/);
+  assert.equal(existsSync(binDir), false);
 });
 
 test("modified managed content is foreign; launcher metadata alone proves no ownership", (t) => {
