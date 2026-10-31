@@ -620,6 +620,7 @@ export default function Sessions(props: {
   const activas = createMemo<RamaDeTareas<SessionRow>[]>((previas) => props.flat || props.sidebar
     ? filteredSessions().map(tarea => ({ tarea, hijas: [] }))
     : taskTree(filteredSessions(), props.includeArchived ? null : false, previas, props.groupByHandler === true));
+  const hayMaquinas = createMemo(() => !props.hideMachine && props.sessions.some((row) => !!row.machine));
   const hideFolder = (row: SessionRow) => props.hideFolder && (props.folderGroup === undefined || projectOf(row) === props.folderGroup);
   const destinosDe = (row: SessionRow) => props.destinosDe?.(row) ?? props.destinos;
   const fijada = (row: SessionRow) => row.pinned ?? (row.chat_de_agente || row.inbox === true);
@@ -730,25 +731,31 @@ export default function Sessions(props: {
             provisional={esProvisional(r.s.id)} archivada={!!r.s.archived} />
         </span>
       </div>
-      <div data-session-preview class={cn("task-card-metadata text-xs font-normal leading-4 text-neutral-500", r.apagada && "opacity-80 group-hover/session:opacity-100")}>
+      <div data-session-preview data-no-folder={hideFolder(r.s) ? "" : undefined} data-no-machine={hayMaquinas() ? undefined : ""} class={cn("task-card-metadata text-xs font-normal leading-4 text-neutral-500", r.apagada && "opacity-80 group-hover/session:opacity-100")}>
         <span data-session-provider class="task-card-provider" title={tarjeta().provider ?? r.s.provider} aria-label={tarjeta().provider ?? r.s.provider}><MarcaAgente id={r.s.provider} size={13} /></span>
-        <Show when={!hideFolder(r.s) && !launcherOf(r.s) && props.carpetaDe?.(r.s)}>{folder =>
-          <FolderChip id={projectOf(r.s)} name={folder()} untitled={tarjetaDelRiel()} class="task-card-folder text-xs text-neutral-500" />
-        }</Show>
-        <Show when={!props.hideMachine && r.s.machine}>{machine => <MachineChip machine={machine()} on={r.s.machine_on !== false} class="task-card-machine" />}</Show>
-        <Show when={conGit() || abridor()}>
-          <span class="task-card-git">
-            <Show when={conGit()}><Show when={git().kind === "kn" || !conPr()} fallback={<RailPull status={git()} />}>
-              <span data-session-pr class={cn("inline-flex min-w-0 items-center gap-1", gitStyle().color)} title={sessionGitDescription(git())} aria-label={sessionGitDescription(git())}><Dynamic component={gitStyle().icon} size={12} aria-hidden="true" /><Show when={git().kind === "branch"}><span class="min-w-0 truncate">{git().branch}</span></Show></span>
-            </Show></Show>
-            <Show when={abridor()}>{who => <ChipDeCara kind="opener" icon={CornerDownRight} name={who()} tip={t("projects.sessions.opened_by", { name: nombre(who()) })} />}</Show>
+        <Show when={!hideFolder(r.s)}>
+          <span class="task-card-slot">
+            <Show when={props.carpetaDe?.(r.s)}>{folder =>
+              <FolderChip id={projectOf(r.s)} name={folder()} untitled={tarjetaDelRiel()} class="min-w-0 text-xs text-neutral-500" />
+            }</Show>
           </span>
         </Show>
-        <span class="task-card-tail">
-          <Show when={r.s.deferred}><span data-deferred class="shrink-0 text-neutral-500" title={t("projects.sessions.deferred")} aria-label={t("projects.sessions.deferred")}>⧗</span></Show>
-          <span class="task-card-rocket">{r.cohete()}</span>
-          <span data-session-time class="whitespace-nowrap text-[0.71875rem] tabular-nums">{shortTaskTime(cuando())}</span>
+        <Show when={hayMaquinas()}>
+          <span class="task-card-slot">
+            <Show when={r.s.machine}>{machine => <MachineChip machine={machine()} on={r.s.machine_on !== false} class="min-w-0" />}</Show>
+          </span>
+        </Show>
+        <span class="task-card-git">
+          <Show when={conGit()}><Show when={git().kind === "kn" || !conPr()} fallback={<RailPull status={git()} />}>
+              <span data-session-pr class={cn("inline-flex min-w-0 items-center gap-1", gitStyle().color)} title={sessionGitDescription(git())} aria-label={sessionGitDescription(git())}><Dynamic component={gitStyle().icon} size={12} aria-hidden="true" /><Show when={git().kind === "branch"}><span class="min-w-0 truncate">{git().branch}</span></Show></span>
+            </Show></Show>
+          <Show when={abridor()}>{who => <ChipDeCara kind="opener" icon={CornerDownRight} name={who()} tip={t("projects.sessions.opened_by", { name: nombre(who()) })} />}</Show>
+          <span class="task-card-tail">
+            <Show when={r.s.deferred}><span data-deferred class="shrink-0 text-neutral-500" title={t("projects.sessions.deferred")} aria-label={t("projects.sessions.deferred")}>⧗</span></Show>
+            <span class="task-card-rocket">{r.cohete()}</span>
+          </span>
         </span>
+        <span data-session-time class="task-card-time text-[0.71875rem] tabular-nums">{shortTaskTime(cuando())}</span>
       </div>
     </div>;
   };
