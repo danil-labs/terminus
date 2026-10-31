@@ -922,7 +922,7 @@ if (!roto) {
   assert.equal(sidebarTask("dm").querySelector('[data-session-status] [data-session-actions]'), null,
     "el menú no ocupa la identidad fija");
   // Fijada: el alfiler va en el hueco del borde, no dentro de la tarjeta.
-  assert.ok(sidebarTask("dm").querySelector(':scope > [role="img"][aria-label="Fijada"] svg.lucide-pin'), "la fijada lleva su alfiler en el borde");
+  assert.ok(sidebarTask("dm").querySelector('[role="img"][aria-label="Fijada"] svg.tarjeta-fijada-alfiler'), "la fijada lleva su alfiler en el borde");
   assert.ok(sidebarTask("dm").className.includes("tarjeta-fijada"), "la fijada dibuja su borde con ::after");
   assert.equal(sidebarTask("dm").querySelector('[data-session-preview] [aria-label="Fijada"]'), null);
   openPinnedTaskMenu("dm");
@@ -934,7 +934,7 @@ if (!roto) {
   await sleep(150);
   assert.deepEqual(pinChanges.at(-1), { project: "p", id: "dm", pinned: false });
   assert.equal(sidebarTask("dm")?.dataset.pinned, undefined);
-  assert.equal(sidebarTask("dm").querySelector(':scope > [role="img"][aria-label="Fijada"]'), null, "sin fijar no queda alfiler");
+  assert.equal(sidebarTask("dm").querySelector('[role="img"][aria-label="Fijada"]:has(svg.tarjeta-fijada-alfiler)'), null, "sin fijar no queda alfiler");
   await closeMenu();
   openPinnedTaskMenu("dm");
   await sleep(50);
@@ -969,11 +969,11 @@ if (!roto) {
   const previewOfCoordinator = () => sidebarTask("topic").querySelector("[data-session-status]");
   threadApp.emit("chat", { kind: "started", session: "topic-work", workspace: "w" });
   await sleep(100);
-  assert.equal(previewOfCoordinator().querySelectorAll('[aria-label="Está trabajando"]').length, 1,
+  assert.equal(previewOfCoordinator().querySelectorAll('[aria-label$="Está trabajando"]').length, 1,
     "el coordinador conserva un foco de actividad cuando solo trabaja su subtarea");
   threadApp.emit("chat", { kind: "started", session: "topic", workspace: "w" });
   await sleep(100);
-  assert.equal(previewOfCoordinator().querySelectorAll('[aria-label="Está trabajando"]').length, 1,
+  assert.equal(previewOfCoordinator().querySelectorAll('[aria-label$="Está trabajando"]').length, 1,
     "un solo estado ocupa su columna, sin contador de subtareas");
   assert.equal(sidebarTask("topic").querySelectorAll("[data-session-status]").length, 1, "el estado ocupa una sola ranura");
   assert.equal(previewOfCoordinator().querySelectorAll("[data-task-orbit]").length, 1, "la ranura lleva una sola órbita");
@@ -981,11 +981,11 @@ if (!roto) {
   assert.equal(previewOfCoordinator().textContent.trim(), "", "la ranura no añade un contador de subtareas");
   threadApp.emit("chat", { kind: "done", session: "topic", workspace: "w", ok: true });
   await sleep(200);
-  assert.equal(previewOfCoordinator().querySelectorAll('[aria-label="Está trabajando"]').length, 1,
+  assert.equal(previewOfCoordinator().querySelectorAll('[aria-label$="Está trabajando"]').length, 1,
     "terminar el turno principal conserva la actividad delegada");
   threadApp.emit("chat", { kind: "done", session: "topic-work", workspace: "w", ok: true });
   await sleep(200);
-  assert.equal(previewOfCoordinator().querySelectorAll('[aria-label="Está trabajando"]').length, 0,
+  assert.equal(previewOfCoordinator().querySelectorAll('[aria-label$="Está trabajando"]').length, 0,
     "el foco de actividad se apaga al terminar la última subtarea");
   const toolbarButtons = [...delegatedToolbar.parentElement.querySelectorAll("button")];
   assert.deepEqual(toolbarButtons.map(button => button.getAttribute("aria-label")), [
@@ -2131,7 +2131,7 @@ if (!roto) {
   assert.equal(taskEditor.value, "Borrador de tarea");
   assert.equal(taskEditor.selectionStart, 2);
   assert.equal(taskEditor.selectionEnd, 5);
-  assert.ok(controlsDoc.querySelector('[data-sesion="recent"] [data-session-status] [aria-label="Está trabajando"]'), "la fila se actualiza sin recrear su editor");
+  assert.ok(controlsDoc.querySelector('[data-sesion="recent"] [data-session-status] [aria-label$="Está trabajando"]'), "la fila se actualiza sin recrear su editor");
   assert.deepEqual(taskRenames, [], "refrescar no guarda un nombre a medio escribir");
   taskEditor.dispatchEvent(new sidebarControls.w.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
   assert.deepEqual(taskRenames, [], "Escape descarta el borrador aunque el agente esté trabajando");
@@ -2447,18 +2447,18 @@ if (!roto) {
   finishPendingTurn("s1");
   await sleep(80);
   const hiddenRow = () => pendingDoc.querySelector('[data-sesion="s1"]');
-  assert.ok(hiddenRow().querySelector('[aria-label="Está trabajando"]'));
+  assert.ok(hiddenRow().querySelector('[aria-label$="Está trabajando"]'));
   pendingTurnApp.emit("chat", { kind: "delta", session: "s1", workspace: "w", text: "Respuesta parcial" });
   pendingTurnApp.w.dispatchEvent(new pendingTurnApp.w.Event("focus"));
   await sleep(80);
-  assert.ok(hiddenRow().querySelector('[aria-label="Está trabajando"]'), "streaming and reconciliation preserve activity in a hidden task");
+  assert.ok(hiddenRow().querySelector('[aria-label$="Está trabajando"]'), "streaming and reconciliation preserve activity in a hidden task");
   hiddenTurnOutcome = "delivered";
   registeredTurns = [];
   pendingTurnApp.w.dispatchEvent(new pendingTurnApp.w.Event("focus"));
   await sleep(80);
   // Entregada y vista, la tarea se queda donde estaba, entre las «Tareas».
   assert.equal(pendingDoc.querySelector('[data-sidebar-section="settled"]'), null, "no hay sección «Asentadas»");
-  assert.equal(hiddenRow().querySelector('[aria-label="Está trabajando"]'), null);
+  assert.equal(hiddenRow().querySelector('[aria-label$="Está trabajando"]'), null);
   // En la tarjeta del riel una entregada no lleva ícono: vista se apaga, sin ver lleva el punto verde.
   assert.ok(hiddenRow().dataset.apagada === "true" || hiddenRow().querySelector('[aria-label="Terminó y no la has abierto"]'), "recovering a missed done refreshes the hidden task result");
   assert.deepEqual(pendingTurnApp.fallos, []);
