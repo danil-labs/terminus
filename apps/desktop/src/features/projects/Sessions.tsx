@@ -363,6 +363,8 @@ export default function Sessions(props: {
   hideFolder?: boolean;
   /** Bajo su cabecera de máquina, se omite la sección completa. */
   hideMachine?: boolean;
+  /** El riel mantiene los intereses Git por carpeta antes de repartir sus grupos. */
+  gitManaged?: boolean;
   /**
    * La tarjeta del riel fuera del riel (las delegadas): su fila y su tarjeta
    * flotante, sin lo que el riel hace con la lista.
@@ -531,6 +533,7 @@ export default function Sessions(props: {
       filas().map(s => [s.id, s.updated_at]), props.vivas, props.current,
     ]));
     createEffect(on(gitInput, () => {
+      if (props.gitManaged) return;
       watcher.prioritize([...(props.current ? [props.current] : []), ...props.vivas, ...filas().map(s => s.id)]);
       watcher.refresh();
     }));

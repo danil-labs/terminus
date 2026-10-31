@@ -29,7 +29,7 @@ import { watchHandlerStatuses } from "../projects/handlerPresence";
 import type { ModelChoices } from "../projects/NewAgent";
 import { watchProfiles } from "../projects/profiles";
 import Sessions, { type SessionRow } from "../projects/Sessions";
-import { effectiveTaskGit, observedSessionGit } from "../projects/taskGit";
+import { effectiveTaskGit, watchSessionGit } from "../projects/taskGit";
 import type { Etapa } from "../projects/TaskStage";
 import {
   agentOptions,
@@ -252,6 +252,25 @@ export default function Sidebar(props: {
     const carpetas = v.folders.filter((f) => (cuentas().get(f) ?? 0) > 0);
     return carpetas.length === v.folders.length ? v : { ...v, folders: carpetas };
   });
+  const gitCandidates = createMemo(() => applySidebarView(todas().map(task => task.row), { ...vistaEfectiva(), group: "none" }, {
+    live: [], approving: [], folderOf: row => carpetaDe(row.id),
+  })[0].tasks);
+  const gitFolders = createMemo(() => [...new Set(gitCandidates().map(row => carpetaDe(row.id)))].sort(), [], {
+    equals: (a, b) => a.length === b.length && a.every((project, i) => project === b[i]),
+  });
+  const gitObservers = createMemo(mapArray(gitFolders, project => {
+    const watcher = watchSessionGit(project);
+    const input = createMemo(() => JSON.stringify([
+      gitCandidates().filter(row => carpetaDe(row.id) === project).map(row => [row.id, row.updated_at]), props.vivas, props.current,
+    ]));
+    createEffect(on(input, () => {
+      watcher.prioritize([...(props.current ? [props.current] : []), ...props.vivas,
+        ...gitCandidates().filter(row => carpetaDe(row.id) === project).map(row => row.id)]);
+      watcher.refresh();
+    }));
+    onCleanup(watcher.release);
+    return { project, rows: watcher.rows };
+  }));
   const grupos = createMemo(() => {
     const todosLosGrupos = applySidebarView(todas().map((x) => x.row), vistaEfectiva(), {
       live: props.vivas,
@@ -259,10 +278,9 @@ export default function Sidebar(props: {
       folderOf: (row) => carpetaDe(row.id),
       workStateOf: (row) => {
         const project = carpetaDe(row.id);
-        if (row.machine && !row.workspace) return "unknown";
         const candidates = relacionadas().filter(other => carpetaDe(other.id) === project
-          && other.workspace === row.workspace && other.machine === row.machine);
-        const rows = observedSessionGit(project, row.machine ? { workspace: row.workspace!, machine: row.machine } : undefined);
+          && (other.machine ?? "") === (row.machine ?? ""));
+        const rows = gitObservers().find(observer => observer.project === project)?.rows() ?? {};
         return workStateOf(effectiveTaskGit(row, rows, candidates));
       },
     });
@@ -383,7 +401,7 @@ export default function Sidebar(props: {
    * nodo del DOM y colocarlo dos veces lo movería del primero al segundo.
    */
   const Historial = (p: { filas: SessionRow[]; sinCarpeta?: boolean; sinMaquina?: boolean }) => (
-    <Sessions sidebar
+    <Sessions sidebar gitManaged
       draggedTask={props.draggedTask}
       hideFolder={p.sinCarpeta}
       hideMachine={p.sinMaquina}

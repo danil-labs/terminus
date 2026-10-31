@@ -27,26 +27,6 @@ type Entry = {
   interests: Map<symbol, string[]>;
 };
 const projects = new Map<string, Entry>();
-const observations = new Map<string, Accessor<Record<string, GitStatus>>>();
-const [observationRevision, setObservationRevision] = createSignal(0);
-let observationWindow: Window | undefined;
-function observeWorkspace() {
-  if (observationWindow === window) return;
-  observationWindow = window;
-  window.addEventListener("harness:workspace", () => {
-    observations.clear();
-    for (const [key, entry] of projects) observations.set(key, entry.rows);
-    setObservationRevision(value => value + 1);
-  });
-}
-const observationKey = (project: string, routing?: { workspace: string; machine?: string }) =>
-  routing?.machine ? JSON.stringify([routing.workspace, routing.machine, project]) : project;
-
-/** Lee el observador existente; agrupar nunca abre otra consulta ni otro temporizador. */
-export function observedSessionGit(project: string, routing?: { workspace: string; machine?: string }): Record<string, GitStatus> {
-  observationRevision();
-  return observations.get(observationKey(project, routing))?.() ?? {};
-}
 // Cerrar una ventana desmonta la tira y el riel antes de montar los nuevos: el
 // observador muere entre medias y el que nace hereda lo visto, no un registro vacío.
 const parked = new Map<string, { rows: Record<string, GitStatus>; forget: () => void }>();
@@ -58,13 +38,7 @@ function park(project: string, rows: Record<string, GitStatus>) {
     target.removeEventListener("harness:workspace", forget);
     if (parked.get(project)?.rows === rows) parked.delete(project);
   };
-  const timer = setTimeout(() => {
-    forget();
-    if (!projects.has(project)) {
-      observations.delete(project);
-      setObservationRevision(value => value + 1);
-    }
-  }, 3_000);
+  const timer = setTimeout(forget, 3_000);
   target.addEventListener("harness:workspace", forget);
   parked.set(project, { rows, forget });
 }
@@ -95,8 +69,7 @@ function drainRemote() {
 }
 
 export function watchSessionGit(project: string, routing?: { workspace: string; machine?: string }) {
-  observeWorkspace();
-  const key = observationKey(project, routing);
+  const key = routing?.machine ? JSON.stringify([routing.workspace, routing.machine, project]) : project;
   const options = routing?.machine ? { headers: { "x-terminus-workspace": routing.workspace, "x-terminus-machine": routing.machine } } : undefined;
   let entry = projects.get(key);
   if (!entry) {
@@ -212,8 +185,6 @@ export function watchSessionGit(project: string, routing?: { workspace: string; 
       document.removeEventListener("visibilitychange", visible);
     } };
     projects.set(key, entry);
-    observations.set(key, entry.rows);
-    setObservationRevision(value => value + 1);
     entry.refresh();
   }
   const token = Symbol();
