@@ -681,9 +681,9 @@ export default function Sessions(props: {
 
   /**
    * La tarjeta del riel y de las delegadas: 52 px y siempre dos líneas. Línea 1:
-   * el título y el hueco del estado, que al pasar el puntero es el menú. Línea 2:
+   * el título, el cohete y el hueco del estado, que al pasar el puntero es el menú. Línea 2:
    * agente, proveedor, carpeta (solo raíz y sin agrupar por carpeta), PR, subtareas,
-   * borrador, quién la abrió, de quién la heredó, el cohete y la hora. Nada de lo
+   * borrador, quién la abrió, de quién la heredó y la hora. Nada de lo
    * que la tarea pide; lo demás vive en la tarjeta flotante.
    */
   const FilaDelRiel = (r: {
@@ -719,6 +719,7 @@ export default function Sessions(props: {
       <>
         <div class="flex h-[18px] min-w-0 items-center gap-1.5">
           <div class="min-w-0 flex-1">{r.titulo}</div>
+          {r.cohete()}
           <span class="relative flex h-5 min-w-[22px] shrink-0 items-center justify-end">
             <span
               data-session-status
@@ -795,7 +796,6 @@ export default function Sessions(props: {
           </Show>
           <span class="min-w-1 flex-1" />
           <span class="flex shrink-0 items-center gap-[5px]">
-            {r.cohete()}
             <span data-session-time class="whitespace-nowrap text-[0.71875rem] tabular-nums">{shortTaskTime(cuando())}</span>
           </span>
         </div>
@@ -872,10 +872,11 @@ export default function Sessions(props: {
       <Show
         when={renombrando() === f.s.id}
         fallback={
-          // El cohete es absoluto: sin este hueco el título se mete debajo. Por
+          // Fuera del riel el cohete es absoluto: el título reserva su hueco. Por
           // `:has`, no por clase reactiva: cada fila mutaría al llegar git.
           <div class={cn(
-            "flex min-w-0 items-center gap-1 text-ui leading-[1.35] [:has(>[data-finish-slot])_&]:pr-16",
+            "flex min-w-0 items-center gap-1 text-ui leading-[1.35]",
+            !tarjetaDelRiel() && "[:has(>[data-finish-slot])_&]:pr-16",
             // La tarjeta del riel: 13,5 px en su línea de 18, sin chincheta ni «Contexto».
             tarjetaDelRiel() && "text-[0.84375rem] leading-[18px]",
             apagada() && "text-neutral-500 group-hover/session:text-neutral-950",
