@@ -353,5 +353,10 @@
   "web.service.demo_prices": "Lista de precios",
   "web.service.unresolved": "Este workspace no tiene atención a clientes.",
   "web.service.unresolved_hint": "Para operar otro workspace, entra a ese workspace.",
-  "web.service.edit_hint": "Para conectar o editar, abre Danil Agents."
+  "web.service.edit_hint": "Para conectar o editar, abre Danil Agents.",
+  "web.auth.request_access": "Solicitar acceso",
+  "web.auth.access_subject": "Solicitar acceso a Danil",
+  "web.auth.access_hint": "¿Todavía no tienes acceso a Danil? Escríbenos para solicitarlo.",
+  "web.auth.access_email_hint": "Se abrirá tu aplicación de correo. Si no se abre, copia esta dirección:",
+  "web.auth.access_required": "Necesitas acceso autorizado a Danil. Puedes solicitarlo por correo."
 }
