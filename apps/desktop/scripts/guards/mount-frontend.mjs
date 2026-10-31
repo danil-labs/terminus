@@ -914,11 +914,13 @@ if (!roto) {
     threadDoc.dispatchEvent(new threadApp.w.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     await sleep(50);
   };
-  // La tarjeta del riel no lleva botón de fijar ni capa de acciones: el menú sale del hueco del estado.
+  // El menú conserva su propio hueco y no sustituye la identidad de la tarjeta.
   assert.equal(sidebarTask("dm").querySelector("[data-session-pin]"), null, "fijar no tiene botón propio en la tarjeta");
   assert.equal(sidebarTask("dm").querySelector(".bg-linear-to-l"), null, "la tarjeta no lleva el velo degradado de las acciones");
-  assert.ok(sidebarTask("dm").querySelector('[data-session-status] + [data-session-actions] button[aria-haspopup="menu"]'),
-    "el menú ocupa el hueco del estado, a la derecha del título");
+  assert.ok(sidebarTask("dm").querySelector('[data-session-actions] button[aria-haspopup="menu"]'),
+    "el menú permanece disponible junto al título");
+  assert.equal(sidebarTask("dm").querySelector('[data-session-status] [data-session-actions]'), null,
+    "el menú no ocupa la identidad fija");
   // Fijada: el alfiler va en el hueco del borde, no dentro de la tarjeta.
   assert.ok(sidebarTask("dm").querySelector(':scope > [role="img"][aria-label="Fijada"] svg.lucide-pin'), "la fijada lleva su alfiler en el borde");
   assert.ok(sidebarTask("dm").className.includes("tarjeta-fijada"), "la fijada dibuja su borde con ::after");
@@ -1815,9 +1817,9 @@ if (!roto) {
   assert.ok(workingDot);
   assert.ok([...workingDot.classList].every((name) => !name.includes("animate")), "the working indicator stays visible without blinking");
   assert.equal(row("p").querySelectorAll("[data-task-orbit]").length, 1, "una tarea sin encargado conserva identidad con órbita");
-  assert.equal(row("p").querySelector('[data-task-orbit] [data-session-agent]'), null, "sin encargado usa el proveedor, no una cara inventada");
-  assert.equal(row("p").querySelectorAll('[data-task-orbit] svg:not([data-spinner])').length, 1, "la marca del proveedor ocupa el centro");
-  assert.equal(row("p").querySelector('[data-session-preview] [data-session-provider]'), null, "el proveedor activo no se repite debajo");
+  assert.equal(row("p").querySelector('[data-task-orbit] [data-session-agent]'), null, "sin encargado no hay una cara inventada");
+  assert.equal(row("p").querySelectorAll('[data-task-orbit] svg:not([data-spinner])').length, 0, "sin encargado el centro queda vacío");
+  assert.equal(row("p").querySelectorAll('[data-session-preview] [data-session-provider]').length, 1, "el proveedor conserva su sección fija debajo");
   assert.equal(tab("p").querySelector("svg[data-spinner]"), null);
   sidebar.emit("question", { session: "p", workspace: "w", turno: "question-turn", preguntas: [{ id: "choose", question: "¿Qué opción?", options: [], free_text: true }] });
   await sleep(100);
