@@ -704,6 +704,7 @@ export default function Sessions(props: {
     const nombre = (agente: string) => displayName(agente, profiles()[agente]);
     // Quién la abrió, si fue otro agente: el lanzador o el encargado de la madre.
     const abridor = () => {
+      if (props.sidebar || !launcherOf(r.s)) return null;
       const quien = r.s.launcher_name ?? r.s.parent_agent;
       return quien && !sameAgent(quien, r.s.agent) ? quien : null;
     };
