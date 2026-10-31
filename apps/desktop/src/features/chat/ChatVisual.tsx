@@ -165,7 +165,7 @@ export default function ChatVisual(props: {
     setPainted(false);
     if (panel) resize(false);
     setHeight(320);
-  }));
+  }, { defer: true }));
   return (
     <div ref={container} class="group/visual relative my-4" style={{ height: expanded() ? `${height()}px` : undefined }} data-chat-visual={props.visual.file}>
       <dialog ref={panel} open aria-label={title()} data-expanded={expanded() ? "" : undefined}

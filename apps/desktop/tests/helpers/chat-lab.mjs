@@ -302,6 +302,25 @@ const cases = {
     results.push({ case: "heap-cycles", rounds, failures });
     await context.close();
   },
+  async "visual-rows"() {
+    const { page, context, failures } = await open({ turns: 120, pageTurns: 120, visuals: 8 });
+    await page.evaluate(() => {
+      window.__long = 0;
+      new PerformanceObserver((list) => { for (const entry of list.getEntries()) window.__long = Math.max(window.__long, entry.duration); }).observe({ entryTypes: ["longtask"] });
+    });
+    const box = await page.evaluate(() => document.querySelector("[data-chat-thread]").parentElement.scrollHeight);
+    let frames = 0;
+    for (let n = 0; n <= 30; n++) {
+      await wheelTo(page, box * (1 - n / 30));
+      await page.waitForTimeout(120);
+      frames = Math.max(frames, await page.evaluate(() => document.querySelectorAll("iframe").length));
+    }
+    const settle = await page.evaluate(() => window.lab.visualReads());
+    await page.waitForTimeout(1500);
+    const state = await page.evaluate(() => ({ reads: window.lab.visualReads(), longest: window.__long, frames: document.querySelectorAll("iframe").length }));
+    results.push({ case: "visual-rows", maxFrames: frames, readsAtStop: settle, ...state, failures });
+    await context.close();
+  },
   async "open-latency"() {
     const times = [];
     for (let n = 0; n < 6; n++) {

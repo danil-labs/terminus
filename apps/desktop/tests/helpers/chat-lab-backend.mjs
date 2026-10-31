@@ -1,6 +1,6 @@
 /** Se inyecta en la página antes de la app: el puente de Tauri contra un motor de mentira, con turnos deterministas. */
 export function backend(options) {
-  const { turns: count, turnBytes = 500, pageTurns = 50, latencyMs = 0, activeEveryMs = 0, failOlder = false, tasks = 1 } = options;
+  const { turns: count, turnBytes = 500, pageTurns = 50, latencyMs = 0, activeEveryMs = 0, failOlder = false, tasks = 1, visuals = 0 } = options;
   const lorem = (n, seed) => {
     const words = ["alfa", "ventana", "turno", "hilo", "motor", "tarea", "página", "medida", "ancla", "lectura"];
     let text = "";
@@ -14,7 +14,14 @@ export function backend(options) {
     : { role: "agent", id: `${id}-t${i}`, at: 1_700_000_000_000 + i * 60_000, model: "gpt-5.6",
         tools: i % 4 === 1 ? [{ name: "Read", target: `src/file${i}.ts`, ok: true }] : [],
         text: `Respuesta ${i} de ${id}. ${lorem(turnBytes * (1 + (i * 13) % 5) / 3, i)}\n\n- uno\n- dos ${i % 3 === 0 ? `\n\n\`\`\`ts\nconst a${i} = ${i};\n\`\`\`` : ""}` };
-  for (const id of taskIds) store.set(id, Array.from({ length: count }, (_, i) => turn(id, i)));
+  const withVisual = (id, i) => {
+    const row = turn(id, i);
+    if (visuals && row.role === "agent" && i % visuals === 1) row.text += `\n\n::terminus-visual{file="v${i}.html" title="Visual ${i}"}\n`;
+    return row;
+  };
+  for (const id of taskIds) store.set(id, Array.from({ length: count }, (_, i) => withVisual(id, i)));
+  const visualHtml = (file) => `<!doctype html><html><body><div style="height:${240 + (file.length * 37) % 200}px;background:#ddd">${file}</div></body></html>`;
+  let visualReads = 0;
   let writes = 1, failing = failOlder, reads = 0;
   const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
   const row = (id) => ({ id, title: `Tarea ${id}`, last_message: "", provider: "codex", model: "gpt-5.6", refs: [], updated_at: writes, turns: store.get(id).length, parent: null, esperando: false });
@@ -50,6 +57,12 @@ export function backend(options) {
     service_poll: { cursor: 0, gap: false, replay: false, runtime: "lab", reset: false },
     task_history: { history: { archived: false, events: [], recovery: null }, branch: null, path: "/lab", available: true, owned: false, restorable: false, recreatable: false, incomplete: false },
     load_session: page, load_history: page,
+    chat_visual_part: () => { throw { what: "lab", detail: "unknown_command" }; },
+    tree_show: ({ path }) => {
+      visualReads++;
+      const text = visualHtml(path);
+      return { kind: "text", text, bytes: new TextEncoder().encode(text).byteLength, truncated: false };
+    },
     load_queue: [], save_queue: null, session_usage: null, list_session_git: {},
     send_message: (a) => a.session, inject_message: null,
     check_environment: { ready: true, blocked: false, reason: null, items: [] },
@@ -89,7 +102,7 @@ export function backend(options) {
   window.lab = {
     append, heal: () => { failing = false; },
     openFirst: () => open(taskIds[0]), openOther: () => open(taskIds[1]),
-    total: () => store.get(taskIds[0]).length, reads: () => reads,
+    total: () => store.get(taskIds[0]).length, reads: () => reads, visualReads: () => visualReads,
     stream: (pieces) => {
       let n = 0;
       emit("chat", { session: taskIds[0], kind: "started", workspace: "w" });
