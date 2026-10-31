@@ -176,7 +176,8 @@ export function VirtualThread(props: {
             style={{ "margin-top": `${row()?.before ?? 0}px`, "margin-bottom": `${row()?.after ?? 0}px` }}
             ref={(element) => queueMicrotask(() => element.isConnected && virtualizer.measureElement(element))}
           >
-            <ThreadRowContext.Provider value={scope}>{props.row(key, index)}</ThreadRowContext.Provider>
+            {/* Sin rastreo: lo que lea al crearse no debe rehacer la fila, con su foco, selección e iframes. */}
+            <ThreadRowContext.Provider value={scope}>{untrack(() => props.row(key, index))}</ThreadRowContext.Provider>
           </div>
         );
   }) as unknown as Accessor<HTMLElement[]>;

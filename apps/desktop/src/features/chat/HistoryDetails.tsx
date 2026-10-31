@@ -7,6 +7,9 @@ import { t } from "../../lib/i18n";
 import { machineOf } from "../machines/store";
 import type { Session } from "./transcript";
 
+const REREADS = 5;
+const REREAD_MS = 150;
+
 /** Una sola página de contenido crudo en memoria, incluso con resultados de muchos MB. */
 export function HistoryDetails(props: { refs: HistoryRef[]; turnId?: string }) {
   const [selected, setSelected] = createSignal<HistoryRef | null>(null);
@@ -19,16 +22,24 @@ export function HistoryDetails(props: { refs: HistoryRef[]; turnId?: string }) {
   onCleanup(() => generation++);
   const close = () => { generation++; setSelected(null); setChunk(null); setOffsets([]); setLoading(false); };
   // El archivo cambió desde que llegó la referencia: se pide la del mismo turno y se empieza de nuevo.
-  async function reread(ref: HistoryRef, current: number) {
-    const fresh = await currentRef<Session["turns"][number]>(
-      (before) => invoke<Session>("load_session", { project: ref.project, id: ref.session, history_request: { version: 1, before, revision: null } }, machineOf(ref.session)),
-      ref, props.turnId,
-    );
-    if (current !== generation || !fresh || fresh.revision === ref.revision) return false;
-    void read({ ...ref, ...fresh }, 0);
-    return true;
+  async function reread(ref: HistoryRef, current: number, attempts: number) {
+    for (; attempts < REREADS; attempts++) {
+      await new Promise((done) => setTimeout(done, REREAD_MS * attempts));
+      if (current !== generation) return true;
+      const fresh = await currentRef<Session["turns"][number]>(
+        (before) => invoke<Session>("load_session", { project: ref.project, id: ref.session, history_request: { version: 1, before, revision: null } }, machineOf(ref.session)),
+        ref, props.turnId,
+      ).catch(() => undefined);
+      if (current !== generation) return true;
+      if (fresh === null) return false;
+      if (fresh) {
+        void read({ ...ref, ...fresh }, 0, false, attempts + 1);
+        return true;
+      }
+    }
+    return false;
   }
-  async function read(ref: HistoryRef, offset: number, backwards = false) {
+  async function read(ref: HistoryRef, offset: number, backwards = false, attempts = 0) {
     const current = ++generation;
     setSelected(ref); setChunk(null); setFailed(false); setLoading(true);
     try {
@@ -41,7 +52,7 @@ export function HistoryDetails(props: { refs: HistoryRef[]; turnId?: string }) {
       setChunk(page);
       if (!backwards) setOffsets(previous => offset === 0 ? [] : [...previous, offset]);
     } catch {
-      if (current === generation && !await reread(ref, current).catch(() => false) && current === generation) setFailed(true);
+      if (current === generation && !await reread(ref, current, attempts)) setFailed(true);
     }
     finally { if (current === generation) setLoading(false); }
   }

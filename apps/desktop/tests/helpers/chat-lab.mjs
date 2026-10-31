@@ -63,10 +63,10 @@ const wheelTo = (page, top) => page.evaluate(async (y) => {
 const mark = (page) => page.evaluate(() => {
   const box = document.querySelector("[data-chat-thread]").parentElement;
   const top = box.getBoundingClientRect().top;
-  const row = [...document.querySelectorAll("[data-thread-key]")].find((el) => el.getBoundingClientRect().bottom > top + 40);
+  const row = [...document.querySelector("[data-chat-thread]").children].find((el) => el.getBoundingClientRect().bottom > top + 40);
   window.__mark = row;
   row.dataset.labMark = "1";
-  return { key: row.dataset.threadKey, top: row.getBoundingClientRect().top - top };
+  return { key: row.dataset.threadKey ?? "", top: row.getBoundingClientRect().top - top };
 });
 /** Muestrea la fila marcada en cada cuadro: un salto que se corrige después también cuenta. */
 const watch = (page) => page.evaluate(() => {
@@ -204,7 +204,7 @@ const cases = {
     const { page, context, failures } = await open({ turns: 60 });
     await page.evaluate(() => window.lab.stream(40));
     await page.waitForTimeout(1200);
-    const stuck = await page.evaluate(() => { const b = document.querySelector("[data-chat-thread]").parentElement; const h = b.querySelector("[data-chat-thread]").lastElementChild.previousElementSibling; return { scroll: b.scrollHeight - b.clientHeight - b.scrollTop, lastBottom: h?.getBoundingClientRect().bottom - b.getBoundingClientRect().bottom }; });
+    const stuck = await page.evaluate(() => { const b = document.querySelector("[data-chat-thread]").parentElement; const h = b.querySelector("[data-chat-thread]").lastElementChild.previousElementSibling; const t = b.querySelector("[data-chat-thread]"); return { padding: t.style.paddingBottom, kids: [...t.children].slice(-4).map((c) => [c.tagName, Math.round(c.getBoundingClientRect().height), getComputedStyle(c).marginBottom]), scroll: b.scrollHeight - b.clientHeight - b.scrollTop, lastBottom: h?.getBoundingClientRect().bottom - b.getBoundingClientRect().bottom }; });
     await wheelTo(page, 1500);
     await page.waitForTimeout(100);
     const marked = await mark(page);
@@ -235,6 +235,30 @@ const cases = {
     await page.waitForTimeout(300);
     const kept = await page.evaluate(() => ({ node: window.__selected.isConnected, before: window.__selectedText, text: getSelection().toString().length }));
     results.push({ case: "selection-focus", key, ...kept, failures });
+    await context.close();
+  },
+  async "selection-pages"() {
+    const { page, context, failures } = await open({ turns: 400, pageTurns: 50 });
+    await wheelTo(page, 2500);
+    await page.waitForTimeout(150);
+    const key = await page.evaluate(() => {
+      const row = [...document.querySelectorAll("[data-thread-key]")].find((el) => el.querySelector("p") && el.getBoundingClientRect().top > 100);
+      const text = row.querySelector("p");
+      const range = document.createRange();
+      range.selectNodeContents(text);
+      getSelection().removeAllRanges();
+      getSelection().addRange(range);
+      window.__selected = row;
+      window.__text = text;
+      window.__chain = [];
+      for (let el = text; el && el !== row; el = el.parentElement) window.__chain.push(el);
+      return row.dataset.threadKey;
+    });
+    await page.waitForTimeout(100);
+    await walkUp(page, 900, () => page.evaluate(() => window.lab.reads() >= 2));
+    await page.waitForTimeout(400);
+    const kept = await page.evaluate(() => ({ row: window.__selected.isConnected, node: window.__text.isConnected, text: getSelection().toString().length, reads: window.lab.reads(), chain: window.__chain.map((el) => `${el.tagName}.${String(el.className).slice(0, 24)}:${el.isConnected}`), rows: document.querySelectorAll("[data-thread-key]").length }));
+    results.push({ case: "selection-pages", key, ...kept, failures });
     await context.close();
   },
   async "jump-unmounted"() {
@@ -279,6 +303,23 @@ const cases = {
     results.push({ case: "task-switch", leaked, failures });
     await context.close();
   },
+  async "reading-return"() {
+    const { page, context, failures } = await open({ turns: 200, pageTurns: 200, tasks: 2 });
+    await wheelTo(page, 3000);
+    await page.waitForTimeout(200);
+    const marked = await mark(page);
+    await page.getByText("Tarea lab-1").first().click();
+    await page.waitForTimeout(700);
+    await page.getByText("Tarea lab-0").first().click();
+    await page.waitForTimeout(900);
+    const back = await page.evaluate((key) => {
+      const row = document.querySelector(`[data-thread-key="${CSS.escape(key)}"]`);
+      const box = document.querySelector("[data-chat-thread]").parentElement;
+      return row ? row.getBoundingClientRect().top - box.getBoundingClientRect().top : null;
+    }, marked.key);
+    results.push({ case: "reading-return", marked, back, failures });
+    await context.close();
+  },
   async "heap-cycles"() {
     const { page, context, failures } = await open({ turns: 400, pageTurns: 400 });
     const sample = async () => {
@@ -300,6 +341,21 @@ const cases = {
       rounds.push(await sample());
     }
     results.push({ case: "heap-cycles", rounds, failures });
+    await context.close();
+  },
+  async "expanded-visual-pages"() {
+    const { page, context, failures } = await open({ turns: 400, pageTurns: 50, visuals: 8 });
+    await walkUp(page, 300, () => page.evaluate(() => Boolean(document.querySelector("iframe")?.isConnected && document.querySelector("[data-chat-visual] button[aria-expanded]"))));
+    await page.waitForTimeout(400);
+    await page.evaluate(() => {
+      window.__frame = document.querySelector("iframe");
+      window.__frame.closest("[data-chat-visual]").querySelector("button[aria-expanded]").click();
+    });
+    await page.waitForTimeout(300);
+    await walkUp(page, 900, () => page.evaluate(() => window.lab.reads() >= 2));
+    await page.waitForTimeout(400);
+    const kept = await page.evaluate(() => ({ frame: window.__frame.isConnected, expanded: document.querySelectorAll("dialog[data-expanded]").length, reads: window.lab.reads() }));
+    results.push({ case: "expanded-visual-pages", ...kept, failures });
     await context.close();
   },
   async "visual-rows"() {

@@ -399,6 +399,8 @@ export async function loadTurns(host: Host, workspace: string, folder: string, i
   return { turns: session.turns ?? [], history: session.history };
 }
 
+const DETAIL_ATTEMPTS = 5;
+const DETAIL_RETRY_MS = 150;
 let details: Promise<unknown> = Promise.resolve();
 
 /**
@@ -409,11 +411,20 @@ export function loadDetail(host: Host, workspace: string, folder: string, id: st
   const part = async (current: HistoryRef, offset: number) =>
     (await host.call<HistoryChunk>("load_session", workspace, { project: folder, id, history_request: { ...current, kind: "detail", offset } })).value;
   const run = async () => {
-    const whole = await readWholeDetail(part, ref).catch(async (): Promise<unknown> => {
-      const fresh = await currentRef((before) => loadTurns(host, workspace, folder, id, before), ref, turnId);
-      if (!fresh) throw new HostError("history_detail_changed");
-      return readWholeDetail(part, fresh);
-    });
+    let current = ref;
+    let whole: unknown;
+    for (let attempt = 0; ; attempt++) {
+      try {
+        whole = await readWholeDetail(part, current);
+        break;
+      } catch (error) {
+        if (attempt >= DETAIL_ATTEMPTS) throw error;
+        await new Promise((done) => setTimeout(done, DETAIL_RETRY_MS * attempt));
+        const fresh = await currentRef((before) => loadTurns(host, workspace, folder, id, before), ref, turnId).catch(() => undefined);
+        if (fresh === null) throw new HostError("history_detail_changed");
+        if (fresh) current = fresh;
+      }
+    }
     return whole === null ? null : typeof whole === "string" ? whole : JSON.stringify(whole, null, 2);
   };
   const next = details.then(run, run);

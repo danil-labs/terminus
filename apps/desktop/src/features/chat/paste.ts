@@ -181,7 +181,7 @@ export type Pegado = {
    * Dónde lee la persona, como hijo del contenido y distancia al borde de
    * arriba; `null` si sigue al fondo. Es lo que se guarda al desmontar el hilo.
    */
-  lectura: () => { hijo: number; desfase: number } | null;
+  lectura: () => { hijo: number; desfase: number; el: Element } | null;
   /** Vuelve a dejar el hijo `hijo` a `desfase` del borde, suelto. */
   retomar: (hijo: number, desfase: number) => void;
   /**
@@ -777,7 +777,7 @@ export function seguirElFondo(enTurno: () => boolean = () => true): Pegado {
     tomarAncla();
   };
 
-  const lectura = () => (sigue() || !ancla ? null : { hijo: ancla.i, desfase: ancla.desfase });
+  const lectura = () => (sigue() || !ancla ? null : { hijo: ancla.i, desfase: ancla.desfase, el: ancla.el });
 
   const retomar = (hijo: number, desfase: number) => {
     const el = dentro?.children?.[hijo];
@@ -789,6 +789,8 @@ export function seguirElFondo(enTurno: () => boolean = () => true): Pegado {
   };
 
   const escribir = (valor: number, lectura = false) => {
+    // Siguiendo manda `pegar`: la posición que recuerda un virtualizador ya quedó atrás del fondo.
+    if (!lectura && sigue()) return;
     ponScrollTop(valor);
     if (lectura && !sigue()) tomarAncla();
     ponCerca(estaCerca());

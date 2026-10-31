@@ -1681,7 +1681,8 @@ export default function Chat(props: ChatProps) {
     claves();
     const lista = bloques();
     const asignadas = clavesDeBloques.assign(lista.map((b) => props.msgs[b.i]?.clave ?? null));
-    return { lista: asignadas, deBloque: new Map(lista.map((b, k) => [b, asignadas[k]])) };
+    // Por clave y no por índice: al anteponer, un índice viejo sobre los bloques nuevos es otra fila y su contenido se rehace.
+    return { lista: asignadas, deBloque: new Map(lista.map((b, k) => [b, asignadas[k]])), deClave: new Map(lista.map((b, k) => [asignadas[k], b])) };
   });
   createEffect(() => {
     clavesDelHilo();
@@ -1789,7 +1790,8 @@ export default function Chat(props: ChatProps) {
     const lectura = hilo.lectura();
     if (!lectura) return props.onLectura?.(null);
     const clave = hiloVirtual
-      ? (elContenido?.children[lectura.hijo] as HTMLElement | undefined)?.dataset.threadKey
+      // Del nodo y no de su sitio: al desmontar, las filas ya salieron del hilo.
+      ? (lectura.el as HTMLElement).dataset.threadKey
       : clavesDelHilo().lista[chunkStart(shownFrom(), origen()) + lectura.hijo];
     props.onLectura?.(clave ? { clave, desfase: lectura.desfase } : null);
   });
@@ -3395,7 +3397,11 @@ export default function Chat(props: ChatProps) {
                 settled={hilo.sostener}
                 onRange={setPrimeraFila}
                 ref={(api: VirtualThreadApi) => { hiloDeFilas = api; saltarALaLectura(); }}
-                row={(_clave: string, indice: () => number) => filaDelHilo(createMemo<Bloque>((previo) => bloques()[indice()] ?? previo, bloques()[indice()]), indice)}
+                row={(clave: string, indice: () => number) => {
+                  // La lista de filas puede ir un paso detrás de las claves: una que ya salió no se pinta.
+                  const inicial = clavesDelHilo().deClave.get(clave);
+                  return inicial ? filaDelHilo(createMemo<Bloque>((previo) => clavesDelHilo().deClave.get(clave) ?? previo, inicial), indice) : null;
+                }}
               />
             )}
           </Show>
