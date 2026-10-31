@@ -64,6 +64,7 @@ test("PATH collisions, including Windows extensions and case, prevent installati
   writeFileSync(join(dir, "danil"), "foreign");
   assert.throws(() => configure({ action: "install", target: process.execPath, binDir, pathValue }), /PATH collision/);
   assert.equal(existsSync(binDir), false);
+  assert.throws(() => configure({ action: "install", target: process.execPath, binDir, pathValue, platform: "win32", pathExt: ".EXE;" }), /PATH collision/);
   rmSync(join(dir, "danil"));
   writeFileSync(join(dir, "Dn.EXE"), "foreign");
   assert.throws(() => configure({ action: "install", target: process.execPath, binDir, pathValue, platform: "win32" }), /PATH collision/);

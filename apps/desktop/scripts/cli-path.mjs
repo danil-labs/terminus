@@ -67,7 +67,7 @@ export function configure({ action, target, binDir, pathValue = process.env.PATH
   });
   if (action === "install") {
     const separator = platform === "win32" ? ";" : delimiter;
-    const extensions = new Set([...pathExt.toLowerCase().split(";"), ".ps1"]);
+    const extensions = new Set([...pathExt.toLowerCase().split(";").filter(Boolean), ".ps1"]);
     const dirs = new Set([directory, ...(platform === "win32" ? [process.cwd()] : []), ...pathValue.split(separator).filter((part) => platform !== "win32" || part).map((part) => resolve(part || process.cwd()))]);
     for (const dir of dirs) {
       let names;
