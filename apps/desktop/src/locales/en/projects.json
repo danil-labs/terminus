@@ -274,7 +274,6 @@
   "projects.sessions.time_yesterday": "yesterday",
   "projects.sessions.time_days": "{count}d",
   "projects.sessions.opened_by": "Opened by {name}",
-  "projects.sessions.handed_from": "Previously handled by {name}",
   "projects.sessions.deferred": "Applies when its machine is on",
   "projects.split.alone": "Open another tab to split the window",
   "projects.split.agent_page": "The agent page takes the whole screen",

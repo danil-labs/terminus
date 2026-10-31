@@ -53,10 +53,9 @@ export function TaskMark({ state, delivered = false, size = 16, identity }: { st
   if (identity) {
     const label = [identity.agent, state ? stateText(state) : delivered ? stateText("delivered") : ""].filter(Boolean).join(" · ");
     const color = state === "asked" || state === "approving" ? theme.warningStrong : state ? stateColor(state, theme) : theme.delivered;
-    const corner = identity.agent ? { position: "absolute" as const, top: -2, right: -2 } : null;
     return <View testID="task-identity" {...(Platform.OS === "web" ? { title: label } : {})} style={{ width: 24, height: 24, alignItems: "center", justifyContent: "center" }} accessibilityRole={label ? "image" : undefined} accessibilityLabel={label || undefined}>
       {identity.agent ? <AgentAvatar name={identity.agent} host={identity.host} folder={identity.folder} size={18} working={state === "working"} /> : null}
-      {state === "working" ? (identity.agent ? null : <TaskOrbit size={16} />) : state || delivered ? <View pointerEvents="none" style={[{ width: 12, height: 12, borderRadius: 6, alignItems: "center", justifyContent: "center", backgroundColor: theme.surface }, corner]}>
+      {state === "working" ? (identity.agent ? null : <TaskOrbit size={16} />) : state || delivered ? <View pointerEvents="none" style={{ position: "absolute", top: -2, right: -2, width: 12, height: 12, borderRadius: 6, alignItems: "center", justifyContent: "center", backgroundColor: theme.surface }}>
         <View testID="task-dot" style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: color }} />
       </View> : null}
     </View>;

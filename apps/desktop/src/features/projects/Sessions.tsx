@@ -1,5 +1,4 @@
 import { invoke } from "../../lib/invoke.ts";
-import ArrowLeftRight from "lucide-solid/icons/arrow-left-right";
 import ChevronRight from "lucide-solid/icons/chevron-right";
 import CornerDownRight from "lucide-solid/icons/corner-down-right";
 import MoreVertical from "lucide-solid/icons/more-vertical";
@@ -649,7 +648,7 @@ export default function Sessions(props: {
   const ChipDeCara = (c: {
     name: string;
     tip: string;
-    kind: "agent" | "opener" | "handoff";
+    kind: "agent" | "opener";
     icon?: typeof CornerDownRight;
     working?: boolean;
   }) => (
@@ -658,7 +657,6 @@ export default function Sessions(props: {
         as="span"
         data-session-agent={c.kind === "agent" ? "" : undefined}
         data-session-opener={c.kind === "opener" ? "" : undefined}
-        data-session-handoff={c.kind === "handoff" ? "" : undefined}
         class="inline-flex shrink-0 items-center gap-0.5"
         aria-label={c.tip}
       >
@@ -707,13 +705,13 @@ export default function Sessions(props: {
       const quien = r.s.launcher_name ?? r.s.parent_agent;
       return quien && !sameAgent(quien, r.s.agent) ? quien : null;
     };
-    const anterior = () => r.s.previous_agent && !sameAgent(r.s.previous_agent, r.s.agent) ? r.s.previous_agent : null;
     // Con un motor que no manda `last_turn_at`, la última vez que se movió.
     const cuando = () => r.s.last_turn_at ?? r.s.updated_at;
     // Memo: al hacer clic el menú se reinicia y, sin él, la ranura reescribe su clase.
     const abierto = createMemo(() => menu() === r.s.id);
-    // Sin rama no hay nada que decir en la tarjeta, salvo un PR que siga vivo.
-    const gitEnTarjeta = () => !propioDeOtra() && (git().kind === "kn" || git().kind === "branch" || (git().kind === "detached" && git().pull_known && !!git().pull));
+    // La sección dice kn, el PR o, sin PR, el nombre de la rama.
+    const conPr = () => (git().kind === "branch" || git().kind === "detached") && !!git().pull_known && !!git().pull;
+    const conGit = () => !propioDeOtra() && (git().kind === "kn" || git().kind === "branch" || conPr());
     const gitStyle = () => {
       const appearance = gitAppearance(git());
       return git().stale ? { ...appearance, color: "text-neutral-500" } : appearance;
@@ -738,13 +736,12 @@ export default function Sessions(props: {
           <FolderChip id={projectOf(r.s)} name={folder()} untitled={tarjetaDelRiel()} class="task-card-folder text-xs text-neutral-500" />
         }</Show>
         <Show when={!props.hideMachine && r.s.machine}>{machine => <MachineChip machine={machine()} on={r.s.machine_on !== false} class="task-card-machine" />}</Show>
-        <Show when={gitEnTarjeta()}>
+        <Show when={conGit() || abridor()}>
           <span class="task-card-git">
-            <Show when={!propioDeOtra()}><Show when={git().kind === "kn" || !git().pull_known || !git().pull} fallback={<RailPull status={git()} />}>
-              <span data-session-pr class={cn("inline-flex shrink-0", gitStyle().color)} title={sessionGitDescription(git())} aria-label={sessionGitDescription(git())}><Dynamic component={gitStyle().icon} size={12} aria-hidden="true" /></span>
+            <Show when={conGit()}><Show when={git().kind === "kn" || !conPr()} fallback={<RailPull status={git()} />}>
+              <span data-session-pr class={cn("inline-flex min-w-0 items-center gap-1", gitStyle().color)} title={sessionGitDescription(git())} aria-label={sessionGitDescription(git())}><Dynamic component={gitStyle().icon} size={12} aria-hidden="true" /><Show when={git().kind === "branch"}><span class="min-w-0 truncate">{git().branch}</span></Show></span>
             </Show></Show>
             <Show when={abridor()}>{who => <ChipDeCara kind="opener" icon={CornerDownRight} name={who()} tip={t("projects.sessions.opened_by", { name: nombre(who()) })} />}</Show>
-            <Show when={anterior()}>{who => <ChipDeCara kind="handoff" icon={ArrowLeftRight} name={who()} tip={t("projects.sessions.handed_from", { name: nombre(who()) })} />}</Show>
           </span>
         </Show>
         <span class="task-card-tail">
