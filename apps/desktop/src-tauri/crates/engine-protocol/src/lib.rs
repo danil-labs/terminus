@@ -97,7 +97,8 @@ pub const EXTENSIONS: &[&str] = &[
 /// Las órdenes del contrato más las de las extensiones. La huella sigue siendo
 /// solo de [`MANIFEST`].
 pub fn full_manifest() -> serde_json::Value {
-    let mut manifest: serde_json::Value = serde_json::from_str(MANIFEST).expect("frozen command manifest");
+    let mut manifest: serde_json::Value =
+        serde_json::from_str(MANIFEST).expect("frozen command manifest");
     for raw in EXTENSIONS {
         let ext: serde_json::Value = serde_json::from_str(raw).expect("extension manifest");
         let extra = ext["commands"].as_array().cloned().unwrap_or_default();
