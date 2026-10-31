@@ -28,6 +28,7 @@ sends).
 | `shared-design` | `scripts/guards/shared-design.mjs` | `packages/design` matches the desktop: theme tokens against `src/styles/global.css` (Violeta and Grafito), status phrases against `projects.status.*` in `es` and `en`, the shared task-list, dock and machine words (`WORDS`) against the same keys in the catalogs, and mark icons against `TaskStatus.tsx`. |
 | `doc-paths` | `scripts/guards/doc-paths.mjs` | Code paths and local links in the documentation exist. Generated files are excluded. |
 | `missing-classes` | `scripts/guards/missing-classes.mjs` | Finds written classes that Tailwind does not generate. |
+| `cli-path` | `tests/unit/cli-path.test.mjs` | Runs the production launcher installer against temporary directories: arguments, pipes, exit code, idempotence, owned removal and PATH collisions (including Windows name variants). Native Windows shell execution requires Windows. |
 | `triggers` | `tests/unit/triggers.test.mjs` | A trigger keeps the handler that opens its panel. |
 | `mount-frontend` | `scripts/guards/mount-frontend.mjs` | Runs `dist/` in jsdom with a simulated IPC and checks that it mounts. It does not open a native window. |
 | `storage-refresh` | `tests/unit/storage-refresh.test.ts` | Refresh batching, stale responses and workspace switches. |

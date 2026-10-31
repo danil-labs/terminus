@@ -71,7 +71,7 @@ export default function Tasks() {
         <Pressable testID="workspace-switcher" onPress={() => router.push("/workspaces")} style={styles.workspace} accessibilityLabel={t("home.switch")}>
           <Avatar name={current?.name ?? "T"} size={32} />
           <Text style={[styles.workspaceName, { color: theme.text }]} numberOfLines={1}>
-            {current?.name ?? "Terminus"}
+            {current?.name ?? "Danil"}
           </Text>
           <Icon name="chevron-down" size={16} color={theme.textMuted} />
           <Badge count={otherPending} />

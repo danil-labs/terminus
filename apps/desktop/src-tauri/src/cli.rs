@@ -34,6 +34,9 @@ const COMMANDS: &[&str] = &[
     "workspace",
 ];
 const GLOBAL_FLAGS: &[&str] = &[
+    "--root",
+    "--engine",
+    "--profile",
     "--workspace",
     "--folder",
     "--instance",

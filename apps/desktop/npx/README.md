@@ -1,6 +1,6 @@
 # @danil-labs/terminus
 
-Instala **Terminus** (la app de escritorio de Danil) con un solo comando:
+Instala **Danil** (la app de escritorio, distribuida como Terminus) con un solo comando:
 
 ```bash
 npx @danil-labs/terminus
@@ -9,6 +9,11 @@ npx @danil-labs/terminus
 Es un canal de distribución para desarrolladores —que ya tienen Node— adicional
 a los instaladores que se bajan a mano desde [terminus.danil.ai](https://terminus.danil.ai).
 Funciona en Windows, macOS (Apple Silicon e Intel) y Linux x86_64.
+
+Este paquete instala la app; sus bins `terminus` y `danil-terminus` no son el
+CLI operativo. `danil` y `dn` se configuran por separado; consulta la
+[guía del CLI](../docs/danil-cli.md). El nombre del paquete y las rutas de
+descarga conservan compatibilidad con las instalaciones existentes.
 
 ## Qué hace
 
