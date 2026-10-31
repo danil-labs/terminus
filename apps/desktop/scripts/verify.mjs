@@ -608,6 +608,8 @@ const steps = [
   ["En el navegador una computadora apagada monta sin encenderse y despierta al mandarle algo", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/web-off.test.mjs")], root],
   ["En el navegador lo que el relay guardó se ve con su hora mientras la computadora está apagada", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/web-cached.test.mjs")], root],
   ["En el navegador un panel junta todas las computadoras y cada orden va a su máquina", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/web-machines.test.mjs")], root],
+  ["En el navegador el almacenamiento sigue a su máquina y no espera a una VM apagada", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/web-machines-storage.test.mjs")], root],
+  ["En el navegador una máquina apagada o de otro contrato no tumba el panel y cada credencial queda aparte", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/web-machines-contracts.test.mjs")], root],
   ["En el navegador los workspaces de la cuenta se ven con sus máquinas dormidas", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/web-account-workspaces.test.mjs")], root],
   ["En el navegador la memoria de la cuenta se ve, se edita y tiene historial con las máquinas apagadas", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/web-memory-account.test.mjs")], root],
   ["En el navegador los spaces salen de la máquina que los guarda aunque otra duerma", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/web-spaces.test.mjs")], root],
