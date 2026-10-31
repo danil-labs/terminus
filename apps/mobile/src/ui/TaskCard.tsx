@@ -122,7 +122,6 @@ function TaskCardView({
   const room = Math.max(0, width - 32 - 16 - 86 - 20 - gitWidth);
   const sections = { folder: Math.min(112, Math.floor(room / 2)), machine: Math.min(104, Math.floor(room / 2)), git: gitWidth };
   const ready = online && canFinishTask(task, git, card.activity.viva || card.activity.aprobando);
-  const branch = !git?.shared_with ? git?.branch : null;
   const kn = git?.kind === "kn" && !git.shared_with ? git.kn : null;
   return (
     <Pressable
@@ -165,10 +164,10 @@ function TaskCardView({
           <Text numberOfLines={1} style={[styles.meta, styles.clip, { color: theme.textMuted }]}>{folder.name ?? folder.id}</Text>
         </View> : null}
         {chips.includes("machine") && card.machine ? <View testID="task-machine" style={{ width: sections.machine, flexShrink: 0 }}><MachineChip name={card.machine.id} on={card.machine.on} /></View> : null}
-        {pull || kn || branch ? <View testID="task-git" style={[styles.chip, { width: sections.git, flexShrink: 0, overflow: "hidden" }]}>
-          {pull ? <PullChip pull={pull} git={git} compact /> : kn ? <View accessibilityRole="image" accessibilityLabel={w(kn === "clean" ? "projects.kn.clean" : kn === "saved" ? "projects.kn.saved" : "projects.kn.draft")}>
+        {pull || kn ? <View testID="task-git" style={[styles.chip, { width: sections.git, flexShrink: 0, overflow: "hidden" }]}>
+          {pull ? <PullChip pull={pull} git={git} compact /> : <View accessibilityRole="image" accessibilityLabel={w(kn === "clean" ? "projects.kn.clean" : kn === "saved" ? "projects.kn.saved" : "projects.kn.draft")}>
             <Icon name={kn === "draft" ? "file-pen-line" : kn === "saved" ? "file-check" : "file"} size={12} color={git?.stale ? theme.textMuted : kn === "saved" ? theme.merged : theme.textMuted} />
-          </View> : <><Icon name="git-branch" size={11} color={theme.textMuted} /><Text numberOfLines={1} style={[styles.meta, styles.clip, { color: theme.textMuted }]}>{branch}</Text></>}
+          </View>}
         </View> : null}
         {tag ? <Text numberOfLines={1} style={[styles.tag, { color: theme.textMuted, backgroundColor: theme.muted }]}>{tag}</Text> : null}
         <View style={{ flex: 1, minWidth: 0 }} />
