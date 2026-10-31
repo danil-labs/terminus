@@ -1,22 +1,18 @@
 import { AgentAvatar } from "./AgentAvatar";
-import { folderColor, RADIUS, TEXT } from "@terminus/design";
+import { RADIUS, TEXT } from "@terminus/design";
 import { type CardPull, type TaskCard as Card, type PullTone, cardPull, canFinishTask, type TaskGit, taskTitle } from "@terminus/tasks";
 import * as Haptics from "expo-haptics";
 import { memo } from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { secondLine } from "../lib/cardLine";
 import { sameCard } from "../lib/reconcile";
-import type { Task } from "../lib/engine";
+import type { Folder, Task } from "../lib/engine";
 import { lang, t, w } from "../lib/i18n";
+import { FolderIcon } from "./FolderIcon";
 import { BrandMark } from "./BrandMark";
 import { Icon, type IconName } from "./Icon";
 import { TaskMark } from "./TaskStatus";
 import { type Theme, useTheme } from "./theme";
-
-/** El cuadrado de color de una carpeta, que la identifica en la lista plana. */
-export function FolderSquare({ id, size = 8 }: { id: string; size?: number }) {
-  return <View style={{ width: size, height: size, borderRadius: 2, backgroundColor: folderColor(id) }} />;
-}
 
 /**
  * La chapa de la máquina que corre la tarea, como `MachineChip` del escritorio:
@@ -64,7 +60,7 @@ type TaskCardProps = {
   task: Task;
   card: Card;
   git?: TaskGit | null;
-  folderName: (id: string) => string | undefined;
+  folderOf: (key: string) => Folder | undefined;
   onPress: () => void;
   onLongPress?: () => void;
   onFinish?: () => void;
@@ -81,6 +77,9 @@ type TaskCardProps = {
  * carpeta. `onPress` y `onLongPress` llegan nuevas en cada render
  * pero solo abren la tarea, que es la misma: no cuentan.
  */
+const sameFolder = (a: Folder | undefined, b: Folder | undefined) =>
+  a?.key === b?.key && a?.name === b?.name && a?.kind === b?.kind && a?.cloud === b?.cloud;
+
 const sameProps = (a: TaskCardProps, b: TaskCardProps) =>
   a.task === b.task &&
   a.git === b.git &&
@@ -90,7 +89,7 @@ const sameProps = (a: TaskCardProps, b: TaskCardProps) =>
   !a.onFinish === !b.onFinish &&
   !a.onLongPress === !b.onLongPress &&
   sameCard(a.card, b.card) &&
-  (a.card.folder ? a.folderName(a.card.folder) : null) === (b.card.folder ? b.folderName(b.card.folder) : null);
+  sameFolder(a.card.folder ? a.folderOf(a.card.folder) : undefined, b.card.folder ? b.folderOf(b.card.folder) : undefined);
 
 /**
  * La lista del teléfono: título, marca y acciones en la primera línea;
@@ -103,7 +102,7 @@ function TaskCardView({
   task,
   card,
   git: observed,
-  folderName,
+  folderOf,
   onPress,
   onLongPress,
   onFinish,
@@ -113,7 +112,7 @@ function TaskCardView({
 }: TaskCardProps) {
   const theme = useTheme();
   const git = observed && !online ? { ...observed, stale: true } : observed;
-  const folder = card.folder ? { id: card.folder, name: folderName(card.folder) } : null;
+  const folder = card.folder ? folderOf(card.folder) ?? { id: card.folder, key: card.folder, host: task.host, name: card.folder } : null;
   const pull = cardPull(git);
   const chips = secondLine(card, pull);
   const ready = online && canFinishTask(task, git, card.activity.viva || card.activity.aprobando);
@@ -169,7 +168,7 @@ function TaskCardView({
             case "folder":
               return folder ? (
                 <View key={chip} style={styles.chip}>
-                  <FolderSquare id={folder.id} />
+                  <FolderIcon folder={folder} size={13} />
                   <Text numberOfLines={1} style={[styles.meta, { color: theme.textMuted, maxWidth: 130 }]}>
                     {folder.name ?? folder.id}
                   </Text>

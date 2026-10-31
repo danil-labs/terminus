@@ -509,7 +509,7 @@ export default function TaskScreen() {
         host={host}
         workspace={workspace}
         machine={host?.label ?? params.host}
-        folder={folderRow ? { key: folderRow.key, name: folderRow.name } : null}
+        folder={folderRow}
         branch={git?.branch ?? null}
         provider={view?.session.provider ?? null}
         subtasks={delegated.length}

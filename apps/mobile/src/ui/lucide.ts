@@ -14,6 +14,8 @@ export type LucideShape =
   | { kind: "ellipse"; cx: number; cy: number; rx: number; ry: number };
 
 export const ICONS = {
+  "folder-git-2": [{"kind": "path", "d": "M9 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v5"}, {"kind": "circle", "cx": 13.0, "cy": 12.0, "r": 2.0}, {"kind": "path", "d": "M18 19c-2.8 0-5-2.2-5-5v8"}, {"kind": "circle", "cx": 20.0, "cy": 19.0, "r": 2.0}],
+  "folder-cloud": [{"kind": "path", "d": "M9 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v4"}, {"kind": "path", "d": "M19.75 20H15.5a3.5 3.5 0 1 1 3.355-4.5h.895a2.25 2.25 0 1 1 0 4.5Z"}],
   "gauge": [{ kind: "path", d: "m12 14 4-4" }, { kind: "path", d: "M3.34 19a10 10 0 1 1 17.32 0" }],
   "trash-2": [{"kind": "path", "d": "M10 11v6"}, {"kind": "path", "d": "M14 11v6"}, {"kind": "path", "d": "M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"}, {"kind": "path", "d": "M3 6h18"}, {"kind": "path", "d": "M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"}],
   "archive": [{"kind": "rect", "width": 20.0, "height": 5.0, "x": 2.0, "y": 3.0, "rx": 1.0}, {"kind": "path", "d": "M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"}, {"kind": "path", "d": "M10 12h4"}],

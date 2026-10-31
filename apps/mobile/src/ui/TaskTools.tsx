@@ -6,13 +6,14 @@ import { useEffect, useRef, useState } from "react";
 import { Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { type ProviderUsage, providerUsage } from "../lib/accountUsage";
 import { accountWorkspace } from "../lib/engine";
+import type { Folder } from "../lib/engine";
 import type { Host } from "../lib/hosts";
 import { lang, t, w } from "../lib/i18n";
 import { BrandMark } from "./BrandMark";
 import { Icon } from "./Icon";
 import { Tap } from "./list";
 import { measure, type Rect } from "./Popover";
-import { FolderSquare } from "./TaskCard";
+import { FolderIcon } from "./FolderIcon";
 import { type Theme, useTheme } from "./theme";
 
 const windowsOf = (limits: AccountLimits | null | undefined): UsageWindow[] =>
@@ -44,7 +45,7 @@ export function TaskTools({
   host: Host | undefined;
   workspace: string;
   machine: string;
-  folder: { key: string; name: string } | null;
+  folder: Folder | null;
   branch: string | null;
   provider: string | null;
   subtasks: number;
@@ -78,7 +79,7 @@ export function TaskTools({
           {folder ? (
             <>
               <Text style={{ color: theme.textMuted }}>/</Text>
-              <FolderSquare id={folder.key} size={8} />
+              <FolderIcon folder={folder} size={13} />
               <Text numberOfLines={1} style={[styles.placeText, { color: theme.text, maxWidth: 100, flexShrink: 0 }]}>{folder.name}</Text>
             </>
           ) : null}

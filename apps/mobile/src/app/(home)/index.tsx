@@ -1,3 +1,4 @@
+import { folderByKey } from "../../lib/folderIcon";
 import { RADIUS, TEXT } from "@terminus/design";
 import { applySidebarView, folderCounts, groupKey, groupLabel, isPinned, type SidebarView } from "@terminus/tasks";
 import { router } from "expo-router";
@@ -87,7 +88,6 @@ export default function Home() {
   const spaces = snapshot?.spaces ?? [];
   const inSpace = (key: string) => !space || key.endsWith("/") || space.folders.includes(key);
   const tasks = (snapshot?.tasks ?? []).filter((task) => taskInSpace(task, space));
-  const folderName = (key: string) => snapshot?.folders.find((f) => f.key === key)?.name;
   const counts = folderCounts(tasks.map((task) => ({ project: task.folderKey, row: task })));
   const kept = view.folders.filter((f) => (counts.get(f) ?? 0) > 0);
   const effective: SidebarView = kept.length === view.folders.length ? view : { ...view, folders: kept };
@@ -316,7 +316,7 @@ export default function Home() {
                         task={task}
                         card={cardOf(task, marks, effective.group === "folder")}
                         git={effectiveGit(git, task, snapshot?.tasks ?? [])}
-                        folderName={folderName}
+                        folderOf={(key) => folderByKey(snapshot?.folders ?? [], key)}
                         when={shortWhen(task.last_turn_at ?? task.updated_at, lang)}
                         onPress={() => openTask(task.host, task.workspace, task.folder, task.id)}
                         onLongPress={onLongPress}

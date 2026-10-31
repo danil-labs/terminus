@@ -1,3 +1,4 @@
+import { folderByKey } from "../lib/folderIcon";
 import { delegatedOf } from "@terminus/tasks";
 import { useLocalSearchParams } from "expo-router";
 import { useMemo } from "react";
@@ -32,7 +33,6 @@ export default function TaskToolsScreen() {
     ...delegatedOf((snapshot?.delegated ?? []).filter((task) => task.host === params.host && !task.remote_launcher), params.id),
     ...(snapshot?.delegated ?? []).filter((task) => !task.archived && task.remote_launcher === key),
   ].sort((a, b) => b.created_at - a.created_at);
-  const folderName = (folderKey: string) => snapshot?.folders.find((f) => f.key === folderKey)?.name;
 
   return (
     <View style={{ flex: 1, backgroundColor: pageColor(theme) }}>
@@ -45,7 +45,7 @@ export default function TaskToolsScreen() {
               key={taskKey(task)}
               task={task}
               card={cardOf(task, marks)}
-              folderName={folderName}
+              folderOf={(key) => folderByKey(snapshot?.folders ?? [], key)}
               when={shortWhen(task.last_turn_at ?? task.updated_at, lang)}
               onPress={() => openTask(task.host, task.workspace, task.folder, task.id)}
               online={hostOf(task.host)?.power() === "on"}
