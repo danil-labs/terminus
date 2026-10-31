@@ -51,7 +51,8 @@ it the command says so; use `pnpm verify`. It never counts for macOS or Windows.
 pnpm verify --remote                   # HEAD; refuses uncommitted changes
 pnpm verify --remote --no-cargo        # the chain without Rust
 pnpm verify --remote --commit <sha>    # any local commit
-pnpm verify --remote --attach <id>     # resume a run, replaying the full log
+pnpm verify --remote --detach          # queue and return; prints the run id
+pnpm verify --remote --attach <id>     # follow a run, replaying the full log
 pnpm verify --remote --cancel <id>     # stop a queued or running run
 pnpm verify --remote --status          # what is queued and running
 ```

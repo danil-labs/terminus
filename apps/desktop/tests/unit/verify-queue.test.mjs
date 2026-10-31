@@ -206,6 +206,18 @@ test("--attach retoma una corrida y repite el log; --cancel la corta", { skip },
   assert.equal(queue.readRun(id).exitCode, null);
 });
 
+test("--detach encola y devuelve el id sin esperar", { skip }, async (t) => {
+  const { repo, home } = workspace(t);
+  const queue = createQueue({ home, config, diskPercent: () => 10 });
+  const host = await serve(t, queue);
+  commit(repo, "echo despues");
+  const { code, output } = await client(repo, host, ["--detach"]);
+  assert.equal(code, 0, output);
+  const id = /--attach (\S+?)`/.exec(output)[1];
+  await queue.settled();
+  assert.equal(queue.readRun(id).state, "passed");
+});
+
 test("sin acceso da un error claro que manda a la cadena local", { skip }, async (t) => {
   const { repo } = workspace(t);
   commit(repo, "true");

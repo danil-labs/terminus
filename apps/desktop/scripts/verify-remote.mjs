@@ -37,12 +37,13 @@ const accessHelp = (host) =>
   `  Con acceso, comprueba Tailscale con \`ssh ${SSH_USER}@${host}\`. Si la máquina está apagada, encenderla pide credenciales de AWS en esta sesión.`;
 
 function parse(argv) {
-  const options = { noCargo: false, commit: null, attach: null, cancel: null, status: false };
+  const options = { noCargo: false, commit: null, attach: null, cancel: null, status: false, detach: false };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === "--remote") continue;
     else if (arg === "--no-cargo") options.noCargo = true;
     else if (arg === "--status") options.status = true;
+    else if (arg === "--detach") options.detach = true;
     else if (arg === "--commit" || arg === "--attach" || arg === "--cancel") {
       const value = argv[(i += 1)];
       if (!value) throw new RemoteError(`${arg} necesita un valor`);
@@ -234,6 +235,10 @@ export async function runRemote(argv) {
     const command = options.noCargo ? "pnpm verify --no-cargo" : "pnpm verify";
     const { id } = await submit(base, commit, command);
     console.log(`  Corrida ${id}: ${commit.slice(0, 10)}, «${command}», en ${host}.`);
+    if (options.detach) {
+      resumeHint(id);
+      return 0;
+    }
     for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
       process.on(signal, () => {
         resumeHint(id);
