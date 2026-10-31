@@ -273,7 +273,6 @@
   "projects.sessions.time_hours": "{count}h",
   "projects.sessions.time_yesterday": "ayer",
   "projects.sessions.time_days": "{count}d",
-  "projects.sessions.opened_by": "La abrió {name}",
   "projects.sessions.deferred": "Se aplica cuando su máquina se encienda",
   "projects.split.alone": "Abre otra pestaña para poder partir la ventana",
   "projects.split.agent_page": "La página del agente ocupa la pantalla entera",

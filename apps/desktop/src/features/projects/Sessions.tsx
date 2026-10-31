@@ -1,6 +1,5 @@
 import { invoke } from "../../lib/invoke.ts";
 import ChevronRight from "lucide-solid/icons/chevron-right";
-import CornerDownRight from "lucide-solid/icons/corner-down-right";
 import MoreVertical from "lucide-solid/icons/more-vertical";
 import Pin from "lucide-solid/icons/pin";
 import PinOff from "lucide-solid/icons/pin-off";
@@ -20,7 +19,6 @@ import { celebrateFinishedTask, FinishTaskButton } from "../../ui/FinishTaskButt
 import { KeyedList } from "../../ui/KeyedList";
 import { Input } from "../../ui/Input";
 import { Toast, ToastPortal } from "../../ui/Toast";
-import { RETARDO_TOOLTIP, TooltipContent, TooltipRoot, TooltipTrigger } from "../../ui/Tooltip";
 import { MarcaAgente } from "../../ui/icons";
 import {
   ITEM_DE_MENU,
@@ -47,7 +45,7 @@ import { canFinishTask, effectiveTaskGit, type GitStatus, sharesTaskGit, watchSe
 import { authorKey, authorKeys, isSubtask } from "./taskAuthors";
 import { descendientes, type Rama as RamaDeTareas, taskTree } from "./taskTree";
 import { rolledOutcome, type TaskActivity, taskPriority } from "@terminus/design";
-import { taskCard, buildTaskTree, launcherOf, sameAgent, taskIdentity, withTaskAncestors } from "@terminus/tasks";
+import { taskCard, buildTaskTree, taskIdentity, withTaskAncestors } from "@terminus/tasks";
 
 export function readableSessionTitle(title: string): string {
   if (!title.startsWith("/root/")) return title;
@@ -645,40 +643,10 @@ export default function Sessions(props: {
    */
   const gitDe = (row: SessionRow) => effectiveTaskGit(row, gitRows(), props.relatedSessions ?? props.sessions);
 
-  /** Una cara de 13 px con el nombre solo en el tooltip; antes de ella, su flecha si la lleva. */
-  const ChipDeCara = (c: {
-    name: string;
-    tip: string;
-    kind: "agent" | "opener";
-    icon?: typeof CornerDownRight;
-    working?: boolean;
-  }) => (
-    <TooltipRoot openDelay={RETARDO_TOOLTIP} placement="top" gutter={4}>
-      <TooltipTrigger
-        as="span"
-        data-session-agent={c.kind === "agent" ? "" : undefined}
-        data-session-opener={c.kind === "opener" ? "" : undefined}
-        class="inline-flex shrink-0 items-center gap-0.5"
-        aria-label={c.tip}
-      >
-        <Show when={c.icon}>{(icon) => <Dynamic component={icon()} size={12} aria-hidden="true" />}</Show>
-        <AstroAvatar
-          name={c.name}
-          status={c.working ? "working" : "asleep"}
-          body={profiles()[c.name]?.body}
-          avatar={profiles()[c.name]?.avatar}
-          size={13}
-        />
-      </TooltipTrigger>
-      <TooltipContent class="pointer-events-none">{c.tip}</TooltipContent>
-    </TooltipRoot>
-  );
-
   /**
    * La tarjeta del riel y de las delegadas: 52 px y siempre dos líneas. Línea 1:
    * el título y el hueco del estado, que al pasar el puntero es el menú. Línea 2:
-   * agente, proveedor, carpeta (solo raíz y sin agrupar por carpeta), PR, subtareas,
-   * borrador, quién la abrió, de quién la heredó, el cohete y la hora. Nada de lo
+   * proveedor, carpeta, máquina, Git, el cohete y la hora. Nada de lo
    * que la tarea pide; lo demás vive en la tarjeta flotante.
    */
   const FilaDelRiel = (r: {
@@ -700,12 +668,6 @@ export default function Sessions(props: {
     // La rama de quien comparte el árbol de su padre se dice en la fila del padre.
     const propioDeOtra = () => !!git().shared_with || sharesTaskGit(r.s, gitRows(), props.relatedSessions ?? props.sessions);
     const nombre = (agente: string) => displayName(agente, profiles()[agente]);
-    // Quién la abrió, si fue otro agente: el lanzador o el encargado de la madre.
-    const abridor = () => {
-      if (props.sidebar || !launcherOf(r.s)) return null;
-      const quien = r.s.launcher_name ?? r.s.parent_agent;
-      return quien && !sameAgent(quien, r.s.agent) ? quien : null;
-    };
     // Con un motor que no manda `last_turn_at`, la última vez que se movió.
     const cuando = () => r.s.last_turn_at ?? r.s.updated_at;
     // Memo: al hacer clic el menú se reinicia y, sin él, la ranura reescribe su clase.
@@ -749,7 +711,6 @@ export default function Sessions(props: {
           <Show when={conGit()}><Show when={git().kind === "kn" || !conPr()} fallback={<RailPull status={git()} />}>
               <span data-session-pr class={cn("inline-flex min-w-0 items-center gap-1", gitStyle().color)} title={sessionGitDescription(git())} aria-label={sessionGitDescription(git())}><Dynamic component={gitStyle().icon} size={12} aria-hidden="true" /><Show when={git().kind === "branch"}><span class="min-w-0 truncate">{git().branch}</span></Show></span>
             </Show></Show>
-          <Show when={abridor()}>{who => <ChipDeCara kind="opener" icon={CornerDownRight} name={who()} tip={t("projects.sessions.opened_by", { name: nombre(who()) })} />}</Show>
           <span class="task-card-tail">
             <Show when={r.s.deferred}><span data-deferred class="shrink-0 text-neutral-500" title={t("projects.sessions.deferred")} aria-label={t("projects.sessions.deferred")}>⧗</span></Show>
             <span class="task-card-rocket">{r.cohete()}</span>
