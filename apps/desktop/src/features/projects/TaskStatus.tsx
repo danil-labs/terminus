@@ -62,10 +62,29 @@ function railColor(state: ReturnType<typeof taskPriority>) {
 /** El anillo punteado de la tarea que el motor todavía registra. */
 function RailDashedRing(props: { size?: number }) {
   return (
-    <svg viewBox="0 0 16 16" width={props.size ?? 14} height={props.size ?? 14} class="animate-spin-lento text-neutral-500" aria-hidden="true">
+    <svg data-spinner viewBox="0 0 16 16" width={props.size ?? 14} height={props.size ?? 14} class="animate-spin-lento text-neutral-500 motion-reduce:animate-none" aria-hidden="true">
       <circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-dasharray="2.2 2.4" />
     </svg>
   );
+}
+
+/** Identidad estable; el estado del turno ocupa su esquina, nunca el centro. */
+function CardMark(props: TaskActivity & { identity: () => JSX.Element; identityLabel?: string; provisional?: boolean; archivada?: boolean }) {
+  const state = () => taskPriority(props);
+  const delivered = () => !state() && props.outcome === "delivered";
+  const label = () => [props.identityLabel, props.provisional ? t("projects.status.provisional") : taskLabel(state()) || (delivered() ? t("projects.status.delivered") : props.archivada ? t("projects.status.archived") : "")].filter(Boolean).join(" · ");
+  return <span class="task-card-identity" data-task-orbit role={label() ? "img" : undefined} title={label()} aria-label={label() || undefined}>
+    {props.identity()}
+    <Show when={props.provisional} fallback={
+      <Show when={state() === "working"} fallback={
+        <Show when={state() || delivered() || props.archivada}>
+          <span class={cn("task-card-badge", state() === "unseen" ? "text-success-strong" : railColor(state()))}>
+            <Dynamic component={state() ? stateIcon(state()) : delivered() ? Check : Archive} size={12} aria-hidden="true" />
+          </span>
+        </Show>
+      }><span class="task-card-orbit"><Spinner size={22} class="text-primary motion-reduce:animate-none" /></span></Show>
+    }><span class="task-card-orbit"><RailDashedRing size={22} /></span></Show>
+  </span>;
 }
 
 /**
@@ -76,7 +95,7 @@ function RailDashedRing(props: { size?: number }) {
  * sin ver, un punto verde; detenida por ti, una pausa gris, separada del fallo.
  * Terminada y vista no lleva nada: lo dice la fila apagándose.
  */
-function RailMark(props: TaskActivity & { provisional?: boolean; archivada?: boolean; plegadas?: boolean; size?: number; workingIdentity?: () => JSX.Element }) {
+function RailMark(props: TaskActivity & { provisional?: boolean; archivada?: boolean; plegadas?: boolean; size?: number }) {
   const state = () => taskPriority(props);
   const label = () => taskLabel(state(), !!props.plegadas);
   const lado = () => props.size ?? 14;
@@ -89,12 +108,7 @@ function RailMark(props: TaskActivity & { provisional?: boolean; archivada?: boo
       </Match>
       <Match when={state() === "working"}>
         <span class="inline-flex shrink-0 items-center justify-center" title={label()} aria-label={label()}>
-          <Show when={props.workingIdentity} fallback={<Spinner size={lado()} class="text-primary" />} >
-            <span class="relative inline-flex size-[22px] items-center justify-center" data-task-orbit>
-              {props.workingIdentity?.()}
-              <span class="pointer-events-none absolute inset-0"><Spinner size={22} class="text-primary motion-reduce:animate-none" /></span>
-            </span>
-          </Show>
+          <Spinner size={lado()} class="text-primary motion-reduce:animate-none" />
         </span>
       </Match>
       <Match when={state() === "unseen"}>
@@ -123,7 +137,8 @@ export default function EstadoDeTarea(props: TaskActivity & {
   size?: number;
   /** Las marcas de la tarjeta del riel (`Sessions.tsx`): arco, anillo, punto. */
   riel?: boolean;
-  workingIdentity?: () => JSX.Element;
+  identity?: () => JSX.Element;
+  identityLabel?: string;
   /** Recién creada: el motor todavía no la registra (`lib/taskDraft.ts`). */
   provisional?: boolean;
   archivada?: boolean;
@@ -131,7 +146,8 @@ export default function EstadoDeTarea(props: TaskActivity & {
   const lado = () => props.size ?? 12;
   const state = () => taskPriority(props);
   const label = () => taskLabel(state(), props.ambito === "plegadas");
-  return <Show when={!props.riel} fallback={<RailMark {...props} plegadas={props.ambito === "plegadas"} />}>
+  return <Show when={!props.identity} fallback={<CardMark {...props} identity={props.identity!} />}>
+  <Show when={!props.riel} fallback={<RailMark {...props} plegadas={props.ambito === "plegadas"} />}>
   <Show when={state() || (props.outcome === "delivered" && props.ambito !== "plegadas")}><span class={cn("inline-flex shrink-0 items-center gap-0.5", props.class)}>
     <Show when={state()} fallback={<Show when={props.outcome === "delivered" && props.ambito !== "plegadas"}><span class="inline-flex shrink-0 text-neutral-500" title={t("projects.status.delivered")} aria-label={t("projects.status.delivered")}><Check size={lado()} aria-hidden="true" /></span></Show>}>
       <span class={cn("inline-flex shrink-0 items-center justify-center", stateColor(state()))} style={{ width: `${lado()}px`, height: `${lado()}px` }} title={label()} aria-label={label()}>
@@ -141,5 +157,5 @@ export default function EstadoDeTarea(props: TaskActivity & {
       </span>
     </Show>
   </span></Show>
-  </Show>;
+  </Show></Show>;
 }

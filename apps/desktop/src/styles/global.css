@@ -1064,3 +1064,42 @@
 [data-astro-orbit="true"]::after {
   animation: none !important;
 }
+
+/* Secciones de la tarjeta: el contenido se recorta dentro de su sección;
+   omitir una sección por agrupación elimina también su ancho. */
+.task-card-lines { container-type: inline-size; width: 100%; min-width: 0; --task-card-surface: var(--color-rail); }
+.task-card-lines[data-outside] { --task-card-surface: var(--color-surface); }
+.task-card-lines[data-selected="true"] { --task-card-surface: var(--color-neutral-200); }
+.task-card-metadata { display: flex; min-width: 0; align-items: center; gap: 5px; height: 16px; }
+.task-card-provider { display: inline-flex; flex: 0 0 16px; width: 16px; align-items: center; }
+.task-card-folder { flex: 0 0 100px; width: 100px; min-width: 0; }
+.task-card-machine { flex: 0 0 86px; width: 86px; min-width: 0; }
+.task-card-git { display: inline-flex; flex: 0 0 72px; width: 72px; min-width: 0; align-items: center; gap: 4px; overflow: hidden; }
+.task-card-tail { display: inline-flex; flex-shrink: 0; align-items: center; gap: 5px; }
+.task-card-identity { position: relative; display: inline-flex; width: 24px; height: 24px; flex-shrink: 0; align-items: center; justify-content: center; }
+.task-card-orbit { position: absolute; inset: 1px; pointer-events: none; }
+.task-card-badge { position: absolute; top: -2px; right: -2px; display: inline-flex; width: 12px; height: 12px; border-radius: 50%; background: var(--task-card-surface, var(--color-surface)); }
+@container (max-width: 400px) {
+  .task-card-folder { flex-basis: 84px; width: 84px; }
+  .task-card-machine { flex-basis: 74px; width: 74px; }
+  .task-card-git { flex-basis: 64px; width: 64px; }
+}
+@container (max-width: 350px) {
+  .task-card-folder { flex-basis: 65px; width: 65px; }
+  .task-card-machine { flex-basis: 60px; width: 60px; }
+  .task-card-git { flex-basis: 64px; width: 64px; }
+  .task-card-metadata { gap: 4px; }
+}
+@container (max-width: 300px) {
+  .task-card-folder { flex-basis: 56px; width: 56px; }
+  .task-card-machine { flex-basis: 48px; width: 48px; }
+  .task-card-git { flex-basis: 64px; width: 64px; }
+}
+@container (max-width: 280px) {
+  .task-card-folder { flex-basis: 42px; width: 42px; }
+  .task-card-machine { flex-basis: 34px; width: 34px; }
+}
+@container (max-width: 260px) {
+  .task-card-folder { flex-basis: 32px; width: 32px; }
+  .task-card-machine { flex-basis: 24px; width: 24px; }
+}

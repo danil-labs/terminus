@@ -1,8 +1,7 @@
-import { AgentAvatar } from "./AgentAvatar";
 import { RADIUS, TEXT } from "@terminus/design";
 import { type CardPull, type TaskCard as Card, type PullTone, cardPull, canFinishTask, type TaskGit, taskTitle } from "@terminus/tasks";
 import * as Haptics from "expo-haptics";
-import { memo } from "react";
+import { memo, useState } from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { secondLine } from "../lib/cardLine";
 import { sameCard } from "../lib/reconcile";
@@ -23,7 +22,7 @@ export function MachineChip({ name, on, size = 12 }: { name: string; on: boolean
   return (
     <View style={[styles.chip, { opacity: on ? 1 : 0.6 }]} accessibilityLabel={on ? name : w("shell.machines.task_off", { name })}>
       <Icon name="server" size={size - 1} color={theme.textMuted} />
-      <Text numberOfLines={1} style={[styles.meta, { color: theme.textMuted, maxWidth: 110, fontSize: size }]}>
+      <Text numberOfLines={1} style={[styles.meta, { color: theme.textMuted, minWidth: 0, flexShrink: 1, fontSize: size }]}>
         {name}
       </Text>
     </View>
@@ -42,16 +41,19 @@ const toneColor = (theme: Theme, tone: PullTone) =>
   tone === "open" ? theme.unseenMark : tone === "closed" || tone === "failure" ? theme.failedMark : tone === "merged" ? theme.merged : theme.textMuted;
 
 /** El PR de la tarea, como `ChipDeGit` del riel: su icono y `#número`, rojo si el CI falló. */
-export function PullChip({ pull, git }: { pull: CardPull; git?: TaskGit | null }) {
+export function PullChip({ pull, git, compact = false }: { pull: CardPull; git?: TaskGit | null; compact?: boolean }) {
   const theme = useTheme();
   const checks = git?.pull_known && git.head === git.pull?.head_sha ? git.pull?.checks : undefined;
   const state = t(`task.git.${pull.state}`);
   const checkLabel = !git?.stale && (pull.state === "open" || pull.state === "draft") && (checks === "pending" || checks === "failure") ? t(`task.git.checks.${checks}`) : state;
   const label = git?.stale ? t("task.git.stale_short") : checkLabel;
   return (
-    <View testID="task-pull" style={[styles.chip, { minWidth: 0, maxWidth: 200 }]} accessibilityLabel={`#${pull.number}, ${state}${label === state ? "" : `, ${label}`}`}>
+    <View testID="task-pull" style={[styles.chip, { minWidth: 0, maxWidth: 200, gap: compact ? 3 : 4 }]} accessibilityLabel={`#${pull.number}, ${state}${label === state ? "" : `, ${label}`}`}>
       <Icon name={PULL_ICONS[pull.state]} size={11} color={toneColor(theme, pull.tone)} />
-      <Text numberOfLines={1} style={[styles.meta, { flexShrink: 1, color: toneColor(theme, pull.numberTone) }]}>#{pull.number} · {label}</Text>
+      <Text numberOfLines={1} style={[styles.meta, { minWidth: 0, flexShrink: 1, fontSize: compact ? TEXT.caption : TEXT.label, color: toneColor(theme, pull.numberTone) }]}>#{pull.number}{compact ? "" : ` · ${label}`}</Text>
+      {compact && (git?.stale ? <Icon name="clock" size={11} color={theme.textMuted} /> : pull.state === "open" && git?.head === git?.pull?.head_sha ? (
+        git?.pull?.review === "changes_requested" ? <Icon name="message-square-warning" size={11} color={theme.warningStrong} /> : checks === "failure" ? <Icon name="circle-x" size={11} color={theme.failedMark} /> : checks === "pending" ? <Icon name="circle-dashed" size={11} color={theme.warningStrong} /> : git?.pull?.review === "approved" ? <Icon name="user-check" size={11} color={theme.unseenMark} /> : checks === "success" ? <Icon name="circle-check" size={11} color={theme.unseenMark} /> : null
+      ) : null)}
     </View>
   );
 }
@@ -93,7 +95,7 @@ const sameProps = (a: TaskCardProps, b: TaskCardProps) =>
 
 /**
  * La lista del teléfono: título, marca y acciones en la primera línea;
- * proveedor, carpeta, máquina, agente y PR o rama en la segunda. La lista lee
+ * proveedor, carpeta, máquina y PR o rama en la segunda. La lista lee
  * el Git por carpeta; pulsar el cohete confirma sin abrir la conversación.
  */
 export const TaskCard = memo(TaskCardView, sameProps);
@@ -115,11 +117,18 @@ function TaskCardView({
   const folder = card.folder ? folderOf(card.folder) ?? { id: card.folder, key: card.folder, host: task.host, name: card.folder } : null;
   const pull = cardPull(git);
   const chips = secondLine(card, pull);
+  const [width, setWidth] = useState(320);
+  const limits = width <= 350 ? { folder: 56, machine: 48, git: 62 } : width <= 400 ? { folder: 84, machine: 80, git: 62 } : { folder: 100, machine: 86, git: 72 };
+  const room = Math.max(0, width - 32 - 16 - 86 - 20 - limits.git);
+  const scale = Math.min(1, room / (limits.folder + limits.machine));
+  const sections = { folder: Math.floor(limits.folder * scale), machine: Math.floor(limits.machine * scale), git: limits.git };
   const ready = online && canFinishTask(task, git, card.activity.viva || card.activity.aprobando);
   const branch = !git?.shared_with ? git?.branch : null;
+  const kn = git?.kind === "kn" && !git.shared_with ? git.kn : null;
   return (
     <Pressable
       testID={`task-${task.host}-${task.id}`}
+      onLayout={event => setWidth(event.nativeEvent.layout.width)}
       onPress={onPress}
       onLongPress={
         onLongPress
@@ -144,51 +153,34 @@ function TaskCardView({
             <Icon name="pin" size={13} color={theme.textMuted} />
           </View>
         ) : null}
-        {onFinish && pull?.state === "merged" && !git?.stale ? <Pressable testID={`finish-${task.host}-${task.id}`} accessibilityRole="button" accessibilityLabel={`${t("task.header.finish")}: ${taskTitle(lang, task)}`} accessibilityState={{ disabled: !ready }} disabled={!ready} hitSlop={8} onPress={(event) => { event.stopPropagation(); onFinish(); }} style={{ width: 40, height: 40, alignItems: "center", justifyContent: "center", marginVertical: -8, opacity: ready ? 1 : 0.3 }}>
-          <Icon name="rocket" size={18} color={theme.merged} />
-        </Pressable> : null}
         <View style={styles.mark}>
-          {card.state || card.delivered ? (
-            <TaskMark state={card.state} delivered={card.delivered} size={15} identity={{ agent: task.agent, provider: card.provider, host: task.host, folder: task.folder }} />
-          ) : (
-            <View style={[styles.hollow, { borderColor: theme.border }]} />
-          )}
+          <TaskMark state={card.state} delivered={card.delivered} identity={{ agent: task.agent, host: task.host, folder: task.folder }} />
         </View>
       </View>
       <View style={[styles.line, styles.second]}>
-        <View style={[styles.line, { flex: 1, minWidth: 0, overflow: "hidden" }]}>
-        {chips.map((chip) => {
-          switch (chip) {
-            case "provider":
-              return card.state === "working" && !task.agent ? null : (
-                <View key={chip} testID="task-provider" accessibilityRole="image" accessibilityLabel={card.provider ?? ""}>
-                  <BrandMark id={card.provider} size={13} color={theme.text} />
-                </View>
-              );
-            case "folder":
-              return folder ? (
-                <View key={chip} style={styles.chip}>
-                  <FolderIcon folder={folder} size={13} />
-                  <Text numberOfLines={1} style={[styles.meta, { color: theme.textMuted, maxWidth: 130 }]}>
-                    {folder.name ?? folder.id}
-                  </Text>
-                </View>
-              ) : null;
-            case "machine":
-              return card.machine ? <MachineChip key={chip} name={card.machine.id} on={card.machine.on} /> : null;
-            case "agent":
-              return card.state !== "working" && card.agent ? <AgentAvatar key={chip} name={card.agent} size={14} host={task.host} folder={task.folder} /> : null;
-            case "pull":
-              return pull ? <PullChip key={chip} pull={pull} git={git} /> : null;
-          }
-        })}
-        {!pull && branch ? <View style={styles.chip} accessibilityLabel={branch}>
-          <Icon name="git-branch" size={11} color={theme.textMuted} />
-          <Text numberOfLines={1} style={[styles.meta, { color: theme.textMuted, maxWidth: 160 }]}>{branch}</Text>
-        </View> : null}
-        {tag ? <Text style={[styles.tag, { color: theme.textMuted, backgroundColor: theme.muted }]}>{tag}</Text> : null}
+        <View testID="task-provider" accessibilityRole="image" accessibilityLabel={card.provider ?? task.provider} {...(Platform.OS === "web" ? { title: card.provider ?? task.provider } : {})} style={styles.provider}>
+          <BrandMark id={card.provider ?? task.provider} size={13} color={theme.text} />
         </View>
-        {when ? <Text style={[styles.when, { color: theme.textMuted, marginLeft: "auto" }]}>{when}</Text> : null}
+        {chips.includes("folder") && folder ? <View testID="task-folder" style={[styles.chip, { width: sections.folder, flexShrink: 0 }]} accessibilityLabel={folder.name}>
+          <FolderIcon folder={folder} size={13} />
+          <Text numberOfLines={1} style={[styles.meta, styles.clip, { color: theme.textMuted }]}>{folder.name ?? folder.id}</Text>
+        </View> : null}
+        {chips.includes("machine") && card.machine ? <View testID="task-machine" style={{ width: sections.machine, flexShrink: 0 }}><MachineChip name={card.machine.id} on={card.machine.on} /></View> : null}
+        {pull || kn || branch ? <View testID="task-git" style={[styles.chip, { width: sections.git, flexShrink: 0, overflow: "hidden" }]}>
+          {pull ? <PullChip pull={pull} git={git} compact /> : kn ? <View accessibilityRole="image" accessibilityLabel={w(kn === "clean" ? "projects.kn.clean" : kn === "saved" ? "projects.kn.saved" : "projects.kn.draft")}>
+            <Icon name={kn === "draft" ? "file-pen-line" : kn === "saved" ? "file-check" : "file"} size={12} color={git?.stale ? theme.textMuted : kn === "saved" ? theme.merged : theme.textMuted} />
+          </View> : <><Icon name="git-branch" size={11} color={theme.textMuted} /><Text numberOfLines={1} style={[styles.meta, styles.clip, { color: theme.textMuted }]}>{branch}</Text></>}
+        </View> : null}
+        {tag ? <Text numberOfLines={1} style={[styles.tag, { color: theme.textMuted, backgroundColor: theme.muted }]}>{tag}</Text> : null}
+        <View style={{ flex: 1, minWidth: 0 }} />
+        <View style={styles.tail}>
+          <View style={styles.action}>
+            {onFinish && ready ? <Pressable testID={`finish-${task.host}-${task.id}`} accessibilityRole="button" accessibilityLabel={`${t("task.header.finish")}: ${taskTitle(lang, task)}`} hitSlop={8} onPress={event => { event.stopPropagation(); onFinish(); }} style={styles.action}>
+              <Icon name="rocket" size={15} color={theme.merged} />
+            </Pressable> : null}
+          </View>
+          <Text testID="task-time" numberOfLines={1} style={[styles.when, { color: theme.textMuted }]}>{when}</Text>
+        </View>
       </View>
     </Pressable>
   );
@@ -196,13 +188,16 @@ function TaskCardView({
 
 const styles = StyleSheet.create({
   card: { paddingHorizontal: 16, paddingVertical: 10, gap: 4, minHeight: 60, justifyContent: "center" },
-  tag: { fontSize: TEXT.caption, fontWeight: "600", paddingHorizontal: 6, paddingVertical: 1, borderRadius: RADIUS.sm, overflow: "hidden" },
-  when: { fontSize: 12.5, fontVariant: ["tabular-nums"] },
+  tag: { fontSize: TEXT.caption, fontWeight: "600", paddingHorizontal: 6, paddingVertical: 1, maxWidth: 64, minWidth: 0, flexShrink: 1, borderRadius: RADIUS.sm, overflow: "hidden" },
+  when: { width: 62, textAlign: "right", fontSize: 12.5, fontVariant: ["tabular-nums"], flexShrink: 0 },
   line: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 18 },
-  second: { gap: 8 },
-  mark: { minWidth: 18, alignItems: "center" },
-  hollow: { width: 9, height: 9, borderRadius: 5, borderWidth: 1.5 },
+  second: { gap: 4 },
+  mark: { width: 24, height: 24, flexShrink: 0, alignItems: "center", justifyContent: "center" },
+  provider: { width: 16, flexShrink: 0, alignItems: "flex-start", justifyContent: "center" },
+  clip: { flex: 1, minWidth: 0 },
+  action: { width: 20, height: 20, alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  tail: { flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 0 },
   title: { flex: 1, minWidth: 0, fontSize: 16, fontWeight: "500" },
-  chip: { flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 1 },
+  chip: { flexDirection: "row", alignItems: "center", gap: 4, minWidth: 0, flexShrink: 1 },
   meta: { fontSize: TEXT.label },
 });

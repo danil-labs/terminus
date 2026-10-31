@@ -22,23 +22,23 @@ const git = (extra: Partial<TaskGit> = {}, checks?: "failure"): TaskGit => ({
   ...extra,
 });
 
-test("proveedor · carpeta · máquina · agente · PR, en ese orden", () => {
-  assert.deepEqual(secondLine(card(), cardPull(git())), ["provider", "folder", "machine", "agent", "pull"]);
+test("proveedor · carpeta · máquina · PR, en ese orden", () => {
+  assert.deepEqual(secondLine(card(), cardPull(git())), ["provider", "folder", "machine", "pull"]);
 });
 
-test("sin proveedor, o con uno sin marca, la línea empieza en la carpeta", () => {
-  assert.deepEqual(secondLine(card({ provider: null }), null), ["folder", "machine", "agent"]);
-  assert.deepEqual(secondLine(card({ provider: "desconocido" }), null), ["folder", "machine", "agent"]);
+test("el slot del proveedor permanece incluso ante datos antiguos sin marca", () => {
+  assert.deepEqual(secondLine(card({ provider: null }), null), ["provider", "folder", "machine"]);
+  assert.deepEqual(secondLine(card({ provider: "desconocido" }), null), ["provider", "folder", "machine"]);
   assert.equal(secondLine(card({ provider: "antigravity" }), null)[0], "provider");
   assert.equal(secondLine(card({ provider: "opencode-zen" }), null)[0], "provider");
 });
 
 test("si te necesita conserva metadatos, sin mostrar el último mensaje", () => {
-  assert.deepEqual(secondLine(card({ esperando: true }), cardPull(git())), ["provider", "folder", "machine", "agent", "pull"]);
+  assert.deepEqual(secondLine(card({ esperando: true }), cardPull(git())), ["provider", "folder", "machine", "pull"]);
 });
 
 test("si falló, la línea normal: no el último mensaje", () => {
-  assert.deepEqual(secondLine(card({ outcome: "failed" }), null), ["provider", "folder", "machine", "agent"]);
+  assert.deepEqual(secondLine(card({ outcome: "failed" }), null), ["provider", "folder", "machine"]);
 });
 
 test("PR con checks fallidos: número en rojo; con git viejo, gris", () => {
@@ -102,7 +102,7 @@ test("work grouping and repeated view toggles preserve the Git request identity"
     b: git({ kind: "kn", kn: "draft" }),
   });
   const key = gitAsksKey(gitAsks(candidates));
-  for (const group of ["folder", "status", "none", "agent", "machine", "status"] as const) {
+  for (const group of ["folder", "status", "none", "machine", "status"] as const) {
     const groups = applySidebarView(candidates, { ...DEFAULT_SIDEBAR_VIEW, group }, {
       live: [], approving: [], workStateOf: task => workStateOf(effectiveGit(book, task, candidates)),
     });
