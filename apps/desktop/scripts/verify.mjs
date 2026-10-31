@@ -588,7 +588,7 @@ const steps = [
   ["En el navegador la interfaz habla con el relay", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/web-transport.test.mjs")], root],
   ["En el navegador la sesión de Danil elige la computadora y explica por qué no entra", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/web-gate.test.mjs")], root],
   ["En el navegador la app abre enseguida, sin instalador ni pantalla de preparación", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/web-setup.test.mjs")], root],
-  ["En el navegador, un trozo que borró un despliegue recarga la página una vez", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/web-stale-chunk.test.mjs")], root],
+  ["En el navegador, una versión nueva se ofrece sin recargar a la fuerza", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/web-stale-chunk.test.mjs")], root],
   ["En el navegador una computadora apagada monta sin encenderse y despierta al mandarle algo", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/web-off.test.mjs")], root],
   ["En el navegador lo que el relay guardó se ve con su hora mientras la computadora está apagada", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/web-cached.test.mjs")], root],
   ["En el navegador un panel junta todas las computadoras y cada orden va a su máquina", process.execPath, ["--test", "--test-force-exit", join(root, "tests/unit/web-machines.test.mjs")], root],
