@@ -50,11 +50,11 @@ assert.equal(tile("w3").dataset.attention, "asked", "una pregunta gana a termina
 assert.ok(tile("w3").querySelector("svg.lucide-circle-question-mark"));
 assert.equal(tile("w4").dataset.attention, undefined, "un estado que la ventana no conoce no se pinta");
 const columnRow = (id) => doc.querySelector(`[data-sesion="${id}"]`);
-// La tarjeta del riel: sin ver es un check verde; vista lo deja neutro y se apaga.
-assert.ok(columnRow("s1").querySelector('[aria-label="Terminó y no la has abierto"] .text-success-strong svg.lucide-check'), "la fila dice terminada sin ver");
+// La tarjeta del riel: sin ver es el punto verde; vista lo deja neutro y se apaga.
+assert.ok(columnRow("s1").querySelector('[aria-label="Terminó y no la has abierto"] .task-card-badge .bg-success-strong'), "la fila dice terminada sin ver");
 assert.equal(columnRow("s3").dataset.apagada, "true", "una entregada ya vista se apaga, en su sitio");
-assert.ok(columnRow("s3").querySelector('[aria-label="Resultado entregado"] svg.lucide-check'), "y conserva el check en su esquina");
-assert.equal(columnRow("s3").querySelector('[aria-label="Resultado entregado"] .text-success-strong'), null, "sin el verde de lo no visto");
+assert.ok(columnRow("s3").querySelector('[aria-label="Resultado entregado"] .task-card-badge .bg-neutral-500'), "y conserva el punto en su esquina");
+assert.equal(columnRow("s3").querySelector('[aria-label="Resultado entregado"] .bg-success-strong'), null, "sin el verde de lo no visto");
 const foldEl = doc.querySelector('button[aria-label="Plegar «Proyecto»"]');
 foldEl.click();
 await sleep(50);
