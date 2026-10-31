@@ -28,17 +28,10 @@
           "type": "String"
         }
       ],
-      "ids": {
-        "arguments": {
-          "project": "folder",
-          "id": "task"
-        },
-        "result": {
-          "members": "task-family",
-          "applied": "task-family",
-          "failures": "task-family"
-        }
-      }
+      "path": "workspace::task_family::task_lifecycle_preview",
+      "output": "-> Result < Value , Failure >",
+      "async": false,
+      "channel": null
     },
     {
       "name": "task_lifecycle_apply",
@@ -76,17 +69,15 @@
           "type": "bool"
         }
       ],
-      "ids": {
-        "arguments": {
-          "project": "folder",
-          "id": "task"
-        },
-        "result": {
-          "members": "task-family",
-          "applied": "task-family",
-          "failures": "task-family"
-        }
-      }
+      "path": "workspace::task_family::task_lifecycle_apply",
+      "output": "-> Result < Value , Failure >",
+      "async": false,
+      "channel": null
     }
-  ]
+  ],
+  "name": "task_lifecycle",
+  "features": [
+    "task_lifecycle_v1"
+  ],
+  "events": []
 }
