@@ -150,15 +150,26 @@ test("an answer after closing changes nothing", async () => {
   assert.equal(pager.older, "idle");
 });
 
+test("a host that keeps answering with its tail ends in a failure, not in a loop of requests", async () => {
+  const engine = new Engine(200);
+  let reads = 0;
+  const pager = new HistoryPager<Turn>({ retryMs: 0, read: async () => { reads++; return engine.page(null); } });
+  const opened = engine.page(null);
+  pager.accept(opened.turns, opened.history);
+  assert.equal(await pager.fetchOlder(), null);
+  assert.equal(pager.older, "failed");
+  assert.equal(reads, 2);
+});
+
 test("a rewrite under the window goes back to the tail without mixing turns", async () => {
   const engine = new Engine(200);
   const pager = new HistoryPager<Turn>({ retryMs: 0, read: async before => engine.page(before) });
   const opened = engine.page(null);
   pager.accept(opened.turns, opened.history);
-  engine.turns = Array.from({ length: 200 }, (_, n) => ({ id: `n${n}` }));
+  engine.turns = Array.from({ length: 220 }, (_, n) => ({ id: `n${n}` }));
   engine.writes++;
   assert.equal(await pager.fetchOlder(), null);
-  assert.equal(pager.loaded!.turns[0].id, "n150");
+  assert.equal(pager.loaded!.turns[0].id, "n170");
   assert.equal(pager.older, "idle");
 });
 

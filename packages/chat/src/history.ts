@@ -161,7 +161,9 @@ export class HistoryPager<T> {
           const tail = await this.options.read(null);
           if (generation !== this.generation) return null;
           this.loaded = undefined;
-          this.accept(tail.turns, tail.history);
+          const fresh = this.accept(tail.turns, tail.history);
+          // The same window again means this host will not join: asking again would never end.
+          if (fresh.start === asked.start) break;
           return this.settle(generation);
         }
         if (merged.start >= asked.start) continue;
