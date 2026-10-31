@@ -1,7 +1,7 @@
 /**
  * Los espacios en la ventana, montados en jsdom contra un servicio simulado
  * con estado: lo que el stub devuelve cambia con lo que la ventana le manda, y
- * cada respuesta sale clonada como del IPC. Lo llama `mount-frontend.mjs`.
+ * cada respuesta sale clonada como del IPC. Lo llama el guarda `mount-spaces.mjs`.
  *
  * Con `TERMINUS_E2E_DIR` deja por escenario el HTML de #root y lo que la
  * ventana invocó, para mirarlo sin volver a correr.

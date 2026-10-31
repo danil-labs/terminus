@@ -1,7 +1,7 @@
 /**
  * El front de `dist/` montado en jsdom, con el IPC de Tauri stubeado.
  *
- * Lo comparten `mount-frontend.mjs`, que afirma que el árbol pinta, y
+ * Lo comparten los guardas `mount-*.mjs`, que afirman que el árbol pinta, y
  * `open-task-cost.mjs`, que cuenta cuánto trabajo cuesta abrir una tarea. Un
  * arranque por guarda divergiría, y el contador dejaría de medir el árbol que el
  * otro guarda da por bueno.
