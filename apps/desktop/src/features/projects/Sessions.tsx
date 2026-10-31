@@ -743,18 +743,19 @@ export default function Sessions(props: {
           <FolderChip id={projectOf(r.s)} name={folder()} untitled={tarjetaDelRiel()} class="task-card-folder text-xs text-neutral-500" />
         }</Show>
         <Show when={!props.hideMachine && r.s.machine}>{machine => <MachineChip machine={machine()} on={r.s.machine_on !== false} class="task-card-machine" />}</Show>
-        <Show when={!propioDeOtra() && ["kn", "branch", "detached"].includes(git().kind)}>
+        <Show when={(worktreeDe(r.s.id)?.owned && !worktreeDe(r.s.id)?.available) || (!propioDeOtra() && ["kn", "branch", "detached"].includes(git().kind))}>
           <span class="task-card-git">
             <Show when={worktreeDe(r.s.id)?.owned && !worktreeDe(r.s.id)?.available}><span class="inline-flex text-error-strong" title={t("projects.sessions.worktree_missing")} aria-label={t("projects.sessions.worktree_missing")}><WorktreeRoto size={12} /></span></Show>
-            <Show when={git().kind === "kn" || !git().pull_known || !git().pull} fallback={<RailPull status={git()} />}>
+            <Show when={!propioDeOtra() && ["kn", "branch", "detached"].includes(git().kind)}><Show when={git().kind === "kn" || !git().pull_known || !git().pull} fallback={<RailPull status={git()} />}>
               <span data-session-pr class={cn("inline-flex shrink-0", gitStyle().color)} title={sessionGitDescription(git())} aria-label={sessionGitDescription(git())}><Dynamic component={gitStyle().icon} size={12} aria-hidden="true" /></span>
-            </Show>
+            </Show></Show>
             <Show when={abridor()}>{who => <ChipDeCara kind="opener" icon={CornerDownRight} name={who()} tip={t("projects.sessions.opened_by", { name: nombre(who()) })} />}</Show>
             <Show when={anterior()}>{who => <ChipDeCara kind="handoff" icon={ArrowLeftRight} name={who()} tip={t("projects.sessions.handed_from", { name: nombre(who()) })} />}</Show>
           </span>
         </Show>
         <span class="min-w-0 flex-1" />
         <span class="task-card-tail">
+          <Show when={r.s.deferred}><span data-deferred class="shrink-0 text-neutral-500" title={t("projects.sessions.deferred")} aria-label={t("projects.sessions.deferred")}>⧗</span></Show>
           <span class="inline-flex size-[18px] shrink-0 items-center justify-center">{r.cohete()}</span>
           <span data-session-time class="whitespace-nowrap text-[0.71875rem] tabular-nums">{shortTaskTime(cuando())}</span>
         </span>
@@ -929,10 +930,11 @@ export default function Sessions(props: {
           <Show when={confirmando() === f.s.id} fallback={<>
               {/* En la tarjeta del riel fijar va primero: el alfiler ya no
                   tiene botón propio en la fila. */}
-              <Show when={m.riel && props.onPin}>
+              <Show when={props.onPin}>
                 <button
                   role="menuitem"
                   data-session-pin
+                  aria-label={fijada(f.s) ? t("projects.sessions.unpin_named", { title: f.s.title }) : t("projects.sessions.pin_named", { title: f.s.title })}
                   class={`${ITEM_DE_MENU} flex items-center gap-2 font-semibold`}
                   onClick={() => void setPinned(f.s)}
                 >
@@ -1282,7 +1284,7 @@ export default function Sessions(props: {
               titulo={<Titulo />}
               apagada={apagada()}
               conMenu={conMenu()}
-              menu={() => <Menu riel />}
+              menu={() => <Menu riel={tarjetaDelRiel()} />}
               cohete={() => (
                 <Show when={puedeFinalizar() && renombrando() !== f.s.id}>
                   <span data-session-actions data-finish-slot class="flex">
