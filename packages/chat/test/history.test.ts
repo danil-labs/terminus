@@ -292,3 +292,18 @@ test("a page that adds nothing ends in a visible failure, not a quiet stop", asy
   assert.equal(await pager.fetchOlder(), null);
   assert.equal(pager.older, "failed");
 });
+
+test("long text keeps its quotes out and survives a file that keeps changing", async () => {
+  const { readDetailText } = await import("../src/historyDetail.ts");
+  const ref = { version: 1 as const, turn: 2, pointer: "/text", revision: "old", bytes: 9 };
+  let writes = 0;
+  const read = {
+    part: async (current: typeof ref) => {
+      if (current.revision !== "r2") throw { what: "revision_changed" };
+      return { version: 1 as const, revision: "r2", offset: 0, next: 9, total: 9, done: true, text: '"a\\nb \\"c"' };
+    },
+    turns: async () => ({ turns: [{ id: "x", history_refs: [{ ...ref, revision: `r${++writes}` }] }], history: { start: 2, end: 3, total: 3, limit: 50, has_more: true } }),
+  };
+  assert.equal(await readDetailText(read, ref, "x"), 'a\nb "c');
+  await assert.rejects(readDetailText({ ...read, part: async () => { throw new Error("gone"); } }, ref, "other"));
+});

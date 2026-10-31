@@ -1,6 +1,6 @@
 import { TEXT } from "@terminus/design";
 import type { HistoryRef } from "@terminus/protocol";
-import { useContext, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { loadDetail } from "../../lib/engine";
 import { t } from "../../lib/i18n";
@@ -14,7 +14,6 @@ export function HistoryDetail({ reference, turnId }: { reference: HistoryRef; tu
   const scope = useContext(ChatScopeContext);
   const [state, setState] = useState<"idle" | "loading" | "failed" | "large">("idle");
   const [text, setText] = useState<string | null>(null);
-  if (text !== null) return <MessageBody text={text} />;
   const open = () => {
     if (!scope || state === "loading") return;
     setState("loading");
@@ -25,6 +24,11 @@ export function HistoryDetail({ reference, turnId }: { reference: HistoryRef; tu
       })
       .catch(() => setState("failed"));
   };
+  // El texto del mensaje es la respuesta misma, no un adjunto que se abre.
+  useEffect(() => {
+    if (reference.pointer === "/text") open();
+  }, [reference.pointer, reference.turn]);
+  if (text !== null) return <MessageBody text={text} />;
   const note = state === "failed" ? t("task.history.failed") : state === "large" ? t("task.history.too_large") : state === "loading" ? t("task.history.older_loading") : null;
   return (
     <View style={{ gap: 4 }}>

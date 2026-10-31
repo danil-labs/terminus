@@ -41,7 +41,7 @@ import type {
   LiveTurn,
 } from "@terminus/protocol";
 import { type HistoryRead } from "@terminus/chat/history";
-import { currentRef, readWholeDetail } from "@terminus/chat/historyDetail";
+import { readDetailText } from "@terminus/chat/historyDetail";
 import { readVisualHtml, type VisualPart, type VisualWhole, VISUAL_FILE, VISUAL_TREE } from "@terminus/chat/visual";
 import { arrangeSpaces, spaceOrder, type AccountWorkspace, groupWorkspaces, linkedAttention, onlyLinked, registryProjects, withRegistry } from "@terminus/computers";
 import { type ChatBackgroundView, chatBackgroundImageUrl, chatBackgroundView, isSingleAttention } from "@terminus/protocol";
@@ -399,10 +399,6 @@ export async function loadTurns(host: Host, workspace: string, folder: string, i
   return { turns: session.turns ?? [], history: session.history };
 }
 
-const DETAIL_ATTEMPTS = 5;
-const DETAIL_RETRY_MS = 150;
-let details: Promise<unknown> = Promise.resolve();
-
 /**
  * El contenido entero de un campo que no cupo en la página; `null` si no se puede traer de una
  * vez. En fila: el relay acota las lecturas de historial simultáneas.
@@ -410,26 +406,7 @@ let details: Promise<unknown> = Promise.resolve();
 export function loadDetail(host: Host, workspace: string, folder: string, id: string, ref: HistoryRef, turnId: string | undefined): Promise<string | null> {
   const part = async (current: HistoryRef, offset: number) =>
     (await host.call<HistoryChunk>("load_session", workspace, { project: folder, id, history_request: { ...current, kind: "detail", offset } })).value;
-  const run = async () => {
-    let current = ref;
-    let whole: unknown;
-    for (let attempt = 0; ; attempt++) {
-      try {
-        whole = await readWholeDetail(part, current);
-        break;
-      } catch (error) {
-        if (attempt >= DETAIL_ATTEMPTS) throw error;
-        await new Promise((done) => setTimeout(done, DETAIL_RETRY_MS * attempt));
-        const fresh = await currentRef((before) => loadTurns(host, workspace, folder, id, before), ref, turnId).catch(() => undefined);
-        if (fresh === null) throw new HostError("history_detail_changed");
-        if (fresh) current = fresh;
-      }
-    }
-    return whole === null ? null : typeof whole === "string" ? whole : JSON.stringify(whole, null, 2);
-  };
-  const next = details.then(run, run);
-  details = next.catch(() => {});
-  return next;
+  return readDetailText({ part, turns: (before) => loadTurns(host, workspace, folder, id, before) }, ref, turnId);
 }
 
 export async function loadTask(host: Host, workspace: string, folder: string, id: string, holding = false): Promise<TaskView> {

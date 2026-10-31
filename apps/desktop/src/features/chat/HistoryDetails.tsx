@@ -1,14 +1,33 @@
 import type { HistoryChunk, HistoryRef } from "@terminus/protocol";
-import { currentRef } from "@terminus/chat/historyDetail";
-import { createSignal, For, Show, onCleanup } from "solid-js";
+import { currentRef, readDetailText } from "@terminus/chat/historyDetail";
+import { createResource, createSignal, For, Show, onCleanup } from "solid-js";
 import { retainRowWhile } from "./threadRow";
 import { invoke } from "../../lib/invoke";
 import { t } from "../../lib/i18n";
+import { Markdown } from "../../ui/Markdown";
 import { machineOf } from "../machines/store";
 import type { Session } from "./transcript";
 
 const REREADS = 5;
 const REREAD_MS = 150;
+
+const readTurns = (ref: HistoryRef) => (before: number) =>
+  invoke<Session>("load_session", { project: ref.project, id: ref.session, history_request: { version: 1, before, revision: null } }, machineOf(ref.session));
+
+/** El texto del mensaje es la respuesta misma: se trae al montar la fila y se lee como cualquier otra. */
+function HistoryText(props: { reference: HistoryRef; turnId?: string; onUnavailable: () => void }) {
+  const [text] = createResource(() => props.reference, (ref) => readDetailText<Session["turns"][number]>({
+    part: (current, offset) => invoke<HistoryChunk>("load_session", { project: ref.project, id: ref.session, history_request: { ...current, kind: "detail", offset } }, machineOf(ref.session)),
+    turns: readTurns(ref),
+  }, ref, props.turnId).then((value) => {
+    if (value === null) props.onUnavailable();
+    return value;
+  }).catch(() => {
+    props.onUnavailable();
+    return null;
+  }));
+  return <Show when={text()}>{(value) => <Markdown>{value()}</Markdown>}</Show>;
+}
 
 /** Una sola página de contenido crudo en memoria, incluso con resultados de muchos MB. */
 export function HistoryDetails(props: { refs: HistoryRef[]; turnId?: string }) {
@@ -27,7 +46,7 @@ export function HistoryDetails(props: { refs: HistoryRef[]; turnId?: string }) {
       await new Promise((done) => setTimeout(done, REREAD_MS * attempts));
       if (current !== generation) return true;
       const fresh = await currentRef<Session["turns"][number]>(
-        (before) => invoke<Session>("load_session", { project: ref.project, id: ref.session, history_request: { version: 1, before, revision: null } }, machineOf(ref.session)),
+        readTurns(ref),
         ref, props.turnId,
       ).catch(() => undefined);
       if (current !== generation) return true;
@@ -56,8 +75,14 @@ export function HistoryDetails(props: { refs: HistoryRef[]; turnId?: string }) {
     }
     finally { if (current === generation) setLoading(false); }
   }
-  return <div class="my-2 text-xs text-neutral-500">
-    <For each={props.refs}>{ref => <button type="button" class="mr-2 underline" onClick={() => void read(ref, 0)}>
+  const [textFailed, setTextFailed] = createSignal(false);
+  const textRef = () => textFailed() ? undefined : props.refs.find((ref) => ref.pointer === "/text");
+  const listed = () => props.refs.filter((ref) => ref !== textRef());
+  return <>
+  <Show when={textRef()}>{(ref) => <HistoryText reference={ref()} turnId={props.turnId} onUnavailable={() => setTextFailed(true)} />}</Show>
+  <Show when={listed().length > 0}>
+  <div class="my-2 text-xs text-neutral-500">
+    <For each={listed()}>{ref => <button type="button" class="mr-2 underline" onClick={() => void read(ref, 0)}>
       {t("chat.history.open")} ({ref.pointer === "/text" ? t("chat.history.text") : ref.pointer === "/pieces" ? t("chat.history.pieces") : t("chat.history.content")}, {Math.ceil(ref.bytes / 1024)} KiB)
     </button>}</For>
     <Show when={selected()}>{ref => <div class="mt-2 rounded border border-border p-2">
@@ -73,5 +98,7 @@ export function HistoryDetails(props: { refs: HistoryRef[]; turnId?: string }) {
         <button type="button" disabled={loading() || page().done} onClick={() => void read(ref(), page().next)}>{t("chat.history.next")}</button>
       </>}</Show>
     </div>}</Show>
-  </div>;
+  </div>
+  </Show>
+  </>;
 }

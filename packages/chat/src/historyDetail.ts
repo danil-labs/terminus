@@ -30,3 +30,37 @@ export async function readWholeDetail(part: (ref: HistoryRef, offset: number) =>
     offset = chunk.next;
   }
 }
+
+const DETAIL_ATTEMPTS = 5;
+const DETAIL_RETRY_MS = 150;
+let queue: Promise<unknown> = Promise.resolve();
+
+export type DetailReader<T extends RefTurn> = {
+  part: (ref: HistoryRef, offset: number) => Promise<HistoryChunk>;
+  turns: (before: number) => Promise<HistoryRead<T>>;
+};
+
+/**
+ * A field as text, retrying around a task that keeps writing. `null`: too large for one read.
+ * One at a time: the relay bounds concurrent history reads. Rejects if the turn is no longer this one.
+ */
+export function readDetailText<T extends RefTurn>(read: DetailReader<T>, ref: HistoryRef, turnId: string | null | undefined): Promise<string | null> {
+  const run = async () => {
+    let current = ref;
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const whole = await readWholeDetail(read.part, current);
+        return whole === null ? null : typeof whole === "string" ? whole : JSON.stringify(whole, null, 2);
+      } catch (error) {
+        if (attempt >= DETAIL_ATTEMPTS) throw error;
+        await new Promise(done => setTimeout(done, DETAIL_RETRY_MS * attempt));
+        const fresh = await currentRef(read.turns, ref, turnId).catch(() => undefined);
+        if (fresh === null) throw new Error("history_detail_changed");
+        if (fresh) current = { ...current, ...fresh };
+      }
+    }
+  };
+  const next = queue.then(run, run);
+  queue = next.catch(() => {});
+  return next;
+}
