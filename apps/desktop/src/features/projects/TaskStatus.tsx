@@ -4,7 +4,7 @@ import CircleAlert from "lucide-solid/icons/circle-alert";
 import CircleHelp from "lucide-solid/icons/circle-help";
 import CirclePause from "lucide-solid/icons/circle-pause";
 import ShieldQuestion from "lucide-solid/icons/shield-question";
-import { Match, Show, Switch } from "solid-js";
+import { type JSX, Match, Show, Switch } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import { t } from "../../lib/i18n";
 import { Spinner } from "../../ui/Spinner";
@@ -76,7 +76,7 @@ function RailDashedRing(props: { size?: number }) {
  * sin ver, un punto verde; detenida por ti, una pausa gris, separada del fallo.
  * Terminada y vista no lleva nada: lo dice la fila apagándose.
  */
-function RailMark(props: TaskActivity & { provisional?: boolean; archivada?: boolean; plegadas?: boolean; size?: number }) {
+function RailMark(props: TaskActivity & { provisional?: boolean; archivada?: boolean; plegadas?: boolean; size?: number; workingIdentity?: () => JSX.Element }) {
   const state = () => taskPriority(props);
   const label = () => taskLabel(state(), !!props.plegadas);
   const lado = () => props.size ?? 14;
@@ -89,7 +89,12 @@ function RailMark(props: TaskActivity & { provisional?: boolean; archivada?: boo
       </Match>
       <Match when={state() === "working"}>
         <span class="inline-flex shrink-0 items-center justify-center" title={label()} aria-label={label()}>
-          <Spinner size={lado()} class="text-primary" />
+          <Show when={props.workingIdentity} fallback={<Spinner size={lado()} class="text-primary" />} >
+            <span class="relative inline-flex size-[22px] items-center justify-center" data-task-orbit>
+              {props.workingIdentity?.()}
+              <span class="pointer-events-none absolute inset-0"><Spinner size={22} class="text-primary motion-reduce:animate-none" /></span>
+            </span>
+          </Show>
         </span>
       </Match>
       <Match when={state() === "unseen"}>
@@ -118,6 +123,7 @@ export default function EstadoDeTarea(props: TaskActivity & {
   size?: number;
   /** Las marcas de la tarjeta del riel (`Sessions.tsx`): arco, anillo, punto. */
   riel?: boolean;
+  workingIdentity?: () => JSX.Element;
   /** Recién creada: el motor todavía no la registra (`lib/taskDraft.ts`). */
   provisional?: boolean;
   archivada?: boolean;

@@ -5,6 +5,7 @@ import CornerDownRight from "lucide-solid/icons/corner-down-right";
 import FilePenLine from "lucide-solid/icons/file-pen-line";
 import MoreVertical from "lucide-solid/icons/more-vertical";
 import Pin from "lucide-solid/icons/pin";
+import UserRound from "lucide-solid/icons/user-round";
 import PinOff from "lucide-solid/icons/pin-off";
 import { createEffect, createMemo, createSignal, For, type JSX, lazy, mapArray, on, onCleanup, Show, Suspense } from "solid-js";
 import { Dynamic } from "solid-js/web";
@@ -48,7 +49,7 @@ import { matchesTaskQuery } from "./taskSearch";
 import { canFinishTask, effectiveTaskGit, type GitStatus, sharesTaskGit, watchSessionGit } from "./taskGit";
 import { authorKey, authorKeys, isSubtask } from "./taskAuthors";
 import { descendientes, type Rama as RamaDeTareas, taskTree } from "./taskTree";
-import { rolledOutcome, type TaskActivity, taskPriority } from "@terminus/design";
+import { agentMarkId, rolledOutcome, type TaskActivity, taskPriority } from "@terminus/design";
 import { taskCard, buildTaskTree, launcherOf, sameAgent, taskIdentity, withTaskAncestors } from "@terminus/tasks";
 
 export function readableSessionTitle(title: string): string {
@@ -698,6 +699,8 @@ export default function Sessions(props: {
   }) => {
     // Qué lleva la línea 2 lo decide la tarjeta compartida con el teléfono (`@terminus/tasks`).
     const tarjeta = () => taskCard(r.s, { live: props.vivas, approving: props.aprobando, hideFolder: hideFolder(r.s) });
+    const working = () => taskPriority(r.actividad) === "working" && !esProvisional(r.s.id);
+    const activeAgent = () => r.s.agent;
     const git = () => gitDe(r.s);
     // La rama de quien comparte el árbol de su padre se dice en la fila del padre.
     const propioDeOtra = () => !!git().shared_with || sharesTaskGit(r.s, gitRows(), props.relatedSessions ?? props.sessions);
@@ -720,13 +723,20 @@ export default function Sessions(props: {
             <span
               data-session-status
               class={cn(
-                "inline-flex size-4 items-center justify-center",
+                "inline-flex min-h-4 min-w-4 items-center justify-center",
                 r.conMenu && "group-hover/session:hidden group-focus-visible/session:sr-only group-has-[:focus-visible]/session:sr-only",
                 r.conMenu && abierto() && "hidden",
               )}
             >
               <EstadoDeTarea
                 riel
+                workingIdentity={() =>
+                  <Show when={activeAgent()} fallback={
+                    <Show when={agentMarkId(r.s.provider)} fallback={<UserRound size={13} class="text-neutral-700" aria-hidden="true" />}><MarcaAgente id={r.s.provider} size={13} /></Show>
+                  }>
+                    {(agent) => <span data-session-agent title={nombre(agent())} aria-label={nombre(agent())}><AstroAvatar name={agent()} status="working" orbit body={profiles()[agent()]?.body} avatar={profiles()[agent()]?.avatar} size={14} /></span>}
+                  </Show>
+                }
                 {...r.actividad}
                 provisional={esProvisional(r.s.id)}
                 archivada={!!r.s.archived}
@@ -754,10 +764,10 @@ export default function Sessions(props: {
             r.apagada && "opacity-80 group-hover/session:opacity-100",
           )}
         >
-          <Show when={tarjeta().agent}>
+          <Show when={!working() && tarjeta().agent}>
             {(agente) => <ChipDeCara kind="agent" name={agente()} tip={nombre(agente())} working={props.vivas.includes(r.s.id)} />}
           </Show>
-          <Show when={tarjeta().provider}>
+          <Show when={(!working() || activeAgent()) && tarjeta().provider}>
             {(proveedor) => <span data-session-provider class="flex shrink-0" title={proveedor()} aria-label={proveedor()}><MarcaAgente id={proveedor()} size={12} /></span>}
           </Show>
           {/* La carpeta solo si el riel no agrupa por carpeta, y solo en la raíz:

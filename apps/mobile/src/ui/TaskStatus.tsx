@@ -1,6 +1,10 @@
-import { type IconShape, LUCIDE, STATUS_ICONS, STATUS_LABELS, type StatusLabel, type TaskState, topState } from "@terminus/design";
+import { agentMarkId, type IconShape, LUCIDE, STATUS_ICONS, STATUS_LABELS, type StatusLabel, type TaskState, topState } from "@terminus/design";
 import { View } from "react-native";
 import Svg, { Circle, Line, Path } from "react-native-svg";
+import { AgentAvatar } from "./AgentAvatar";
+import { BrandMark } from "./BrandMark";
+import { Icon as GenericIcon } from "./Icon";
+import { TaskOrbit } from "./TaskOrbit";
 import { lang } from "../lib/i18n";
 import { type Theme, useTheme } from "./theme";
 
@@ -45,13 +49,15 @@ function Icon({ state, color, size }: { state: Exclude<StatusLabel, "working">; 
 }
 
 /** The mark of one task, or of a folded group; nothing when there is nothing to say. */
-export function TaskMark({ state, delivered = false, size = 16 }: { state: TaskState | null; delivered?: boolean; size?: number }) {
+export function TaskMark({ state, delivered = false, size = 16, identity }: { state: TaskState | null; delivered?: boolean; size?: number; identity?: { agent?: string | null; provider?: string | null; host?: string; folder?: string } }) {
   const theme = useTheme();
   const box = { width: size, height: size, alignItems: "center" as const, justifyContent: "center" as const };
   if (state === "working") {
     return (
-      <View style={box} accessibilityLabel={stateText("working")}>
-        <View style={{ width: size * 0.4, height: size * 0.4, borderRadius: size, backgroundColor: theme.primary }} />
+      <View style={identity ? undefined : box} accessibilityLabel={[stateText("working"), identity?.agent ?? identity?.provider].filter(Boolean).join(" · ")}>
+        {identity ? <TaskOrbit>
+          {identity.agent ? <AgentAvatar name={identity.agent} host={identity.host} folder={identity.folder} size={16} working /> : agentMarkId(identity.provider) ? <BrandMark id={identity.provider} size={14} color={theme.text} /> : <GenericIcon name="user-round" size={14} color={theme.text} />}
+        </TaskOrbit> : <View style={[box, { width: size * 0.4, height: size * 0.4, borderRadius: size, backgroundColor: theme.primary }]} />}
       </View>
     );
   }

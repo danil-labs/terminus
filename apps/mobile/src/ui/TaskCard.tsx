@@ -137,13 +137,6 @@ function TaskCardView({
       style={({ pressed }) => [styles.card, { backgroundColor: pressed && Platform.OS !== "android" ? theme.border : "transparent" }]}
     >
       <View style={styles.line}>
-        <View style={styles.mark}>
-          {card.state || card.delivered ? (
-            <TaskMark state={card.state} delivered={card.delivered} size={15} />
-          ) : (
-            <View style={[styles.hollow, { borderColor: theme.border }]} />
-          )}
-        </View>
         <Text numberOfLines={1} style={[styles.title, { color: theme.text }]}>
           {taskTitle(lang, task)}
         </Text>
@@ -155,13 +148,20 @@ function TaskCardView({
         {onFinish && pull?.state === "merged" && !git?.stale ? <Pressable testID={`finish-${task.host}-${task.id}`} accessibilityRole="button" accessibilityLabel={`${t("task.header.finish")}: ${taskTitle(lang, task)}`} accessibilityState={{ disabled: !ready }} disabled={!ready} hitSlop={8} onPress={(event) => { event.stopPropagation(); onFinish(); }} style={{ width: 40, height: 40, alignItems: "center", justifyContent: "center", marginVertical: -8, opacity: ready ? 1 : 0.3 }}>
           <Icon name="rocket" size={18} color={theme.merged} />
         </Pressable> : null}
-        {when ? <Text style={[styles.when, { color: theme.textMuted }]}>{when}</Text> : null}
+        <View style={styles.mark}>
+          {card.state || card.delivered ? (
+            <TaskMark state={card.state} delivered={card.delivered} size={15} identity={{ agent: task.agent, provider: card.provider, host: task.host, folder: task.folder }} />
+          ) : (
+            <View style={[styles.hollow, { borderColor: theme.border }]} />
+          )}
+        </View>
       </View>
       <View style={[styles.line, styles.second]}>
+        <View style={[styles.line, { flex: 1, minWidth: 0, overflow: "hidden" }]}>
         {chips.map((chip) => {
           switch (chip) {
             case "provider":
-              return (
+              return card.state === "working" && !task.agent ? null : (
                 <View key={chip} testID="task-provider" accessibilityRole="image" accessibilityLabel={card.provider ?? ""}>
                   <BrandMark id={card.provider} size={13} color={theme.text} />
                 </View>
@@ -178,7 +178,7 @@ function TaskCardView({
             case "machine":
               return card.machine ? <MachineChip key={chip} name={card.machine.id} on={card.machine.on} /> : null;
             case "agent":
-              return card.agent ? <AgentAvatar key={chip} name={card.agent} size={14} host={task.host} folder={task.folder} /> : null;
+              return card.state !== "working" && card.agent ? <AgentAvatar key={chip} name={card.agent} size={14} host={task.host} folder={task.folder} /> : null;
             case "pull":
               return pull ? <PullChip key={chip} pull={pull} git={git} /> : null;
           }
@@ -188,6 +188,8 @@ function TaskCardView({
           <Text numberOfLines={1} style={[styles.meta, { color: theme.textMuted, maxWidth: 160 }]}>{branch}</Text>
         </View> : null}
         {tag ? <Text style={[styles.tag, { color: theme.textMuted, backgroundColor: theme.muted }]}>{tag}</Text> : null}
+        </View>
+        {when ? <Text style={[styles.when, { color: theme.textMuted, marginLeft: "auto" }]}>{when}</Text> : null}
       </View>
     </Pressable>
   );
@@ -198,10 +200,10 @@ const styles = StyleSheet.create({
   tag: { fontSize: TEXT.caption, fontWeight: "600", paddingHorizontal: 6, paddingVertical: 1, borderRadius: RADIUS.sm, overflow: "hidden" },
   when: { fontSize: 12.5, fontVariant: ["tabular-nums"] },
   line: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 18 },
-  second: { paddingLeft: 24, gap: 8 },
-  mark: { width: 18, alignItems: "center" },
+  second: { gap: 8 },
+  mark: { minWidth: 18, alignItems: "center" },
   hollow: { width: 9, height: 9, borderRadius: 5, borderWidth: 1.5 },
-  title: { flex: 1, fontSize: 16, fontWeight: "500" },
+  title: { flex: 1, minWidth: 0, fontSize: 16, fontWeight: "500" },
   chip: { flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 1 },
   meta: { fontSize: TEXT.label },
 });

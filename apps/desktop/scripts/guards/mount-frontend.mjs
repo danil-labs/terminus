@@ -807,6 +807,10 @@ if (!roto) {
   assert.equal(agentSends[0].taskFromAgent, true);
   assert.equal(agentSends[0].baseRef, null);
   assert.ok(draftDoc.querySelector('[data-sidebar-tasks] [data-sesion="new-agent-task"] [data-session-agent]'), "el primer mensaje crea una tarea visible con la pastilla de su arquetipo");
+  const activeDraftRow = draftDoc.querySelector('[data-sidebar-tasks] [data-sesion="new-agent-task"]');
+  assert.equal(activeDraftRow.querySelectorAll("[data-session-agent]").length, 1, "la identidad activa se pinta una sola vez");
+  assert.ok(activeDraftRow.querySelector('[data-session-status] [data-task-orbit] [data-astro-status="working"]'), "la cara activa va dentro del arco a la derecha del título");
+  assert.equal(activeDraftRow.querySelector('[data-session-preview] [data-session-agent]'), null, "la segunda línea no duplica la cara activa");
   assert.deepEqual(draftApp.fallos, []);
   draftApp.w.close();
 
@@ -963,8 +967,12 @@ if (!roto) {
     "el coordinador conserva un foco de actividad cuando solo trabaja su subtarea");
   threadApp.emit("chat", { kind: "started", session: "topic", workspace: "w" });
   await sleep(100);
-  assert.equal(previewOfCoordinator().querySelectorAll("[aria-label]").length, 1,
+  assert.equal(previewOfCoordinator().querySelectorAll('[aria-label="Está trabajando"]').length, 1,
     "un solo estado ocupa su columna, sin contador de subtareas");
+  assert.equal(sidebarTask("topic").querySelectorAll("[data-session-status]").length, 1, "el estado ocupa una sola ranura");
+  assert.equal(previewOfCoordinator().querySelectorAll("[data-task-orbit]").length, 1, "la ranura lleva una sola órbita");
+  assert.equal(previewOfCoordinator().querySelectorAll("[data-session-agent]").length, 1, "una sola identidad vive dentro de la órbita");
+  assert.equal(previewOfCoordinator().textContent.trim(), "", "la ranura no añade un contador de subtareas");
   threadApp.emit("chat", { kind: "done", session: "topic", workspace: "w", ok: true });
   await sleep(200);
   assert.equal(previewOfCoordinator().querySelectorAll('[aria-label="Está trabajando"]').length, 1,
@@ -1801,6 +1809,10 @@ if (!roto) {
   const workingDot = tab("p").querySelector('.rounded-full.bg-current');
   assert.ok(workingDot);
   assert.ok([...workingDot.classList].every((name) => !name.includes("animate")), "the working indicator stays visible without blinking");
+  assert.equal(row("p").querySelectorAll("[data-task-orbit]").length, 1, "una tarea sin encargado conserva identidad con órbita");
+  assert.equal(row("p").querySelector('[data-task-orbit] [data-session-agent]'), null, "sin encargado usa el proveedor, no una cara inventada");
+  assert.equal(row("p").querySelectorAll('[data-task-orbit] svg:not([data-spinner])').length, 1, "la marca del proveedor ocupa el centro");
+  assert.equal(row("p").querySelector('[data-session-preview] [data-session-provider]'), null, "el proveedor activo no se repite debajo");
   assert.equal(tab("p").querySelector("svg[data-spinner]"), null);
   sidebar.emit("question", { session: "p", workspace: "w", turno: "question-turn", preguntas: [{ id: "choose", question: "¿Qué opción?", options: [], free_text: true }] });
   await sleep(100);
