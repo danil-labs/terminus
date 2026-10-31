@@ -1,9 +1,4 @@
 {
-  "code.column.close.label": "Close the work tree",
-  "code.column.close.title": "Close the work tree (Esc)",
-  "code.column.export_chat": "Export chat",
-  "code.column.export_chat.busy": "Exporting…",
-  "code.column.title": "Folder",
   "code.comparing": "Comparing…",
   "code.diff.layout.label": "How the change is shown",
   "code.diff.layout.unified": "Unified",

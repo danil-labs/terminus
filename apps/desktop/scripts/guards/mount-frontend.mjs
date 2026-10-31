@@ -5156,15 +5156,6 @@ if (!roto) {
   assert.equal(unstartedDoc.body.textContent.includes(rejectedPrompt), false);
   assert.deepEqual(unstarted.fallos, []);
 
-  // Las columnas laterales ceden ancho hasta su mínimo antes de que la caja se
-  // aplaste. jsdom no calcula el reparto: se comprueba lo que lo decide.
-  unstartedDoc.querySelector('button[aria-label="Ver el árbol de trabajo"]')?.click();
-  await sleep(100);
-  const conversation = unstartedDoc.querySelector("[data-conversacion]");
-  assert.ok(conversation.classList.contains("flex-[1_1_30rem]"), "the conversation keeps a base width");
-  const workColumn = conversation.nextElementSibling.nextElementSibling;
-  assert.equal(workColumn.style.minWidth, "300px", "the work column yields down to its minimum");
-  assert.ok(workColumn.classList.contains("shrink-[1000]"));
   unstarted.w.close();
 
   for (const settings of [true, false]) {
