@@ -17,6 +17,7 @@
   "projects.threads.invalid_provider": "The agent provider is unavailable. Select another in its profile.",
   "projects.threads.inbox": "Previous inbox",
   "projects.sessions.launched_by_agent": "Agent",
+  "projects.sessions.handoff_issue": "This handoff has an inconsistent origin; the task stays available here.",
   "projects.sessions.launched_by_you": "My tasks",
   "projects.sessions.launcher_unknown": "Unknown author",
   "projects.sessions.pin_named": "Pin “{title}”",

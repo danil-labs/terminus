@@ -3,6 +3,7 @@ import ChevronRight from "lucide-solid/icons/chevron-right";
 import MoreVertical from "lucide-solid/icons/more-vertical";
 import Pin from "lucide-solid/icons/pin";
 import PinOff from "lucide-solid/icons/pin-off";
+import TriangleAlert from "lucide-solid/icons/triangle-alert";
 import { createEffect, createMemo, createSignal, For, type JSX, lazy, mapArray, on, onCleanup, Show, Suspense } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import { arrastrar, fueArrastre, tareaEnVuelo } from "../../lib/drag";
@@ -107,6 +108,8 @@ export type SessionRow = {
   /** El backend decide el pin; las conversaciones antiguas heredan el valor por omisión. */
   pinned?: boolean | null;
   launched_by?: string | null;
+  handoff_parent?: string | null;
+  handoff_issue?: "missing_source" | "contradictory" | "cycle" | null;
   launcher_available?: boolean;
   /** Hija de una delegación entre máquinas: su coordinador vive allá (`@terminus/tasks` `remote.ts`). */
   remote_parent?: unknown;
@@ -773,6 +776,8 @@ export default function Sessions(props: {
       if (n && n !== f.s.title) props.onRenombrar(f.s.id, n);
     };
 
+    /** `missing_source` no se marca: borrar la fuente de una receptora fijada es legítimo. */
+    const handoffRoto = () => f.s.handoff_issue === "contradictory" || f.s.handoff_issue === "cycle";
     const marcaDeFijada = () => <span role="img" aria-label={t("projects.sessions.pinned")} title={t("projects.sessions.pinned")} class="shrink-0 text-neutral-500"><Pin size={12} /></span>;
     /**
      * Terminada y vista en la tarjeta del riel: sin marca, la fila se apaga
@@ -798,6 +803,7 @@ export default function Sessions(props: {
             apagada() && "text-neutral-500 group-hover/session:text-neutral-950",
           )}>
             <Show when={fijada(f.s) && !tarjetaDelRiel()}>{marcaDeFijada()}</Show>
+            <Show when={handoffRoto()}><span role="img" aria-label={t("projects.sessions.handoff_issue")} title={t("projects.sessions.handoff_issue")} class="shrink-0 text-warning-strong"><TriangleAlert size={12} /></span></Show>
             <Show when={contextual(f.s) && !tarjetaDelRiel()}><span class="shrink-0 text-caption font-normal text-neutral-500">{t("projects.sessions.context")}</span></Show>
             <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"><WithMentions>{f.s.subagent ? readableSessionTitle(title()) : title()}</WithMentions></span>
           </div>

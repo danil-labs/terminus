@@ -7,7 +7,7 @@ import { Platform, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAccount } from "../../lib/account";
 import { ALPHA_DEMO, ALPHA_ORDINARY } from "../../lib/alpha-mode";
-import { cardOf, cardTask, marksOf } from "../../lib/cards";
+import { cardOf, cardTask, marksOf, familyTasks } from "../../lib/cards";
 import { useCustomization } from "../../lib/customization";
 import { archiveTask, failureText, setPinned, type Task, taskInSpace, taskKey } from "../../lib/engine";
 import { lang, t, w } from "../../lib/i18n";
@@ -98,7 +98,7 @@ export default function Home() {
 
   const spaces = snapshot?.spaces ?? [];
   const inSpace = (key: string) => !space || key.endsWith("/") || space.folders.includes(key);
-  const tasks = (snapshot?.tasks ?? []).filter((task) => taskInSpace(task, space));
+  const tasks = familyTasks((snapshot?.tasks ?? []).filter((task) => taskInSpace(task, space)), snapshot?.delegated ?? [], marks);
   const counts = folderCounts(tasks.map((task) => ({ project: task.folderKey, row: task })));
   const kept = view.folders.filter((f) => (counts.get(f) ?? 0) > 0);
   const effective: SidebarView = kept.length === view.folders.length ? view : { ...view, folders: kept };
