@@ -147,6 +147,7 @@ export default function TaskScreen() {
   const prepending = useRef<ScrollAnchor>(null);
   const prependTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const readingScope = useRef<string | null>(null);
+  const climb = useRef(() => {});
   const clearPrepending = () => {
     if (prependTimer.current !== null) clearTimeout(prependTimer.current);
     prependTimer.current = null;
@@ -173,6 +174,7 @@ export default function TaskScreen() {
       if (restoreAnchor(node, held, false)) {
         anchor.current = held;
         clearPrepending();
+        queueMicrotask(() => climb.current());
       }
     } else restoreAnchor(node, anchor.current, false);
   };
@@ -347,6 +349,7 @@ export default function TaskScreen() {
       prepending.current = held;
       prependTimer.current = setTimeout(() => {
         if (prepending.current === held) resetReading();
+        climb.current();
       }, PREPEND_RECOVERY_MS);
     }
     put();
@@ -462,10 +465,12 @@ export default function TaskScreen() {
       prepending.current = held;
       if (held) prependTimer.current = setTimeout(() => {
         if (prepending.current === held) resetReading();
+        climb.current();
       }, PREPEND_RECOVERY_MS);
       setWebWindow({ scope: page.scope, first: page.rows[Math.max(0, page.first - TAIL_PAGE_SIZE)].key });
     } else if (!needleNow.current) void askOlderNow.current();
   }, []);
+  climb.current = continueUp;
   const onContentSize = useCallback(() => {
     const node = scroller();
     if (!node || webReady.current !== webSlice.current.scope) return;
@@ -523,8 +528,12 @@ export default function TaskScreen() {
       if (prepending.current || !follow.current.following) restoreReading(node);
     });
     observer.observe(node, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["style"] });
-    const intent = ["wheel", "touchstart", "pointerdown"] as const;
-    const interruptPrepend = () => { if (prepending.current) resetReading(); };
+    const intent = ["wheel", "touchstart", "touchmove", "pointerdown"] as const;
+    // En el borde de arriba un gesto no produce `scroll`: es el único aviso de que se quiere seguir.
+    const interruptPrepend = () => {
+      if (prepending.current) resetReading();
+      climb.current();
+    };
     for (const event of intent) node.addEventListener(event, interruptPrepend, { passive: true });
     return () => {
       observer.disconnect();
