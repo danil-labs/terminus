@@ -628,7 +628,7 @@ export function createWebTransport(
       case "updater":
         return null;
       case "app":
-        return action === "version" ? version : action === "name" ? "Terminus" : null;
+        return action === "version" ? version : action === "name" ? "Danil" : null;
       case "dialog":
         if (action === "message") return dialog(args);
         host.alert(t("web.local_files"));

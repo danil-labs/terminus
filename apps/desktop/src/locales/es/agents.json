@@ -2,7 +2,7 @@
   "agents.mode.manual": "Manual",
   "agents.mode.edits": "Acepta ediciones",
   "agents.mode.auto": "Automático",
-  "agents.mode.missing.codex": "La integración actual de Codex todavía no conecta las aprobaciones de App Server con Terminus. Por ahora solo admite el modo automático.",
+  "agents.mode.missing.codex": "La integración actual de Codex todavía no conecta las aprobaciones de App Server con Danil. Por ahora solo admite el modo automático.",
   "agents.mode.missing.antigravity.manual": "Antigravity no devuelve aprobaciones: lo que emite mientras trabaja no tiene ninguna forma de pedir permiso, y no lee respuestas.",
   "agents.mode.missing.antigravity.edits": "Antigravity acepta las ediciones, pero a los comandos no les pide permiso: los deniega solo y termina el turno sin respuesta y sin decir por qué.",
   "agents.command.clash.picker": "{command} no se mandó: el modelo y el razonamiento se eligen en el selector de modelo de la caja.",

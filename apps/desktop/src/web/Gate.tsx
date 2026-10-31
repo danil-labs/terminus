@@ -61,7 +61,7 @@ export function Gate(props: { session: Session; endpoint: string; initial?: Gate
 
   return (
     <main class="flex h-full flex-col overflow-y-auto bg-bg px-10 py-10" data-web-gate={view().t}>
-      <h1 class="m-0 mb-5 text-3xl leading-tight font-display font-bold tracking-[-0.03em] text-neutral-950">Terminus</h1>
+      <h1 class="m-0 mb-5 text-3xl leading-tight font-display font-bold tracking-[-0.03em] text-neutral-950">Danil</h1>
       <Switch>
         <Match when={view().t === "waiting"}>
           <p class="m-0 text-sm text-neutral-500">{t("web.computers.waiting")}</p>

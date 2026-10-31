@@ -1,5 +1,5 @@
 {
-  "kn.error.missing": "Terminus no pudo lanzar su propio kn. Vuelve a abrir la app; sin él no se escribe en esta carpeta.",
+  "kn.error.missing": "Danil no pudo lanzar su propio kn. Vuelve a abrir la app; sin él no se escribe en esta carpeta.",
   "kn.error.run": "kn no pudo completar la operación. Revisa el detalle y vuelve a intentarlo.",
   "kn.error.conflict": "Hay un conflicto al integrar. Actualiza la sesión, resuélvelo ahí y vuelve a integrar.",
   "kn.error.invalid": "kn rechazó el pedido. Revisa que la sesión siga existiendo.",

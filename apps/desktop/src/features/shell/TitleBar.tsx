@@ -71,7 +71,7 @@ export default function TitleBar(props: {
   const titulo = createWindowTitle();
   const segmentoFinal = () => {
     const actual = titulo();
-    if (!actual || actual === "Terminus") return null;
+    if (!actual || actual === "Terminus" || actual === "Danil") return null;
     const partes = actual.split(" · ");
     const texto = partes.at(-1) ?? actual;
     return texto;

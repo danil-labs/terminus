@@ -1,5 +1,6 @@
 import { Show, createSignal, onMount } from "solid-js";
 import { getVersion } from "@tauri-apps/api/app";
+import { t } from "../../lib/i18n";
 
 /**
  * La versión instalada, en el extremo derecho de la barra inferior.
@@ -40,9 +41,9 @@ export default function PieVersion() {
       {(v) => (
         <p
           class="m-0 min-w-0 shrink truncate px-2 text-right font-mono text-[0.6875rem] text-neutral-500"
-          title={`Terminus ${v()}`}
+          title={t("settings.update.current", { version: v() })}
         >
-          Terminus {v()}
+          {t("settings.update.current", { version: v() })}
         </p>
       )}
     </Show>
