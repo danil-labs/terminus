@@ -249,7 +249,17 @@ fn status_of(app: &tauri::AppHandle, account: &str, value: &Live) -> Value {
     } else {
         "memory"
     };
-    json!({ "state": "active", "user": value.user, "storage": storage })
+    json!({ "state": "active", "user": value.user, "storage": storage, "active_account_id": active_account(&value.access_token) })
+}
+
+/// Solo el claim que las vistas necesitan para elegir la cuenta; el token no sale de aquí.
+fn active_account(token: &str) -> Option<u64> {
+    let payload = URL_SAFE_NO_PAD.decode(token.split('.').nth(1)?).ok()?;
+    serde_json::from_slice::<Value>(&payload)
+        .ok()?
+        .get("active_account_id")?
+        .as_u64()
+        .filter(|id| *id > 0)
 }
 
 #[tauri::command(async)]
@@ -646,6 +656,13 @@ mod tests {
         let q = url_query("code=v1.a-b_c&state=xyz%2Dq");
         assert_eq!(q["code"], "v1.a-b_c");
         assert_eq!(q["state"], "xyz-q");
+    }
+
+    #[test]
+    fn active_account_is_read_from_the_claim() {
+        let payload = URL_SAFE_NO_PAD.encode(br#"{"active_account_id":476,"sub":"x"}"#);
+        assert_eq!(active_account(&format!("h.{payload}.s")), Some(476));
+        assert_eq!(active_account("not-a-jwt"), None);
     }
 
     #[test]
