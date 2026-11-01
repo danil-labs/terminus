@@ -1,6 +1,8 @@
 import { type JSX, Show, createSignal } from "solid-js";
 import { t } from "../../lib/i18n";
 import { setMoviendoHueco } from "../../lib/sites";
+import { cn } from "../../lib/utils";
+import { BELOW_LOCATION_MARGIN } from "../../lib/window";
 
 /** The chat keeps its 320 px minimum plus the 16 px gutter, whatever width was chosen. */
 const CHAT_ROOM = 336;
@@ -48,7 +50,7 @@ export default function TaskFilesRow(props: {
       <Show when={props.open && !props.covers}>
           <div role="separator" tabindex={0} aria-orientation="vertical" aria-label={t("code.panel.resize")}
             data-dragging={dragging() ? "" : undefined}
-            class="group/hueco relative z-40 mt-9 mb-2 w-4 shrink-0 cursor-ew-resize touch-none outline-none"
+            class={cn("group/hueco relative z-40 mb-2 w-4 shrink-0 cursor-ew-resize touch-none outline-none", BELOW_LOCATION_MARGIN)}
             onPointerDown={(event) => {
               event.preventDefault();
               const handle = event.currentTarget;

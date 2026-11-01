@@ -810,7 +810,9 @@
   background-attachment: fixed;
 }
 .tab-active::before,
-.tab-active::after {
+.tab-active::after,
+.tab-join::before,
+.tab-join::after {
   content: "";
   position: absolute;
   bottom: 0;
@@ -818,15 +820,30 @@
   height: var(--tab-foot);
   pointer-events: none;
 }
-.tab-active::before {
+.tab-active::before,
+.tab-join::before {
   right: 100%;
   -webkit-mask: radial-gradient(circle at 0 0, transparent var(--tab-foot), #000 calc(var(--tab-foot) + 0.5px));
   mask: radial-gradient(circle at 0 0, transparent var(--tab-foot), #000 calc(var(--tab-foot) + 0.5px));
 }
-.tab-active::after {
+.tab-active::after,
+.tab-join::after {
   left: 100%;
   -webkit-mask: radial-gradient(circle at 100% 0, transparent var(--tab-foot), #000 calc(var(--tab-foot) + 0.5px));
   mask: radial-gradient(circle at 100% 0, transparent var(--tab-foot), #000 calc(var(--tab-foot) + 0.5px));
+}
+/* La pestaña de un documento se funde con el panel de abajo, igual que `.tab-active`
+   con la ventana. El relleno es la superficie del panel, no el fondo de la ventana:
+   el documento se lee sobre `surface` y la franja de atrás es `surface-muted`. */
+.tab-join {
+  --tab-foot: 6px;
+  position: relative;
+  border-radius: var(--tab-foot) var(--tab-foot) 0 0;
+  background: var(--color-surface);
+}
+.tab-join::before,
+.tab-join::after {
+  background: var(--color-surface);
 }
 /* Marco de la ventana (franja y columna de workspaces): en claro un gris sólido y la
    barra lateral un tono hundido; en oscuro se queda el velo y el vidrio de siempre. */

@@ -5,6 +5,7 @@ import { t } from "../../lib/i18n";
 import { left, legible, tono } from "../../lib/limits";
 import { sharedLazy } from "../../lib/sharedLazy";
 import { cn } from "../../lib/utils";
+import { HEADER_HEIGHT } from "../../lib/window";
 import { Button } from "../../ui/Button";
 import { MarcaAgente } from "../../ui/icons";
 import { ProgressBar } from "../../ui/ProgressBar";
@@ -95,7 +96,7 @@ export function UsagePanel(props: { usage: Usage; agent: string; onManage: () =>
   const cards = () => orderedCards(props.usage, props.agent);
   return (
     <>
-      <div class="flex h-9 shrink-0 items-center border-b border-border px-3">
+      <div class={cn("flex shrink-0 items-center border-b border-border px-3", HEADER_HEIGHT)}>
         <span class="text-xs font-semibold text-neutral-950">{t("usage.heading")}</span>
       </div>
       <div class="min-h-0 flex-1 overflow-y-auto">

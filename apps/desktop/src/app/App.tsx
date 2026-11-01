@@ -286,6 +286,7 @@ import {
 } from "../lib/usage";
 import { cn } from "../lib/utils";
 import {
+  BELOW_LOCATION,
   createCompactViewport,
   HEADER_HEIGHT,
   isWindows,
@@ -7812,8 +7813,9 @@ export default function App() {
           const ancho = () => (cubre() ? undefined : taskFilesWidth(panel().tabs.length > 0, anchoDeArchivos(), anchoDelArbol()));
           return (
             <Show when={usado()}>
-              {/* The top padding sits over the task's location row: only the card takes the pointer. */}
-              <div class="pointer-events-none z-10 flex min-h-0 min-w-0 justify-self-end pt-9 pr-2 pb-2 *:pointer-events-auto"
+              {/* The padding clears the location row (8 px of air plus the 30 px box)
+                  instead of covering it: only the card takes the pointer. */}
+              <div class={cn("pointer-events-none z-10 flex min-h-0 min-w-0 justify-self-end pr-2 pb-2 *:pointer-events-auto", BELOW_LOCATION)}
                 classList={{ hidden: !visible(), "w-full pl-2": cubre(), "mt-[30px]": llevaTiraInterior(sitio()), "transition-[width] duration-200 ease-out": !moviendoHueco() }}
                 style={{ ...placement(), width: ancho() }}
                 onPointerDown={() => { const d = sitio(); if (d) mandarVentana(d); }}>
@@ -7935,7 +7937,7 @@ export default function App() {
           return (
             <Show when={usado() && project()}>
               {(proyecto) => (
-                <div class="pointer-events-none z-10 flex min-h-0 min-w-0 justify-self-end pt-9 pr-2 pb-2 *:pointer-events-auto"
+                <div class={cn("pointer-events-none z-10 flex min-h-0 min-w-0 justify-self-end pr-2 pb-2 *:pointer-events-auto", BELOW_LOCATION)}
                   classList={{ hidden: !visible(), "w-full pl-2": cubre(), "mt-[30px]": llevaTiraInterior(sitio()), "transition-[width] duration-200 ease-out": !moviendoHueco() }}
                   style={{ ...estiloDeLaCelda(sitio()), width: ancho() }}
                   onPointerDown={() => mandarVentana(sitio())}>

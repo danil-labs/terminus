@@ -1,6 +1,8 @@
 import { type ComponentProps, createEffect, createSignal, on, Show } from "solid-js";
 import GitBranch from "lucide-solid/icons/git-branch";
 import { t } from "../../lib/i18n";
+import { cn } from "../../lib/utils";
+import { HEADER_HEIGHT } from "../../lib/window";
 import type { SenderTask } from "../../lib/recipients";
 import { Button } from "../../ui/Button";
 import { asFailure, FailureNote } from "../../ui/Failure";
@@ -107,7 +109,7 @@ export function DelegatedToolbar(props: { model: DelegatedPanelModel; pressed: b
   </Show>;
 }
 
-/** La lista de delegadas, en la ventana de la tarea: filtros en la cabecera de 36 px. */
+/** La lista de delegadas, en la ventana de la tarea: filtros en la caja de 30 px. */
 export function DelegatedPanel(props: { model: () => DelegatedPanelModel | undefined }) {
   const [all, setAll] = createSignal(false);
   const data = () => props.model();
@@ -120,7 +122,7 @@ export function DelegatedPanel(props: { model: () => DelegatedPanelModel | undef
   // «Activas» son solo las que te necesitan o siguen trabajando, sin sus madres de contexto.
   const shown = () => all() ? rows() : active();
   return <>
-    <div class="flex h-9 shrink-0 items-center justify-between gap-2 border-b border-border px-2" aria-label={t("chat.delegation.heading")}>
+    <div class={cn("flex shrink-0 items-center justify-between gap-2 border-b border-border px-2", HEADER_HEIGHT)} aria-label={t("chat.delegation.heading")}>
       <span class="min-w-0 truncate text-xs font-medium">{t("chat.delegation.total", { count: rows().length })}</span>
       <div class="flex shrink-0 gap-1" role="group" aria-label={t("chat.delegation.filter")}>
         <Button size="sm" variant="ghost" class="h-6 px-2 text-xs aria-pressed:bg-surface-muted aria-pressed:text-neutral-950" aria-pressed={!all()} onClick={() => setAll(false)}>{t("chat.delegation.activity")}</Button>

@@ -4,6 +4,7 @@ import { createEffect, For, Show } from "solid-js";
 import { df } from "../../lib/format";
 import { t } from "../../lib/i18n";
 import { cn } from "../../lib/utils";
+import { HEADER_HEIGHT } from "../../lib/window";
 import { Button } from "../../ui/Button";
 import { Input } from "../../ui/Input";
 import { groupSearchHits, type SearchHit } from "./searchCards";
@@ -24,7 +25,7 @@ export default function SearchPanel(props: { surface: SearchSurface }) {
   const groups = () => groupSearchHits(props.surface.cards());
   return (
     <>
-      <div class="flex h-9 shrink-0 items-center gap-1 border-b border-border px-1.5" role="search" aria-label={t("chat.search.label")}>
+      <div class={cn("flex shrink-0 items-center gap-1 border-b border-border px-1.5", HEADER_HEIGHT)} role="search" aria-label={t("chat.search.label")}>
         <Input ref={(el) => props.surface.bindInput(el)} class="h-7 min-h-0 flex-1 py-0 text-xs focus-visible:border-border-strong focus-visible:outline-none" value={props.surface.query()}
           placeholder={t("chat.search.placeholder")} aria-label={t("chat.search.label")}
           onInput={(event) => props.surface.setQuery(event.currentTarget.value)}
