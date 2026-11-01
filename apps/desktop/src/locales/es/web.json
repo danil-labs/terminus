@@ -271,7 +271,6 @@
   "web.admin.failed": "No se pudieron leer tus workspaces de Danil.",
   "web.admin.denied_workspace": "Este workspace no tiene nada que mostrarte aquí: lo ven su owner y sus admin.",
   "web.admin.back": "Volver a Danil",
-  "web.admin.group_workspace": "Workspace",
   "web.admin.group_organization": "Organización",
   "web.admin.general": "General",
   "web.admin.members": "Miembros",
@@ -285,7 +284,6 @@
   "web.admin.role_member": "Miembro",
   "web.admin.demo_other": "Ventas",
   "web.admin.support": "Acceso de soporte",
-  "web.admin.group_shared": "Compartido con el equipo",
   "web.admin.skills": "Skills",
   "web.admin.mcp": "MCP",
   "web.admin.agents": "Agentes",
@@ -432,7 +430,6 @@
   "web.admin.pull_state.approved": "Aprobado",
   "web.admin.pull_state.merged": "Fusionado",
   "web.admin.pull_state.closed": "Cerrado",
-  "web.admin.authority_open": "Por decidir: si esta lista la manda tu cuenta de Danil o un repositorio. Mientras tanto, aquí no se cambia directo.",
   "web.admin.rules_workspace": "Reglas de este workspace",
   "web.admin.rules_hint": "Cada regla dice cómo se cumple. Las que solo orientan no bloquean a nadie.",
   "web.admin.rules_organization": "Reglas de la organización",
@@ -447,5 +444,10 @@
   "web.admin.identity_retention": "Retención",
   "web.admin.identity_roles": "Roles a medida",
   "web.admin.personal": "Esta cuenta es personal: esta página es para organizaciones. Tu consumo, tu plan y el acceso de soporte están en Configuración.",
-  "web.admin.personal_open": "Abrir Configuración"
+  "web.admin.personal_open": "Abrir Configuración",
+  "web.admin.policy_by_review": "Un cambio entra cuando otra persona lo aprueba. Danil guarda cada versión.",
+  "web.admin.policy_internal": "Política interna de Danil",
+  "web.admin.policy_send_review": "Enviar a revisión",
+  "web.admin.policy_proposals": "Propuestas de esta política",
+  "web.admin.policy_no_proposals": "No hay propuestas abiertas."
 }

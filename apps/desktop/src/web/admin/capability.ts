@@ -4,7 +4,7 @@ import { accountKind } from "./sections";
 
 const api = (session: InboxSession) => createSupportAccess(session, fetch, `${import.meta.env.BASE_URL}alpha-api`);
 
-/** El enlace al Harness en Configuración: abre `/admin` si la persona administra una organización. */
+/** El enlace al Harness en Configuración. Un miembro entra en solo lectura, pero sus secciones aún no tienen fuente real: sin ellas no se le ofrece. */
 export function adminPageCapability(session: InboxSession, href = `${import.meta.env.BASE_URL}admin`) {
   return {
     href: (workspace: string | null) => (workspace ? `${href}?workspace=${encodeURIComponent(workspace)}` : href),

@@ -5,7 +5,7 @@ import { activeAccountOf, webAuditLog } from "../audit-log";
 import { authLocation } from "../auth/return";
 import type { WatchedSession } from "../session";
 import { AdminPage, type AdminSource } from "./AdminPage";
-import type { MenuOrder, Section } from "./sections";
+import type { Section } from "./sections";
 import "../phrases";
 import "../../styles/global.css";
 
@@ -45,9 +45,8 @@ export async function startAdminDemo(options: { dark: boolean }) {
   const query = new URLSearchParams(window.location.search);
   const workspace = t("web.alpha.demo_workspace");
   const source: AdminSource = {
-    ...adminDemo(query.get("account"), workspace, t("web.admin.demo_other")),
+    ...adminDemo(query.get("account"), workspace, t("web.admin.demo_other"), query.get("policy") === "internal"),
     support: supportAccessDemo(workspace),
-    menu: (query.get("menu") as MenuOrder | null) ?? undefined,
     section: (query.get("section") as Section | null) ?? undefined,
     home: `${home()}?demo=1${options.dark ? "&theme=dark" : ""}`,
     settings: `${home()}?demo=1&account=personal&settings=usage${options.dark ? "&theme=dark" : ""}`,
