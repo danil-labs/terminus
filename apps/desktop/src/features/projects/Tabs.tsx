@@ -277,7 +277,7 @@ export default function TabStrip(props: {
             props.onDrag?.(p.id, e);
           }}
           class={cn(
-            "group flex h-7 shrink-0 touch-none items-center rounded-sm pr-1 select-none",
+            "group flex h-[30px] shrink-0 touch-none items-center rounded-sm pr-1 select-none",
             task() ? "w-[220px] text-sm" : "w-[180px] text-label",
             active()
               ? "tab-active font-semibold text-neutral-950"
@@ -472,7 +472,7 @@ export default function TabStrip(props: {
         {(label) => (
           <div
             data-borrador=""
-            class="tab-active ml-0.5 group flex h-7 w-[220px] shrink-0 items-center rounded-sm pr-1 text-sm font-semibold text-neutral-950 select-none"
+            class="tab-active ml-0.5 group flex h-[30px] w-[220px] shrink-0 items-center rounded-sm pr-1 text-sm font-semibold text-neutral-950 select-none"
           >
             <div
               aria-current="page"
