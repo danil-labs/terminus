@@ -81,6 +81,13 @@ El movimiento reducido y el fondo suspenden arcos y movimiento interno. Los toke
 semánticos existentes determinan el contraste de las marcas; el morado fijo conserva
 su limitación de contraste sobre el riel oscuro y no se sustituye por `primary`.
 
+## Página de carpeta
+
+La página abre en Tareas; Configuración es otra pestaña con carpeta, fuentes,
+agentes y memoria. Cada sección usa `Panel` de `src/ui/`, con `surface` sólido: el
+contraste de su texto no depende de la imagen de fondo. Un agente ocupa una línea
+y solo muestra quién lo lee cuando esa combinación se sale de la más común.
+
 ## Tema de terminal
 
 `src/lib/terminal-themes.ts` y `src/styles/terminal.css` conservan los temas Terminus,
