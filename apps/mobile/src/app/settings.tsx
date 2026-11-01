@@ -147,7 +147,8 @@ function PushRow({ getToken }: { getToken: () => Promise<string> }) {
       setNote(await action());
     } catch (err) {
       const code = err instanceof Error ? err.message : "";
-      setNote(code === "push_denied" ? t("push.blocked") : t("push.failed"));
+      // El build de prueba (staging) muestra qué paso falló; los demás, solo el mensaje.
+      setNote(code === "push_denied" ? t("push.blocked") : PUSH_TEST && code ? `${t("push.failed")} (${code})` : t("push.failed"));
     } finally {
       setState(await pushState());
       setBusy(false);

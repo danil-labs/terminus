@@ -103,3 +103,10 @@ test("si requestPermission rechaza, el error ocurre antes de la red", async () =
   await assert.rejects(enablePush(async () => "token"), { name: "NotAllowedError" });
   assert.deepEqual(s.calls, []);
 });
+
+test("un fallo del navegador dice en qué paso ocurrió y no llega a guardar", async () => {
+  const s = setup();
+  s.own.pushManager.subscribe = async () => { throw new DOMException("Registration failed - push service error", "AbortError"); };
+  await assert.rejects(enablePush(async () => "token"), { message: "subscribe: AbortError: Registration failed - push service error" });
+  assert.deepEqual(s.calls, ["GET https://push.invalid/v1/push/config", "register"]);
+});
