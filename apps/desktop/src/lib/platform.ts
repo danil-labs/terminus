@@ -76,6 +76,8 @@ export type Capabilities = {
   accountAuditLog?: AuditLogSource;
   /** `/admin` dentro de esta web (alfa); `allowed` dice si la persona es owner o admin de algún workspace de Danil. Sin esto, el escritorio la abre en el navegador. */
   adminPage?: { href: (workspace: string | null) => string; allowed: () => Promise<boolean> };
+  /** Lo de una cuenta personal en Configuración › Cuenta. `isPersonal` decide si se ofrece; sin `usage` o `plan`, esas pestañas no salen. */
+  personalAccount?: { isPersonal: () => Promise<boolean>; usage?: () => JSX.Element; plan?: () => JSX.Element };
   /** El logo y el fondo de los workspaces leídos y cambiados en la cuenta con la sesión (la web). */
   accountAssets?: WorkspaceAssetsSource;
   /** Botón extra al lado de la búsqueda de la barra lateral (en la web, volver a Danil Agents). */

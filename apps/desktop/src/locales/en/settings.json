@@ -773,10 +773,8 @@
   "settings.tab.machines": "Your machines",
   "settings.tab.folders": "Folders",
   "settings.tab.secrets": "Secrets",
-  "settings.admin": "Administration",
   "settings.nav.connections": "Connections",
   "settings.tab.emails": "Emails",
-  "settings.tab.operation": "Operations and code",
   "settings.tab.customers": "Customer service",
   "settings.customers.title": "Customer service",
   "settings.customers.unavailable": "This section is not available in the desktop app yet. Open it on the web with your Danil account.",
@@ -794,5 +792,10 @@
   "settings.connections.one_workspace": "Choose only one workspace per computer before activating.",
   "settings.connections.access_saved": "Selection saved. Access is checked when the orchestrator uses each destination.",
   "settings.connections.retry": "Retry",
-  "settings.connections.approval_fixed": "An existing connection keeps its approval mode. The service does not yet support changing it."
+  "settings.connections.approval_fixed": "An existing connection keeps its approval mode. The service does not yet support changing it.",
+  "settings.tab.plugins": "Plugins",
+  "settings.tab.memory": "Memory",
+  "settings.tab.external": "External access",
+  "settings.tab.usage": "Usage",
+  "settings.tab.plan": "Plan"
 }
