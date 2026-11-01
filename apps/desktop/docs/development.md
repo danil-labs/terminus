@@ -72,12 +72,29 @@ an outside pull request goes there only after someone reads it.
 
 `VERIFY_REMOTE_HOST=<machine>` reaches the queue through an SSH tunnel;
 `VERIFY_REMOTE_HOST=<host>:<port>` uses a port already open, such as an SSM
-port forward to 8787. If the queue does not answer and SSH did not refuse, the
-client runs `aws ec2 start-instances` with the caller's credentials
-(`AWS_PROFILE`, `VERIFY_REMOTE_AWS` for the binary). The machine stops itself
-after 15 idle minutes. A run, a bundle upload, and sessions and builds younger
-than 2 hours count as use, so a forgotten shell stops counting at 2 hours and
-the machine stops 15 minutes later. If it was stopping, the client retries.
+port forward to 8787. The machine stops itself after 15 idle minutes. A run, a
+bundle upload, and sessions and builds younger than 2 hours count as use, so a
+forgotten shell stops counting at 2 hours and the machine stops 15 minutes later.
+
+If the queue does not answer and SSH did not refuse, the client starts the
+machine and asks again every 15 seconds, up to four minutes, while the queue
+stays silent; a machine that is still stopping refuses the first attempts.
+
+1. `danil computers machine start vm-verify --json`, with the caller's Danil
+   session (`DANIL_CLI` for the binary).
+2. `terminus machine start vm-verify --json`, the same with the installed client
+   (`TERMINUS_CLI` for the binary), only when `danil` is missing, does not know
+   the command, or refuses the environment because it holds `TERMINUS_*` context.
+   `VERIFY_REMOTE_TERMINUS` replaces steps 1 and 2 with one binary, called with
+   `machine start vm-verify --json`.
+3. `aws ec2 start-instances` with the caller's credentials (`AWS_PROFILE`,
+   `VERIFY_REMOTE_AWS` for the binary), only when no CLI knows the command, or
+   one answers `machine_account`, `machine_unreachable` or
+   `identity_unavailable`. `IncorrectInstanceState` retries; any other failure
+   ends the run. Windows builds without these CLIs always land here.
+
+`computer_stopping` retries. `access_denied`, `license_required`, `not_found`
+and any other refusal from a CLI end the run with the reason.
 
 The queue is `scripts/verify-queue/server.mjs`: one per machine, one run at a
 time, first come first served, listening on loopback only. It takes repo, commit
