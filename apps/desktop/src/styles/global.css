@@ -1088,10 +1088,14 @@
 .task-card-lines { position: relative; container-type: inline-size; width: 100%; min-width: 0; --task-card-surface: var(--color-rail); }
 .task-card-lines[data-outside] { --task-card-surface: var(--color-surface); }
 .task-card-selected .task-card-lines { --task-card-surface: var(--color-neutral-200); }
-/* Con el menú a la vista, el contenido se desvanece hacia la derecha sobre cualquier fondo. */
-.group\/session:hover .task-card-with-menu > :not([data-session-actions]),
-.group\/session:focus-within .task-card-with-menu > :not([data-session-actions]),
-.task-card-with-menu[data-menu-open] > :not([data-session-actions]) { mask-image: linear-gradient(to right, #000 calc(100% - 104px), transparent calc(100% - 44px)); }
+/* Con el menú a la vista, la primera línea se desvanece a su lado y la hora con
+   ella; el cohete de la segunda línea sigue a la vista y a mano. */
+.group\/session:hover .task-card-with-menu > :not([data-session-actions], [data-session-preview]),
+.group\/session:focus-within .task-card-with-menu > :not([data-session-actions], [data-session-preview]),
+.task-card-with-menu[data-menu-open] > :not([data-session-actions], [data-session-preview]) { mask-image: linear-gradient(to right, #000 calc(100% - 72px), transparent calc(100% - 32px)); }
+.group\/session:hover .task-card-with-menu [data-session-time],
+.group\/session:focus-within .task-card-with-menu [data-session-time],
+.task-card-with-menu[data-menu-open] [data-session-time] { mask-image: linear-gradient(to right, #000, transparent); }
 .task-card-metadata { display: grid; grid-template-columns: 16px minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.3fr) 36px; min-width: 0; align-items: center; gap: 6px; height: 16px; }
 .task-card-metadata[data-no-folder], .task-card-metadata[data-no-machine] { grid-template-columns: 16px minmax(0, 1fr) minmax(0, 1.3fr) 36px; }
 .task-card-metadata[data-no-folder][data-no-machine] { grid-template-columns: 16px minmax(0, 1fr) 36px; }
