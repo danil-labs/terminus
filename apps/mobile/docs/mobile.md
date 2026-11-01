@@ -120,10 +120,10 @@ workspaces, que va a la raíz que fijó la compilación,
   instalar las dos. `index.html`, el manifest y `sw.js` se revalidan y solo
   `_expo/static/*` (con hash) se guarda largo. En iOS la app instalada no
   comparte almacenamiento con Safari: se inicia sesión una vez dentro de ella.
-- **Avisos push:** `public/sw.js` solo muestra avisos (`push` y
+- **Avisos push:** `apps/mobile/public/sw.js` solo muestra avisos (`push` y
   `notificationclick`, sin `fetch` ni caché) y vive con scope `<base>m/`: en
   app.danil.ai la raíz es del service worker de Appv2. Lo registra
-  `src/lib/push.web.ts` cuando la persona activa «Avisos de tareas» en Cuenta de
+  `apps/mobile/src/lib/push.web.ts` cuando la persona activa «Avisos de tareas» en Cuenta de
   Danil; la suscripción se guarda en Danil Computers, cuyo relay avisa cuando una
   tarea termina, se detiene o pide algo, también con el navegador cerrado. El
   aviso trae solo identificadores: el worker arma la ruta (`?to=/task/…`) y no
