@@ -145,3 +145,14 @@ ventana oculta Atención y no reintenta.
   cualquier proceso del mismo usuario puede leerlo. El riesgo es del JWT, que
   también sirve directo contra el BFF; la ruta por Computers no lo amplía.
 - El Worker de entrada solo existe en alfa (`terminus-entry-alfa`).
+- Atención en la ventana sale solo en builds con `DANIL_DESKTOP_ATTENTION=1`
+  (`vite.config.ts`). Sin la bandera, la ventana no cambia. Se enciende cuando
+  la entrada (`/auth/desktop*`), Computers (`/v1/bff/*`) y la migración
+  `bff_window_grants` estén desplegados.
+- El regreso del navegador usa un puerto de `127.0.0.1` (RFC 8252), no un
+  sondeo: el Worker de entrada no guarda estado. El código no sirve sin el
+  verificador, que solo tiene el Rust de la ventana. Lo que impide que un agente
+  abra su propio flujo es el clic de la persona en la página de consentimiento.
+- Por ahora la ventana usa la cuenta principal de Danil (`account` vacío). Elegir
+  la cuenta del workspace abierto queda pendiente: las vistas reciben el nombre
+  del workspace, no su id.
