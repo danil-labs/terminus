@@ -34,7 +34,7 @@ test("an off computer mounts as it is and wakes with the first message", async (
   let w;
   const app = await boot("listo", "web-off", {}, undefined, { "sb-supabase-auth-token": session }, {
     web: true,
-    antes: (win) => {
+    beforeImport: (win) => {
       w = win;
       globalThis.WebSocket = fake.Socket;
       win.terminusWeb = { supabaseUrl: SUPABASE, supabaseKey: "public-anon-key" };
@@ -58,7 +58,7 @@ test("an off computer mounts as it is and wakes with the first message", async (
     assert.ok(fake.calls.filter((c) => c.command === "list_projects").length > before, "waiting reads go out once it is on");
     assert.ok(text().includes("Tarea t1"), "and the panel fills in");
     assert.equal(w.document.querySelector("[data-web-sync]")?.dataset.state, "online", "the indicator shows it on");
-    assert.deepEqual(app.fallos, []);
+    assert.deepEqual(app.failures, []);
   } finally {
     globalThis.fetch = own;
   }

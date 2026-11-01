@@ -58,7 +58,7 @@ for (const mode of ["copy", "cancel", "existing"]) test(`web: ${mode} mantiene s
   });
   const app = await boot("listo", `web-carry-${mode}`, {}, undefined, { "harness.layout.machines.run_on": JSON.stringify({ w: "cmp_vm" }), "harness.layout.sidebar.view.w": JSON.stringify({ folders: [], agent: null, group: "folder" }) }, {
     web: true,
-    antes: (w) => {
+    beforeImport: (w) => {
       globalThis.WebSocket = f.Socket;
       w.terminusWeb = { endpoint: "https://relay.test", computers: [VM, MAC], getToken: async () => "tok" };
     },
@@ -95,7 +95,7 @@ for (const mode of ["copy", "cancel", "existing"]) test(`web: ${mode} mantiene s
     assert.equal(calls("cmp_mac", "work_status").length, 0);
     assert.equal(calls("cmp_mac", "work_export").length, 0);
     assert.equal(doc.querySelector("[data-carry-sheet]"), null);
-    assert.deepEqual(app.fallos, []);
+    assert.deepEqual(app.failures, []);
     return;
   }
 
@@ -113,7 +113,7 @@ for (const mode of ["copy", "cancel", "existing"]) test(`web: ${mode} mantiene s
     assert.ok(await until(() => calls("cmp_vm", "send_message").length === 1), "cancelar atrapó el envío en otra transferencia");
     assert.equal(doc.querySelector("[data-carry-sheet]"), null);
     assert.equal(calls("cmp_vm", "work_write_part").length, 0);
-    assert.deepEqual(app.fallos, []);
+    assert.deepEqual(app.failures, []);
     return;
   }
   doc.querySelector("[data-carry-confirm]").click();
@@ -125,5 +125,5 @@ for (const mode of ["copy", "cancel", "existing"]) test(`web: ${mode} mantiene s
   const sent = calls("cmp_vm", "send_message")[0].args;
   assert.deepEqual([sent.baseRef, sent.unwrapSnapshot], ["w1", true]);
   assert.equal(calls("cmp_mac", "send_message").length, 0);
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });

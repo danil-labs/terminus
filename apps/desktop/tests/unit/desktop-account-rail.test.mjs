@@ -83,7 +83,7 @@ test("Cuenta de Danil lists the account's computers; a name edited in place reac
     doc.querySelector('[data-machine-option="cmp_vm"]')?.textContent ?? "no option",
   );
   assert.equal(f.relays.cmp_vm.sockets.length, 1, "renaming does not reconnect the machine");
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 test("el composer ofrece los modelos autenticados de la máquina seleccionada", async () => {
@@ -105,7 +105,7 @@ test("el composer ofrece los modelos autenticados de la máquina seleccionada", 
   doc.querySelector('[data-machine-option="cmp_home"]').click();
   await sleep(600);
   assert.equal(doc.querySelector('[aria-label*="Sonnet del Mac"]'), null, "el modelo remoto sigue al volver a esta máquina");
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 
@@ -130,7 +130,7 @@ test("one desktop uses the shared spaces order instead of an old local preferenc
   registry[0].settings.space_order = '["b","a"]';
   app.w.dispatchEvent(new app.w.Event("focus"));
   assert.ok(await until(() => ids().join(",") === "b,a"), "an order changed on another client reaches the open window");
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 for (const folder of ["", "p1"]) test(`remote row in folder ${JSON.stringify(folder)} stays open across a delayed load in another machine's space`, async () => {
@@ -162,7 +162,7 @@ for (const folder of ["", "p1"]) test(`remote row in folder ${JSON.stringify(fol
   assert.equal(relayCalls("cmp_vm", "load_session").length, 1);
   assert.ok(doc.querySelector('[data-preview-header]'), "the temporary tab remains");
   assert.ok(doc.body.textContent.includes("Remote transcript B"), "the loaded conversation remains visible");
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
   app.w.close();
 });
 
@@ -187,7 +187,7 @@ test("el composer pide proyectos y ramas a la máquina elegida", async () => {
   assert.ok(relayCalls("cmp_vm", "project_base_branches").some(c => c.args.project === "p1"));
   assert.equal(native("project_base_branches").length, 0, "la rama local no se consulta");
   assert.ok(doc.body.textContent.includes("vm-dev"), "el selector muestra la rama de esa máquina");
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 // With a single window there is no edge to split on: a drop near an edge opens in the window too.
@@ -216,7 +216,7 @@ for (const [name, x, y, cells] of [["center", 500, 400, 1], ["right", 950, 400, 
       assert.equal(doc.querySelectorAll('[data-preview-header]').length, 0, "the dropped task is retained");
       const sites = new Set([...doc.querySelectorAll('[data-tira]')].map(el => el.dataset.ventana));
       assert.equal(sites.size, cells);
-      assert.deepEqual(app.fallos, []);
+      assert.deepEqual(app.failures, []);
     } finally {
       app.w.close();
     }
@@ -248,7 +248,7 @@ test("rail drag cancels with Escape and preserves a subsequent normal click", as
     await sleep(700);
     assert.equal(relayCalls("cmp_vm", "load_session").length, 1);
     assert.ok(doc.querySelector('[data-preview-header]'), "normal click still opens a preview");
-    assert.deepEqual(app.fallos, []);
+    assert.deepEqual(app.failures, []);
   } finally {
     app.w.close();
   }
@@ -278,7 +278,7 @@ test("rail folder drops still move the task on its own machine without opening a
     assert.equal(moves[0].args.to, "p2");
     assert.equal(relayCalls("cmp_vm", "load_session").length, 0);
     assert.equal(doc.querySelectorAll('[role="tab"]').length, 0);
-    assert.deepEqual(app.fallos, []);
+    assert.deepEqual(app.failures, []);
   } finally {
     app.w.close();
   }
@@ -306,7 +306,7 @@ test("dragging an existing task preview retains that same tab", async () => {
     assert.equal(doc.querySelectorAll('[data-preview-header]').length, 0);
     assert.equal(doc.querySelectorAll('[role="tab"]').length, 1);
     assert.ok(relayCalls("cmp_vm", "load_session").every(call => call.args.id === "t1"));
-    assert.deepEqual(app.fallos, []);
+    assert.deepEqual(app.failures, []);
   } finally {
     app.w.close();
   }

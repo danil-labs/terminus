@@ -21,9 +21,9 @@ test("signed out, the desktop is the local window as before", async () => {
   assert.equal(doc.querySelector("[data-machine]"), null, "one machine: no badge");
   assert.equal(listed.length, 0, "the computers are never listed");
   assert.equal(f.relays.cmp_vm.sockets.length, 0, "no relay session opens");
-  assert.ok(!app.comandos.includes("account_relay_token"), "no token is asked for");
+  assert.ok(!app.commands.includes("account_relay_token"), "no token is asked for");
   assert.deepEqual(await invoke("machine_list"), [{ id: "local", local: true, active: true, on: true, hosts: true }], "the window's own machine list");
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 test("an engine without client tokens leaves the window local", async () => {
@@ -35,7 +35,7 @@ test("an engine without client tokens leaves the window local", async () => {
   assert.equal(doc.querySelector("[data-machine]"), null);
   assert.equal(listed.length, 0);
   assert.equal(f.relays.cmp_vm.sockets.length, 0);
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 test("signed in, the tasks of every machine show together; a VM task's actions go to the VM by its envelope", async () => {
@@ -71,7 +71,7 @@ test("signed in, the tasks of every machine show together; a VM task's actions g
   assert.ok(await until(() => native("send_message").length === 1), "a local task stays native");
   assert.equal(native("send_message")[0].args.session, "t1");
   assert.equal(relayCalls("cmp_vm", "send_message").length, 1);
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 test("the account and danil_* stay on this computer, and whoAmI asks for the window's workspace by name", async () => {
@@ -85,7 +85,7 @@ test("the account and danil_* stay on this computer, and whoAmI asks for the win
   });
   assert.ok(native("danil_workspace_account").some((c) => c.args?.workspace === "w"), "the account is the one of the window's workspace, asked by name");
   for (const command of ["list_accounts", "danil_sessions", "danil_workspace_account", "account_relay_token"]) assert.equal(relayCalls("cmp_vm", command).length, 0, `${command} never leaves this computer`);
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 test("a new task is born on this computer unless «Ejecutar en» picks another for the workspace", async () => {
@@ -114,7 +114,7 @@ test("a new task is born on this computer unless «Ejecutar en» picks another f
   assert.equal(native("send_message").length, 1, "nothing more is born on this computer");
   assert.equal(JSON.parse(app.w.localStorage.getItem("harness.layout.machines.run_on")).w, "cmp_vm", "«Ejecutar en» is remembered for this workspace");
   assert.equal(app.w.localStorage.getItem("terminus-web:computer"), null, "no global last machine decides for another workspace");
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 test("the task card says its machine, and the folder chip adds no native tooltip", async () => {
@@ -143,7 +143,7 @@ test("the task card says its machine, and the folder chip adds no native tooltip
   assert.ok(aqui, "the card of a local task has a machine row");
   assert.ok(aqui.parentElement.textContent.includes("Mi Mac"), "its name in the account, not «Esta Mac»");
   assert.equal(aqui.getAttribute("aria-label"), "encendida");
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 test("an action wakes the VM; a physical machine that is off is never started", async () => {
@@ -170,7 +170,7 @@ test("an action wakes the VM; a physical machine that is off is never started", 
   const toasts = [...doc.querySelectorAll("[data-machine-toast]")].map((n) => n.textContent);
   assert.ok(toasts.some((x) => x.includes("Danil VM se encendió")), `a toast says it turned on: ${toasts}`);
   assert.ok(!text().includes("Algo se rompió"), "no generic failure");
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 test("with another machine in «Ejecutar en», a clone runs there with start_project_clone", async () => {
@@ -223,5 +223,5 @@ test("with another machine in «Ejecutar en», a clone runs there with start_pro
   await sleep(600);
   assert.ok(!text().includes("Recibiendo objetos"), "the clone ended");
   assert.equal(app.w.localStorage.getItem("harness.layout.projects.remote_clones"), null);
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });

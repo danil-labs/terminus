@@ -141,7 +141,7 @@ test("llevar explícitamente a la VM copia por partes y crea la tarea sobre la f
   assert.equal(log.find((c) => c.name === "work_write_part").args.transfer, exported.args.operation ? `t-${exported.args.operation}` : undefined, "se copió otra transferencia");
   assert.equal(doc.querySelector("[data-carry-sheet]"), null);
   assert.ok(await until(() => doc.querySelector("[data-carry-origin]")?.textContent.includes("feat/run-on-bundle")), "la tarea no dice que es una copia");
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 test("si la copia se corta el mensaje vuelve a la caja y reintentar sigue sin volver a exportar", async () => {
@@ -172,7 +172,7 @@ test("si la copia se corta el mensaje vuelve a la caja y reintentar sigue sin vo
   assert.equal(log.filter((c) => c.name === "work_export").length, exports, "reintentar volvió a exportar");
   assert.equal(log.filter((c) => c.name === "work_write_part").length, 4);
   assert.equal(doc.querySelector("[data-carry-progress]"), null, "el avance sigue a la vista");
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 test("sin nada sin subir y con el proyecto en la VM se manda como siempre, sin hoja", async () => {
@@ -191,7 +191,7 @@ test("sin nada sin subir y con el proyecto en la VM se manda como siempre, sin h
   assert.equal(sent.machine, "vm");
   assert.equal(sent.args.unwrapSnapshot, undefined);
   assert.equal(log.filter((c) => c.name.startsWith("work_") && c.name !== "work_status").length, 0, "copió algo sin hoja");
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 test("traer a esta Mac una tarea de la VM: la rama llega aquí y la tarea nueva sigue sobre ella con un resumen corto", async () => {
@@ -238,7 +238,7 @@ test("traer a esta Mac una tarea de la VM: la rama llega aquí y la tarea nueva 
   assert.deepEqual([sent.machine, sent.args.baseRef, sent.args.unwrapSnapshot], ["local", "w1", true]);
   assert.ok(await until(() => doc.querySelector("[data-carry-origin]")?.textContent.includes("Viene de «Arreglar login» en vm")), "la tarea nueva no dice de dónde viene");
   assert.ok(doc.querySelector("[data-carry-open-original]"), "sin enlace a la original");
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 test("una carpeta sin remoto se lleva desde su menú: viaja entera y la VM crea el proyecto con el mismo id", async () => {
@@ -268,7 +268,7 @@ test("una carpeta sin remoto se lleva desde su menú: viaja entera y la VM crea 
   const imported = log.filter((c) => c.name === "work_import" && !c.args.probe).at(-1);
   assert.deepEqual([imported.machine, imported.args.create], ["vm", { name: "P1", id: "p1" }]);
   assert.equal(log.filter((c) => c.name === "start_project_clone").length, 0, "intentó clonar sin remoto");
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 
@@ -303,7 +303,7 @@ test("cancelar la copia explícita permite enviar en la VM sin copiar", async ()
   assert.equal(doc.querySelector("[data-carry-sheet]"), null);
   assert.equal(log.find(c => c.name === "send_message").machine, "vm");
   assert.equal(log.filter(c => c.name === "work_write_part").length, 0);
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 for (const sourceOn of [true, false]) test(`crear en una VM no consulta ni copia desde la Mac (${sourceOn ? "encendida" : "apagada"})`, async () => {
@@ -318,5 +318,5 @@ for (const sourceOn of [true, false]) test(`crear en una VM no consulta ni copia
   assert.ok(await until(() => log.some(c => c.name === "send_message")), "enviar abrió una transferencia implícita");
   assert.equal(doc.querySelector("[data-carry-sheet]"), null);
   assert.equal(log.filter(c => c.name.startsWith("work_")).length, 0);
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });

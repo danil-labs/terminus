@@ -84,7 +84,7 @@ export async function open(name, { status = SIGNED_IN, token = TOKEN, computers 
     ...extra,
   });
   const app = await boot("listo", name, responses, undefined, storage, {
-    antes: () => {
+    beforeImport: () => {
       globalThis.WebSocket = f.Socket;
       const previous = globalThis.fetch;
       const fake = (url, init) => {

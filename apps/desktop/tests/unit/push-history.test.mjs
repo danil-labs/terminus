@@ -43,5 +43,5 @@ test("subir hasta arriba pide la página anterior y la antepone sin remontar lo 
   assert.ok(pages.every((before) => before === null || before === 30));
   assert.ok(text(app).includes("Pregunta 0"), "la página anterior no llegó al hilo");
   assert.ok(last.isConnected, "anteponer remontó lo que ya estaba pintado");
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
