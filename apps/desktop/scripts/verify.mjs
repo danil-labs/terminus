@@ -463,6 +463,12 @@ const steps = [
     root,
   ],
   [
+    "Search cards keep the match text and skip a day the message does not have",
+    process.execPath,
+    ["--test", "--experimental-strip-types", join(root, "tests/unit/search-cards.test.ts")],
+    root,
+  ],
+  [
     "The tab shortcut reads the physical key and does not clash with another",
     process.execPath,
     ["--test", "--experimental-strip-types", join(root, "tests/unit/tab-shortcuts.test.ts")],
