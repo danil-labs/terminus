@@ -1671,7 +1671,18 @@ export default function Chat(props: ChatProps) {
   const searchMessages = () => bloques().flatMap((block, index) => {
     const message = block.tipo === "pasos" ? null : block.msg;
     if (!message || !["user", "agent"].includes(message.role) || message.shell || message.permission) return [];
-    return [{ block: index, text: message.role === "agent" ? stripNextSteps(textoVisible(message.text)) : message.text, markdown: message.role === "agent" }];
+    const named = message.author?.name?.trim() || message.encargado || message.fromTask?.title || "";
+    const speaker = named || (message.role === "agent" && message.agent
+      ? (props.agents.find((agent) => agent.id === message.agent)?.label ?? message.agent)
+      : null);
+    return [{
+      block: index,
+      text: message.role === "agent" ? stripNextSteps(textoVisible(message.text)) : message.text,
+      markdown: message.role === "agent",
+      role: message.role as "user" | "agent",
+      speaker,
+      at: typeof message.at === "number" ? message.at : undefined,
+    }];
   });
   const esLaTiraViva = (bloque: Bloque) => Boolean(props.busy) && bloque === bloques().at(-1);
   // Pasos que llegan tras la respuesta abren otro tramo, y el de la respuesta deja de correr.

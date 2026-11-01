@@ -53,7 +53,7 @@ export default function TaskFilesCard(props: {
   const hasTabs = () => panel().tabs.length > 0;
   const expanded = () => panel().expanded || (props.expandedOnly && hasTabs());
   // Narrow, the card shows the tree or the viewer, never both side by side.
-  let root: HTMLElement | undefined;
+  let root: HTMLDivElement | undefined;
   const [narrow, setNarrow] = createSignal(false);
   // What a narrow card shows; the wide card's tree preference stays untouched.
   const [narrowView, setNarrowView] = createSignal<"viewer" | "tree">("viewer");
@@ -178,7 +178,7 @@ export default function TaskFilesCard(props: {
   );
 
   return (
-    <section ref={root} class="@container relative flex h-full min-w-0 flex-1 overflow-hidden rounded-lg border border-border bg-surface shadow-md" data-task-files>
+    <div ref={root} class="relative flex h-full min-h-0 min-w-0 flex-1 overflow-hidden">
       <Show when={hasTabs()}>
         <div class="flex min-w-0 flex-1 flex-col" classList={{ hidden: !showViewer() }}>
           <div class="flex h-9 shrink-0 items-center gap-1 border-b border-border pl-1.5">
@@ -269,7 +269,7 @@ export default function TaskFilesCard(props: {
             </Suspense>
           </Show>
         </aside>
-    </section>
+    </div>
   );
 }
 
