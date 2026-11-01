@@ -98,6 +98,8 @@ export const APP_ACTIONS = [
   "cancel_login",
   "discard_account",
   "remove_account",
+  // El próximo turno corre con esta cuenta. No enciende la máquina: el uso solo se muestra si ya está encendida.
+  "set_active_account",
   // «Nueva carpeta» y «Clonar repo» desde la tarea nueva: el clon corre en segundo
   // plano y avisa con el evento `project_clone`.
   "create_project",

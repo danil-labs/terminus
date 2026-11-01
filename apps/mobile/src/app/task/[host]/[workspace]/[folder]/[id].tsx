@@ -30,6 +30,7 @@ import {
 } from "../../../../../lib/engine";
 import { HostError } from "../../../../../lib/hosts";
 import { type ChatLine, type Line, type LivePiece, type WorkLine, applyLive, lineMatches, liveAfterRead, runClock, savesLive, workRuns } from "../../../../../lib/steps";
+import { failureGesture, failureSentence, isInterruption } from "../../../../../lib/failureNotice";
 import { publishWork, releaseWork } from "../../../../../lib/workSheet";
 import { lang, t, w } from "../../../../../lib/i18n";
 import { type ScrollAnchor, anchorOf, restoreAnchor, scrollToEnd } from "../../../../../lib/scrollAnchor";
@@ -725,8 +726,36 @@ const Row = memo(function Row({ line, theme, needle, paused, onOpen, streaming, 
       </View>
     );
   if (line.kind === "shell") return <ShellRun command={line.command} output={line.output} exitCode={line.exitCode} theme={theme} />;
+  if (line.kind === "message" && line.role === "system" && (line.meta === "fallo" || line.meta === "cupo" || line.fallo)) return <FailureNotice line={line} theme={theme} />;
   return <Bubble line={line} theme={theme} streaming={streaming} onQuickReply={onQuickReply} />;
 });
+
+function say(key: string, vars?: Record<string, string | number>) {
+  return t(key as Parameters<typeof t>[0], vars);
+}
+
+/** La fila del fallo, como en la ventana: la frase de la clase y, si sirve, cambiar de cuenta. */
+function FailureNotice({ line, theme }: { line: Extract<Line, { kind: "message" }>; theme: Theme }) {
+  const sentence = failureSentence(line, say) ?? line.text;
+  if (!sentence) return null;
+  const gesture = line.meta === "fallo" ? failureGesture(line.fallo?.clase) : null;
+  const interrupted = line.meta === "fallo" && isInterruption(line.text);
+  const color = interrupted || line.meta !== "fallo" ? (line.quota?.to ? theme.info : theme.textMuted) : theme.warningStrong;
+  return (
+    <View accessibilityRole={line.meta === "fallo" && !interrupted ? "alert" : "text"} style={styles.notice}>
+      <View style={[styles.noticeRule, { backgroundColor: theme.border }]} />
+      <Text style={{ color, fontSize: TEXT.ui, lineHeight: 18, flexShrink: 1 }}>
+        {sentence}
+        {gesture ? (
+          <Text accessibilityRole="link" onPress={() => router.push("/accounts")} style={{ textDecorationLine: "underline" }}>
+            {` — ${say(gesture.key)}`}
+          </Text>
+        ) : null}
+      </Text>
+      <View style={[styles.noticeRest, { backgroundColor: theme.border }]} />
+    </View>
+  );
+}
 
 function Bubble({ line, theme, streaming, onQuickReply }: { line: Extract<Line, { kind: "message" }>; theme: Theme; streaming?: boolean; onQuickReply?: (prompt: string) => Promise<boolean> }) {
   const from = line.from ?? null;
@@ -901,6 +930,9 @@ const styles = StyleSheet.create({
   signature: { fontSize: TEXT.label, fontWeight: "600", paddingLeft: 2 },
   reply: { alignSelf: "stretch", paddingHorizontal: 4, paddingVertical: 2 },
   progress: { alignSelf: "stretch", paddingHorizontal: 4 },
+  notice: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 6 },
+  noticeRule: { width: 24, height: StyleSheet.hairlineWidth },
+  noticeRest: { flex: 1, height: StyleSheet.hairlineWidth },
   card: { borderWidth: 1, borderRadius: 14, padding: 12, gap: 10 },
   option: { borderWidth: 1, borderRadius: 10, padding: 10 },
   input: { flex: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, fontSize: TEXT.lead, maxHeight: 140 },

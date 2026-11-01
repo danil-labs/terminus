@@ -127,7 +127,10 @@ workspaces, que va a la raíz que fijó la compilación,
   Danil; la suscripción se guarda en Danil Computers, cuyo relay avisa cuando una
   tarea termina, se detiene o pide algo, también con el navegador cerrado. El
   aviso trae solo identificadores: el worker arma la ruta (`?to=/task/…`) y no
-  muestra texto del chat. El destino del aviso de inicio de sesión lo escribe el
+  muestra texto del chat, así que con la app cerrada dice que se detuvo y no el
+  motivo. Con la app abierta, el aviso local, la campana y el chat leen la clase
+  del turno (`sin_cupo`, la credencial, …) y dicen la misma frase que el
+  escritorio. El destino del aviso de inicio de sesión lo escribe el
   build (`phoneWorker`). En iPhone solo funciona instalada en el inicio (iOS
   16.4 o posterior). Cerrar sesión borra la suscripción antes de soltar el token.
 - **Lo que se recuerda:** `localStorage` en lugar del llavero (`store.web.ts`).
@@ -194,7 +197,7 @@ Los avisos salen en la app, igual para los dos caminos: una tarea que entra en
 | `settings` | Configuración (Proveedores de IA, actividad, memoria, máquinas, bridge); con `section=account`, Cuenta de Danil |
 | `inbox`, `inbox-thread` | El Inbox de Danil web de solo lectura y su conversación |
 | `task-tools` | Herramientas del chat: sus subtareas |
-| `(home)/notifications` | «Ahora» de todas las máquinas y «Antes», lo que llegó con la app abierta |
+| `(home)/notifications` | «Ahora» de todas las máquinas y «Antes», lo que llegó con la app abierta. Si se detuvo, el subtítulo dice por qué (el cupo, la credencial), leído del turno sin encender la máquina |
 | `(home)/new` | Nueva tarea: el cuadro de escribir con «Ejecutar en» (la última usada, si no la VM), carpeta, rama base y agente; `!` la crea con un comando. La hoja de Carpeta termina en «Nueva carpeta» y «Clonar repo» (ver «Carpetas nuevas») |
 | `preview` | Menú de una tarea (⋯ o pulsación larga): PR, Abrir, Cambiarle el nombre, Fijar, Archivar, Eliminar y Finalizar con confirmación; el cohete de la lista abre directamente la confirmación |
 | `accounts` | Proveedores de IA: cuentas por proveedor y correo, consumo, máquinas, iniciar y cerrar sesión |
@@ -202,7 +205,7 @@ Los avisos salen en la app, igual para los dos caminos: una tarea que entra en
 | `agents` | Hoja «Ver todos» del dock |
 | `workspaces` | Cambiar de workspace: cada uno con sus máquinas y lo que te necesita (las máquinas, la cuenta y el bridge pasaron a `settings`) |
 | `agent/[workspace]/[name]` | Conversaciones con el agente y cuadro para empezar otra |
-| `task/[host]/[workspace]/[folder]/[id]` | Conversación en la máquina de la tarea: aprobaciones, preguntas y el cuadro de escribir (modelo, permisos, adjuntos, `/`, `@`, `!`, cola y detener) |
+| `task/[host]/[workspace]/[folder]/[id]` | Conversación en la máquina de la tarea: aprobaciones, preguntas y el cuadro de escribir (modelo, permisos, adjuntos, `/`, `@`, `!`, cola y detener). Un fallo muestra la frase de su clase y, si es el cupo o la credencial, el enlace a Cuentas |
 | `pair` | Bridge de desarrollo; también `terminus-mobile://pair?url=…&token=…` |
 | `auth/callback` | La vuelta del navegador del inicio con Google o Microsoft |
 
@@ -223,7 +226,7 @@ lleva su comentario allí:
 | Almacenamiento por máquina (en Consumos) | `list_workspaces` sin workspace para capacidad; `list_storage` al abrir el detalle del workspace | — |
 | Reloj del turno en curso | `list_live_turns` | — |
 | Identidad de agentes | `list_agent_profiles`, `preview_file` | — |
-| Cuentas de IA | `list_accounts`, `account_status`, `account_limits` | `add_account`, `login_account`, `submit_login_code`, `cancel_login`, `discard_account`, `remove_account` |
+| Cuentas de IA | `list_accounts`, `account_status`, `account_limits` | `add_account`, `login_account`, `submit_login_code`, `cancel_login`, `discard_account`, `remove_account`, `set_active_account` (el próximo turno corre con esta cuenta; no enciende la máquina) |
 | Fondo del chat | `chat_background` | — |
 | Chat enriquecido | `tree_show` (el árbol `terminus-chat-visuals`), `chat_visual_part`, `preview_file`, `attachment_preview` | — |
 | Archivos de la tarea | `list_task_trees`, `tree_files`, `tree_show` (cualquier árbol de la tarea, solo lectura) | — |
@@ -356,8 +359,9 @@ de 48 o más, segmentado, chips), `apps/mobile/src/ui/Popover.tsx` (menú anclad
   Archivadas en Buscar. Mover una tarea a otro espacio (`move_task_to_space`)
   y el árbol de trabajo del chat todavía no están en la lista y no se ven.
 - El chat lleva bajo el título la fila máquina / carpeta / rama con buscar en
-  el chat, subtareas y la barra de uso de la cuenta del proveedor (detalle con
-  sus ventanas, Actualizar y Gestionar cuentas). La memoria de la conversación
+  el chat, subtareas y la barra de uso de la cuenta activa del proveedor
+  (detalle con sus ventanas, cuál está en uso, Usar esta para cambiarla,
+  Actualizar y Gestionar cuentas). La memoria de la conversación
   (`session_usage`) no está en la lista cerrada.
 - La ficha del workspace (cabecera de Inicio y filas de Workspaces) pinta su
   logo de la cuenta (`logo_url` de `GET /v1/workspaces`), leído con la sesión y
