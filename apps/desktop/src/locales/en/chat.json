@@ -276,7 +276,6 @@
   "chat.steer.not_running": "This task no longer has a running turn. Send the message as a new turn.",
   "chat.steer.stopping": "This turn is closing. Wait for it to finish before sending the message.",
   "chat.steer.unsupported": "This agent does not take messages mid-turn. It will be sent when the turn ends.",
-  "chat.steer.after_stop": "This agent does not take messages mid-turn: the turn was stopped and the message goes as a new turn.",
   "chat.steer.delivered": "This message was already delivered to the agent.",
   "chat.steer.unconfirmed": "Message delivery to the agent could not be confirmed. Check the conversation before resending.",
   "chat.fork.invalid_origin": "Could not read this task’s fork origin. Retry without deleting its history.",
