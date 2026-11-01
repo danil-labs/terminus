@@ -169,7 +169,7 @@ Sobre seldon-host#72 (`feat/workspace-danil-link`); ver «Conciliación».
 4. **Conector.** `hello` manda la lista de workspaces ligados de la máquina. El
    relay la usa para saber cuáles materializó cada una.
 5. **Contrato.** Se agregan las órdenes nuevas y el campo `account` en
-   `commands.json`. Sube la versión del contrato, y Terminus fija el motor nuevo.
+   `commands.json`. Sube la versión del contrato, y Danil fija el motor nuevo.
 
 ### 3. `danil-labs/terminus` — una lista, una regla
 
@@ -232,7 +232,7 @@ Sobre seldon-host#72 (`feat/workspace-danil-link`); ver «Conciliación».
 3. **Conflictos de ajustes.** Propongo que gane la última escritura, con
    `settings_version`, y avisar cuando se rechaza una.
 4. **Workspaces de organización con varias personas.** Este plan es de un solo
-   dueño. Los miembros llegan con WorkOS o Radiant (decisión abierta 1 de
+   dueño. Los miembros llegan con WorkOS o Harness (decisión abierta 1 de
    `danil-workspace/docs/decisions/2026-10-19-personal-computers-architecture.md`).
    `radiant_workspace_id` deja la puerta abierta.
 
@@ -290,7 +290,7 @@ seldon-host#72: **solo la dueña, como sincronizar una carpeta de Drive.**
 
 - Un workspace se liga solo a la cuenta de Danil dueña de la computadora. No hay
   miembros, «Otra cuenta», códigos de dispositivo por workspace ni modo
-  Radiant.
+  Harness.
 - **La sincronización sigue a la sesión de Danil** (decidido por la persona el
   2026-10-21, después de ver Configuración): con la sesión iniciada, todos los
   workspaces de esta computadora se ven en la web, el teléfono y sus otras

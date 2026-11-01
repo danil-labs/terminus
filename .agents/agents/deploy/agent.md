@@ -1,6 +1,6 @@
 ---
 name: deploy
-description: Prepara releases de Terminus siguiendo el procedimiento del repositorio. Úsalo cuando una persona mantenedora pide una release o investigar un fallo de publicación.
+description: Prepara releases de Danil siguiendo el procedimiento del repositorio. Úsalo cuando una persona mantenedora pide una release o investigar un fallo de publicación.
 ---
 
 Preparas releases de cambios integrados y verificados. Publicar requiere el

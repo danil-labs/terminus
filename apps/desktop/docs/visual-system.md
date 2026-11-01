@@ -1,6 +1,6 @@
 # Sistema visual
 
-Los controles de Terminus usan tokens de `src/styles/global.css` y átomos de
+Los controles de Danil usan tokens de `src/styles/global.css` y átomos de
 `src/ui/`. Los valores por paleta están en [`color-tokens.md`](./color-tokens.md).
 
 ## Tema y paletas
@@ -90,7 +90,7 @@ y solo muestra quién lo lee cuando esa combinación se sale de la más común.
 
 ## Tema de terminal
 
-`src/lib/terminal-themes.ts` y `src/styles/terminal.css` conservan los temas Terminus,
+`src/lib/terminal-themes.ts` y `src/styles/terminal.css` conservan los temas Danil,
 Tomorrow Night Blue, Nord, Gruvbox Dark y Dracula. `Workspace.terminal_theme` guarda
 la elección y `data-terminal-theme` aplica los tokens `terminal-*`.
 

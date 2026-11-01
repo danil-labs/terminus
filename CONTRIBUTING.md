@@ -1,6 +1,6 @@
-# Contributing to Terminus
+# Contributing to Danil
 
-Thanks for helping. This repository holds the Terminus clients: the desktop app, the
+Thanks for helping. This repository holds the Danil clients: the desktop app, the
 mobile app, the packages they share and their release tooling. The engine (`seldon-runtime`) is a separate, proprietary
 binary; changes to how projects, tasks, agents or accounts behave inside the
 engine can't be made here, but bug reports about them are welcome as issues.

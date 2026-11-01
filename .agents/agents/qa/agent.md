@@ -47,7 +47,7 @@ una ventana abierta no retenga el ejecutable que se va a enlazar.
 Construye la ventana de la rama con `pnpm window:build` y ábrela contra el
 laboratorio del motor (`pnpm engine:start`). El laboratorio usa datos
 desechables y la identidad `ai.danil.seldon.dev`; nunca uses los datos de una
-Terminus instalada. Una fixture, cuenta o plataforma ausente deja cobertura
+Danil instalada. Una fixture, cuenta o plataforma ausente deja cobertura
 pendiente.
 
 El recorrido llega hasta el efecto en pantalla o disco. Incluye escenarios de

@@ -152,7 +152,7 @@ assert.deepEqual(collapsedApp.failures, []);
  */
 const WINDOWS = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36 Edg/120.0";
 const windowsApp = await boot("listo", "title-bar-windows", { ...TASK_AFTER_QUEUE,
-  "plugin:window|title": "Terminus",
+  "plugin:window|title": "Danil",
   check_environment: () => ({ ready: true, blocked: false, reason: null, items: [], bootstrap: [], engineBuild: "0.2.73 b1fed68" }),
   list_dependencies: [],
   list_language_packs: [], list_bundled_language_packs: [],
