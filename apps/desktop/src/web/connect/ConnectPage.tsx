@@ -22,7 +22,7 @@ export type ConnectView =
   | { t: "done" }
   | { t: "denied" };
 
-/** `app.danil.ai/terminus/connect?code=…`: approves a Terminus that asked to join this account. */
+/** `alfa-app.danil.ai/connect?code=…`: approves a Terminus that asked to join this account. */
 export function ConnectPage(props: { session: Session; endpoint: string; code: string }) {
   const [view, setView] = createSignal<ConnectView>(props.code ? { t: "loading" } : { t: "missing" });
   const [name, setName] = createSignal("");
