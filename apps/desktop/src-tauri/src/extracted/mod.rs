@@ -1,6 +1,7 @@
 //! Ventana habitual conectada exclusivamente al motor privado seleccionado.
 //! Sin argumentos usa el motor empaquetado, que se resuelve con la ventana ya abierta;
 //! una raíz de 0.2.74 pasa antes por el traspaso.
+mod agents_session;
 mod appearance;
 mod background_service;
 mod desktop;
@@ -258,6 +259,10 @@ fn start(client: Option<Arc<Client>>, autostart: bool, launcher: launcher::Launc
             proxy::service_poll,
             proxy::machine_list,
             proxy::account_relay_token,
+            agents_session::agents_session_status,
+            agents_session::agents_session_connect,
+            agents_session::agents_session_sign_out,
+            agents_session::agents_bff_fetch,
             proxy::service_filter,
             proxy::load_history,
             handler_policy::handler_action,
