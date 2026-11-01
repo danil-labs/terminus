@@ -134,7 +134,7 @@ session it opens `<base>auth`, shared with the phone browser and device approval
 This entry supports email/password registration and sign-in, Google and Microsoft,
 email confirmation and resending confirmation. Authentication callbacks run here
 before the machine gate or phone redirect. `next` stays inside the configured
-Terminus base and travels in the callback URL, including a device code; it does
+Danil base and travels in the callback URL, including a device code; it does
 not depend on the original tab's storage. Supabase must allow that callback URL
 and its email templates must preserve the supplied redirect. Registration does
 not grant a license or provision a machine. After a 401

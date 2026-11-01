@@ -72,7 +72,7 @@ export default function SpaceMenu(props: {
             variant="chrome"
             size="compact"
             data-space-menu=""
-            class="h-7 min-w-0 max-w-44 shrink gap-1.5 px-2 text-ui font-semibold"
+            class="h-[30px] min-w-0 max-w-44 shrink gap-1.5 px-2 text-ui font-semibold"
             aria-label={t("spaces.bar.label", { workspace: props.workspace })}
             title={actual() ? spaceName(actual()!) : undefined}
             onDblClick={(e: MouseEvent) => {

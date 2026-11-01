@@ -1,12 +1,12 @@
-# Terminus móvil
+# Danil móvil
 
-Una app de iOS y Android para ver y dirigir Terminus desde el teléfono: qué
+Una app de iOS y Android para ver y dirigir Danil desde el teléfono: qué
 tareas te necesitan, aprobar o rechazar permisos, contestar preguntas, escribirle
 a una tarea o a un agente y crear tareas nuevas. No es un editor ni una terminal.
 
 Trabaja sobre las máquinas de la persona a través de **Danil Computers**: por
 omisión su VM administrada por Danil, y además cualquier otra máquina donde
-Terminus o su Seldon Host esté conectado a su cuenta (una Mac, otro VPS). Cada
+Danil o su Seldon Host esté conectado a su cuenta (una Mac, otro VPS). Cada
 máquina sigue siendo la dueña de sus tareas; el teléfono es otro cliente más,
 como la web.
 
@@ -99,7 +99,7 @@ como la web.
 
 ## En el navegador
 
-La misma app se compila para web y vive dentro de Terminus web, en
+La misma app se compila para web y vive dentro de Danil web, en
 `/terminus/m/` (`apps/desktop/scripts/web-mobile.mjs`, último paso de
 `pnpm web:build`). La web de escritorio manda ahí a los teléfonos y cada una
 tiene un enlace a la otra («Ver la versión de escritorio» en la hoja de
@@ -192,7 +192,7 @@ Los avisos salen en la app, igual para los dos caminos: una tarea que entra en
 | `personalize` | Personalizar: secciones de Inicio, Filtrar (abre `filter`) y Agrupar |
 | `profile` | Menú de perfil: Cuenta de Danil, Tema, Mantener despierta, Configuración, Puertos y Almacenamiento |
 | `settings` | Configuración (Proveedores de IA, actividad, memoria, máquinas, bridge); con `section=account`, Cuenta de Danil |
-| `inbox`, `inbox-thread` | El Inbox de Danil Agents de solo lectura y su conversación |
+| `inbox`, `inbox-thread` | El Inbox de Danil web de solo lectura y su conversación |
 | `task-tools` | Herramientas del chat: sus subtareas |
 | `(home)/notifications` | «Ahora» de todas las máquinas y «Antes», lo que llegó con la app abierta |
 | `(home)/new` | Nueva tarea: el cuadro de escribir con «Ejecutar en» (la última usada, si no la VM), carpeta, rama base y agente; `!` la crea con un comando. La hoja de Carpeta termina en «Nueva carpeta» y «Clonar repo» (ver «Carpetas nuevas») |
@@ -319,7 +319,7 @@ EXPO_PUBLIC_SUPABASE_URL=http://<ip>:8787 EXPO_PUBLIC_COMPUTERS_ENDPOINT=http://
 ```
 
 En la app se entra con cualquier correo y contraseña. `--mac-off` apaga la Mac;
-`--license` simula una cuenta sin Terminus.
+`--license` simula una cuenta sin licencia de pago.
 
 El camino de desarrollo con el motor del lab sigue igual:
 

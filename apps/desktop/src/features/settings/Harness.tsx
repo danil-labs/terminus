@@ -1,3 +1,8 @@
+/**
+ * El panel de Harness. La copy propia usa `harness.*`; las frases que manda el
+ * motor (`radiant.error.*`, `radiant.governance.*`, `radiant.usage.*`) siguen en
+ * `radiant.json` porque son el nombre del contrato, no de la pantalla.
+ */
 import { invoke } from "../../lib/invoke.ts";
 import { listen } from "../../lib/serviceEvents";
 import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
@@ -9,7 +14,7 @@ import { Button } from "../../ui/Button";
 import { asFailure, type Failure, FailureNote } from "../../ui/Failure";
 import { Input } from "../../ui/Input";
 import { Select } from "../../ui/Select";
-import RadiantGovernance from "./RadiantGovernance";
+import HarnessGovernance from "./HarnessGovernance";
 
 type RemoteWorkspace = { id: string; name: string };
 type LoginView = {
@@ -36,7 +41,7 @@ type Identity = {
 };
 type Mode = "cloud" | "custom";
 
-export default function Radiant() {
+export default function Harness() {
   const [status, setStatus] = createSignal<Status | null>(null);
   const [mode, setMode] = createSignal<Mode>("cloud");
   const [url, setUrl] = createSignal("");
@@ -181,16 +186,16 @@ export default function Radiant() {
     <section class="grid max-w-2xl gap-4">
       <header class="grid gap-1">
         <h2 class="m-0 text-lg font-display font-bold tracking-tight text-neutral-950">
-          {t("radiant.title")}
+          {t("harness.title")}
         </h2>
-        <p class="m-0 text-sm text-neutral-500">{t("radiant.description")}</p>
+        <p class="m-0 text-sm text-neutral-500">{t("harness.description")}</p>
       </header>
 
       <div class="grid gap-3 rounded-lg border border-border bg-surface-raised p-4">
-        <h3 class="m-0 text-sm font-semibold text-neutral-950">{t("radiant.server.title")}</h3>
+        <h3 class="m-0 text-sm font-semibold text-neutral-950">{t("harness.server.title")}</h3>
         <div
           role="radiogroup"
-          aria-label={t("radiant.server.label")}
+          aria-label={t("harness.server.label")}
           class="inline-flex w-fit gap-0.5 rounded-md border border-border bg-surface p-0.5"
         >
           <For each={["cloud", "custom"] as Mode[]}>
@@ -206,7 +211,7 @@ export default function Radiant() {
                 )}
                 onClick={() => chooseServer(id)}
               >
-                {id === "cloud" ? t("radiant.server.cloud") : t("radiant.server.custom")}
+                {id === "cloud" ? t("harness.server.cloud") : t("harness.server.custom")}
               </button>
             )}
           </For>
@@ -225,7 +230,7 @@ export default function Radiant() {
                     if (cloud) void act(() => invoke<Status>("radiant_set_server", { server: cloud }), true);
                   }}
                 >
-                  {t("radiant.server.use")}
+                  {t("harness.server.use")}
                 </Button>
               </Show>
             </div>
@@ -240,8 +245,8 @@ export default function Radiant() {
           >
             <Input
               class="max-w-sm flex-1 font-mono"
-              aria-label={t("radiant.server.url_label")}
-              placeholder={t("radiant.server.url_placeholder")}
+              aria-label={t("harness.server.url_label")}
+              placeholder={t("harness.server.url_placeholder")}
               value={url()}
               spellcheck={false}
               autocomplete="off"
@@ -249,7 +254,7 @@ export default function Radiant() {
               onInput={(e) => setUrl(e.currentTarget.value)}
             />
             <Button size="sm" type="submit" disabled={busy() || running() || !url().trim()}>
-              {t("radiant.server.use")}
+              {t("harness.server.use")}
             </Button>
           </form>
         </Show>
@@ -257,28 +262,28 @@ export default function Radiant() {
 
       <Show when={status()?.server}>
         <div class="grid gap-3 rounded-lg border border-border bg-surface-raised p-4">
-          <h3 class="m-0 text-sm font-semibold text-neutral-950">{t("radiant.session.title")}</h3>
+          <h3 class="m-0 text-sm font-semibold text-neutral-950">{t("harness.session.title")}</h3>
           <Show
             when={running()}
             fallback={
               <div class="flex flex-wrap items-center justify-between gap-2">
                 <span class="text-sm text-neutral-700">
                   {!status()?.signed_in
-                    ? t("radiant.session.signed_out", { server: server() })
+                    ? t("harness.session.signed_out", { server: server() })
                     : account()
-                      ? t("radiant.session.signed_in_as", { account: account(), server: server() })
-                      : t("radiant.session.signed_in", { server: server() })}
+                      ? t("harness.session.signed_in_as", { account: account(), server: server() })
+                      : t("harness.session.signed_in", { server: server() })}
                 </span>
                 <Show
                   when={status()?.signed_in}
                   fallback={
                     <Button size="sm" disabled={busy()} onClick={() => void act(() => invoke<Status>("radiant_login"), true)}>
-                      {t("radiant.session.login")}
+                      {t("harness.session.login")}
                     </Button>
                   }
                 >
                   <Button size="sm" variant="outline" disabled={busy()} onClick={() => void act(() => invoke<Status>("radiant_logout"), true)}>
-                    {busy() ? t("radiant.session.logging_out") : t("radiant.session.logout")}
+                    {busy() ? t("harness.session.logging_out") : t("harness.session.logout")}
                   </Button>
                 </Show>
               </div>
@@ -286,11 +291,11 @@ export default function Radiant() {
           >
             <Show
               when={login()?.prompt}
-              fallback={<p class="m-0 text-sm text-neutral-500">{t("radiant.session.starting")}</p>}
+              fallback={<p class="m-0 text-sm text-neutral-500">{t("harness.session.starting")}</p>}
             >
               {(prompt) => (
                 <div class="grid gap-2">
-                  <span class="text-sm text-neutral-700">{t("radiant.session.code")}</span>
+                  <span class="text-sm text-neutral-700">{t("harness.session.code")}</span>
                   <span class="font-mono text-2xl font-semibold tracking-widest text-neutral-950">
                     {prompt().code}
                   </span>
@@ -308,11 +313,11 @@ export default function Radiant() {
                     if (uri) void invoke("open_external", { target: uri }).catch((e) => setFailure(asFailure(e)));
                   }}
                 >
-                  {t("radiant.session.open_browser")}
+                  {t("harness.session.open_browser")}
                 </Button>
               </Show>
               <Button size="sm" variant="outline" onClick={() => void act(() => invoke<Status>("radiant_cancel_login"))}>
-                {t("radiant.session.cancel")}
+                {t("harness.session.cancel")}
               </Button>
             </div>
           </Show>
@@ -322,7 +327,7 @@ export default function Radiant() {
           <Show when={status()?.signed_in && identity()?.status === "organization_selection_required"}>
             <Select
               class="max-w-sm"
-              aria-label={t("radiant.organization.label")}
+              aria-label={t("harness.organization.label")}
               disabled={busy()}
               value=""
               onChange={(e) => {
@@ -331,7 +336,7 @@ export default function Radiant() {
               }}
             >
               <option value="" disabled>
-                {t("radiant.organization.choose")}
+                {t("harness.organization.choose")}
               </option>
               <For each={identity()?.organizations ?? []}>{(o) => <option value={o.id}>{o.name}</option>}</For>
             </Select>
@@ -343,9 +348,9 @@ export default function Radiant() {
       <Show when={status()?.server && status()?.signed_in}>
         <div class="grid gap-3 rounded-lg border border-border bg-surface-raised p-4">
           <div class="flex items-center justify-between gap-2">
-            <h3 class="m-0 text-sm font-semibold text-neutral-950">{t("radiant.workspace.title")}</h3>
+            <h3 class="m-0 text-sm font-semibold text-neutral-950">{t("harness.workspace.title")}</h3>
             <Button size="compact" variant="ghost" disabled={busy()} onClick={() => void loadWorkspaces()}>
-              {t("radiant.workspace.refresh")}
+              {t("harness.workspace.refresh")}
             </Button>
           </div>
           <Show
@@ -359,11 +364,11 @@ export default function Radiant() {
             {(list) => (
               <Show
                 when={list().length > 0}
-                fallback={<p class="m-0 text-sm text-neutral-500">{t("radiant.workspace.empty")}</p>}
+                fallback={<p class="m-0 text-sm text-neutral-500">{t("harness.workspace.empty")}</p>}
               >
                 <Select
                   class="max-w-sm"
-                  aria-label={t("radiant.workspace.title")}
+                  aria-label={t("harness.workspace.title")}
                   disabled={busy()}
                   value={status()?.workspace?.id ?? ""}
                   onChange={(e) => {
@@ -373,7 +378,7 @@ export default function Radiant() {
                   }}
                 >
                   <option value="" disabled>
-                    {t("radiant.workspace.choose")}
+                    {t("harness.workspace.choose")}
                   </option>
                   {/* `selected` por fila: cada lista trae objetos nuevos, el navegador marca
                       la primera opción recreada y `value`, que no cambió, no se reaplica. */}
@@ -392,7 +397,7 @@ export default function Radiant() {
       </Show>
 
       <Show when={status()?.server && status()?.signed_in}>
-        <RadiantGovernance remote={status()?.workspace ?? null} />
+        <HarnessGovernance remote={status()?.workspace ?? null} />
       </Show>
 
       <Show when={failure()}>{(error) => <FailureNote f={error()} />}</Show>
