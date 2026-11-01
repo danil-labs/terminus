@@ -15,16 +15,19 @@ Si el commit ya tiene una cadena completa en verde en esta plataforma, no la
 repitas: cita ese resultado y dedica el tiempo a los recorridos. Una cadena
 nueva solo hace falta si cambió el commit.
 
-En Linux, córrela en la VM de verify: ahí un mensaje a la tarea no la mata y tu
-máquina queda libre. Lanza y consulta; no te quedes esperando en primer plano:
+En Linux, córrela en la cola de la VM de verify: ahí un mensaje a la tarea no la
+mata y tu máquina queda libre. Lanza y consulta; no te quedes esperando:
 
 ```bash
-c=$(git rev-parse HEAD)
-git bundle create - HEAD | ssh verify@vm-verify "./verify-commit $c"
-ssh verify@vm-verify "tail -5 runs/$c.log"   # termina con rc=0
+pnpm verify --remote --detach          # imprime el id de la corrida
+pnpm verify --remote --attach <id>     # log entero y exit real; repítelo si se corta
+pnpm verify --remote --status          # qué hay en cola
 ```
 
-Si la VM no responde porque está apagada o no hay acceso, ejecuta `pnpm verify`
+Lleva un commit, no el árbol de trabajo. Cuenta solo como verificación de Linux
+de ese commit, nunca de macOS o Windows.
+
+Si el comando dice que no hay acceso a la cola, ejecuta `pnpm verify`
 aquí, en un comando de primer plano bajo 10 minutos. `--no-cargo` no comprueba
 Rust. Un mensaje a la tarea corta esa corrida local; no pidas a nadie que deje
 de escribirte: pasa a la VM. `--quick` nunca cuenta para un veredicto.

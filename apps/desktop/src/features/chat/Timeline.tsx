@@ -11,6 +11,7 @@ import SquareTerminal from "lucide-solid/icons/square-terminal";
 import TriangleAlert from "lucide-solid/icons/triangle-alert";
 import Wrench from "lucide-solid/icons/wrench";
 import { type Component, createSignal, For, Match, Show, Switch } from "solid-js";
+import { createRowSignal } from "./threadRow";
 import { Dynamic } from "solid-js/web";
 import { t } from "../../lib/i18n";
 import { flechaDeLista } from "../../lib/shortcuts";
@@ -73,7 +74,7 @@ function claveDeFila(fila: Fila, i: number) {
 export default function LineaDeTiempo(props: { pasos: Paso[] }) {
   let marco: HTMLDivElement | undefined;
   const [foco, setFoco] = createSignal(0);
-  const [abiertas, setAbiertas] = createSignal<Record<string, boolean>>({});
+  const [abiertas, setAbiertas] = createRowSignal<Record<string, boolean>>("steps", {});
 
   const filas = () => agrupar(props.pasos);
 
@@ -382,7 +383,7 @@ const LETRAS_DE_COMANDO = 600;
 
 /** Recortado: un heredoc entero tapaba la salida, que es lo que dice por qué falló. */
 function Comando(props: { texto: string }) {
-  const [entero, setEntero] = createSignal(false);
+  const [entero, setEntero] = createRowSignal("command", false);
   const recorte = () => {
     const lineas = props.texto.split("\n");
     let corto = lineas.slice(0, LINEAS_DE_COMANDO).join("\n");

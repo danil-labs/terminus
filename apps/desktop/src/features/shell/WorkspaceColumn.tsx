@@ -13,6 +13,7 @@ import { taskLabel } from "../projects/TaskStatus";
 import { SignalDot, taskSignalTone } from "../../ui/SignalDot";
 import { cerrarConEscape, createWorkspaces, type Workspace } from "../settings/workspaces-store";
 import { topState, type AttentionState, type WorkspaceAttention } from "./attention";
+import KeepAwake from "./KeepAwake";
 import ProfileMenu from "./ProfileMenu";
 
 /** Las iniciales de las dos primeras palabras; una sola palabra da una letra. */
@@ -327,6 +328,8 @@ function ColumnFoot(props: {
         {tools()}
         <span aria-hidden="true" class="my-1 h-px w-6 shrink-0 bg-border-strong" />
       </Show>
+      {/* Sólo la computadora de esta ventana: en la web la orden iría a una máquina remota. */}
+      <Show when={import.meta.env.MODE !== "web"}><KeepAwake /></Show>
       <button type="button" class={boton} aria-label={t("settings.title")} title={t("settings.title")} onClick={() => props.onSettings()}>
         <SettingsIcon size={17} aria-hidden="true" />
       </button>

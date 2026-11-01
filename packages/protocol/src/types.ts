@@ -268,7 +268,10 @@ export type TreeFolder = { path: string; repo: boolean; lazy?: boolean; ignored?
 /** `tree_files`: las rutas de los archivos de un árbol, con sus carpetas. */
 export type TreeFiles = { paths: string[]; folders: TreeFolder[]; truncated: boolean };
 /** `load_session`. */
-export type OpenedSession = { id: string; provider: string; model: string | null; agent?: string | null; permission_mode?: string | null; turns: Turn[] };
+/** The `history` field of a read: `turns[i]` is turn `start + i`. */
+export type HistoryPage = { version?: number; revision?: string; total: number; start: number; end: number; limit: number; has_more: boolean };
+
+export type OpenedSession = { id: string; provider: string; model: string | null; observed_model?: string | null; agent?: string | null; permission_mode?: string | null; turns: Turn[]; history?: HistoryPage | null };
 
 /** `pending_requests`. */
 export type PendingRequests = {
