@@ -4,7 +4,7 @@
  * guardados abren la pestaña que ahora los contiene.
  */
 export const SETTINGS_ENTRIES = [
-  { id: "account", group: "you", tabs: ["cuenta-danil", "emails", "security"] },
+  { id: "account", group: "you", tabs: ["cuenta-danil", "emails", "usage", "plan", "support", "security"] },
   { id: "preferences", group: "you", tabs: ["general", "appearance", "notify", "languages", "workspaces"] },
   { id: "ai-accounts", group: "you", tabs: ["proveedores-ia"] },
   { id: "machines", group: "you", tabs: ["machines", "entorno", "activity"] },

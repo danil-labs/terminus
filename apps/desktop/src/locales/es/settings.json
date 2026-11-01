@@ -795,5 +795,7 @@
   "settings.connections.approval_fixed": "El modo de aprobación de una conexión existente se conserva. El servicio todavía no permite cambiarlo.",
   "settings.tab.plugins": "Plugins",
   "settings.tab.memory": "Memoria",
-  "settings.tab.external": "Acceso externo"
+  "settings.tab.external": "Acceso externo",
+  "settings.tab.usage": "Consumo",
+  "settings.tab.plan": "Plan"
 }

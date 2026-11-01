@@ -30,6 +30,7 @@ export async function startAdmin(settings: { login: string; supabaseUrl: string;
     auditLog: webAuditLog(settings.supabaseUrl, settings.supabaseKey, () => session.getToken(), () => void session.unauthorized()),
     workspace: new URLSearchParams(window.location.search).get("workspace"),
     home: home(),
+    settings: `${home()}?settings=usage`,
   };
   render(() => <AdminPage source={source} />, root());
 }
@@ -49,6 +50,7 @@ export async function startAdminDemo(options: { dark: boolean }) {
     menu: (query.get("menu") as MenuOrder | null) ?? undefined,
     section: (query.get("section") as Section | null) ?? undefined,
     home: `${home()}?demo=1${options.dark ? "&theme=dark" : ""}`,
+    settings: `${home()}?demo=1&account=personal&settings=usage${options.dark ? "&theme=dark" : ""}`,
   };
   render(() => <AdminPage source={source} />, root());
 }

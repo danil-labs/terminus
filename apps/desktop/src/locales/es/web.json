@@ -445,5 +445,7 @@
   "web.admin.identity_scim": "Aprovisionamiento SCIM",
   "web.admin.identity_domains": "Dominios",
   "web.admin.identity_retention": "Retención",
-  "web.admin.identity_roles": "Roles a medida"
+  "web.admin.identity_roles": "Roles a medida",
+  "web.admin.personal": "Esta cuenta es personal: esta página es para organizaciones. Tu consumo, tu plan y el acceso de soporte están en Configuración.",
+  "web.admin.personal_open": "Abrir Configuración"
 }

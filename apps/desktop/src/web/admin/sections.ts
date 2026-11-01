@@ -4,16 +4,17 @@ export type Section = "general" | "usage" | "members" | "support" | "audit" | "s
 export type MenuOrder = "scope" | "task" | "flat";
 export type GroupName = "workspace" | "people" | "control" | "shared" | "organization" | "summary";
 
-/** El plan manda; sin plan, una cuenta sin organización es personal. */
-export function accountKind(account: { organization: string | null; plan: string | null }): AccountKind {
+/** Solo un plan explícito hace personal a una cuenta: si el BFF no lo manda, tratarla así dejaría sin Harness a una organización. */
+export function accountKind(account: { plan: string | null }): AccountKind {
   const plan = account.plan?.toLowerCase() ?? "";
   if (plan.includes("enterprise")) return "enterprise";
-  if (plan.includes("personal") || !account.organization) return "personal";
+  if (plan.includes("personal")) return "personal";
   return "teams";
 }
 
+/** El Harness es de organizaciones: lo de una cuenta personal vive en Configuración. */
 const BY_KIND: Record<AccountKind, readonly Section[]> = {
-  personal: ["general", "usage", "audit", "support", "plan"],
+  personal: [],
   teams: ["general", "usage", "members", "support", "audit", "skills", "mcp", "agents", "rules", "workspaces", "plan"],
   enterprise: ["general", "usage", "members", "support", "audit", "skills", "mcp", "agents", "rules", "workspaces", "plan", "identity"],
 };

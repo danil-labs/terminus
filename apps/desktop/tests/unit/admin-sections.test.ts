@@ -4,18 +4,15 @@ import { accountKind, menuFor, type Section, visibleSections } from "../../src/w
 
 const ALL = new Set<Section>(["general", "usage", "members", "support", "audit", "skills", "mcp", "agents", "rules", "workspaces", "plan", "identity"]);
 
-test("the plan decides the kind of account; without one, no organization means personal", () => {
-  assert.equal(accountKind({ organization: "Danil", plan: "Enterprise" }), "enterprise");
-  assert.equal(accountKind({ organization: "Danil", plan: "Teams" }), "teams");
-  assert.equal(accountKind({ organization: "Danil", plan: null }), "teams");
-  assert.equal(accountKind({ organization: null, plan: null }), "personal");
-  assert.equal(accountKind({ organization: null, plan: "Personal" }), "personal");
+test("only an explicit plan makes an account personal, so a missing plan never locks out an organization", () => {
+  assert.equal(accountKind({ plan: "Enterprise" }), "enterprise");
+  assert.equal(accountKind({ plan: "Teams" }), "teams");
+  assert.equal(accountKind({ plan: "Personal" }), "personal");
+  assert.equal(accountKind({ plan: null }), "teams");
 });
 
-test("personal keeps its own usage and sees nothing of a team or organization", () => {
-  const visible = visibleSections("personal", true, ALL);
-  assert.ok(visible.includes("usage"));
-  for (const section of ["members", "skills", "mcp", "agents", "rules", "workspaces", "identity"] as const) assert.ok(!visible.includes(section), section);
+test("a personal account has no Harness", () => {
+  assert.deepEqual(visibleSections("personal", true, ALL), []);
 });
 
 test("a member only reads usage and what governs their work", () => {

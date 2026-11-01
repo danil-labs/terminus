@@ -116,6 +116,9 @@ const organizationOf = (plan: string, enterprise: boolean, workspace: string, ot
   identity: enterprise ? [{ id: "sso", value: "Activo con Okta" }, { id: "domains", value: "ejemplo.mx" }, { id: "retention", value: "365 días" }] : undefined,
 });
 
+/** Lo de una cuenta personal en Configuración. */
+export const personalDemo = { usage: usageDemo(true), plan: async () => ({ name: "Personal", detail: "1 workspace" }) };
+
 /** Las cuatro cuentas de la vista previa; `account` llega de `?account=`. */
 export function adminDemo(account: string | null, workspace: string, other: string): Pick<AdminSource, "memberships" | "active" | "shared" | "workspace" | "auditLog" | "usage" | "members" | "rules" | "policy" | "organization"> {
   const personal = account === "personal";
@@ -129,10 +132,10 @@ export function adminDemo(account: string | null, workspace: string, other: stri
     workspace: null,
     shared: sharedDemo(),
     auditLog: { list: async () => ({ kind: "ok", entries: auditDemo, more: false }) },
-    usage: usageDemo(personal || account === "member"),
+    usage: usageDemo(account === "member"),
     members: membersDemo(),
     rules: { rules: async () => RULES },
     policy: policyDemo(),
-    organization: personal ? { plan: async () => ({ name: "Personal", detail: "1 workspace" }) } : organizationOf(row.plan ?? "", enterprise, workspace, other),
+    organization: organizationOf(row.plan ?? "", enterprise, workspace, other),
   };
 }

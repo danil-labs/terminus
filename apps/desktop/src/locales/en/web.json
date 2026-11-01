@@ -445,5 +445,7 @@
   "web.admin.identity_scim": "SCIM provisioning",
   "web.admin.identity_domains": "Domains",
   "web.admin.identity_retention": "Retention",
-  "web.admin.identity_roles": "Custom roles"
+  "web.admin.identity_roles": "Custom roles",
+  "web.admin.personal": "This is a personal account: this page is for organizations. Your usage, plan and support access are in Settings.",
+  "web.admin.personal_open": "Open Settings"
 }

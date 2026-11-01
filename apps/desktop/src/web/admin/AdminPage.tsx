@@ -59,8 +59,10 @@ export type AdminSource = {
   section?: Section;
   /** El workspace desde el que se entró; `null` si se abrió directo: entonces manda la cuenta de la sesión. */
   workspace: string | null;
-  /** Adónde lleva «Volver a Terminus». */
+  /** Adónde lleva «Volver a Danil». */
   home: string;
+  /** Configuración, abierta donde vive lo de una cuenta personal. */
+  settings: string;
 };
 
 const ICONS: Record<Section, () => JSX.Element> = {
@@ -138,8 +140,8 @@ export function AdminPage(props: { source: AdminSource }) {
   const manager = () => isManager(current()?.role ?? "");
   const kind = () => (current() ? accountKind(current()!) : "personal");
   const visible = () => (current() ? visibleSections(kind(), manager(), available()) : []);
-  /** Personal y miembro leen una lista corta, sin títulos de grupo. */
-  const grouped = () => kind() !== "personal" && manager();
+  /** Un miembro lee una lista corta, sin títulos de grupo. */
+  const grouped = manager;
   const menu = () => {
     const groups = menuFor(props.source.menu ?? "task", visible());
     return grouped() ? groups : [{ group: groups[0]?.group ?? "summary", sections: groups.flatMap((entry) => entry.sections) }];
@@ -166,6 +168,16 @@ export function AdminPage(props: { source: AdminSource }) {
           <div class="m-auto grid max-w-md gap-3 p-6">
             <p role="alert" class="m-0 text-sm text-error-strong">{t("web.admin.failed")}</p>
             {back}
+          </div>
+        </Match>
+        <Match when={current() && kind() === "personal"}>
+          <div class="m-auto grid max-w-md gap-3 p-6" data-admin-personal="">
+            <h1 class="m-0 text-lg font-semibold">{t("web.admin.title")}</h1>
+            <p role="status" class="m-0 text-sm text-neutral-500">{t("web.admin.personal")}</p>
+            <div class="flex flex-wrap gap-2">
+              <Button as="a" size="sm" href={props.source.settings}>{t("web.admin.personal_open")}</Button>
+              {back}
+            </div>
           </div>
         </Match>
         <Match when={!current() || visible().length === 0}>
@@ -275,7 +287,7 @@ function Body(props: { section: Section | undefined; workspace: Membership; sour
           <General workspace={props.workspace} source={props.source} onOpen={props.onOpen} />
         </Match>
         <Match when={props.section === "usage" && props.source.usage}>
-          {(usage) => <Usage source={usage()} own={props.kind === "personal" || !props.manager} />}
+          {(usage) => <Usage source={usage()} own={!props.manager} />}
         </Match>
         <Match when={props.section === "members" && props.source.members}>{(members) => <Members source={members()} />}</Match>
         <Match when={props.section === "skills" && props.source.shared}>{(s) => <SharedSkills source={s()} policy={policy()} canPropose={props.manager} />}</Match>
