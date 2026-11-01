@@ -61,4 +61,10 @@ test("entering a workspace is a closed write", async () => {
   assert.equal((await post({ key: "a:476" }, { Origin: "https://evil.test" })).status, 403);
   assert.equal((await post({ key: "a:476" }, { "X-Danil-Actor": "ai" })).status, 403);
   assert.equal(seen.length, 1);
+  const staging = await worker.fetch(new Request("https://staging-app.danil.ai/alpha-api/api/workspace/enter", {
+    method: "POST", body: JSON.stringify({ key: "a:476" }),
+    headers: { Authorization: "Bearer token", Origin: "https://staging-app.danil.ai", "Content-Type": "application/json" },
+  }), { ...env, ENTRY_HOST: "staging-app.danil.ai" });
+  assert.equal(staging.status, 200, "the staging host enters with its own origin");
+  assert.equal(seen[1].headers.get("Origin"), "https://staging-app.danil.ai");
 });

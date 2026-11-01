@@ -229,7 +229,7 @@ async function forward(env, upstream) {
 /** Una escritura de correos: desde esta página, con sesión y el cuerpo exacto de su ruta. */
 /** Entrar a un workspace en esta sesión. Solo la clave llega al BFF, que decide con el Bearer de la persona. */
 async function enterWrite(request, env, url) {
-  if (request.headers.get("Origin") !== `https://${HOST}`) return json("forbidden_origin", 403);
+  if (request.headers.get("Origin") !== url.origin) return json("forbidden_origin", 403);
   if ((request.headers.get("X-Danil-Actor") ?? "").trim().toLowerCase() === "ai") return json("identity_requires_person", 403);
   const authorization = request.headers.get("Authorization");
   if (!authorization || !/^Bearer \S+$/i.test(authorization)) return json("unauthorized", 401);
@@ -241,7 +241,7 @@ async function enterWrite(request, env, url) {
   if (!exact(body, ["key"]) || typeof body.key !== "string" || !WORKSPACE_KEY.test(body.key)) return json("invalid_body", 400);
   if (!env.APPV2_BFF) return json("bff_unavailable", 503);
   url.pathname = "/api/workspace/enter";
-  const headers = { Authorization: authorization, Accept: "application/json", "Content-Type": "application/json", Origin: `https://${HOST}` };
+  const headers = { Authorization: authorization, Accept: "application/json", "Content-Type": "application/json", Origin: url.origin };
   return forward(env, new Request(url, { method: "POST", headers, body: JSON.stringify({ key: body.key }), redirect: "manual" }));
 }
 
