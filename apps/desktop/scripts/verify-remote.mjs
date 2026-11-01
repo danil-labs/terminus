@@ -126,7 +126,7 @@ async function openLink(host) {
     async up() {
       if (tunnel) return;
       errors = "";
-      const child = spawn(process.env.VERIFY_REMOTE_SSH ?? "ssh", ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "-o", "ExitOnForwardFailure=yes", "-o", "StrictHostKeyChecking=accept-new", "-N", "-L", local, `${SSH_USER}@${host}`], { stdio: ["ignore", "ignore", "pipe"], windowsHide: true });
+      const child = spawn(process.env.VERIFY_REMOTE_SSH ?? "ssh", ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "-o", "ExitOnForwardFailure=yes", "-o", "ServerAliveInterval=5", "-o", "ServerAliveCountMax=2", "-o", "StrictHostKeyChecking=accept-new", "-N", "-L", local, `${SSH_USER}@${host}`], { stdio: ["ignore", "ignore", "pipe"], windowsHide: true });
       tunnel = child;
       child.stderr.on("data", (chunk) => { errors += chunk; });
       child.once("error", (error) => {
@@ -256,6 +256,17 @@ async function submit(base, commit, command) {
   }
 }
 
+/** La máquina pudo apagarse justo al llegar el commit: se enciende y se manda una vez más. */
+async function submitOnce(link, host, commit, command) {
+  try {
+    return await submit(link.base, commit, command);
+  } catch (error) {
+    if (error instanceof RemoteError) throw error;
+    await connect(link, host);
+    return submit(link.base, commit, command);
+  }
+}
+
 function resumeHint(id) {
   console.error(`\n  La corrida ${id} sigue en la máquina. Retómala con \`pnpm verify --remote --attach ${id}\`.`);
 }
@@ -322,7 +333,7 @@ export async function runRemote(argv) {
     if (!options.commit && git(["status", "--porcelain"])) throw new RemoteError("Hay cambios sin commit y la corrida solo lleva commits. Haz commit, o nombra uno con --commit <sha>.");
     const commit = git(["rev-parse", "--verify", `${options.commit ?? "HEAD"}^{commit}`]);
     const command = options.noCargo ? "pnpm verify --no-cargo" : "pnpm verify";
-    const { id } = await submit(base, commit, command);
+    const { id } = await submitOnce(link, host, commit, command);
     console.log(`  Corrida ${id}: ${commit.slice(0, 10)}, «${command}», en ${host}.`);
     if (options.detach) {
       resumeHint(id);

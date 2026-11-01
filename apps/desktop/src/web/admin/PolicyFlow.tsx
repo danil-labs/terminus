@@ -1,4 +1,4 @@
-/** Cambiar una política: ver la vigente, proponer, validar y seguir el PR. Nada aquí se guarda directo. */
+/** Cambiar una política: ver la vigente, proponer, validar y seguir su revisión. Git es el camino principal; sin repositorio, Danil versiona la política con el mismo flujo. */
 import { createResource, createSignal, For, Show } from "solid-js";
 import { SettingsPanel, SettingsRow, SettingsSection } from "../../features/settings/layout";
 import { t } from "../../lib/i18n";
@@ -8,10 +8,12 @@ import { ENLACE } from "../../ui/ExternalLink";
 import { Textarea } from "../../ui/Textarea";
 
 export type PolicyArea = "rules" | "skills" | "mcp" | "agents";
-export type PolicyCurrent = { revision: string; repo: string; path: string; content: string };
+/** `repository: null`: política interna, versionada en Danil. */
+export type PolicyCurrent = { revision: string; repository: { name: string; path: string } | null; content: string };
 export type PolicyProposal = { valid: boolean; errors: { path: string; message: string }[]; changed: boolean; added: string[]; modified: string[]; removed: string[]; proposedRevision: string | null };
 export type PullState = "checks" | "review" | "approved" | "merged" | "closed";
-export type PolicyPull = { id: string; number: number; title: string; url: string; author: string; state: PullState; proposedRevision: string };
+/** `url: null`: propuesta interna, sin PR que abrir. */
+export type PolicyPull = { id: string; number: number; title: string; url: string | null; author: string; state: PullState; proposedRevision: string };
 export type PolicySource = {
   current: (area: PolicyArea) => Promise<PolicyCurrent>;
   /** Comprueba la candidata; no escribe nada. */
@@ -39,6 +41,7 @@ export function PolicyFlow(props: { area: PolicyArea; source: PolicySource; canP
   const [proposal, setProposal] = createSignal<PolicyProposal | null>(null);
   const [busy, setBusy] = createSignal(false);
   const [failed, setFailed] = createSignal(false);
+  const internal = () => current()?.repository === null;
   const text = () => draft() ?? current()?.content ?? "";
   const run = async (work: () => Promise<void>) => {
     setBusy(true);
@@ -55,9 +58,9 @@ export function PolicyFlow(props: { area: PolicyArea; source: PolicySource; canP
   });
   return (
     <SettingsPanel data-policy-flow={props.area}>
-      <SettingsSection title={t("web.admin.policy_current")} description={t("web.admin.policy_by_pr")}>
+      <SettingsSection title={t("web.admin.policy_current")} description={internal() ? t("web.admin.policy_by_review") : t("web.admin.policy_by_pr")}>
         <Show when={current()}>
-          {(value) => <SettingsRow label={`${value().repo} · ${value().path}`} description={t("web.admin.policy_revision", { revision: value().revision.slice(0, 12) })} />}
+          {(value) => <SettingsRow label={value().repository ? `${value().repository!.name} · ${value().repository!.path}` : t("web.admin.policy_internal")} description={t("web.admin.policy_revision", { revision: value().revision.slice(0, 12) })} />}
         </Show>
       </SettingsSection>
       <Show when={props.canPropose}>
@@ -81,7 +84,7 @@ export function PolicyFlow(props: { area: PolicyArea; source: PolicySource; canP
                     <Changes title={t("web.admin.policy_modified")} items={value().modified} />
                     <Changes title={t("web.admin.policy_removed")} items={value().removed} />
                   </div>
-                  <Button class="mt-3 justify-self-start" size="sm" disabled={busy()} onClick={() => void open(value())}>{t("web.admin.policy_open_pr")}</Button>
+                  <Button class="mt-3 justify-self-start" size="sm" disabled={busy()} onClick={() => void open(value())}>{internal() ? t("web.admin.policy_send_review") : t("web.admin.policy_open_pr")}</Button>
                 </Show>
               </Show>
             </SettingsSection>
@@ -89,10 +92,10 @@ export function PolicyFlow(props: { area: PolicyArea; source: PolicySource; canP
         </Show>
       </Show>
       <Show when={failed()}><p role="alert" class="m-0 text-sm text-error-strong">{t("web.admin.policy_failed")}</p></Show>
-      <SettingsSection title={t("web.admin.policy_pulls")}>
-        <For each={pulls()} fallback={<p class="m-0 py-3 text-sm text-neutral-500">{t("web.admin.policy_no_pulls")}</p>}>
+      <SettingsSection title={internal() ? t("web.admin.policy_proposals") : t("web.admin.policy_pulls")}>
+        <For each={pulls()} fallback={<p class="m-0 py-3 text-sm text-neutral-500">{internal() ? t("web.admin.policy_no_proposals") : t("web.admin.policy_no_pulls")}</p>}>
           {(row) => (
-            <SettingsRow data-policy-pull={row.state} label={<a class={ENLACE} href={row.url} target="_blank" rel="noopener noreferrer">{`#${row.number} · ${row.title}`}</a>} description={t("web.admin.policy_pull_detail", { author: row.author, revision: row.proposedRevision.slice(0, 12) })}>
+            <SettingsRow data-policy-pull={row.state} label={<Show when={row.url} fallback={`#${row.number} · ${row.title}`}>{(url) => <a class={ENLACE} href={url()} target="_blank" rel="noopener noreferrer">{`#${row.number} · ${row.title}`}</a>}</Show>} description={t("web.admin.policy_pull_detail", { author: row.author, revision: row.proposedRevision.slice(0, 12) })}>
               <Badge tone={TONE[row.state]}>{t(`web.admin.pull_state.${row.state}`)}</Badge>
             </SettingsRow>
           )}

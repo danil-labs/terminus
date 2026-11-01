@@ -72,7 +72,9 @@ an outside pull request goes there only after someone reads it.
 
 `VERIFY_REMOTE_HOST=<machine>` reaches the queue through an SSH tunnel;
 `VERIFY_REMOTE_HOST=<host>:<port>` uses a port already open, such as an SSM
-port forward to 8787. The machine stops itself after 30 idle minutes.
+port forward to 8787. The machine stops itself after 15 idle minutes. A run, a
+bundle upload, and sessions and builds younger than 2 hours count as use, so a
+forgotten shell stops counting at 2 hours and the machine stops 15 minutes later.
 
 If the queue does not answer and SSH did not refuse, the client starts the
 machine and asks again every 15 seconds, up to four minutes, while the queue
@@ -100,8 +102,10 @@ and a command listed in `repos.json`, and knows nothing else about a repo. Each
 repo has one fixed checkout and one fixed `CARGO_TARGET_DIR` under
 `/var/lib/verify-queue/repos/`; everything else is cleaned between runs. Above
 80 % disk it deletes the target, before a run or after a failed one, and
-rebuilds once. To install or update it, copy `scripts/verify-queue/` to the
-machine and run `install.sh` as root.
+rebuilds once. The user `verify` runs branch code, so `egress.nft` denies it
+IMDS, the tailnet and private networks, and the `tailscaled` socket is closed to
+it; it keeps internet access for packages. To install or update it, copy
+`scripts/verify-queue/` to the machine and run `install.sh` as root.
 
 ## Sweeping `target/`
 

@@ -30,7 +30,7 @@ import { Members, type MembersSource } from "./Members";
 import { Identity, type OrganizationSource, OrganizationWorkspaces, Plan } from "./Organization";
 import type { PolicySource } from "./PolicyFlow";
 import { Rules, type RulesSource } from "./Rules";
-import { type AccountKind, accountKind, type GroupName, type MenuOrder, menuFor, type Section, visibleSections } from "./sections";
+import { type AccountKind, accountKind, type GroupName, menuFor, type Section, visibleSections } from "./sections";
 import { SharedAgents, SharedMcp, SharedSkills, type SharedSource } from "./Shared";
 import { Usage, type UsageSource } from "./Usage";
 
@@ -54,8 +54,7 @@ export type AdminSource = {
   /** Dónde se propone y se sigue un cambio de política; sin esto, no se ofrece proponer. */
   policy?: PolicySource;
   organization?: OrganizationSource;
-  /** Solo el demo compara órdenes de menú y abre en una sección. */
-  menu?: MenuOrder;
+  /** Solo el demo abre en una sección. */
   section?: Section;
   /** El workspace desde el que se entró; `null` si se abrió directo: entonces manda la cuenta de la sesión. */
   workspace: string | null;
@@ -98,10 +97,8 @@ const sectionName = (section: Section) =>
 
 const groupName = (group: GroupName) =>
   ({
-    workspace: t("web.admin.group_workspace"),
     people: t("web.admin.group_people"),
     control: t("web.admin.group_control"),
-    shared: t("web.admin.group_shared"),
     organization: t("web.admin.group_organization"),
     summary: t("web.admin.group_summary"),
   })[group];
@@ -143,7 +140,7 @@ export function AdminPage(props: { source: AdminSource }) {
   /** Un miembro lee una lista corta, sin títulos de grupo. */
   const grouped = manager;
   const menu = () => {
-    const groups = menuFor(props.source.menu ?? "task", visible());
+    const groups = menuFor(visible());
     return grouped() ? groups : [{ group: groups[0]?.group ?? "summary", sections: groups.flatMap((entry) => entry.sections) }];
   };
   const [chosen, setChosen] = createSignal<Section | null>(props.source.section ?? null);
