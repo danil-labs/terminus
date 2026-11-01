@@ -21,12 +21,38 @@ function needsInstall(): boolean {
   return ios && !standalone;
 }
 
+async function ownRegistration(): Promise<ServiceWorkerRegistration | undefined> {
+  const found = await navigator.serviceWorker.getRegistration(SCOPE);
+  // getRegistration busca por prefijo: también puede devolver el worker raíz.
+  return found?.scope === new URL(SCOPE, window.location.href).href ? found : undefined;
+}
+
 async function registration(): Promise<ServiceWorkerRegistration> {
-  return (await navigator.serviceWorker.getRegistration(SCOPE)) ?? navigator.serviceWorker.register(`${SCOPE}sw.js`, { scope: SCOPE });
+  const found = (await ownRegistration()) ?? await navigator.serviceWorker.register(`${SCOPE}sw.js`, { scope: SCOPE });
+  const worker = found.active ?? found.installing ?? found.waiting;
+  if (!worker) throw new Error("push_worker_missing");
+  if (worker.state !== "activated") {
+    await new Promise<void>((resolve, reject) => {
+      const finish = (error?: Error) => {
+        clearTimeout(timer);
+        worker.removeEventListener("statechange", changed);
+        if (error) reject(error);
+        else resolve();
+      };
+      const changed = () => {
+        if (worker.state === "activated") finish();
+        else if (worker.state === "redundant") finish(new Error("push_worker_failed"));
+      };
+      const timer = setTimeout(() => finish(new Error("push_worker_timeout")), 15_000);
+      worker.addEventListener("statechange", changed);
+      changed();
+    });
+  }
+  return found;
 }
 
 async function current(): Promise<PushSubscription | null> {
-  const found = await navigator.serviceWorker.getRegistration(SCOPE);
+  const found = await ownRegistration();
   return found ? found.pushManager.getSubscription() : null;
 }
 
@@ -51,7 +77,6 @@ export async function enablePush(getToken: () => Promise<string>): Promise<void>
   const key = await pushPublicKey(COMPUTERS);
   if (!key) throw new Error("push_disabled");
   const found = await registration();
-  await navigator.serviceWorker.ready;
   const subscription = (await found.pushManager.getSubscription()) ?? (await found.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(key) }));
   await save(getToken, subscription);
 }
