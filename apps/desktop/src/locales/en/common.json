@@ -1,4 +1,5 @@
 {
+  "common.brand_name": "Danil",
   "common.failure.generic": "The action failed. Check whether it completed before retrying; if it persists, share the details with support.",
   "common.failure.detail": "Detail for reporting it",
   "common.install.no_space": "You need {needed} free and have {free}. Free up some space and try again.",

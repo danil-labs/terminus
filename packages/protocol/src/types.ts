@@ -188,6 +188,10 @@ export type SessionRow = {
   parent?: string | null;
   launched_by?: string | null;
   launcher_available?: boolean;
+  /** La ejecutora viva de la que continúa por handoff; un motor viejo no lo manda. */
+  handoff_parent?: string | null;
+  /** Por qué no cuelga de quien le cedió; un motor viejo no lo manda. */
+  handoff_issue?: "missing_source" | "contradictory" | "cycle" | null;
   /** Hija de una delegación entre máquinas; un motor viejo no lo manda (`@terminus/tasks` `remote.ts`). */
   remote_parent?: { machine: string; workspace?: string | null; task: string; request_id?: string | null } | null;
   stage?: "in_progress" | "review" | "done" | null;
@@ -216,6 +220,10 @@ export type Turn = {
   at?: number;
   meta?: string | null;
   model?: string | null;
+  /** Tiempo de trabajo activo del tramo del agente; falta en tareas antiguas. */
+  duration_ms?: number | null;
+  /** Una decisión de permiso: va firmada por la persona, con el texto vacío. */
+  permission?: PermissionDecision | null;
   tools?: TurnTool[];
   questions?: Question[] | null;
   answers?: Answer[] | null;
@@ -230,6 +238,10 @@ export type Turn = {
   /** La tarea que lo escribió por el CLI (`Turn::from_task`). */
   from_task?: SenderTask | null;
 };
+/** `sessions::PermissionDecision`. */
+export type PermissionDecision = { tool: string; target?: string | null; allow: boolean };
+/** Un turno que sigue contestando (`turn::list_live_turns`); `started_at` en ms de la máquina. */
+export type LiveTurn = { session: string; started_at: number };
 /** La tarea que escribió un input, como era al escribirlo (`sessions::SenderTask`). */
 export type SenderTask = { folder: string; task: string; title: string; provider: string; model?: string | null; machine?: string | null };
 /** Un paso del turno; `images` son data URLs que produjo la herramienta. `ok: false` si falló. */
@@ -248,9 +260,18 @@ export type FilePreview = {
   truncated: boolean;
 };
 /** `tree_show`: un archivo de un árbol de la tarea. */
-export type TreeContent = { kind: string; text: string; bytes: number; truncated: boolean };
+export type TreeContent = { kind: string; text: string; bytes: number; truncated: boolean; data_url?: string | null; pdf?: string | null };
+/** `list_task_trees`: un árbol de la tarea (su copia de trabajo, y los que declare). */
+export type TaskTree = { key: string; name: string; path: string; kind: "git" | "folder" | "kn"; missing: boolean };
+/** Una carpeta de `tree_files`: `lazy` e `ignored` no traen sus archivos en la lista. */
+export type TreeFolder = { path: string; repo: boolean; lazy?: boolean; ignored?: boolean };
+/** `tree_files`: las rutas de los archivos de un árbol, con sus carpetas. */
+export type TreeFiles = { paths: string[]; folders: TreeFolder[]; truncated: boolean };
 /** `load_session`. */
-export type OpenedSession = { id: string; provider: string; model: string | null; agent?: string | null; permission_mode?: string | null; turns: Turn[] };
+/** The `history` field of a read: `turns[i]` is turn `start + i`. */
+export type HistoryPage = { version?: number; revision?: string; total: number; start: number; end: number; limit: number; has_more: boolean };
+
+export type OpenedSession = { id: string; provider: string; model: string | null; observed_model?: string | null; agent?: string | null; permission_mode?: string | null; turns: Turn[]; history?: HistoryPage | null };
 
 /** `pending_requests`. */
 export type PendingRequests = {

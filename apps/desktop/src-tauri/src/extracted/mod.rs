@@ -120,7 +120,7 @@ fn title(app: &tauri::AppHandle) -> String {
         .app
         .windows
         .first()
-        .map_or("Terminus", |w| w.title.as_str())
+        .map_or("Danil", |w| w.title.as_str())
         .to_owned()
 }
 

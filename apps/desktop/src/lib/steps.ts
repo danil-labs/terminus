@@ -15,7 +15,7 @@
  * máquina, y por eso van en mono al lado del verbo—: traducirlos rompería el
  * emparejamiento con lo que manda `runtime/chat/`.
  */
-import { bareCommand, classify, fileName, type StepKind } from "@terminus/chat/steps";
+import { bareCommand, classify, fileName, joinableKind, joinSteps, stepCounts, type CountedStep, type StepCount, type StepKind } from "@terminus/chat/steps";
 import { manifiesto, t } from "./i18n.ts";
 
 /** Qué clase de acto fue. Decide el verbo y el ícono de la fila. */
@@ -142,22 +142,18 @@ export function pasoDeSistema(clase: Clase, texto: string): Paso {
  */
 export type Fila = { clase: Clase; pasos: Paso[] };
 
-/** Las clases que se juntan cuando vienen seguidas. */
-const JUNTABLES: Clase[] = ["leer", "buscar", "editar", "web", "plan", "otro"];
+/** El nombre neutro de cada clase; las que no son actos del agente no se cuentan. */
+const NEUTRA: Partial<Record<Clase, CountedStep["kind"]>> = { leer: "read", buscar: "search", editar: "edit", ejecutar: "run", web: "web", plan: "plan", otro: "other", permiso: "permission" };
 
 export function agrupar(pasos: Paso[]): Fila[] {
-  const filas: Fila[] = [];
-  for (const p of pasos) {
-    const ultima = filas[filas.length - 1];
-    const junta =
-      ultima?.clase === p.clase &&
-      JUNTABLES.includes(p.clase) &&
-      p.detalle === null && !p.mcpApp &&
-      ultima.pasos.every((q) => q.detalle === null);
-    if (junta) ultima.pasos.push(p);
-    else filas.push({ clase: p.clase, pasos: [p] });
-  }
-  return filas;
+  return joinSteps(
+    pasos,
+    (p) => p.clase,
+    (clase, p, fila) => {
+      const neutra = NEUTRA[clase];
+      return neutra !== undefined && joinableKind(neutra) && p.detalle === null && !p.mcpApp && fila.every((q) => q.detalle === null);
+    },
+  ).map(({ kind, steps }) => ({ clase: kind, pasos: steps }));
 }
 
 /**
@@ -175,35 +171,40 @@ export function cuentaDelTramo(pasos: Paso[], vivo = false): string | null {
  * Ya va con mayúscula inicial; se une con `common.steps.summary.separator`.
  */
 export function partesDelTramo(pasos: Paso[], vivo = false): { clase: Clase; texto: string }[] {
-  const de = (clase: Clase) => pasos.filter((p) => p.clase === clase);
-  const editados = archivosDistintos(de("editar"));
-  const permisos = de("permiso");
-  const cuentas: [number, (count: number) => string, Clase][] = vivo
-    ? [
-        [de("leer").length, (count) => t("common.steps.summary_live.read", { count }), "leer"],
-        [de("buscar").length, (count) => t("common.steps.summary_live.search", { count }), "buscar"],
-        [editados, (count) => t("common.steps.summary_live.edit", { count }), "editar"],
-        [de("ejecutar").length, (count) => t("common.steps.summary_live.run", { count }), "ejecutar"],
-        [de("web").length, (count) => t("common.steps.summary_live.web", { count }), "web"],
-        [de("plan").length, (count) => t("common.steps.summary_live.plan", { count }), "plan"],
-        [de("otro").length, (count) => t("common.steps.summary_live.other", { count }), "otro"],
-      ]
-    : [
-        [de("leer").length, (count) => t("common.steps.summary.read", { count }), "leer"],
-        [de("buscar").length, (count) => t("common.steps.summary.search", { count }), "buscar"],
-        [editados, (count) => t("common.steps.summary.edit", { count }), "editar"],
-        [de("ejecutar").length, (count) => t("common.steps.summary.run", { count }), "ejecutar"],
-        [de("web").length, (count) => t("common.steps.summary.web", { count }), "web"],
-        [de("plan").length, (count) => t("common.steps.summary.plan", { count }), "plan"],
-        [de("otro").length, (count) => t("common.steps.summary.other", { count }), "otro"],
-      ];
-  cuentas.push(
-    [permisos.filter((p) => p.permitido).length, (count) => t("common.steps.summary.allowed", { count }), "permiso"],
-    [permisos.filter((p) => !p.permitido).length, (count) => t("common.steps.summary.denied", { count }), "permiso"],
+  const cuentas = stepCounts(
+    pasos.flatMap((p) => {
+      const kind = NEUTRA[p.clase];
+      return kind ? [{ kind, target: p.objetivo, allowed: p.permitido }] : [];
+    }),
   );
-  const partes = cuentas.filter(([n]) => n > 0).map(([n, frase, clase]) => ({ clase, texto: frase(n) }));
+  const partes = cuentas.map(({ kind, count }) => ({ clase: claseDeCuenta(kind), texto: fraseDeCuenta(kind, count, vivo) }));
   if (partes[0]) partes[0].texto = partes[0].texto.charAt(0).toLocaleUpperCase(manifiesto().formato) + partes[0].texto.slice(1);
   return partes;
+}
+
+const claseDeCuenta = (kind: StepCount["kind"]): Clase => (kind === "allowed" || kind === "denied" ? "permiso" : CLASE[kind]);
+
+function fraseDeCuenta(kind: StepCount["kind"], count: number, vivo: boolean) {
+  switch (kind) {
+    case "read":
+      return vivo ? t("common.steps.summary_live.read", { count }) : t("common.steps.summary.read", { count });
+    case "search":
+      return vivo ? t("common.steps.summary_live.search", { count }) : t("common.steps.summary.search", { count });
+    case "edit":
+      return vivo ? t("common.steps.summary_live.edit", { count }) : t("common.steps.summary.edit", { count });
+    case "run":
+      return vivo ? t("common.steps.summary_live.run", { count }) : t("common.steps.summary.run", { count });
+    case "web":
+      return vivo ? t("common.steps.summary_live.web", { count }) : t("common.steps.summary.web", { count });
+    case "plan":
+      return vivo ? t("common.steps.summary_live.plan", { count }) : t("common.steps.summary.plan", { count });
+    case "other":
+      return vivo ? t("common.steps.summary_live.other", { count }) : t("common.steps.summary.other", { count });
+    case "allowed":
+      return t("common.steps.summary.allowed", { count });
+    default:
+      return t("common.steps.summary.denied", { count });
+  }
 }
 
 /** Tres ediciones al mismo archivo son un archivo que revisar, no tres. */

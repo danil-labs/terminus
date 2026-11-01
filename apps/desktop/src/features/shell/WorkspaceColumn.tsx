@@ -1,7 +1,6 @@
 import Plus from "lucide-solid/icons/plus";
 import SettingsIcon from "lucide-solid/icons/settings";
 import { children, createEffect, createSignal, For, type JSX, onCleanup, Show } from "solid-js";
-import { Dynamic } from "solid-js/web";
 import { t } from "../../lib/i18n";
 import { createNavigationReorder } from "../../lib/navigation-order";
 import { KeyedList } from "../../ui/KeyedList";
@@ -10,9 +9,11 @@ import { capabilities, type OtherAccount, type OtherWorkspace } from "../../lib/
 import { generacionDeLogo, urlDeLogo } from "./logo-src";
 import { ITEM_DE_MENU, Popover, PopoverAnchor, PopoverContent } from "../../ui/Popover";
 import { RETARDO_TOOLTIP, TooltipContent, TooltipRoot, TooltipTrigger } from "../../ui/Tooltip";
-import { stateColor, stateIcon, taskLabel } from "../projects/TaskStatus";
+import { taskLabel } from "../projects/TaskStatus";
+import { SignalDot, taskSignalTone } from "../../ui/SignalDot";
 import { cerrarConEscape, createWorkspaces, type Workspace } from "../settings/workspaces-store";
 import { topState, type AttentionState, type WorkspaceAttention } from "./attention";
+import KeepAwake from "./KeepAwake";
 import ProfileMenu from "./ProfileMenu";
 import { workspaceBar } from "./workspace-directory";
 
@@ -60,23 +61,11 @@ export function MarcaDeWorkspace(props: { id?: string; name: string; logo?: stri
   );
 }
 
-/**
- * Lo más urgente de un workspace, en un disco. La pregunta va en amarillo con el
- * glifo navy: el amarillo como glifo sobre la superficie no llega a 3:1.
- */
+/** Lo más urgente de un workspace: la señal común sobre un disco de superficie. */
 export function AttentionBadge(props: { state: AttentionState; class?: string }) {
   return (
-    <span
-      data-attention-badge={props.state}
-      class={cn(
-        "grid size-4 shrink-0 place-items-center rounded-full border",
-        props.state === "asked"
-          ? "border-border-strong bg-brand-yellow text-brand-navy"
-          : cn("border-border bg-surface", stateColor(props.state)),
-        props.class,
-      )}
-    >
-      <Dynamic component={stateIcon(props.state)} size={11} />
+    <span data-attention-badge={props.state} class={cn("grid size-3 shrink-0 place-items-center rounded-full bg-surface", props.class)}>
+      <SignalDot tone={taskSignalTone(props.state)} />
     </span>
   );
 }
@@ -176,7 +165,7 @@ export default function WorkspaceColumn(props: {
                 </span>
               </span>
               <Show when={state()}>
-                {(s) => <AttentionBadge state={s()} class="absolute -top-1.5 -right-1.5" />}
+                {(s) => <AttentionBadge state={s()} class="absolute -top-1 -right-1" />}
               </Show>
             </span>
           </TooltipTrigger>
@@ -349,6 +338,8 @@ function ColumnFoot(props: {
         {tools()}
         <span aria-hidden="true" class="my-1 h-px w-6 shrink-0 bg-border-strong" />
       </Show>
+      {/* Sólo la computadora de esta ventana: en la web la orden iría a una máquina remota. */}
+      <Show when={import.meta.env.MODE !== "web"}><KeepAwake /></Show>
       <button type="button" class={boton} aria-label={t("settings.title")} title={t("settings.title")} onClick={() => props.onSettings()}>
         <SettingsIcon size={17} aria-hidden="true" />
       </button>

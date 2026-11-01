@@ -10,6 +10,7 @@ import SlidersHorizontal from "lucide-solid/icons/sliders-horizontal";
 import Sparkles from "lucide-solid/icons/sparkles";
 import { listen } from "../../lib/serviceEvents";
 import { createResource, createSignal, For, type JSX, lazy, onCleanup, onMount, Show, Suspense } from "solid-js";
+import { Dynamic } from "solid-js/web";
 import { capabilities } from "../../lib/platform";
 import { t } from "../../lib/i18n";
 import { flechaDeLista } from "../../lib/shortcuts";
@@ -30,13 +31,17 @@ import {
 } from "../../ui/sidebar";
 import type { ModelChoices } from "../projects/NewAgent";
 import AIProviders from "./AIProviders";
+import Connections from "./Connections";
 import ConnectionsOperation from "./ConnectionsOperation";
 import { CustomerAgents, CustomerConnections } from "./CustomerService";
 import Environment from "./Environment";
 import { machines } from "../machines/store";
 import { secretsRoute } from "./secrets-support";
 import General from "./General";
+import Integrations from "./Integrations";
+import { PaquetesDeLengua } from "./LanguagePacks";
 import type { ContextoDeProyectos } from "./ManageProjects";
+import ProveedorDeMemoria from "./MemoryProvider";
 import { NotifyBehavior } from "./NotifyBehavior";
 import Providers from "./Providers";
 import { SETTINGS_ENTRIES, type SettingsEntryId, type SettingsGroup, settingsTarget } from "./settings-entries";
@@ -45,6 +50,7 @@ import Workspaces from "./Workspaces";
 import { SettingsPanel, SettingsSection } from "./layout";
 // Chunks aparte: solo los carga quien abre la sección.
 const DanilAccount = lazy(() => import("./DanilAccount"));
+const SupportAccess = lazy(() => import("./SupportAccess"));
 const ActivityLogs = lazy(() => import("./ActivityLogs"));
 const Appearance = lazy(() => import("./Appearance"));
 const ManageProjects = lazy(() => import("./ManageProjects"));
@@ -102,10 +108,14 @@ const pestanasDe = (
   return {
     "cuenta-danil": cuenta ? tab("cuenta-danil", () => t("settings.tab.profile"), () => <Suspense fallback={null}><DanilAccount part="profile" /></Suspense>) : undefined,
     emails: capabilities().accountEmails ? tab("emails", () => t("settings.tab.emails"), () => <Suspense fallback={null}><DanilAccount part="emails" /></Suspense>) : undefined,
+    usage: capabilities().personalAccount?.usage ? tab("usage", () => t("settings.tab.usage"), () => capabilities().personalAccount?.usage?.()) : undefined,
+    plan: capabilities().personalAccount?.plan ? tab("plan", () => t("settings.tab.plan"), () => capabilities().personalAccount?.plan?.()) : undefined,
+    support: capabilities().personalAccount && capabilities().supportAccess ? tab("support", () => t("web.admin.support"), () => <Suspense fallback={null}><SettingsPanel><SupportAccess source={capabilities().supportAccess!} /></SettingsPanel></Suspense>) : undefined,
     security: tab("security", () => t("settings.tab.security"), null),
     general: tab("general", () => t("settings.nav.general"), () => <General />),
     appearance: tab("appearance", () => t("settings.nav.appearance"), () => <Suspense fallback={null}><Appearance proyecto={agentes.proyecto} /></Suspense>),
     notify: tab("notify", () => t("settings.tab.notify"), () => <SettingsPanel><SettingsSection title={t("settings.tab.notify")}><NotifyBehavior /></SettingsSection></SettingsPanel>),
+    languages: tab("languages", () => t("settings.languages.title"), () => <SettingsPanel><PaquetesDeLengua /></SettingsPanel>),
     workspaces: tab("workspaces", () => t("settings.tab.workspace_bar"), () => <Workspaces />),
     "proveedores-ia": tab("proveedores-ia", () => t("settings.nav.ai_providers"), () => <AIProviders superficies={superficies()} agentesEnUso={agentes.agentesEnUso} />),
     machines: cuenta ? tab("machines", () => t("settings.tab.machines"), () => <Suspense fallback={null}><DanilAccount part="machines" /></Suspense>) : undefined,
@@ -125,7 +135,10 @@ const pestanasDe = (
       </Suspense>
     )),
     skills: tab("skills", () => t("settings.nav.skills"), () => <Skills />),
-    operation: tab("operation", () => t("settings.tab.operation"), () => <ConnectionsOperation workspace={workspace()} />),
+    operation: tab("operation", () => t("settings.skills.tab_mcp"), () => <ConnectionsOperation />),
+    plugins: tab("plugins", () => t("settings.tab.plugins"), () => <SettingsPanel><Integrations /></SettingsPanel>),
+    memory: tab("memory", () => t("settings.tab.memory"), () => <SettingsPanel><ProveedorDeMemoria /></SettingsPanel>),
+    external: cuenta ? tab("external", () => t("settings.tab.external"), () => <Suspense fallback={null}><Connections workspace={workspace()} /></Suspense>) : undefined,
     customers: tab("customers", () => t("settings.tab.customers"), () => <CustomerConnections workspace={agentsWorkspace} />),
   };
 };
@@ -154,10 +167,13 @@ const GRUPOS: { id: SettingsGroup; nombre: () => string }[] = [
   { id: "workspace", nombre: () => t("settings.nav.group_workspace") },
 ];
 
+/** Una entrada con solo pestañas de cuenta personal, mientras llega si la cuenta lo es. */
+const SIN_PESTANA: Pestana = { id: "", name: "", panel: null };
+
 const idTab = (id: string) => `cfg-tab-${id}`;
 const idSub = (id: string) => `cfg-sub-${id}`;
 
-/** «Administración ↗»: en la web de alfa, solo para owner y admin; el escritorio no sabe el rol y la ofrece siempre. */
+/** El enlace al Harness: en la web de alfa, solo para owner y admin; el escritorio no sabe el rol y la ofrece siempre. */
 function AdminLink(props: { workspace: string | null }) {
   const page = capabilities().adminPage;
   const [allowed] = createResource(async () => (page ? await page.allowed().catch(() => false) : capabilities().nativeWindow));
@@ -178,7 +194,7 @@ function AdminLink(props: { workspace: string | null }) {
               onClick={open}
             >
               <span class="flex size-4 items-center justify-center"><Shield size={15} /></span>
-              <span class="truncate">{t("settings.admin")}</span>
+              <span class="truncate">{t("web.admin.title")}</span>
               <ExternalLink size={13} class="text-neutral-500" />
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -291,7 +307,9 @@ export default function Settings(props: {
   const ENTRADAS = entradasDe(pestanas);
 
   // Sin soporte del motor activo, Secretos no se ofrece; su enlace directo sí abre el aviso.
-  const pestanaVisible = (p: Pestana) => p.id !== "secrets" || secretsRoute(capabilities().accountCredentials ? "worker" : "engine", machines()) !== "unsupported";
+  const [personal] = createResource(async () => (await capabilities().personalAccount?.isPersonal().catch(() => false)) ?? false);
+  const dePersonal = (p: Pestana) => ["usage", "plan", "support"].includes(p.id);
+  const pestanaVisible = (p: Pestana) => (dePersonal(p) ? personal() === true : p.id !== "secrets" || secretsRoute(capabilities().accountCredentials ? "worker" : "engine", machines()) !== "unsupported");
   const pedido = settingsTarget(props.panel);
   const inicial = ENTRADAS.find((e) => e.id === pedido?.entry) ?? ENTRADAS[0];
   const [activo, setActivo] = createSignal<SettingsEntryId>(inicial.id);
@@ -371,7 +389,7 @@ export default function Settings(props: {
   const entrada = () => ENTRADAS.find((d) => d.id === activo()) ?? ENTRADAS[0];
   const pestana = () => {
     const e = entrada();
-    return e.tabs.find((p) => p.id === subs()[e.id] && p.panel) ?? e.tabs.find((p) => p.panel && pestanaVisible(p))!;
+    return e.tabs.find((p) => p.id === subs()[e.id] && p.panel && (!dePersonal(p) || pestanaVisible(p))) ?? e.tabs.find((p) => p.panel && pestanaVisible(p)) ?? SIN_PESTANA;
   };
   const elegir = (p: Pestana) => {
     if (p.panel) setSubs((antes) => ({ ...antes, [entrada().id]: p.id }));
@@ -487,33 +505,32 @@ export default function Settings(props: {
             </Sidebar>
 
             <div class="relative min-h-0 min-w-0 bg-surface">
-              <Button
-                variant="ghost"
-                size="iconCompact"
-                class="absolute right-8 top-3 z-10 hidden size-7 md:inline-flex"
-                onClick={props.onClose}
-                aria-label={t("settings.close")}
-              >
-                <Close size={16} />
-              </Button>
-              {/* `pestana().panel?.()` vive dentro de una expresión reactiva:
-                  cambiar de entrada o de pestaña monta el panel que corresponde. */}
+              {/* Cada panel debe montarse como componente: invocarlo aquí
+                  metería sus señales en el efecto de selección y lo repintaría
+                  cuando cambian sus propios controles. */}
               <div
                 id="cfg-panel"
                 role="tabpanel"
                 aria-labelledby={idTab(entrada().id)}
-                class="h-full min-w-0 overflow-auto px-4 pb-10 pt-5 md:px-8 md:pt-6"
+                class="h-full min-h-0 min-w-0 overflow-auto md:flex md:flex-col md:overflow-hidden"
               >
-                <header class="mb-6 grid gap-0.5 pr-10">
-                  <h2 class="m-0 text-lg font-semibold">{entrada().name}</h2>
-                  <p class="m-0 text-ui text-neutral-500">{entrada().hint}</p>
+                {/* En escritorio el encabezado y sus pestañas quedan fuera del scroll: así el cerrar no comparte lugar con el contenido. */}
+                <div class="px-4 pt-5 md:shrink-0 md:px-8 md:pt-6">
+                <header class={cn("grid grid-cols-[minmax(0,1fr)] items-start gap-3 md:grid-cols-[minmax(0,1fr)_auto]", entrada().tabs.length > 1 ? "mb-5" : "border-0 border-b border-solid border-border pb-4")}>
+                  <div class="grid gap-0.5">
+                    <h2 class="m-0 text-lg font-semibold">{entrada().name}</h2>
+                    <p class="m-0 text-ui text-neutral-500">{entrada().hint}</p>
+                  </div>
+                  <Button variant="ghost" size="iconCompact" class="hidden size-7 md:inline-flex" onClick={props.onClose} aria-label={t("settings.close")}>
+                    <Close size={16} />
+                  </Button>
                 </header>
                 <Show when={entrada().tabs.length > 1}>
                   <div
                     role="tablist"
                     aria-label={entrada().name}
                     onKeyDown={moverPestana}
-                    class="mb-6 flex items-end gap-5 overflow-x-auto border-0 border-b border-solid border-border"
+                    class="flex items-end gap-5 overflow-x-auto border-0 border-b border-solid border-border"
                   >
                     <For each={entrada().tabs.filter(pestanaVisible)}>
                       {(p) => (
@@ -541,8 +558,9 @@ export default function Settings(props: {
                     </For>
                   </div>
                 </Show>
-                <div id="cfg-subpanel" role={entrada().tabs.length > 1 ? "tabpanel" : undefined} aria-labelledby={entrada().tabs.length > 1 ? idSub(pestana().id) : undefined} class="min-w-0">
-                  {pestana().panel?.()}
+                </div>
+                <div id="cfg-subpanel" role={entrada().tabs.length > 1 ? "tabpanel" : undefined} aria-labelledby={entrada().tabs.length > 1 ? idSub(pestana().id) : undefined} class="min-w-0 px-4 pb-10 pt-5 md:min-h-0 md:flex-1 md:overflow-auto md:px-8">
+                  <Dynamic component={pestana().panel ?? (() => null)} />
                 </div>
               </div>
             </div>

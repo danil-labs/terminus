@@ -24,6 +24,8 @@ export const APP_READS = [
   "load_session",
   "pending_requests",
   "list_active_turns",
+  // Desde cuándo corre el turno: el reloj del turno en curso.
+  "list_live_turns",
   "list_workspace_attention",
   // El cuadro de escribir, como el de la ventana: modelos y razonamiento,
   // permisos, la barra de comandos, las menciones y la rama base.
@@ -44,6 +46,10 @@ export const APP_READS = [
   // (su árbol `terminus-chat-visuals`), y las imágenes, archivos y adjuntos que
   // el mensaje nombra por su ruta en la máquina.
   "tree_show",
+  // Los archivos de la tarea: sus árboles y la lista de cada uno. Se leen igual que en la ventana,
+  // sin encender nada que no esté encendido, y un archivo se abre con `tree_show`.
+  "list_task_trees",
+  "tree_files",
   // Un visual que no cabe de una vez: por partes de 512 KiB, con sus imágenes incrustadas.
   "chat_visual_part",
   "preview_file",

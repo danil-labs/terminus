@@ -1,9 +1,26 @@
 # Verification guards
 
-`pnpm verify` runs `scripts/verify.mjs` and stops at the first failure.
+`pnpm verify` runs `scripts/verify.mjs`, side by side within the budget of the machine, and stops at the first failure.
 `SKIPPED` (skipped) marks a check that could not run. In CI a skip fails the
 run; locally it is allowed and listed in the summary. `--no-cargo` skips the
 Rust steps.
+
+`pnpm verify --quick` is a working check, never a merge gate: run the full chain
+before merging. It compares with `origin/dev` (`--base=<ref>` changes it) through
+`git merge-base` and `git diff`, including uncommitted and untracked files, and
+always runs the static guards, the linter and `tsc`. Of the tests, it runs those
+that reach a changed file through their imports or a `src/`, `scripts/` or
+`alpha-entry/` path they name. `src-tauri/` and `seldon-runtime.lock` add the
+Rust steps and both vite builds, which cargo needs. A selected test that reads
+`dist/` also adds the builds. A source
+change does not select the tests that mount `dist/`, `mount-frontend`,
+`missing-classes`, `theme-inversion`, `bundle-size` or the perf ceilings unless they also import the
+changed file: they depend on the whole front and appear in the list of what was
+skipped. Every run names that list
+and says it is not a complete verification. It falls back to the full chain,
+and says why, when git cannot answer, when `package.json`, a lockfile,
+`verify.mjs`, `verify-scope.mjs`, `git.mjs`, `tests/helpers/` or `packages/`
+changed, or when a file has no place in the map.
 
 The engine (`seldon-runtime`) is not in this repository. Guards that need to
 know what the engine registers or emits read its frozen contract:
@@ -30,7 +47,17 @@ sends).
 | `doc-paths` | `scripts/guards/doc-paths.mjs` | Code paths and local links in the documentation exist. Generated files are excluded. |
 | `missing-classes` | `scripts/guards/missing-classes.mjs` | Finds written classes that Tailwind does not generate. |
 | `triggers` | `tests/unit/triggers.test.mjs` | A trigger keeps the handler that opens its panel. |
-| `mount-frontend` | `scripts/guards/mount-frontend.mjs` | Runs `dist/` in jsdom with a simulated IPC and checks that it mounts. It does not open a native window. |
+| `mount-frontend` | `scripts/guards/mount-frontend.mjs` | Runs `dist/` in jsdom with a simulated IPC and checks that it mounts, with the window's first gestures, panels and tabs. It does not open a native window. |
+| `mount-task-notices` | `scripts/guards/mount-task-notices.mjs` | Same harness: a task's notices and when they repeat. |
+| `mount-agents` | `scripts/guards/mount-agents.mjs` | Same harness: agent bubbles, drafts, mentions, threads and inbox. |
+| `mount-task-composer` | `scripts/guards/mount-task-composer.mjs` | Same harness: an open task's composer, queue, fork, preview and attachments. |
+| `mount-sidebar` | `scripts/guards/mount-sidebar.mjs` | Same harness: the rail's git rows, closing with live turns, selection, groups, recents and clone. |
+| `mount-turns` | `scripts/guards/mount-turns.mjs` | Same harness: base branch, authoritative turn state, in-flight replies and task history. |
+| `mount-settings` | `scripts/guards/mount-settings.mjs` | Same harness: Settings for providers, integrations, plugins, Harness, language, agents and workspaces. |
+| `mount-workspaces` | `scripts/guards/mount-workspaces.mjs` | Same harness: workspace column, title bar, finishing a task, local links and first-run setup. |
+| `mount-permissions` | `scripts/guards/mount-permissions.mjs` | Same harness: live questions, newborn tasks and permission choices. |
+| `mount-content` | `scripts/guards/mount-content.mjs` | Same harness: chat prose and diagrams, background child tasks, a rejected first turn and updates. |
+| `mount-spaces` | `scripts/guards/mount-spaces.mjs` | Same harness: the window's spaces with the rail grouped by folder. |
 | `storage-refresh` | `tests/unit/storage-refresh.test.ts` | Refresh batching, stale responses and workspace switches. |
 | `open-task-cost` | `tests/perf/open-task-cost.mjs` | Nodes, mutations, IPC calls and IPC bytes when opening a 480-turn thread. The ceiling only goes down. |
 | `reread-thread` | `tests/perf/reread-thread.mjs` | Unmounts when re-reading an unchanged thread, with a new turn and during refreshes. The ceiling only goes down. |

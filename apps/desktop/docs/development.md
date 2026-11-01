@@ -41,6 +41,78 @@ provider installation, account gating and retry recovery in the compiled front
 with simulated IPC. It runs manually, outside `pnpm verify`, and does not check
 the native window or a real ZCode account.
 
+## Remote verify
+
+`pnpm verify --remote` runs the Linux chain on the team machine `vm-verify`
+and needs access to Danil's tailnet (`ssh verify@vm-verify` must work). Without
+it the command says so; use `pnpm verify`. It never counts for macOS or Windows.
+
+Access: `alberto`, `alejandro`, `mauricio`, `roberto`, `cit`, and the machines
+`tag:vm-alberto`, `tag:vm-alejandro` and `tag:vm-mauricio`.
+
+The client needs only Node, git, `ssh` on the PATH and Tailscale, so it runs the
+same from PowerShell or cmd on Windows (`ssh.exe` is the OpenSSH Client optional
+feature). What runs is still Linux: a run launched from Windows verifies Linux.
+
+```sh
+pnpm verify --remote                   # HEAD; refuses uncommitted changes
+pnpm verify --remote --no-cargo        # the chain without Rust
+pnpm verify --remote --commit <sha>    # any local commit
+pnpm verify --remote --detach          # queue and return; prints the run id
+pnpm verify --remote --attach <id>     # follow a run, replaying the full log
+pnpm verify --remote --cancel <id>     # stop a queued or running run
+pnpm verify --remote --status          # what is queued and running
+```
+
+The exit code is the run's. The run lives on the machine: if the client dies,
+it goes on and `--attach` gets its log and exit code. The commit travels as a
+`git bundle`, incremental against what the machine already has, because the
+machine holds no secrets and clones nothing. Running a commit executes it, so
+an outside pull request goes there only after someone reads it.
+
+`VERIFY_REMOTE_HOST=<machine>` reaches the queue through an SSH tunnel;
+`VERIFY_REMOTE_HOST=<host>:<port>` uses a port already open, such as an SSM
+port forward to 8787. The machine stops itself after 15 idle minutes. A run, a
+bundle upload, and sessions and builds younger than 2 hours count as use, so a
+forgotten shell stops counting at 2 hours and the machine stops 15 minutes later.
+
+If the queue does not answer and SSH did not refuse, the client starts the
+machine and asks again every 15 seconds, up to four minutes, while the queue
+stays silent; a machine that is still stopping refuses the first attempts.
+
+1. `danil computers machine start vm-verify --json`, with the caller's Danil
+   session (`DANIL_CLI` for the binary).
+2. `terminus machine start vm-verify --json`, the same with the installed client
+   (`TERMINUS_CLI` for the binary), only when `danil` is missing, does not know
+   the command, or refuses the environment because it holds `TERMINUS_*` context.
+   `VERIFY_REMOTE_TERMINUS` replaces steps 1 and 2 with one binary, called with
+   `machine start vm-verify --json`.
+3. `aws ec2 start-instances` with the caller's credentials (`AWS_PROFILE`,
+   `VERIFY_REMOTE_AWS` for the binary), only when no CLI knows the command, or
+   one answers `machine_account`, `machine_unreachable` or
+   `identity_unavailable`. `IncorrectInstanceState` retries; any other failure
+   ends the run. Windows builds without these CLIs always land here.
+
+`computer_stopping` retries. `access_denied`, `license_required`, `not_found`
+and any other refusal from a CLI end the run with the reason.
+
+The queue is `scripts/verify-queue/server.mjs`: one per machine, one run at a
+time, first come first served, listening on loopback only. It takes repo, commit
+and a command listed in `repos.json`, and knows nothing else about a repo. Each
+repo has one fixed checkout and one fixed `CARGO_TARGET_DIR` under
+`/var/lib/verify-queue/repos/`; everything else is cleaned between runs. Above
+80 % disk it deletes the target, before a run or after a failed one, and
+rebuilds once. The user `verify` runs branch code, so `egress.nft` denies it
+IMDS, the tailnet and private networks, and the `tailscaled` socket is closed to
+it; it keeps internet access for packages. To install or update it, copy
+`scripts/verify-queue/` to the machine and run `install.sh` as root.
+
+## Sweeping `target/`
+
+`node scripts/sweep-targets.mjs --root <worktrees>` lists the `target/` folders
+that nothing touched in 24 hours and no `cargo` or `rustc` is using. `--apply`
+deletes them.
+
 ## The browser build
 
 The same front runs in a browser against Danil Computers instead of the Tauri
@@ -83,7 +155,7 @@ session it opens `<base>auth`, shared with the phone browser and device approval
 This entry supports email/password registration and sign-in, Google and Microsoft,
 email confirmation and resending confirmation. Authentication callbacks run here
 before the machine gate or phone redirect. `next` stays inside the configured
-Terminus base and travels in the callback URL, including a device code; it does
+Danil base and travels in the callback URL, including a device code; it does
 not depend on the original tab's storage. Supabase must allow that callback URL
 and its email templates must preserve the supplied redirect. Registration does
 not grant a license or provision a machine. After a 401

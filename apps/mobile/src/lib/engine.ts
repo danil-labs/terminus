@@ -4,6 +4,8 @@
  * por el relay o por el bridge. Sin React Native: se prueba en Node.
  */
 import type {
+  HistoryChunk,
+  HistoryRef,
   AccountLimits,
   AccountList,
   LoginEvent,
@@ -29,14 +31,21 @@ import type {
   SlashMenu,
   Space,
   TaskBlockers,
+  TaskTree,
+  TreeContent,
+  TreeFiles,
   Startup,
   Turn,
   Workspace,
   WorkspaceAttention,
+  LiveTurn,
 } from "@terminus/protocol";
+import { type HistoryRead } from "@terminus/chat/history";
+import { readDetailText } from "@terminus/chat/historyDetail";
 import { readVisualHtml, type VisualPart, type VisualWhole, VISUAL_FILE, VISUAL_TREE } from "@terminus/chat/visual";
 import { arrangeSpaces, spaceOrder, type AccountWorkspace, groupWorkspaces, linkedAttention, onlyLinked, registryProjects, withRegistry } from "@terminus/computers";
 import { type ChatBackgroundView, chatBackgroundImageUrl, chatBackgroundView, isSingleAttention } from "@terminus/protocol";
+import type { TaskActivity } from "@terminus/design";
 import { type FlatRow, flattenTasks, launcherOf, REMOTE_CHILD_FEATURE, type RemoteScope, remoteLauncherOf } from "@terminus/tasks";
 import { AUTO_MODE } from "./composer.ts";
 import { type Host, HostError } from "./hosts.ts";
@@ -47,6 +56,8 @@ export type Task = SessionRow & {
   host: string;
   /** Hija remota: la `taskKey` de su coordinador en otra máquina (`mergeSnapshots`). */
   remote_launcher?: string | null;
+  /** La atención de la familia, si la entrada la carga (`withFamilyActivity`). */
+  delegated_activity?: TaskActivity;
   workspace: string;
   /** Id de la carpeta en su máquina; `""` es sin carpeta. */
   folder: string;
@@ -74,7 +85,7 @@ export type Agent = {
 };
 
 /** Lo que una máquina sabe de un workspace. */
-export type Folder = Project & { key: string; host: string };
+export type Folder = Project & { key: string; host: string; cloud?: string | null };
 
 export type HostSnapshot = {
   host: string;
@@ -370,14 +381,44 @@ export type TaskView = {
   questions: PendingQuestion[];
   running: boolean;
   cachedAt: number | null;
+  /** Desde cuándo corre su turno, en ms de la máquina; `null` si no se pudo saber: entonces no se muestra tiempo. */
+  liveSince: number | null;
 };
 
-export async function loadTask(host: Host, workspace: string, folder: string, id: string): Promise<TaskView> {
+/** Con estos campos exactos, `null` incluido: la copia del relay se busca por los argumentos y así la comparte con la web. */
+const historyRequest = (before: number | null) => ({ version: 1, before, revision: null });
+
+/** La cola de la tarea. Una máquina apagada sin esa copia aún puede tener la entera, solo para quien no tiene nada que perder. */
+async function tailOf(host: Host, workspace: string, folder: string, id: string, holding: boolean, at: { cachedAt: number | null }) {
+  const session = await read<OpenedSession | null>(host, "load_session", workspace, { project: folder, id, history_request: historyRequest(null) }, null, at);
+  if (session || holding || host.power() === "on") return session;
+  return read<OpenedSession | null>(host, "load_session", workspace, { project: folder, id }, null, at);
+}
+
+/** Una página anterior. Sin ella en una máquina apagada no es el principio de la conversación: es que no se puede leer ahora. */
+export async function loadTurns(host: Host, workspace: string, folder: string, id: string, before: number): Promise<HistoryRead<Turn>> {
+  const session = await read<OpenedSession | null>(host, "load_session", workspace, { project: folder, id, history_request: historyRequest(before) }, null, { cachedAt: null });
+  if (!session) throw new HostError("machine_off", host.label);
+  return { turns: session.turns ?? [], history: session.history };
+}
+
+/**
+ * El contenido entero de un campo que no cupo en la página; `null` si no se puede traer de una
+ * vez. En fila: el relay acota las lecturas de historial simultáneas.
+ */
+export function loadDetail(host: Host, workspace: string, folder: string, id: string, ref: HistoryRef, turnId: string | undefined): Promise<string | null> {
+  const part = async (current: HistoryRef, offset: number) =>
+    (await host.call<HistoryChunk>("load_session", workspace, { project: folder, id, history_request: { ...current, kind: "detail", offset } })).value;
+  return readDetailText({ part, turns: (before) => loadTurns(host, workspace, folder, id, before) }, ref, turnId);
+}
+
+export async function loadTask(host: Host, workspace: string, folder: string, id: string, holding = false): Promise<TaskView> {
   const at = { cachedAt: null as number | null };
-  const [session, pending, live] = await Promise.all([
-    read<OpenedSession | null>(host, "load_session", workspace, { project: folder, id }, null, at),
+  const [session, pending, live, liveTurns] = await Promise.all([
+    tailOf(host, workspace, folder, id, holding, at),
     read<PendingRequests | null>(host, "pending_requests", workspace, { session: id }, null, at).catch((): PendingRequests | null => null),
     read<string[]>(host, "list_active_turns", workspace, { workspace }, [], at).catch((): string[] => []),
+    read<LiveTurn[]>(host, "list_live_turns", workspace, {}, [], at).catch((): LiveTurn[] => []),
   ]);
   if (!session) throw new HostError("machine_off", host.label);
   const turns = session.turns ?? [];
@@ -393,7 +434,7 @@ export async function loadTask(host: Host, workspace: string, folder: string, id
       questions: remaining,
     }] : [];
   });
-  return { session, permissions: pending?.permissions ?? [], questions, running: live.includes(id) && host.power() === "on", cachedAt: at.cachedAt };
+  return { session, permissions: pending?.permissions ?? [], questions, running: live.includes(id) && host.power() === "on", cachedAt: at.cachedAt, liveSince: liveTurns.find((turn) => turn.session === id)?.started_at ?? null };
 }
 
 /**
@@ -442,7 +483,7 @@ export type Draft = {
 
 /** El proveedor y el modelo con que sigue una tarea: los de su último turno. */
 export function taskDefaults(view: TaskView): { provider: string; model: string | null } {
-  const model = [...view.session.turns].reverse().find((t) => t.model)?.model ?? view.session.model ?? null;
+  const model = [...view.session.turns].reverse().find((t) => t.model)?.model ?? view.session.model ?? view.session.observed_model ?? null;
   return { provider: view.session.provider, model };
 }
 
@@ -574,6 +615,8 @@ export async function answerQuestion(host: Host, workspace: string, folder: stri
   // El proceso puede haber terminado o la pregunta haberse respondido en otro cliente.
   const current = await loadTask(host, workspace, folder, id);
   const question = current.questions.find((q) => q.turn === pending.turn);
+  // Una pregunta que ya no entra en la cola no prueba que esté contestada: la respuesta no se descarta en silencio.
+  if (!question && !current.session.turns.some((turn) => turn.id === pending.turn)) throw new HostError("question_unverified");
   if (!question) return;
   const remaining = respuestas.filter((a) => question.questions.some((q) => q.id === a.question));
   if (question.request_id) {
@@ -753,6 +796,28 @@ export async function readVisual(host: Host, workspace: string, folder: string, 
     if (detail === "invalid_visual_file" || detail === "visual_too_large" || detail === "visual_read_failed") throw new HostError(detail);
     throw error;
   }
+}
+
+// --- Los archivos de la tarea -----------------------------------------------------
+
+/** Los árboles de la tarea: su copia de trabajo y los que declare. Los que ya no están en disco no se enseñan. */
+export async function taskTrees(host: Host, workspace: string, folder: string, session: string): Promise<TaskTree[]> {
+  const answer = await host.call<TaskTree[]>("list_task_trees", workspace, { project: folder, session });
+  return (answer.value ?? []).filter((tree) => !tree.missing);
+}
+
+/** Las rutas de un árbol de la tarea. */
+export async function treeFiles(host: Host, workspace: string, folder: string, session: string, tree: string): Promise<TreeFiles> {
+  const answer = await host.call<TreeFiles>("tree_files", workspace, { project: folder, session, tree });
+  if (!answer.value) throw new HostError("operation_failed");
+  return answer.value;
+}
+
+/** Un archivo de un árbol de la tarea: texto, o su imagen en `data_url`. */
+export async function treeFile(host: Host, workspace: string, folder: string, session: string, tree: string, path: string): Promise<TreeContent> {
+  const answer = await host.call<TreeContent>("tree_show", workspace, { project: folder, session, tree, path });
+  if (!answer.value) throw new HostError("operation_failed");
+  return answer.value;
 }
 
 // --- Cuentas de IA ---------------------------------------------------------------

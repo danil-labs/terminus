@@ -11,6 +11,7 @@ import { type Notice, attentionOf, noticer } from "./engine";
 import { type AccountFleet, type Host, type Pairing, accountFleet, bridgeHost } from "./hosts";
 import { t } from "./i18n";
 import { Notifications } from "./notifications";
+import { renewPush } from "./push";
 import { COMPUTERS } from "./supabase";
 
 type Listener = (host: string, events: EngineEvent[], gap: boolean) => void;
@@ -110,6 +111,11 @@ function LiveMachinesProvider({ children, active }: { children: ReactNode; activ
   const reloadGeneration = useRef(0);
   const openTask = useRef<string | null>(null);
   const titles = useRef(new Map<string, string>());
+
+  const signedInAs = account.session?.user.id;
+  useEffect(() => {
+    if (signedIn) void renewPush(account.getToken);
+  }, [signedIn, signedInAs]);
 
   useEffect(() => {
     if (!active) { setPairing(null); setPairingLoaded(true); return; }

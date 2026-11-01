@@ -164,6 +164,7 @@ const ok = (step: string) => {
     const pid = await createTask(mac, "w-prod", { folder: "p-mac-api", prompt: "Pide permiso para borrar build", provider: "claude", model: null, agent: null, space: null });
     await until("pide permiso", () => (events.get("cmp_mac") ?? []).some((e) => e.name === "chat" && (e.payload as { kind: string }).kind === "permission"));
     const waiting = await loadTask(mac, "w-prod", "p-mac-api", pid);
+    assert.equal(typeof waiting.liveSince, "number", "el reloj del turno sale de list_live_turns");
     assert.equal(waiting.permissions.length, 1);
     assert.equal(waiting.running, true);
     await respondPermission(mac, "w-prod", pid, waiting.permissions[0].request_id, true);

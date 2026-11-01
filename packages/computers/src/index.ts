@@ -20,12 +20,14 @@ export {
 export {
   type AuditEntry,
   type Connection,
+  type ConnectionCapabilities,
   type ConnectionMachine,
   type ConnectionPatch,
   type ConnectionState,
   type UpdatedConnection,
   PERMISSION_MODES,
   connectionAudit,
+  connectionCapabilities,
   listConnections,
   mcpUrl,
   revokeConnection,
@@ -183,3 +185,4 @@ export { type SealOptions, type SealRecipient, SEAL_MAX_BYTES, canSeal, fromBase
 export { arrangeSpaces, spaceOrder, type SpaceOrderSource } from "./space-order.ts";
 export { createSpaceOrderSource } from "./space-order-source.ts";
 export { ACCOUNT_ASSET_MAX_BYTES, ACCOUNT_ASSET_TYPES, type AccountAssetKind, type BlobFetch, accountAssetUrl, readAccountAsset } from "./assets.ts";
+export { type PushDevice, forgetPushDevice, keyBytes, pushPublicKey, savePushDevice, testPush } from "./push.ts";

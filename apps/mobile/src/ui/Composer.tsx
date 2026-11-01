@@ -351,7 +351,7 @@ export function Composer({
     void send();
   }
 
-  const showStop = running && !hasText && Boolean(onStop);
+  const showStop = running && Boolean(onStop);
   const sendLabel = shell ? w("chat.composer.run") : w("chat.composer.send");
 
   return (
@@ -425,69 +425,58 @@ export function Composer({
             ))}
           </ScrollView>
         ) : null}
-        <TextInput
-          testID={testID}
-          style={[styles.input, { color: theme.text, fontFamily: shell ? Platform.select({ ios: "Menlo", default: "monospace" }) : undefined }]}
-          value={text}
-          onChangeText={setText}
-          selection={forced ?? undefined}
-          onSelectionChange={(e) => {
-            setSelection(e.nativeEvent.selection);
-            if (forced) setForced(null);
-          }}
-          placeholder={placeholder}
-          placeholderTextColor={theme.textMuted}
-          underlineColorAndroid="transparent"
-          multiline
-          textAlignVertical="top"
-          // El teclado dice «Enviar». En iOS y Android el retorno manda y no mete salto de línea.
-          returnKeyType="send"
-          enterKeyHint="send"
-          submitBehavior={Platform.OS === "web" ? undefined : "submit"}
-          onSubmitEditing={Platform.OS === "web" ? undefined : () => void send()}
-          onKeyPress={Platform.OS === "web" ? onWebKey : undefined}
-        />
         <View style={styles.row}>
           {shell ? (
-            <View style={[styles.pill, { backgroundColor: theme.text }]}>
+            <View style={[styles.pill, styles.shellPill, { backgroundColor: theme.text }]}>
               <Icon name="terminal" size={13} color={theme.bg} />
               <Text style={{ color: theme.bg, fontSize: TEXT.label, fontWeight: "600" }}>{w("chat.composer.terminal")}</Text>
             </View>
           ) : (
-            <>
-              <Pressable
-                testID="attach"
-                hitSlop={6}
-                disabled={!ready}
-                accessibilityLabel={w("chat.attachments.add")}
-                onPress={() => setSheet("attach")}
-                style={[styles.round, { opacity: ready ? 1 : 0.4 }]}
-              >
-                <Icon name="paperclip" size={18} color={theme.textMuted} />
-              </Pressable>
-              {modes.length ? (
-                <Pressable testID="mode" onPress={() => setSheet("mode")} style={[styles.pill, { borderColor: theme.border, borderWidth: StyleSheet.hairlineWidth }]}>
-                  <Icon name="shield" size={13} color={theme.textMuted} />
-                  <Text numberOfLines={1} style={{ color: theme.textMuted, fontSize: TEXT.label, maxWidth: 110 }}>
-                    {modeOption ? phrase(modeOption.label) : w("chat.mode.placeholder")}
-                  </Text>
-                </Pressable>
-              ) : null}
-            </>
+            <Pressable
+              testID="attach"
+              hitSlop={6}
+              disabled={!ready}
+              accessibilityLabel={w("chat.attachments.add")}
+              onPress={() => setSheet("attach")}
+              style={[styles.round, { opacity: ready ? 1 : 0.4 }]}
+            >
+              <Icon name="paperclip" size={20} color={theme.textMuted} />
+            </Pressable>
           )}
-          <View style={{ flex: 1 }} />
+  <TextInput
+            testID={testID}
+            style={[styles.input, { color: theme.text, fontFamily: shell ? Platform.select({ ios: "Menlo", default: "monospace" }) : undefined }]}
+            value={text}
+            onChangeText={setText}
+            selection={forced ?? undefined}
+            onSelectionChange={(e) => {
+              setSelection(e.nativeEvent.selection);
+              if (forced) setForced(null);
+            }}
+            placeholder={placeholder}
+            placeholderTextColor={theme.textMuted}
+            underlineColorAndroid="transparent"
+            multiline
+            textAlignVertical="top"
+            // El teclado dice «Enviar». En iOS y Android el retorno manda y no mete salto de línea.
+            returnKeyType="send"
+            enterKeyHint="send"
+            submitBehavior={Platform.OS === "web" ? undefined : "submit"}
+            onSubmitEditing={Platform.OS === "web" ? undefined : () => void send()}
+            onKeyPress={Platform.OS === "web" ? onWebKey : undefined}
+          />
+            {!shell && modes.length ? (
+            <Pressable testID="mode" onPress={() => setSheet("mode")} accessibilityLabel={`${w("chat.mode.listbox")}: ${modeOption ? phrase(modeOption.label) : w("chat.mode.placeholder")}`} style={styles.round}>
+              <Icon name="shield" size={19} color={theme.textMuted} />
+            </Pressable>
+          ) : null}
           {!shell && current ? (
-            <Pressable testID="model" onPress={() => setSheet("model")} style={[styles.pill, styles.modelPill, { borderColor: theme.border }]} accessibilityLabel={w("chat.model.title")}>
-              <BrandMark id={current} size={13} color={theme.text} />
-              <Text numberOfLines={1} style={{ color: theme.text, fontSize: TEXT.label, maxWidth: 130 }}>
-                {modelText}
-              </Text>
-              {efforts.length ? <Text style={{ color: theme.textMuted, fontSize: TEXT.label }}>· {effortLabel(effort)}</Text> : null}
-              <Icon name="chevron-down" size={12} color={theme.textMuted} />
+            <Pressable testID="model" onPress={() => setSheet("model")} style={styles.round} accessibilityLabel={`${w("chat.model.title")}: ${modelText}${efforts.length ? ` · ${effortLabel(effort)}` : ""}`}>
+              <BrandMark id={current} size={20} color={theme.text} />
             </Pressable>
           ) : null}
           {showStop ? (
-            <Pressable testID="stop" onPress={onStop} accessibilityLabel={w("chat.turn.stop")} style={[styles.send, { backgroundColor: theme.text }]}>
+            <Pressable testID="stop" onPress={onStop} accessibilityRole="button" accessibilityLabel={w("chat.turn.stop")} style={[styles.send, { backgroundColor: theme.text }]}>
               <Icon name="square" size={11} color={theme.bg} fill={theme.bg} />
             </Pressable>
           ) : shell ? (
@@ -500,12 +489,6 @@ export function Composer({
           )}
         </View>
       </View>
-      {running && hasText && onStop ? (
-        <Pressable onPress={onStop} style={styles.stopLine} testID="stop-inline">
-          <Icon name="square" size={10} color={theme.textMuted} fill={theme.textMuted} />
-          <Text style={{ color: theme.textMuted, fontSize: TEXT.ui }}>{w("chat.turn.stop")}</Text>
-        </Pressable>
-      ) : null}
       {note ? <Text style={[styles.hint, { color: theme.textMuted, paddingHorizontal: 16 }]}>{note}</Text> : null}
 
       <Sheet visible={sheet === "attach"} title={w("chat.attachments.add")} onClose={() => setSheet(null)}>
@@ -625,15 +608,15 @@ export function SelectorChip({ icon, left, label, value, onPress, testID, muted 
 
 const styles = StyleSheet.create({
   wrap: { paddingHorizontal: 10, paddingTop: 6, gap: 6 },
-  box: { borderWidth: 0, borderRadius: 20, paddingTop: 4, paddingBottom: 6, paddingHorizontal: 6, ...Platform.select({ web: { outlineStyle: "solid", outlineWidth: 0, boxShadow: "none" } }) },
-  input: { fontSize: 16, lineHeight: 21, minHeight: 40, maxHeight: 21 * 6 + 16, paddingHorizontal: 8, paddingTop: 9, paddingBottom: 6, borderWidth: 0, backgroundColor: "transparent", ...Platform.select({ web: { outlineStyle: "solid", outlineWidth: 0, boxShadow: "none" } }) },
-  row: { flexDirection: "row", alignItems: "center", gap: 6 },
-  round: { width: 34, height: 34, alignItems: "center", justifyContent: "center", borderRadius: 17 },
+  box: { borderWidth: 0, borderRadius: 26, paddingVertical: 5, paddingHorizontal: 6, ...Platform.select({ web: { outlineStyle: "solid", outlineWidth: 0, boxShadow: "none" } }) },
+  input: { fontSize: 16, lineHeight: 21, flex: 1, minWidth: 0, minHeight: 34, maxHeight: 21 * 6 + 16, paddingHorizontal: 6, paddingTop: 7, paddingBottom: 6, borderWidth: 0, backgroundColor: "transparent", ...Platform.select({ web: { outlineStyle: "solid", outlineWidth: 0, boxShadow: "none" } }) },
+  row: { flexDirection: "row", alignItems: "flex-end", gap: 2 },
+  shellPill: { marginBottom: 3, marginRight: 4 },
+  round: { width: 36, height: 36, alignItems: "center", justifyContent: "center", borderRadius: 17 },
   pill: { flexDirection: "row", alignItems: "center", gap: 5, borderRadius: 14, paddingHorizontal: 9, height: 28 },
   modelPill: { borderWidth: StyleSheet.hairlineWidth, flexShrink: 1 },
   send: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center" },
   run: { flexDirection: "row", alignItems: "center", gap: 6, height: 34, borderRadius: 17, paddingHorizontal: 14 },
-  stopLine: { flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-end", paddingHorizontal: 8 },
   files: { gap: 6, paddingHorizontal: 4, paddingTop: 4 },
   file: { flexDirection: "row", alignItems: "center", gap: 5, borderRadius: RADIUS.lg, paddingHorizontal: 8, paddingVertical: 5 },
   queue: { gap: 6 },

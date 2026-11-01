@@ -74,7 +74,7 @@ test("a managed computer skips the install step and connects its cloud accounts 
   const opened = [];
   const app = await boot("listo", "web-onboarding", {}, undefined, { "sb-supabase-auth-token": session }, {
     web: true,
-    antes: (win) => {
+    beforeImport: (win) => {
       w = win;
       globalThis.WebSocket = fake.Socket;
       win.open = (url) => void opened.push(url);
@@ -91,7 +91,7 @@ test("a managed computer skips the install step and connects its cloud accounts 
     await sleep(1500);
     assert.equal(w.document.querySelector("[data-web-onboarding]")?.dataset.webOnboarding, "space", "the first run opens on the space");
     assert.ok(text().includes("Crea tu espacio"), "the space step is shown");
-    assert.ok(!text().includes("Instalar asistentes") && !text().includes("Preparar Terminus"), "no install or prepare phase");
+    assert.ok(!text().includes("Instalar asistentes") && !text().includes("Preparar Danil"), "no install or prepare phase");
     assert.ok(!text().includes("Elige tus proveedores"), "never the provider picker");
     assert.equal(w.document.querySelector("[data-web-onboarding-machine]"), null, "one computer needs no name");
     assert.ok(!text().includes("De mi organización") && !text().includes("Radiant"), "the web offers no organization nor Radiant");
@@ -149,7 +149,7 @@ test("a managed computer skips the install step and connects its cloud accounts 
     assert.ok(fake.calls.some((c) => c.command === "cancel_login" && c.args.id === "a2"), "leaving stops the login still open");
     assert.equal(w.document.querySelector("[data-web-onboarding]"), null, "Hacerlo después enters the app");
     assert.ok(fake.calls.some((c) => c.command === "list_projects"), "the app mounts");
-    assert.deepEqual(app.fallos, []);
+    assert.deepEqual(app.failures, []);
   } finally {
     globalThis.fetch = own;
   }
@@ -162,7 +162,7 @@ test("with more than one computer the onboarding names the one it sets up and lo
   const opened = [];
   const app = await boot("listo", "web-onboarding-fleet", {}, undefined, {}, {
     web: true,
-    antes: (win) => {
+    beforeImport: (win) => {
       globalThis.WebSocket = f.Socket;
       win.open = (url) => void opened.push(url);
       win.terminusWeb = {
@@ -198,5 +198,5 @@ test("with more than one computer the onboarding names the one it sets up and lo
   button("Hacerlo después").click();
   await sleep(1500);
   assert.equal(doc.querySelector("[data-web-onboarding]"), null, "Hacerlo después enters the app");
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });

@@ -1,12 +1,12 @@
-# Terminus móvil
+# Danil móvil
 
-Una app de iOS y Android para ver y dirigir Terminus desde el teléfono: qué
+Una app de iOS y Android para ver y dirigir Danil desde el teléfono: qué
 tareas te necesitan, aprobar o rechazar permisos, contestar preguntas, escribirle
 a una tarea o a un agente y crear tareas nuevas. No es un editor ni una terminal.
 
 Trabaja sobre las máquinas de la persona a través de **Danil Computers**: por
 omisión su VM administrada por Danil, y además cualquier otra máquina donde
-Terminus o su Seldon Host esté conectado a su cuenta (una Mac, otro VPS). Cada
+Danil o su Seldon Host esté conectado a su cuenta (una Mac, otro VPS). Cada
 máquina sigue siendo la dueña de sus tareas; el teléfono es otro cliente más,
 como la web.
 
@@ -99,7 +99,7 @@ como la web.
 
 ## En el navegador
 
-La misma app se compila para web y vive dentro de Terminus web, en
+La misma app se compila para web y vive dentro de Danil web, en
 `/terminus/m/` (`apps/desktop/scripts/web-mobile.mjs`, último paso de
 `pnpm web:build`). La web de escritorio manda ahí a los teléfonos y cada una
 tiene un enlace a la otra («Ver la versión de escritorio» en la hoja de
@@ -117,9 +117,19 @@ workspaces, que va a la raíz que fijó la compilación,
   (no se cambian: obligaría a reinstalar) y `scope: "/"`, porque el inicio de
   sesión de Danil vive en `/` y en iOS fuera del scope abriría Safari aparte.
   La app de Danil tiene su propio manifest con `id: "/"`; el `id` distinto deja
-  instalar las dos. Sin service worker: `index.html` y el manifest se revalidan
-  y solo `_expo/static/*` (con hash) se guarda largo. En iOS la app instalada no
+  instalar las dos. `index.html`, el manifest y `sw.js` se revalidan y solo
+  `_expo/static/*` (con hash) se guarda largo. En iOS la app instalada no
   comparte almacenamiento con Safari: se inicia sesión una vez dentro de ella.
+- **Avisos push:** `apps/mobile/public/sw.js` solo muestra avisos (`push` y
+  `notificationclick`, sin `fetch` ni caché) y vive con scope `<base>m/`: en
+  app.danil.ai la raíz es del service worker de Appv2. Lo registra
+  `apps/mobile/src/lib/push.web.ts` cuando la persona activa «Avisos de tareas» en Cuenta de
+  Danil; la suscripción se guarda en Danil Computers, cuyo relay avisa cuando una
+  tarea termina, se detiene o pide algo, también con el navegador cerrado. El
+  aviso trae solo identificadores: el worker arma la ruta (`?to=/task/…`) y no
+  muestra texto del chat. El destino del aviso de inicio de sesión lo escribe el
+  build (`phoneWorker`). En iPhone solo funciona instalada en el inicio (iOS
+  16.4 o posterior). Cerrar sesión borra la suscripción antes de soltar el token.
 - **Lo que se recuerda:** `localStorage` en lugar del llavero (`store.web.ts`).
 - **Visualizaciones y archivos HTML:** el `iframe` de la ventana (`srcdoc`,
   `allow-scripts` sin `allow-same-origin`) en lugar del WebView. Un PDF no se
@@ -182,7 +192,7 @@ Los avisos salen en la app, igual para los dos caminos: una tarea que entra en
 | `personalize` | Personalizar: secciones de Inicio, Filtrar (abre `filter`) y Agrupar |
 | `profile` | Menú de perfil: Cuenta de Danil, Tema, Mantener despierta, Configuración, Puertos y Almacenamiento |
 | `settings` | Configuración (Proveedores de IA, actividad, memoria, máquinas, bridge); con `section=account`, Cuenta de Danil |
-| `inbox`, `inbox-thread` | El Inbox de Danil Agents de solo lectura y su conversación |
+| `inbox`, `inbox-thread` | El Inbox de Danil web de solo lectura y su conversación |
 | `task-tools` | Herramientas del chat: sus subtareas |
 | `(home)/notifications` | «Ahora» de todas las máquinas y «Antes», lo que llegó con la app abierta |
 | `(home)/new` | Nueva tarea: el cuadro de escribir con «Ejecutar en» (la última usada, si no la VM), carpeta, rama base y agente; `!` la crea con un comando. La hoja de Carpeta termina en «Nueva carpeta» y «Clonar repo» (ver «Carpetas nuevas») |
@@ -211,10 +221,12 @@ lleva su comentario allí:
 | Vista previa y finalizar | `task_blockers` | `set_session_pinned`, `rename_session`, `set_task_archived`, `finish_task`, `delete_session` |
 | Cuadro de escribir | `list_models`, `list_permission_modes`, `list_slash_menu`, `list_mentions`, `project_base_branches` | `run_shell_command`, `stop_shell_command`, `guardar_imagen_pegada`, `prepare_attachments`, `set_permission_mode` (cambiar el modo del turno en marcha; a automático aprueba lo pendiente) |
 | Almacenamiento por máquina (en Consumos) | `list_workspaces` sin workspace para capacidad; `list_storage` al abrir el detalle del workspace | — |
+| Reloj del turno en curso | `list_live_turns` | — |
 | Identidad de agentes | `list_agent_profiles`, `preview_file` | — |
 | Cuentas de IA | `list_accounts`, `account_status`, `account_limits` | `add_account`, `login_account`, `submit_login_code`, `cancel_login`, `discard_account`, `remove_account` |
 | Fondo del chat | `chat_background` | — |
-| Chat enriquecido | `tree_show` (solo el árbol `terminus-chat-visuals`), `chat_visual_part`, `preview_file`, `attachment_preview` | — |
+| Chat enriquecido | `tree_show` (el árbol `terminus-chat-visuals`), `chat_visual_part`, `preview_file`, `attachment_preview` | — |
+| Archivos de la tarea | `list_task_trees`, `tree_files`, `tree_show` (cualquier árbol de la tarea, solo lectura) | — |
 | Carpetas nuevas | `get_project_directory`, `project_clone_status` | `create_project`, `start_project_clone`, `cancel_project_clone` |
 | Registros de actividad por máquina | `list_activity`, `read_activity`, `read_activity_log` | — |
 | PR en la tarjeta | `list_session_git` (por carpeta, con las visibles en `priority`) | — |
@@ -307,7 +319,7 @@ EXPO_PUBLIC_SUPABASE_URL=http://<ip>:8787 EXPO_PUBLIC_COMPUTERS_ENDPOINT=http://
 ```
 
 En la app se entra con cualquier correo y contraseña. `--mac-off` apaga la Mac;
-`--license` simula una cuenta sin Terminus.
+`--license` simula una cuenta sin licencia de pago.
 
 El camino de desarrollo con el motor del lab sigue igual:
 

@@ -34,7 +34,7 @@ test("an off computer mounts as it is and wakes with the first message", async (
   let w;
   const app = await boot("listo", "web-off", {}, undefined, { "sb-supabase-auth-token": session }, {
     web: true,
-    antes: (win) => {
+    beforeImport: (win) => {
       w = win;
       globalThis.WebSocket = fake.Socket;
       win.terminusWeb = { supabaseUrl: SUPABASE, supabaseKey: "public-anon-key" };
@@ -48,7 +48,7 @@ test("an off computer mounts as it is and wakes with the first message", async (
     assert.equal(w.document.querySelector("[data-web-sync]")?.dataset.state, "offline", "the indicator shows it off");
     assert.ok(!text().includes("La máquina de este host está apagada"), "no error notice");
     assert.ok(!text().includes("Algo se rompió"), "no generic failure");
-    assert.ok(!text().includes("Preparando Terminus"), "no installer");
+    assert.ok(!text().includes("Preparando Danil"), "no installer");
     assert.ok(!fake.calls.some((c) => c.command === "prepare_runtime"));
 
     const before = fake.calls.filter((c) => c.command === "list_projects").length;
@@ -58,7 +58,7 @@ test("an off computer mounts as it is and wakes with the first message", async (
     assert.ok(fake.calls.filter((c) => c.command === "list_projects").length > before, "waiting reads go out once it is on");
     assert.ok(text().includes("Tarea t1"), "and the panel fills in");
     assert.equal(w.document.querySelector("[data-web-sync]")?.dataset.state, "online", "the indicator shows it on");
-    assert.deepEqual(app.fallos, []);
+    assert.deepEqual(app.failures, []);
   } finally {
     globalThis.fetch = own;
   }

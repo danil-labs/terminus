@@ -9,7 +9,6 @@ import { capabilities } from "../../lib/platform";
 import { type Apariencia, apariencia, elegirApariencia } from "../../lib/theme";
 import { cn } from "../../lib/utils";
 import { ITEM_DE_MENU, Popover, PopoverAnchor, PopoverContent } from "../../ui/Popover";
-import { descriptionOf, MODES, nameOf, watchKeepAwake } from "./KeepAwake";
 
 const DanilFooterEntry = lazy(() => import("./DanilFooterEntry"));
 const WorkspaceDirectoryMenu = lazy(() => import("./WorkspaceDirectoryMenu"));
@@ -32,7 +31,7 @@ const SEGMENTO = "flex min-w-0 gap-0.5 rounded-md bg-surface-muted p-0.5";
 const OPCION = "h-6 min-w-0 flex-1 truncate rounded-sm px-2 text-xs text-neutral-500 outline-none hover:text-neutral-950 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-primary";
 const ELEGIDA = "bg-surface-raised font-semibold text-neutral-950 shadow-sm";
 
-/** El avatar al pie de la columna: la cuenta, el tema, mantener despierta, reportar un bug y, en la web, cerrar sesión. */
+/** El avatar al pie de la columna: la cuenta, el tema, reportar un bug y, en la web, cerrar sesión. */
 export default function ProfileMenu(props: {
   onAccount: () => void;
   onReportarBug: () => void;
@@ -40,7 +39,6 @@ export default function ProfileMenu(props: {
 }) {
   const [open, setOpen] = createSignal(false);
   const [tema, setTema] = createSignal<Apariencia>(apariencia());
-  const despierta = watchKeepAwake();
   const cuenta = () => capabilities().danilAccount || capabilities().accountProfile;
   const alternar = () => setOpen((o) => !o);
   const generico = () => (
@@ -64,13 +62,6 @@ export default function ProfileMenu(props: {
           <Suspense fallback={generico()}>
             <DanilFooterEntry collapsed onOpen={alternar} fallback={generico()} />
           </Suspense>
-        </Show>
-        {/* Mientras la computadora no puede dormir, el avatar lo dice sin abrir el menú. */}
-        <Show when={despierta.status()?.active}>
-          <span
-            aria-hidden="true"
-            class="pointer-events-none absolute right-0.5 bottom-0.5 size-2.5 rounded-full border-2 border-surface-raised bg-warning"
-          />
         </Show>
       </PopoverAnchor>
       <PopoverContent class="w-72 p-1" aria-label={t("shell.profile.menu")}>
@@ -103,32 +94,6 @@ export default function ProfileMenu(props: {
             )}
           </For>
         </div>
-        <Show when={despierta.status()?.supported ? despierta.status() : null}>
-          {(s) => (
-            <>
-              <p class="m-0 flex items-center justify-between gap-2 px-2 pt-1 pb-1 text-caption font-medium text-neutral-500">
-                <span>{t("shell.keep_awake.title")}</span>
-                <span class="font-normal">{s().active ? t("shell.keep_awake.active") : t("shell.keep_awake.inactive")}</span>
-              </p>
-              <div role="radiogroup" aria-label={t("shell.keep_awake.title")} class={cn(SEGMENTO, "mx-2")}>
-                <For each={MODES}>
-                  {(mode) => (
-                    <button
-                      type="button"
-                      role="radio"
-                      aria-checked={s().mode === mode}
-                      class={cn(OPCION, s().mode === mode && ELEGIDA)}
-                      onClick={() => despierta.choose(mode)}
-                    >
-                      {nameOf(mode)}
-                    </button>
-                  )}
-                </For>
-              </div>
-              <p class="m-0 px-2 pt-1 pb-2 text-caption text-neutral-500">{descriptionOf(s().mode)}</p>
-            </>
-          )}
-        </Show>
         <div class="my-1 h-px bg-border" />
         <p class="m-0 flex items-center gap-1.5 px-2 pt-1 pb-1 text-caption font-medium text-error-strong">
           <Bug size={12} aria-hidden="true" />

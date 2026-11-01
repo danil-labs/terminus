@@ -44,8 +44,14 @@ export type Follow = {
 /** Lo que se lee de un `onScroll`, en píxeles. */
 export type Metrics = { offset: number; content: number; viewport: number };
 
-/** Al abrir una tarea: abajo y siguiendo. */
-export const OPENED: Follow = { following: true, near: true, offset: 0, seen: null };
+/**
+ * Al abrir una tarea: abajo y siguiendo. La lista invertida abre sin ningún evento de scroll: sin un `offset` que
+ * ganarle, el primer gesto que aleja del final no soltaría el hilo.
+ */
+export const OPENED: Follow = { following: true, near: true, offset: Infinity, seen: null };
+
+/** El desplazamiento desde arriba de una lista invertida, cuyo 0 es el final. */
+export const fromTop = (offset: number, { content, viewport }: Omit<Metrics, "offset">) => content - viewport - offset;
 
 export const distanceToEnd = ({ offset, content, viewport }: Metrics) => Math.max(0, content - viewport - offset);
 
@@ -57,6 +63,12 @@ export function scrolled(state: Follow, metrics: Metrics, replies: number): Foll
   if (metrics.offset < state.offset - SLOP) return { following: false, near, offset: metrics.offset, seen: replies };
   return { ...state, near, offset: Math.max(state.offset, metrics.offset) };
 }
+
+/**
+ * `scrolled` con lo medido, sin evento de scroll: lo que cabe también está en su final. Nativo entrega el marco
+ * antes que el contenido, y con una sola medida cualquier lista parecería estar abajo: espera a tener las dos.
+ */
+export const measuredFollow = (state: Follow, metrics: Metrics, replies: number) => (metrics.content && metrics.viewport ? scrolled(state, metrics, replies) : state);
 
 /** Si un cambio de tamaño (contenido o ventana) debe bajar al final. */
 export const shouldStick = (state: Follow) => state.following;

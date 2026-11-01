@@ -1,5 +1,6 @@
 import { MOBILE_WEB_DIR, WEB_LAYOUT_KEY } from "@terminus/design";
 import { router, useLocalSearchParams } from "expo-router";
+import { useEffect, useState } from "react";
 import { Platform, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAccount } from "../lib/account";
@@ -7,6 +8,7 @@ import { BRIDGE_ENABLED } from "../lib/bridge";
 import type { Host } from "../lib/hosts";
 import { t, w } from "../lib/i18n";
 import { useMachines } from "../lib/machines";
+import { disablePush, enablePush, PUSH_TEST, type PushState, pushState, sendTestPush } from "../lib/push";
 import { Dot } from "../ui/components";
 import { Group, GroupHeader, LargeTitle, ListRow, NavBar, pageColor } from "../ui/list";
 import { useTheme } from "../ui/theme";
@@ -35,7 +37,7 @@ export default function Settings() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { section } = useLocalSearchParams<{ section?: string }>();
-  const { email, signOut, session } = useAccount();
+  const { email, signOut, session, getToken } = useAccount();
   const { hosts, pairing, pair, registry } = useMachines();
   const account = section === "account";
   const power = (host: Host) =>
@@ -52,7 +54,7 @@ export default function Settings() {
             <Group>
               {session ? <ListRow title={email ?? ""} subtitle={t("account.title")} /> : null}
               {session ? (
-                <ListRow testID="sign-out" title={t("account.sign_out")} destructive onPress={() => { router.dismissAll(); void signOut(); }} />
+                <ListRow testID="sign-out" title={t("account.sign_out")} destructive onPress={() => { router.dismissAll(); void disablePush(getToken).finally(signOut); }} />
               ) : (
                 <ListRow testID="sign-in" title={t("signin.title")} chevron onPress={() => router.push("/signin")} />
               )}
@@ -60,6 +62,7 @@ export default function Settings() {
             {Platform.OS === "web" ? (
               <>
                 <View style={{ height: 20 }} />
+                {session ? <PushRow getToken={getToken} /> : null}
                 <Group>
                   <ListRow testID="desktop-layout" title={t("web.desktop_layout")} chevron onPress={() => { localStorage.setItem(WEB_LAYOUT_KEY, "desktop"); window.location.assign(desktopBase()); }} />
                 </Group>
@@ -125,5 +128,53 @@ export default function Settings() {
         )}
       </ScrollView>
     </View>
+  );
+}
+
+/** Avisos de tareas en este dispositivo (solo web). Los errores quedan en la fila. */
+function PushRow({ getToken }: { getToken: () => Promise<string> }) {
+  const [state, setState] = useState<PushState | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+  useEffect(() => {
+    void pushState().then(setState);
+  }, []);
+  if (!state || (!state.supported && !state.needsInstall)) return null;
+  const run = async (action: () => Promise<string | null>) => {
+    setBusy(true);
+    setNote(null);
+    try {
+      setNote(await action());
+    } catch (err) {
+      const code = err instanceof Error ? err.message : "";
+      setNote(code === "push_denied" ? t("push.blocked") : t("push.failed"));
+    } finally {
+      setState(await pushState());
+      setBusy(false);
+    }
+  };
+  const subtitle = note ?? (state.needsInstall ? t("push.install") : state.blocked ? t("push.blocked") : t("push.subtitle"));
+  return (
+    <>
+      <Group>
+        <ListRow
+          testID="push"
+          icon={{ name: "bell", color: "#ef4444" }}
+          title={t("push.title")}
+          subtitle={subtitle}
+          value={state.on ? t("push.on") : t("push.off")}
+          disabled={busy || state.needsInstall || (state.blocked && !state.on)}
+          onPress={() => void run(async () => {
+            if (state.on) await disablePush(getToken);
+            else await enablePush(getToken);
+            return null;
+          })}
+        />
+        {PUSH_TEST && state.on ? (
+          <ListRow testID="push-test" title={t("push.test")} disabled={busy} onPress={() => void run(async () => t("push.test_sent", { count: String(await sendTestPush(getToken)) }))} />
+        ) : null}
+      </Group>
+      <View style={{ height: 20 }} />
+    </>
   );
 }

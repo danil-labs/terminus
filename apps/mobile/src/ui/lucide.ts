@@ -14,6 +14,13 @@ export type LucideShape =
   | { kind: "ellipse"; cx: number; cy: number; rx: number; ry: number };
 
 export const ICONS = {
+  "user-check": [{"kind": "path", "d": "m16 11 2 2 4-4"}, {"kind": "path", "d": "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"}, {"kind": "circle", "cx": 9.0, "cy": 7.0, "r": 4.0}],
+  "message-square-warning": [{"kind": "path", "d": "M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"}, {"kind": "path", "d": "M12 15h.01"}, {"kind": "path", "d": "M12 7v4"}],
+  "circle-check": [{"kind": "circle", "cx": 12.0, "cy": 12.0, "r": 10.0}, {"kind": "path", "d": "m9 12 2 2 4-4"}],
+  "circle-x": [{"kind": "circle", "cx": 12.0, "cy": 12.0, "r": 10.0}, {"kind": "path", "d": "m15 9-6 6"}, {"kind": "path", "d": "m9 9 6 6"}],
+  "file-check": [{"kind": "path", "d": "M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"}, {"kind": "path", "d": "M14 2v4a2 2 0 0 0 2 2h4"}, {"kind": "path", "d": "m9 15 2 2 4-4"}],
+  "folder-git-2": [{"kind": "path", "d": "M9 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v5"}, {"kind": "circle", "cx": 13.0, "cy": 12.0, "r": 2.0}, {"kind": "path", "d": "M18 19c-2.8 0-5-2.2-5-5v8"}, {"kind": "circle", "cx": 20.0, "cy": 19.0, "r": 2.0}],
+  "folder-cloud": [{"kind": "path", "d": "M9 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v4"}, {"kind": "path", "d": "M19.75 20H15.5a3.5 3.5 0 1 1 3.355-4.5h.895a2.25 2.25 0 1 1 0 4.5Z"}],
   "gauge": [{ kind: "path", d: "m12 14 4-4" }, { kind: "path", d: "M3.34 19a10 10 0 1 1 17.32 0" }],
   "trash-2": [{"kind": "path", "d": "M10 11v6"}, {"kind": "path", "d": "M14 11v6"}, {"kind": "path", "d": "M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"}, {"kind": "path", "d": "M3 6h18"}, {"kind": "path", "d": "M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"}],
   "archive": [{"kind": "rect", "width": 20.0, "height": 5.0, "x": 2.0, "y": 3.0, "rx": 1.0}, {"kind": "path", "d": "M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"}, {"kind": "path", "d": "M10 12h4"}],
@@ -61,6 +68,11 @@ export const ICONS = {
   "user-round": [{"kind": "circle", "cx": 12.0, "cy": 8.0, "r": 5.0}, {"kind": "path", "d": "M20 21a8 8 0 0 0-16 0"}],
   "rocket": [{"kind":"path","d":"M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"},{"kind":"path","d":"M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09"},{"kind":"path","d":"M9 12a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.4 22.4 0 0 1-4 2z"},{"kind":"path","d":"M9 12H4s.55-3.03 2-4c1.62-1.08 5 .05 5 .05"}],
   "ellipsis": [{"kind":"circle","cx":5,"cy":12,"r":1},{"kind":"circle","cx":12,"cy":12,"r":1},{"kind":"circle","cx":19,"cy":12,"r":1}],
+  "file-pen-line": [{"kind":"path","d":"M14.364 13.634a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506l4.013-4.009a1 1 0 0 0-3.004-3.004z"},{"kind":"path","d":"M14.487 7.858A1 1 0 0 1 14 7V2"},{"kind":"path","d":"M20 19.645V20a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l2.516 2.516"},{"kind":"path","d":"M8 18h1"}],
+  "square-terminal": [{"kind":"path","d":"m7 11 2-2-2-2"},{"kind":"path","d":"M11 13h4"},{"kind":"rect","width":18,"height":18,"x":3,"y":3,"rx":2,"ry":2}],
+  "globe": [{"kind":"circle","cx":12,"cy":12,"r":10},{"kind":"path","d":"M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"},{"kind":"path","d":"M2 12h20"}],
+  "wrench": [{"kind":"path","d":"M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z"}],
+  "shield-check": [{"kind":"path","d":"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"},{"kind":"path","d":"m9 12 2 2 4-4"}],
   "x": [{"kind": "path", "d": "M18 6 6 18"}, {"kind": "path", "d": "m6 6 12 12"}],
   "inbox": [{"kind": "polyline", "points": "22 12 16 12 14 15 10 15 8 12 2 12"}, {"kind": "path", "d": "M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"}],
   "bot": [{"kind": "path", "d": "M12 8V4H8"}, {"kind": "rect", "width": 16.0, "height": 12.0, "x": 4.0, "y": 8.0, "rx": 2.0}, {"kind": "path", "d": "M2 14h2"}, {"kind": "path", "d": "M20 14h2"}, {"kind": "path", "d": "M15 13v2"}, {"kind": "path", "d": "M9 13v2"}],

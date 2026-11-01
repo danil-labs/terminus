@@ -2,8 +2,9 @@ import { RADIUS, TEXT } from "@terminus/design";
 import { AgentAvatar } from "../../../../../ui/AgentAvatar";
 import { SendButton } from "../../../../../ui/SendButton";
 import { Stack, router, useFocusEffect, useLocalSearchParams } from "expo-router";
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AppState, FlatList, Image, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { AppState, FlatList, Image, type NativeScrollEvent, type NativeSyntheticEvent, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { type HistoryRead, HistoryPager, type LoadedHistory, type OlderState, hasOlder, hasRecentGap } from "@terminus/chat/history";
 import { type ChatEvent, type Question, type Turn, DEFAULT_CHAT_VEIL } from "@terminus/protocol";
 import { delegatedOf, taskTitle } from "@terminus/tasks";
 import {
@@ -17,6 +18,7 @@ import {
   coalesced,
   injectIntoTask,
   loadTask,
+  loadTurns,
   markSeen,
   respondPermission,
   runShell,
@@ -27,20 +29,25 @@ import {
   taskDefaults,
 } from "../../../../../lib/engine";
 import { HostError } from "../../../../../lib/hosts";
-import { type Line, type LivePiece, type StepRow, applyLive, bareCommand, fileName, linesOfLive, linesOfTurn, liveAfterRead } from "../../../../../lib/steps";
+import { type ChatLine, type Line, type LivePiece, type WorkLine, applyLive, lineMatches, liveAfterRead, runClock, savesLive, workRuns } from "../../../../../lib/steps";
+import { publishWork, releaseWork } from "../../../../../lib/workSheet";
 import { lang, t, w } from "../../../../../lib/i18n";
-import { type Follow, OPENED, jumped, scrolled, shouldStick, showJump, unseen } from "../../../../../lib/follow";
+import { type ScrollAnchor, anchorOf, restoreAnchor, scrollToEnd } from "../../../../../lib/scrollAnchor";
+import { type Follow, MARGIN, OPENED, fromTop, jumped, scrolled, showJump, unseen } from "../../../../../lib/follow";
 import { useAccount } from "../../../../../lib/account";
 import { useMachines } from "../../../../../lib/machines";
 import { COMPUTERS } from "../../../../../lib/supabase";
 import { useWorkspaces } from "../../../../../lib/workspaces";
+import { HistoryDetail } from "../../../../../ui/chat/HistoryDetail";
 import { Attachments, MessageBody, toolImages } from "../../../../../ui/chat/Message";
 import { ChatScopeContext } from "../../../../../ui/chat/scope";
+import { TurnStatus, WorkGroup } from "../../../../../ui/chat/Work";
 import { Composer, type Submission } from "../../../../../ui/Composer";
 import { type Theme, useTheme } from "../../../../../ui/theme";
-import { Icon, type IconName } from "../../../../../ui/Icon";
+import { Icon } from "../../../../../ui/Icon";
 import { openTask } from "../../../../../ui/components";
 import { KeyboardScreen } from "../../../../../ui/KeyboardScreen";
+import { PermissionCard } from "../../../../../ui/PermissionCard";
 import { TaskHeader } from "../../../../../ui/TaskHeader";
 import { TaskTools } from "../../../../../ui/TaskTools";
 import { effectiveGit } from "../../../../../lib/taskGit";
@@ -50,25 +57,23 @@ import { Avatar } from "../../../../../ui/components";
 
 /** Kinds that change what the task reports: pending requests or whether it runs. */
 const REFRESH = new Set(["permission", "permission_resolved", "started", "done", "presence", "segment_saved"]);
-/** Tras estos, lo que llegó en vivo ya está guardado: la lectura lo reemplaza (`liveAfterRead`). */
-const SAVED = new Set(["done", "segment_saved"]);
+const TAIL_PAGE_SIZE = 20;
+const PREPEND_RECOVERY_MS = 500;
 
-const sameLine = (a: Line, b: Line) => JSON.stringify(a) === JSON.stringify(b);
+const sameLine = (a: ChatLine, b: ChatLine) => a === b || JSON.stringify(a) === JSON.stringify(b);
+const NO_TURNS: Turn[] = [];
+const imagesOfTurn = (turn: Turn) => toolImages(turn.tools);
 
 /**
- * Las líneas de la conversación: por turno, sus avances, sus pasos y su
- * respuesta (`linesOfTurn`). Cada lectura trae turnos nuevos aunque no
- * cambien: una línea igual a la anterior se reutiliza, con sus mismos arreglos
- * de imágenes, para que `MessageBody` (memo) no vuelva a pintarse.
+ * Cada lectura trae turnos nuevos aunque no cambien: una línea igual a la anterior
+ * se reutiliza, con sus mismos arreglos de imágenes, para que `MessageBody` (memo)
+ * no vuelva a pintarse.
  */
-function linesOf(turns: Turn[], previous: ReadonlyMap<string, Line>): Line[] {
-  return turns.flatMap((turn, i) =>
-    linesOfTurn(turn, turn.id ?? String(i), toolImages(turn.tools)).map((line) => {
-      const old = previous.get(line.key);
-      return old && sameLine(old, line) ? old : line;
-    }),
-  );
-}
+const keepSame = (lines: ChatLine[], previous: ReadonlyMap<string, ChatLine>) =>
+  lines.map((line) => {
+    const old = previous.get(line.key);
+    return old && sameLine(old, line) ? old : line;
+  });
 
 /**
  * Una tarea en vivo, en la máquina que la corre: conversación, aprobaciones,
@@ -92,10 +97,42 @@ export default function TaskScreen() {
   // Lo que se mandó mientras la VM enciende: sin él, el mensaje desaparece el minuto o dos que tarda.
   const [pending, setPending] = useState<string | null>(null);
   const [background, setBackground] = useState<Backdrop | null>(null);
-  const list = useRef<FlatList<Line>>(null);
+  // Las decisiones que ya salieron, por `request_id`: el motor falla en la segunda. El ref ataja el doble toque antes del render.
+  const [deciding, setDeciding] = useState<ReadonlySet<string>>(new Set());
+  const decidingNow = useRef(new Set<string>());
+  const list = useRef<FlatList<ChatLine>>(null);
   // Buscar en el chat: con texto, solo las líneas que lo dicen; `null` cerrado.
   const [finding, setFinding] = useState<string | null>(null);
   const key = `${params.host}/${id}`;
+  // La ventana de la conversación y su página anterior; una por máquina, workspace y tarea.
+  const [history, setHistory] = useState<LoadedHistory<Turn> | null>(null);
+  const [older, setOlder] = useState<OlderState>("idle");
+  const pagerScope = `${params.host}\n${workspace}\n${id}`;
+  const pager = useRef<{ scope: string; pager: HistoryPager<Turn> } | null>(null);
+  const hostNow = useRef(host);
+  hostNow.current = host;
+  const pagerNow = () => {
+    if (pager.current?.scope === pagerScope) return pager.current.pager;
+    const scope = pagerScope;
+    const next: HistoryPager<Turn> = new HistoryPager<Turn>({
+      read: async (before): Promise<HistoryRead<Turn>> => {
+        const machine = hostNow.current;
+        if (!machine) throw new HostError("machine_off");
+        if (before !== null) return loadTurns(machine, workspace, folder, id, before);
+        const tail = await loadTask(machine, workspace, folder, id, true);
+        return { turns: tail.session.turns, history: tail.session.history };
+      },
+      onChange: () => {
+        if (pager.current?.scope !== scope) return;
+        setHistory(next.loaded ?? null);
+        setOlder(next.older);
+      },
+    });
+    pager.current = { scope, pager: next };
+    return next;
+  };
+  const needle = finding?.trim().toLowerCase() ?? "";
+  const webScope = JSON.stringify([params.host, workspace, folder, id, needle]);
   // Las que esta tarea lanzó: la lista las esconde bajo ella, como el riel del escritorio. Las hijas
   // remotas viven en otra máquina y nombran a esta por su `taskKey`.
   const delegated = useMemo(() => [
@@ -106,9 +143,41 @@ export default function TaskScreen() {
   // cambia con cada evento de scroll; solo el botón, que se ve, va en estado.
   const follow = useRef<Follow>(OPENED);
   const [jump, setJump] = useState<{ shown: boolean; unseen: number }>({ shown: false, unseen: 0 });
-  // Al final de verdad: el `scrollToEnd` de la `FlatList` calcula el fondo con el alto estimado de sus filas y sin el
-  // pie (lo que llega en vivo), y con eso se queda corto o sube. El de su `ScrollView` usa el alto medido.
-  const toBottom = (animated: boolean) => list.current?.getNativeScrollRef()?.scrollToEnd({ animated });
+  const anchor = useRef<ScrollAnchor>(null);
+  const prepending = useRef<ScrollAnchor>(null);
+  const prependTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const readingScope = useRef<string | null>(null);
+  const climb = useRef(() => {});
+  const clearPrepending = () => {
+    if (prependTimer.current !== null) clearTimeout(prependTimer.current);
+    prependTimer.current = null;
+    prepending.current = null;
+  };
+  const resetReading = () => {
+    clearPrepending();
+    anchor.current = null;
+  };
+  const webReady = useRef<string | null>(null);
+  const [paintedScope, setPaintedScope] = useState<string | null>(null);
+  const [webWindow, setWebWindow] = useState<{ scope: string; first: string | null }>({ scope: "", first: null });
+  const needleNow = useRef("");
+  const webSlice = useRef<{ first: number; rows: readonly ChatLine[]; scope: string }>({ first: 0, rows: [], scope: "" });
+  const scroller = () => Platform.OS === "web" ? list.current?.getScrollableNode() as unknown as Element | null : null;
+  const toBottom = (animated: boolean) => {
+    const node = scroller();
+    if (node) scrollToEnd(node, animated);
+    else list.current?.scrollToOffset({ offset: 0, animated });
+  };
+  const restoreReading = (node: Element) => {
+    const held = prepending.current;
+    if (held) {
+      if (restoreAnchor(node, held, false)) {
+        anchor.current = held;
+        clearPrepending();
+        queueMicrotask(() => climb.current());
+      }
+    } else restoreAnchor(node, anchor.current, false);
+  };
 
   const fail = useCallback(
     (error: unknown) => {
@@ -136,8 +205,10 @@ export default function TaskScreen() {
     if (!host) return;
     const asked = `${host.id}/${id}`;
     const before = liveNow.current;
-    const next = await loadTask(host, workspace, folder, id);
+    const window = pagerNow();
+    const next = await loadTask(host, workspace, folder, id, Boolean(window.loaded));
     if (keyNow.current !== asked) return;
+    window.accept(next.session.turns, next.session.history, { reading: !follow.current.following });
     setView(next);
     putLive(liveAfterRead(liveNow.current, before, { running: next.running, resync }));
   };
@@ -152,6 +223,10 @@ export default function TaskScreen() {
   useEffect(() => {
     setOpenTask(key);
     setView(null);
+    pager.current?.pager.close();
+    pager.current = null;
+    setHistory(null);
+    setOlder("idle");
     putLive([]);
     follow.current = OPENED;
     setJump({ shown: false, unseen: 0 });
@@ -194,11 +269,14 @@ export default function TaskScreen() {
   const reread = useRef((_resync: boolean) => {});
   reread.current = (resync) => void refresh(resync).catch(fail);
   const focused = useRef(false);
+  // Volver de la hoja no relee: bajo ella siguen llegando los eventos.
+  const sheetOpened = useRef(false);
   useFocusEffect(
     useCallback(() => {
       // El primer foco es la apertura, que ya lee arriba.
-      if (focused.current) reread.current(false);
+      if (focused.current && !sheetOpened.current) reread.current(false);
       focused.current = true;
+      sheetOpened.current = false;
     }, []),
   );
   useEffect(() => {
@@ -216,7 +294,7 @@ export default function TaskScreen() {
           const chat = event.payload as ChatEvent;
           if (chat.session !== id) continue;
           if (event.name !== "chat") {
-            void refresh(false).catch(fail);
+            void refresh(savesLive(event.name)).catch(fail);
             continue;
           }
           if (chat.kind === "delta" || chat.kind === "tool" || chat.kind === "tool_done") putLive(applyLive(liveNow.current, chat));
@@ -224,7 +302,7 @@ export default function TaskScreen() {
             void refresh()
               .then(() => host && markSeen(host, workspace, id))
               .catch(fail);
-          } else if (REFRESH.has(chat.kind)) void refresh(SAVED.has(chat.kind)).catch(fail);
+          } else if (REFRESH.has(chat.kind)) void refresh(savesLive(event.name, chat.kind)).catch(fail);
         }
       }),
     [subscribe, params.host, id, refresh, fail, host, workspace],
@@ -249,12 +327,35 @@ export default function TaskScreen() {
     }
   }
 
-  /** Baja animado al final y vuelve a seguirlo: el botón y mandar un mensaje. */
+  /** Baja animado al final y vuelve a seguirlo: el botón y mandar un mensaje. Sin la cola cargada, primero la trae. */
   const toEnd = () => {
     follow.current = jumped(follow.current);
     setJump({ shown: false, unseen: 0 });
-    toBottom(true);
+    const window = pagerNow();
+    if (window.loaded && hasRecentGap(window.loaded)) void window.latest().then(() => toBottom(false)).catch(fail);
+    else toBottom(true);
   };
+
+  /** Pone lo anterior sobre lo que se lee. En la web la lista no es invertida: el ancla lo sostiene. */
+  const askOlder = async (retry = false) => {
+    const window = pagerNow();
+    if (!window.loaded || !hasOlder(window.loaded) || window.older === "loading" || (window.older === "failed" && !retry)) return;
+    const put = await window.fetchOlder();
+    if (!put) return;
+    const node = scroller();
+    const held = node ? anchorOf(node) : null;
+    if (held) {
+      clearPrepending();
+      prepending.current = held;
+      prependTimer.current = setTimeout(() => {
+        if (prepending.current === held) resetReading();
+        climb.current();
+      }, PREPEND_RECOVERY_MS);
+    }
+    put();
+  };
+  const askOlderNow = useRef(askOlder);
+  askOlderNow.current = askOlder;
 
   /** Enviar desde el cuadro: un mensaje abre otro turno; `!` corre el comando en la carpeta. */
   const submit = (s: Submission) => {
@@ -269,7 +370,17 @@ export default function TaskScreen() {
   };
   const inject = (text: string, attachments: string[]) => act(() => injectIntoTask(host!, workspace, folder, id, text, attachments));
 
-  const decide = (permission: Permission, allow: boolean) => host && void act(() => respondPermission(host, workspace, id, permission.request_id, allow));
+  const settle = (requestId: string) => {
+    if (decidingNow.current.delete(requestId)) setDeciding(new Set(decidingNow.current));
+  };
+  const respond = (permission: Permission, allow: boolean) => {
+    if (!host || decidingNow.current.has(permission.request_id)) return;
+    decidingNow.current.add(permission.request_id);
+    setDeciding(new Set(decidingNow.current));
+    void act(() => respondPermission(host, workspace, id, permission.request_id, allow)).then((sent) => {
+      if (!sent) settle(permission.request_id);
+    });
+  };
   const answer = (pending: PendingQuestion, chosen: Record<string, string[]>, free: Record<string, string>) =>
     host && void act(() => answerQuestion(host, workspace, folder, id, pending, chosen, free));
   // Un `!` en marcha se detiene con su comando; si no había, se detiene el turno.
@@ -281,7 +392,11 @@ export default function TaskScreen() {
       .catch(fail);
 
   const running = host?.power() === "on" && (view?.running ?? false);
-  const permissions = view?.permissions ?? [];
+  const permissions = useMemo(() => view?.permissions ?? [], [view?.permissions]);
+  // Otro cliente pudo decidir: `pending_requests` manda, sin decisión optimista.
+  useEffect(() => {
+    for (const requestId of decidingNow.current) if (!permissions.some((p) => p.request_id === requestId)) settle(requestId);
+  }, [permissions]);
 
   /** Elegir modo con el turno en marcha: el motor lo aplica al turno vivo (`switchLiveMode`). */
   const chosenMode = useRef<string | null>(null);
@@ -294,34 +409,75 @@ export default function TaskScreen() {
   };
   const questions = view?.questions ?? [];
   const asleep = host?.canAct() === "asleep" || host?.canAct() === "outdated";
-  const turns = view?.session.turns;
-  const shown = useRef<ReadonlyMap<string, Line>>(new Map());
+  const turns = history?.turns ?? NO_TURNS;
+  const base = history?.start ?? 0;
+  const thread = useMemo(() => workRuns(turns, live, running, imagesOfTurn, base), [turns, live, running, base]);
+  const recentGap = history ? hasRecentGap(history) : false;
+  const shown = useRef<ReadonlyMap<string, ChatLine>>(new Map());
   const lines = useMemo(() => {
-    const next = linesOf(turns ?? [], shown.current);
+    const next = keepSame(thread.lines, shown.current);
     shown.current = new Map(next.map((line) => [line.key, line]));
     return next;
-  }, [turns]);
+  }, [thread.lines]);
   const cachedNote =
     view?.cachedAt && host ? t("machines.cached", { name: host.label, time: new Date(view.cachedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }) : null;
   const title = (view?.session.turns.find((turn) => turn.role === "user")?.text ?? "").split("\n")[0];
   const lastAgent = [...lines].reverse().find((line) => line.kind === "message" && line.role !== "user" && line.role !== "system" && line.role !== "shell")?.key;
-  const liveLines = useMemo(() => linesOfLive(live), [live]);
+  const liveLines = thread.live;
   // Las respuestas del agente, para contar en el botón las que entraron desde que se subió.
   const replies = useRef(0);
-  replies.current = lines.filter((line) => line.kind === "message" && line.role !== "user" && line.role !== "system" && line.role !== "shell").length;
+  const repliesHeld = lines.filter((line) => line.kind === "message" && line.role !== "user" && line.role !== "system" && line.role !== "shell").length;
+  // Una página anterior no es una respuesta nueva: al moverse la ventana, la cuenta sigue donde iba.
+  const repliesBase = useRef({ start: base, offset: 0 });
+  if (repliesBase.current.start !== base) repliesBase.current = { start: base, offset: repliesHeld - replies.current };
+  replies.current = repliesHeld - repliesBase.current.offset;
   const onScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (Platform.OS === "web" && prepending.current) return;
     const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
-    const next = scrolled(follow.current, { offset: contentOffset.y, content: contentSize.height, viewport: layoutMeasurement.height }, replies.current);
+    const metrics = { content: contentSize.height, viewport: layoutMeasurement.height };
+    const next = scrolled(follow.current, { ...metrics, offset: Platform.OS === "web" ? contentOffset.y : fromTop(contentOffset.y, metrics) }, replies.current);
     follow.current = next;
+    const node = scroller();
+    if (node) {
+      // Con la hoja encima el centro del hilo no es del hilo: se queda el ancla que había y no se piden más filas.
+      anchor.current = next.following ? null : sheetOpened.current ? anchor.current : anchorOf(node);
+      const page = webSlice.current;
+      if (!sheetOpened.current && webReady.current === page.scope && contentOffset.y < MARGIN && page.first > 0 && !prepending.current) {
+        const held = anchorOf(node);
+        prepending.current = held;
+        if (held) prependTimer.current = setTimeout(() => {
+          if (prepending.current === held) resetReading();
+        }, PREPEND_RECOVERY_MS);
+        setWebWindow({ scope: page.scope, first: page.rows[Math.max(0, page.first - TAIL_PAGE_SIZE)].key });
+      } else if (!sheetOpened.current && webReady.current === page.scope && contentOffset.y < MARGIN && page.first === 0 && !needleNow.current) void askOlderNow.current();
+    }
     const shown = showJump(next);
     setJump((now) => (now.shown === shown ? now : { shown, unseen: unseen(next, replies.current) }));
   }, []);
-  // Siguiendo, todo lo que cambia de alto —el texto que llega, los pasos, una imagen, el teclado— baja de un corte.
-  // Suelto, no se mueve: crecer por abajo no toca el scroll.
-  const stick = useCallback(() => {
-    if (shouldStick(follow.current)) toBottom(false);
+  // Lo que entró arriba no mueve la barra: sin este paso nadie vuelve a mirar si hace falta más.
+  const continueUp = useCallback(() => {
+    const node = scroller();
+    if (!node || prepending.current || sheetOpened.current) return;
+    const page = webSlice.current;
+    if (webReady.current !== page.scope || node.scrollTop >= MARGIN) return;
+    if (page.first > 0) {
+      const held = anchorOf(node);
+      prepending.current = held;
+      if (held) prependTimer.current = setTimeout(() => {
+        if (prepending.current === held) resetReading();
+        climb.current();
+      }, PREPEND_RECOVERY_MS);
+      setWebWindow({ scope: page.scope, first: page.rows[Math.max(0, page.first - TAIL_PAGE_SIZE)].key });
+    } else if (!needleNow.current) void askOlderNow.current();
   }, []);
-  const onLayout = useCallback((_: LayoutChangeEvent) => stick(), [stick]);
+  climb.current = continueUp;
+  const onContentSize = useCallback(() => {
+    const node = scroller();
+    if (!node || webReady.current !== webSlice.current.scope) return;
+    if (prepending.current || !follow.current.following) restoreReading(node);
+    else toBottom(false);
+    if (!prepending.current && !follow.current.following) continueUp();
+  }, []);
   const newReplies = jump.shown ? unseen(follow.current, replies.current) : 0;
   const streaming = liveLines.some((line) => line.key === "live");
   const scope = useMemo(() => (host ? { host, hostId: params.host, workspace, folder, session: id } : null), [host, params.host, workspace, folder, id]);
@@ -330,8 +486,9 @@ export default function TaskScreen() {
   // El modo con que sigue la tarea. Con `null` el motor correría el suyo por omisión, no el que guardó la tarea.
   const savedMode = view?.session.permission_mode ?? null;
   const workspaceMode = workspaces.find((w) => w.id === workspace)?.defaultPermissionMode ?? null;
-  const latest = useRef({ view, submit });
-  latest.current = { view, submit };
+  const latest = useRef({ view, submit, respond });
+  latest.current = { view, submit, respond };
+  const decide = useCallback((permission: Permission, allow: boolean) => latest.current.respond(permission, allow), []);
   const quickReply = useCallback((prompt: string) => {
     const { view: now, submit: send } = latest.current;
     return now ? send({ shell: false, prompt, ...taskDefaults(now), effort: null, permissionMode: now.session.permission_mode ?? null, attachments: [] }) : Promise.resolve(false);
@@ -339,9 +496,97 @@ export default function TaskScreen() {
 
   const folderRow = snapshot?.folders.find((f) => f.host === params.host && f.id === folder) ?? null;
   const gitBook = useTaskGit(hostOf, [{ host: params.host, workspace, folder, id }]);
-  const git = effectiveGit(gitBook, { id, host: params.host, workspace }, snapshot?.tasks ?? []);
-  const needle = finding?.trim().toLowerCase() ?? "";
-  const visible = needle ? lines.filter((line) => ("text" in line ? line.text : line.kind === "shell" ? `${line.command}\n${line.output}` : "").toLowerCase().includes(needle)) : lines;
+  const git = effectiveGit(gitBook, { id, host: params.host, workspace, folder }, snapshot?.tasks ?? []);
+  const visible = useMemo(() => needle ? lines.filter((line) => lineMatches(line, needle)) : lines, [lines, needle]);
+  const first = webWindow.scope === webScope ? visible.findIndex((line) => line.key === webWindow.first) : -1;
+  const webStart = first < 0 ? Math.max(0, visible.length - TAIL_PAGE_SIZE) : first;
+  const listed = useMemo(() => Platform.OS === "web" ? visible.slice(webStart) : [...visible].reverse(), [visible, webStart]);
+  webSlice.current = { first: webStart, rows: visible, scope: webScope };
+  needleNow.current = needle;
+  useLayoutEffect(() => {
+    if (readingScope.current !== webScope) {
+      resetReading();
+      webReady.current = null;
+      readingScope.current = webScope;
+    }
+    const node = scroller();
+    if (!node || !view) return;
+    if (webReady.current !== webScope) {
+      // Las últimas 20 filas están medidas antes de mostrarse: no hay recorrido ni DOM invertido.
+      follow.current = OPENED;
+      toBottom(false);
+      webReady.current = webScope;
+      setWebWindow({ scope: webScope, first: visible[webStart]?.key ?? null });
+      setPaintedScope(webScope);
+    } else if (prepending.current) restoreReading(node);
+  }, [webScope, Boolean(view), webStart, visible.length]);
+  useLayoutEffect(() => {
+    const node = scroller();
+    if (!node) return;
+    // La virtualización puede remontar filas entre medidas; corregir en la mutación evita pintar ese salto.
+    const observer = new MutationObserver(() => {
+      if (prepending.current || !follow.current.following) restoreReading(node);
+    });
+    observer.observe(node, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["style"] });
+    const intent = ["wheel", "touchstart", "touchmove", "pointerdown"] as const;
+    // En el borde de arriba un gesto no produce `scroll`: es el único aviso de que se quiere seguir.
+    const interruptPrepend = () => {
+      if (prepending.current) resetReading();
+      climb.current();
+    };
+    for (const event of intent) node.addEventListener(event, interruptPrepend, { passive: true });
+    return () => {
+      observer.disconnect();
+      for (const event of intent) node.removeEventListener(event, interruptPrepend);
+      resetReading();
+    };
+  }, [webScope]);
+
+  const olderRow = older === "idle" ? null : (
+    <View style={styles.olderRow} accessibilityRole={older === "failed" ? "alert" : undefined} testID="older-state">
+      <Text style={{ color: theme.textMuted, fontSize: TEXT.ui }}>
+        {older === "loading" ? t("task.history.older_loading") : host?.power() === "on" ? t("task.history.older_failed") : t("task.history.older_offline")}
+      </Text>
+      {older === "failed" ? (
+        <Pressable onPress={() => void askOlder(true)} accessibilityRole="button" testID="older-retry">
+          <Text style={{ color: theme.primary, fontSize: TEXT.ui }}>{t("task.history.retry")}</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+  const lastRun = thread.runs.at(-1);
+  const since = running ? runClock(view?.liveSince ?? null, lastRun?.at ?? null) : null;
+  const asleepNote = asleep && host ? (host.canAct() === "outdated" ? w("web.machines.outdated_action", { name: host.label }) : w("web.machines.off_action", { name: host.label })) : null;
+  const wakingNote = waking && host ? w("shell.machines.waking", { name: host.label }) : null;
+  const owner = useRef({}).current;
+  useEffect(() => {
+    publishWork(key, owner, { runs: thread.runs, since, permissions, deciding, asleep: asleepNote, waking: wakingNote, note, questions: questions.length, decide });
+  }, [key, owner, thread.runs, since, permissions, deciding, asleepNote, wakingNote, note, questions.length, decide]);
+  useEffect(() => () => releaseWork(key, owner), [key, owner]);
+
+  const openWork = useCallback(
+    (line: WorkLine, at: number, find: string | null) => {
+      // Dos toques durante la transición serían hoja sobre hoja.
+      if (sheetOpened.current) return;
+      sheetOpened.current = true;
+      router.push({ pathname: "/task-work", params: { host: params.host, workspace, folder: params.folder, id, run: line.run, at: String(at), ...(find ? { find } : {}) } });
+    },
+    [params.host, workspace, params.folder, id],
+  );
+  const waiting = permissions.length > 0;
+  const cached = cachedNote ? <Text style={[styles.banner, { color: theme.textMuted, backgroundColor: theme.muted }]}>{cachedNote}</Text> : undefined;
+  const liveFooter = (
+          <View style={styles.footer}>
+            {liveLines.map((line) => (
+              <Row key={line.key} line={line} theme={theme} needle={needle} paused={waiting} onOpen={openWork} streaming={line.key === "live"} />
+            ))}
+            {running && !streaming ? <TurnStatus run={lastRun} since={since} waiting={waiting} /> : null}
+            {pending && waking ? <Bubble line={{ key: "pending", kind: "message", role: "user", text: pending, images: [], attachments: [] }} theme={theme} /> : null}
+            {wakingNote ? <Text style={{ color: theme.textMuted }}>{wakingNote}</Text> : null}
+            {asleepNote ? <Text style={{ color: theme.textMuted }}>{asleepNote}</Text> : null}
+            {note ? <Text style={{ color: theme.textMuted }}>{note}</Text> : null}
+          </View>
+  );
 
   return (
     <KeyboardScreen>
@@ -367,46 +612,39 @@ export default function TaskScreen() {
         host={host}
         workspace={workspace}
         machine={host?.label ?? params.host}
-        folder={folderRow ? { key: folderRow.key, name: folderRow.name } : null}
+        folder={folderRow}
         branch={git?.branch ?? null}
         provider={view?.session.provider ?? null}
         subtasks={delegated.length}
         finding={finding}
         onFind={setFinding}
         onTools={() => router.push({ pathname: "/task-tools", params: { host: params.host, workspace, folder: params.folder, id } })}
+        onFiles={() => router.push({ pathname: "/task-files", params: { host: params.host, workspace, folder: params.folder, id } })}
       />
       <View style={styles.thread}>
       <FlatList
         ref={list}
-        data={visible}
+        inverted={Platform.OS !== "web"}
+        style={Platform.OS === "web" && paintedScope !== webScope ? { opacity: 0 } : undefined}
+        data={listed}
+        initialNumToRender={TAIL_PAGE_SIZE}
         keyExtractor={(line) => line.key}
         contentContainerStyle={styles.list}
-        onContentSizeChange={stick}
-        onLayout={onLayout}
+        onContentSizeChange={onContentSize}
         onScroll={onScroll}
         scrollEventThrottle={16}
         // Lo que cambia de alto por encima de lo que se lee (una imagen que carga, pasos que se abren) no lo mueve.
-        maintainVisibleContentPosition={Platform.OS === "web" ? undefined : { minIndexForVisible: 0 }}
-        renderItem={({ item }) => <Row line={item} theme={theme} onQuickReply={item.key === lastAgent && !running && !asleep ? quickReply : undefined} />}
-        ListHeaderComponent={cachedNote ? <Text style={[styles.banner, { color: theme.textMuted, backgroundColor: theme.muted }]}>{cachedNote}</Text> : undefined}
-        ListFooterComponent={
-          <View style={styles.footer}>
-            {liveLines.map((line) => (
-              <Row key={line.key} line={line} theme={theme} streaming={line.key === "live"} />
-            ))}
-            {running && !streaming ? <Text style={{ color: theme.textMuted }}>{t("state.working")}…</Text> : null}
-            {pending && waking ? <Bubble line={{ key: "pending", kind: "message", role: "user", text: pending, images: [], attachments: [] }} theme={theme} /> : null}
-            {waking && host ? <Text style={{ color: theme.textMuted }}>{w("shell.machines.waking", { name: host.label })}</Text> : null}
-            {asleep && host ? (
-              <Text style={{ color: theme.textMuted }}>
-                {host.canAct() === "outdated" ? w("web.machines.outdated_action", { name: host.label }) : w("web.machines.off_action", { name: host.label })}
-              </Text>
-            ) : null}
-            {note ? <Text style={{ color: theme.textMuted }}>{note}</Text> : null}
-          </View>
-        }
+        maintainVisibleContentPosition={Platform.OS === "web" ? { minIndexForVisible: 0 } : { minIndexForVisible: 0, autoscrollToTopThreshold: MARGIN }}
+        renderItem={({ item }) => {
+          const row = <Row line={item} theme={theme} needle={needle} paused={waiting} onOpen={openWork} onQuickReply={item.key === lastAgent && !running && !asleep ? quickReply : undefined} />;
+          return Platform.OS === "web" ? <View nativeID={`chat-row:${encodeURIComponent(webScope)}:${item.key}`}>{row}</View> : row;
+        }}
+        onEndReached={Platform.OS === "web" || needle ? undefined : () => void askOlder()}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={Platform.OS === "web" ? liveFooter : <>{cached}{olderRow}</>}
+        ListHeaderComponent={Platform.OS === "web" ? <>{cached}{olderRow}</> : liveFooter}
       />
-      {jump.shown ? (
+      {jump.shown || recentGap ? (
         <Pressable
           onPress={toEnd}
           accessibilityRole="button"
@@ -414,7 +652,7 @@ export default function TaskScreen() {
           style={[styles.toBottom, { backgroundColor: theme.surface, borderColor: theme.border }]}
         >
           <Text style={{ color: theme.text, fontSize: TEXT.ui, fontWeight: "500" }}>
-            {newReplies > 0 ? w("chat.thread.new_messages", { count: newReplies }) : w("chat.thread.to_bottom")}
+            {recentGap ? t("task.history.latest") : newReplies > 0 ? w("chat.thread.new_messages", { count: newReplies }) : w("chat.thread.to_bottom")}
           </Text>
           <Icon name="arrow-down" size={14} color={theme.text} />
         </Pressable>
@@ -423,7 +661,7 @@ export default function TaskScreen() {
       {permissions.length || questions.length ? (
         <ScrollView style={styles.pending} contentContainerStyle={styles.footer}>
           {permissions.map((p) => (
-            <PermissionCard key={p.request_id} permission={p} theme={theme} disabled={asleep} onDecide={(allow) => decide(p, allow)} />
+            <PermissionCard key={p.request_id} permission={p} disabled={asleep} busy={deciding.has(p.request_id)} onDecide={(allow) => decide(p, allow)} />
           ))}
           {questions.map((q) => (
             <QuestionCard key={q.turn} pending={q} theme={theme} disabled={asleep} onAnswer={(c, f) => answer(q, c, f)} />
@@ -476,8 +714,8 @@ function ChatBackdrop({ background, theme }: { background: Backdrop | null; them
 const MONO = Platform.select({ ios: "Menlo", default: "monospace" });
 
 /** Una línea solo se repinta si cambia: `linesOf` le deja el mismo objeto a la que no cambió. */
-const Row = memo(function Row({ line, theme, streaming, onQuickReply }: { line: Line; theme: Theme; streaming?: boolean; onQuickReply?: (prompt: string) => Promise<boolean> }) {
-  if (line.kind === "steps") return <Steps rows={line.rows} theme={theme} />;
+const Row = memo(function Row({ line, theme, needle, paused, onOpen, streaming, onQuickReply }: { line: ChatLine; theme: Theme; needle: string; paused: boolean; onOpen: (line: WorkLine, at: number, find: string | null) => void; streaming?: boolean; onQuickReply?: (prompt: string) => Promise<boolean> }) {
+  if (line.kind === "work") return <WorkGroup line={line} needle={needle} paused={paused} onOpen={onOpen} />;
   if (line.kind === "progress")
     return (
       <View style={styles.progress}>
@@ -495,7 +733,7 @@ function Bubble({ line, theme, streaming, onQuickReply }: { line: Extract<Line, 
   const mine = line.role === "user" && !from;
   const system = line.role === "system";
   const shell = line.role === "shell";
-  if (!line.text && !line.images.length && !line.attachments.length) return null;
+  if (!line.text && !line.images.length && !line.attachments.length && !line.refs?.length) return null;
   // Como en la ventana: lo de la persona va en globo; la respuesta del agente, sin globo y a todo el ancho.
   const agent = line.role !== "user" && !system && !shell;
   const bubble = (
@@ -523,6 +761,7 @@ function Bubble({ line, theme, streaming, onQuickReply }: { line: Extract<Line, 
       ) : line.text || line.images.length ? (
         <MessageBody text={line.text} streaming={streaming} images={line.images} onQuickReply={onQuickReply} />
       ) : null}
+      {line.refs?.map((reference) => <HistoryDetail key={`${reference.turn}${reference.pointer}`} reference={reference} turnId={line.turnId} />)}
     </View>
   );
   if (!from) return bubble;
@@ -549,68 +788,6 @@ function Bubble({ line, theme, streaming, onQuickReply }: { line: Extract<Line, 
   );
 }
 
-/** «N tareas delegadas», como el panel del lanzador en el escritorio: se abre con un toque y cada una lleva a su chat. */
-
-const STEP_ICON: Record<StepRow["kind"], IconName> = { read: "file", search: "sparkles", edit: "square-pen", run: "terminal", web: "external-link", plan: "list-checks", other: "sparkles" };
-/** Las filas que se ven de entrada; las de antes se abren con un toque. */
-const SHOWN_ROWS = 4;
-
-/** La cabecera de una fila, como `resumen` del escritorio: el verbo se lee, el sujeto va en mono. */
-function rowLabel(row: StepRow): { verb: string; subject: string | null } {
-  const n = row.steps.length;
-  const target = row.steps[0].target;
-  switch (row.kind) {
-    case "read":
-      return n === 1 ? { verb: w("common.steps.read.one"), subject: target && fileName(target) } : { verb: w("common.steps.read.many", { count: n }), subject: null };
-    case "search":
-      return n === 1 ? { verb: w("common.steps.search.one"), subject: target } : { verb: w("common.steps.search.many", { count: n }), subject: null };
-    case "edit": {
-      const files = new Set(row.steps.map((s, i) => s.target ?? `#${i}`)).size;
-      return n === 1 ? { verb: w("common.steps.edit.one"), subject: target && fileName(target) } : { verb: w("common.steps.edit.many", { count: files }), subject: null };
-    }
-    case "run":
-      return { verb: w("common.steps.run"), subject: target && bareCommand(target).split("\n")[0] };
-    case "web":
-      return n === 1 ? { verb: w("common.steps.web.one"), subject: target } : { verb: w("common.steps.web.many", { count: n }), subject: null };
-    case "plan":
-      return { verb: n === 1 ? w("common.steps.plan.one") : w("common.steps.plan.many", { count: n }), subject: null };
-    default:
-      return n === 1 ? { verb: w("common.steps.other.one", { tool: row.steps[0].name }), subject: target } : { verb: w("common.steps.other.many", { count: n }), subject: null };
-  }
-}
-
-/** Lo que el agente hizo: una fila por acto, con qué y sobre qué; las más viejas, plegadas. */
-function Steps({ rows, theme }: { rows: StepRow[]; theme: Theme }) {
-  const [open, setOpen] = useState(false);
-  const hidden = open ? 0 : Math.max(0, rows.length - SHOWN_ROWS);
-  return (
-    <View style={styles.steps}>
-      {hidden ? (
-        <Pressable onPress={() => setOpen(true)} hitSlop={6} style={styles.stepRow}>
-          <Icon name="chevron-right" size={14} color={theme.textMuted} />
-          <Text style={{ color: theme.textMuted, fontSize: TEXT.ui }}>{t("task.more_steps", { count: hidden })}</Text>
-        </Pressable>
-      ) : null}
-      {rows.slice(hidden).map((row, i) => {
-        const { verb, subject } = rowLabel(row);
-        const failed = row.steps.some((s) => s.ok === false);
-        const running = row.steps.some((s) => s.running);
-        const color = failed ? theme.error : theme.textMuted;
-        return (
-          <View key={i} style={styles.stepRow}>
-            <Icon name={STEP_ICON[row.kind]} size={14} color={color} />
-            <Text numberOfLines={1} style={{ flexShrink: 1, color, fontSize: TEXT.ui }}>
-              {verb}
-              {subject ? <Text style={{ fontFamily: MONO, fontSize: TEXT.label }}>{` ${subject}`}</Text> : null}
-              {running ? "…" : ""}
-            </Text>
-          </View>
-        );
-      })}
-    </View>
-  );
-}
-
 /** Un `!` de la persona: el comando y lo que imprimió, como en la ventana. */
 function ShellRun({ command, output, exitCode, theme }: { command: string; output: string; exitCode: number | null; theme: Theme }) {
   const failed = exitCode !== null && exitCode !== 0;
@@ -626,27 +803,6 @@ function ShellRun({ command, output, exitCode, theme }: { command: string; outpu
           </Text>
         </ScrollView>
       ) : null}
-    </View>
-  );
-}
-
-function PermissionCard({ permission, theme, disabled, onDecide }: { permission: Permission; theme: Theme; disabled: boolean; onDecide: (allow: boolean) => void }) {
-  return (
-    <View style={[styles.card, { borderColor: theme.approving, backgroundColor: theme.surface }]} testID="permission">
-      <Text style={{ color: theme.text, fontWeight: "600" }}>{t("task.permission", { tool: permission.tool })}</Text>
-      {permission.target ? (
-        <Text selectable style={[styles.code, { color: theme.text, backgroundColor: theme.muted }]}>
-          {permission.target}
-        </Text>
-      ) : null}
-      <View style={styles.actions}>
-        <Pressable disabled={disabled} style={[styles.action, { backgroundColor: theme.muted, opacity: disabled ? 0.5 : 1 }]} onPress={() => onDecide(false)} testID="deny">
-          <Text style={{ color: theme.text }}>{t("task.deny")}</Text>
-        </Pressable>
-        <Pressable disabled={disabled} style={[styles.action, { backgroundColor: theme.primary, opacity: disabled ? 0.5 : 1 }]} onPress={() => onDecide(true)} testID="allow">
-          <Text style={{ color: theme.onPrimary, fontWeight: "600" }}>{t("task.allow")}</Text>
-        </Pressable>
-      </View>
     </View>
   );
 }
@@ -712,7 +868,8 @@ const styles = StyleSheet.create({
   thread: { flex: 1 },
   delegated: { marginHorizontal: 12, marginTop: 8, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, borderWidth: StyleSheet.hairlineWidth },
   delegatedRow: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 6 },
-  list: { padding: 12, gap: 8 },
+  // `flex-end` en una lista invertida es arriba: un hilo corto sigue empezando arriba.
+  list: { flexGrow: 1, justifyContent: "flex-end", padding: 12, gap: 8 },
   // Como el del escritorio: una píldora centrada por encima del borde de abajo del hilo.
   toBottom: {
     position: "absolute",
@@ -733,6 +890,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   footer: { gap: 8 },
+  olderRow: { alignItems: "center", gap: 4, paddingVertical: 6 },
   pending: { flexGrow: 0, maxHeight: "55%", paddingHorizontal: 12, paddingBottom: 8 },
   bubble: { maxWidth: "92%", borderRadius: 14, padding: 10, borderWidth: StyleSheet.hairlineWidth },
   incoming: { alignSelf: "flex-start", maxWidth: "100%", borderColor: "transparent", shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 2, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
@@ -743,12 +901,7 @@ const styles = StyleSheet.create({
   signature: { fontSize: TEXT.label, fontWeight: "600", paddingLeft: 2 },
   reply: { alignSelf: "stretch", paddingHorizontal: 4, paddingVertical: 2 },
   progress: { alignSelf: "stretch", paddingHorizontal: 4 },
-  steps: { alignSelf: "stretch", gap: 4, paddingHorizontal: 4, paddingVertical: 2 },
-  stepRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   card: { borderWidth: 1, borderRadius: 14, padding: 12, gap: 10 },
-  code: { fontFamily: MONO, fontSize: TEXT.ui, padding: 8, borderRadius: RADIUS.lg },
-  actions: { flexDirection: "row", justifyContent: "flex-end", gap: 8 },
-  action: { borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10 },
   option: { borderWidth: 1, borderRadius: 10, padding: 10 },
   input: { flex: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, fontSize: TEXT.lead, maxHeight: 140 },
 });

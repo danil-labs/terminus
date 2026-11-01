@@ -1,20 +1,21 @@
-# Terminus
+# Danil
 
-A desktop agentic development environment. Terminus runs terminal agents
+Danil is a desktop agentic development environment. It runs terminal agents
 (Claude Code, Codex and others) against your organization's repositories and
 answers in plain language — for people who need those answers but don't write
 code.
 
 **[terminus.danil.ai](https://terminus.danil.ai)**
 
-This repository holds the **Terminus window**: the desktop app (Tauri + SolidJS)
+This repository holds the **Danil window**: the desktop app (Tauri + SolidJS)
 and its release tooling. The **engine** that runs projects, tasks and agents,
 `seldon-runtime`, is a proprietary binary by Danil; it is not in this
 repository and is downloaded pinned by version and SHA-256.
 
 ## Install
 
-Download the latest installer:
+Download the latest installer. The files keep the `Terminus-*` names because
+installed copies and the updater expect them:
 
 - **[Terminus-Windows-Setup.exe](https://github.com/danil-labs/terminus/releases/latest/download/Terminus-Windows-Setup.exe)** — Windows 10 or 11, 64-bit
 - **[Terminus-macOS.dmg](https://github.com/danil-labs/terminus/releases/latest/download/Terminus-macOS.dmg)** — macOS, Apple Silicon and Intel
@@ -68,7 +69,7 @@ pnpm engine:start            # starts the engine with throwaway data and opens t
 
 `pnpm engine:start` keeps everything under `apps/desktop/.engine/lab/`: its own data
 directory, HOME and temp folder, and the engine identity `ai.danil.seldon.dev`.
-It never touches the data, keychain or accounts of an installed Terminus. Stop
+It never touches the data, keychain or accounts of an installed Danil. Stop
 the engine with `pnpm engine:stop` (it also stops by itself five minutes after
 the last window closes). `node scripts/engine.mjs help` lists every command.
 
@@ -143,10 +144,11 @@ engine release: [TERMS.md](https://github.com/danil-labs/terminus/releases/downl
 [third-party notices by platform](https://github.com/danil-labs/terminus/releases/tag/seldon-runtime-v0.2.73-4b8714c)
 for the version pinned in `apps/desktop/seldon-runtime.lock`.
 
-"Terminus", "Danil" and their logos are trademarks of Danil;
-the license does not grant permission to use them. Forks must use their own
+"Danil" and its logo are trademarks of Danil. Some installers and installed
+identifiers still carry the Terminus name, also a trademark of Danil; the
+license does not grant permission to use either. Forks must use their own
 name, icons and update endpoint.
 
 ---
 
-Terminus is made by [Danil](https://danil.ai).
+Made by [Danil](https://danil.ai).

@@ -1,3 +1,4 @@
+import { SignalDot } from "../../ui/SignalDot";
 import { For, Show, createSignal } from "solid-js";
 import Check from "lucide-solid/icons/check";
 import ChevronDown from "lucide-solid/icons/chevron-down";
@@ -38,9 +39,6 @@ export function MachinePicker(props: { workspace: string | null; project?: Proje
     setRunOn(props.workspace, m.active ? null : m.id);
   }
 
-  const punto = (m: Machine) =>
-    `inline-block size-1.5 shrink-0 rounded-full ${m.on ? "bg-success" : "bg-neutral-300"}`;
-
   const razon = (m: Machine) => {
     const falta = props.workspace ? unavailable(m, props.project) : null;
     if (falta === "workspace") return { label: t("shell.machines.unlinked"), hint: t("shell.machines.unlinked_hint", { name: nombre(m) }) };
@@ -58,7 +56,7 @@ export function MachinePicker(props: { workspace: string | null; project?: Proje
           <MachineIcon wakes={elegida() ? wakesOf(elegida() as Machine) : false} size={12} />
           <span class="truncate">{elegida() ? nombre(elegida() as Machine) : t("shell.machines.label")}</span>
           <Show when={elegida()}>
-            <span class={punto(elegida() as Machine)} aria-hidden="true" />
+            <SignalDot tone={(elegida() as Machine).on ? "success" : "off"} />
           </Show>
           <ChevronDown size={11} aria-hidden="true" />
         </PopoverTrigger>
@@ -75,7 +73,7 @@ export function MachinePicker(props: { workspace: string | null; project?: Proje
                   onClick={() => elegir(m)}
                 >
                   <MachineIcon wakes={wakesOf(m)} size={12} />
-                  <span class={punto(m)} aria-hidden="true" />
+                  <SignalDot tone={m.on ? "success" : "off"} />
                   <span class="flex-1 truncate">{nombre(m)}</span>
                   <span class="text-2xs" data-machine-reason={razon(m) ? "" : undefined}>
                     {razon(m)?.label ?? (m.on ? t("shell.machines.on") : t("shell.machines.off"))}

@@ -1,4 +1,5 @@
 import { For, Show, Suspense, createSignal, lazy, onCleanup, onMount } from "solid-js";
+import { SignalDot } from "../../ui/SignalDot";
 import { listen } from "../../lib/serviceEvents";
 import { invoke } from "../../lib/invoke.ts";
 import { Button } from "../../ui/Button";
@@ -879,7 +880,7 @@ export default function Herramientas(props: { solo?: string | string[] }) {
                     </span>
                     <Show when={p.managed}>
                       <Badge forma="dato" class="shrink-0">
-                        {t("settings.tools.radiant")}
+                        {t("settings.tools.harness")}
                       </Badge>
                     </Show>
                     <Button
@@ -1011,10 +1012,7 @@ export function ConexionesMenu(props: {
             <div class="flex min-h-8 items-center gap-2 px-2 py-1 text-ui" title={p.detalle || undefined}>
               {contenido()}
               {/* Ámbar si está muerto, verde si está puesto y sano. */}
-              <span
-                class={cn("size-1.5 shrink-0 rounded-full", p.muerto ? "bg-warning-strong" : "bg-success-strong")}
-                title={p.muerto ? t("settings.tools.dead_now") : undefined}
-              />
+              <SignalDot tone={p.muerto ? "warning" : "success"} title={p.muerto ? t("settings.tools.dead_now") : undefined} />
             </div>
           }
         >
@@ -1034,7 +1032,7 @@ export function ConexionesMenu(props: {
             {contenido()}
             <Show
               when={estado() === "waiting"}
-              fallback={<span class="size-1.5 shrink-0 rounded-full bg-error-strong" />}
+              fallback={<SignalDot tone="error" />}
             >
               <span class="shrink-0 text-caption text-neutral-500">
                 {mcpLoginUrl() ? t("settings.tools.open_login") : t("settings.tools.opening")}
@@ -1070,7 +1068,7 @@ export function ConexionesMenu(props: {
             <McpMark size={props.triggerClass ? 16 : 14} />
             {/* Sin contador: solo el punto, arriba, cuando alguno pide sesión. */}
             <Show when={pendientes().size > 0}>
-              <span class="absolute top-0.5 right-0.5 size-1.5 rounded-full bg-error-strong" />
+              <SignalDot tone="error" class="absolute top-0.5 right-0.5" />
             </Show>
           </Button>
         )}

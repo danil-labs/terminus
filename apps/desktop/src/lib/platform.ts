@@ -81,6 +81,8 @@ export type Capabilities = {
     pin: (keys: string[]) => Promise<void>;
   };
   adminPage?: { href: (workspace: string | null) => string; allowed: () => Promise<boolean> };
+  /** Lo de una cuenta personal en Configuración › Cuenta. `isPersonal` decide si se ofrece; sin `usage` o `plan`, esas pestañas no salen. */
+  personalAccount?: { isPersonal: () => Promise<boolean>; usage?: () => JSX.Element; plan?: () => JSX.Element };
   /** El logo y el fondo de los workspaces leídos y cambiados en la cuenta con la sesión (la web). */
   accountAssets?: WorkspaceAssetsSource;
   /** Botón extra al lado de la búsqueda de la barra lateral (en la web, volver a Danil Agents). */

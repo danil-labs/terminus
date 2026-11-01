@@ -45,7 +45,7 @@ import { installIpc } from "./ipc";
 import { webAccountProfile } from "./account";
 import { webAccountEmails } from "./account-emails";
 import { authLocation } from "./auth/return";
-import { adminPageCapability } from "./admin/capability";
+import { adminPageCapability, personalAccountCapability } from "./admin/capability";
 import { agentsSession } from "./attention/workspace-sources";
 import { webGithubAccount } from "./github-account";
 import { type Account, type Listing, SLOT_PREFIX, loadAccounts, ownerOf, pickAccount, readListings, rememberLast, removeExtra, savedListings } from "./accounts";
@@ -55,6 +55,7 @@ import type { WatchedSession } from "./session";
 import { webWorkspaceAssets } from "./workspace-assets";
 import type { MachineRow, MachineStatus } from "./SyncNote";
 import { type BrowserHost, createWebTransport } from "./transport";
+import { announceStaleTab, updateNoticeReady } from "./update-state";
 
 declare const __TERMINUS_VERSION__: string;
 /** Set at build time in `vite.config.ts`; all public values. */
@@ -77,11 +78,17 @@ const UNLINKED_AGAIN = 60_000;
 /**
  * A tab opened before a deploy asks for chunks the new build no longer has, and
  * the Worker answers them with the page (`not_found_handling`): the lazy screen
- * stays blank. Reload into the new build, once per window of time so a chunk
- * that is really broken does not loop.
+ * stays blank. Once the app is on screen the person decides (`UpdateNotice`);
+ * before that there is nothing to lose: reload into the new build, once per
+ * window of time so a chunk that is really broken does not loop.
  */
 const RELOADED_AT = "terminus.web.reloaded-at";
 window.addEventListener("vite:preloadError", (event) => {
+  if (updateNoticeReady()) {
+    event.preventDefault();
+    announceStaleTab();
+    return;
+  }
   if (Date.now() - Number(sessionStorage.getItem(RELOADED_AT) ?? 0) < 30_000) return;
   sessionStorage.setItem(RELOADED_AT, String(Date.now()));
   event.preventDefault();
@@ -257,6 +264,7 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
     accountAssets: webWorkspaceAssets(base.endpoint, base.getToken, base.onUnauthorized),
     accountAuditLog: import.meta.env.TERMINUS_ALPHA && base.supabaseUrl && base.supabaseKey ? webAuditLog(base.supabaseUrl, base.supabaseKey, base.getToken, base.onUnauthorized) : undefined,
     adminPage: import.meta.env.TERMINUS_ALPHA ? adminPageCapability({ getToken: async () => await base.getToken(), unauthorized: async () => base.refresh ? await base.refresh() : false }) : undefined,
+    personalAccount: import.meta.env.TERMINUS_ALPHA ? personalAccountCapability({ getToken: async () => await base.getToken(), unauthorized: async () => base.refresh ? await base.refresh() : false }) : undefined,
     accountMemory: { endpoint: base.endpoint, getToken: token },
     accountCredentials: { endpoint: base.endpoint, getToken: token },
     machineName: (id) => fleet.name(id),
@@ -320,10 +328,15 @@ function mountApp(computers: Computer[], base: Base, before?: (id: string) => ()
   installIpc(window, createWebTransport(active, __TERMINUS_VERSION__, browser, github));
   window.addEventListener("pagehide", () => fleet.flush());
   void import("./phrases").then(() => import("../app/main"));
-  void Promise.all([import("solid-js/web"), import("./SyncNote"), import("./phrases")]).then(([{ render }, { SyncNote }]) => {
+  void Promise.all([import("solid-js/web"), import("./SyncNote"), import("./UpdateNotice"), import("./phrases")]).then(([{ render }, { SyncNote }, { UpdateNotice }]) => {
     const layer = document.createElement("div");
     document.body.append(layer);
-    render(() => <SyncNote machines={machines} />, layer);
+    render(() => (
+      <>
+        <SyncNote machines={machines} />
+        <UpdateNotice />
+      </>
+    ), layer);
   });
   return (fresh) => {
     rows = new Map(fresh.map((c) => [c.computer_id, c]));

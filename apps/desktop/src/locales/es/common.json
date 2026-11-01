@@ -1,4 +1,5 @@
 {
+  "common.brand_name": "Danil",
   "common.failure.generic": "No se pudo completar la acción. Revisa si se completó antes de reintentar; si persiste, comparte el detalle con soporte.",
   "common.failure.detail": "Detalle para reportarlo",
   "common.install.no_space": "Necesitas {needed} libres y tienes {free}. Libera espacio y vuelve a intentar.",

@@ -105,6 +105,10 @@ export default function RootLayout() {
             name="preview"
             options={Platform.OS === "web" ? { presentation: "transparentModal", headerShown: false, contentStyle: { backgroundColor: "transparent" }, animation: "none" } : { presentation: "formSheet", sheetAllowedDetents: "fitToContents", sheetGrabberVisible: true, headerShown: false, sheetCornerRadius: 18 }}
           />
+          <Stack.Screen
+            name="task-work"
+            options={Platform.OS === "web" ? { presentation: "transparentModal", headerShown: false, contentStyle: { backgroundColor: "transparent" }, animation: "none" } : { presentation: "formSheet", sheetAllowedDetents: [0.5, 0.95], sheetGrabberVisible: true, title: w("chat.work.title") }}
+          />
           {/* Listas nativas: cada pantalla apilada pinta su cabecera (`NavBar`), igual en las tres plataformas. */}
           <Stack.Screen name="personalize" options={{ headerShown: false }} />
           <Stack.Screen name="search" options={{ headerShown: false, animation: Platform.OS === "ios" ? "fade" : undefined }} />
@@ -113,6 +117,7 @@ export default function RootLayout() {
           <Stack.Screen name="inbox" options={{ headerShown: false }} />
           <Stack.Screen name="inbox-thread" options={{ headerShown: false }} />
           <Stack.Screen name="task-tools" options={{ headerShown: false }} />
+          <Stack.Screen name="task-files" options={{ headerShown: false }} />
           <Stack.Screen name="activity" options={{ title: t("activity.title") }} />
           <Stack.Screen name="accounts" options={{ title: w("settings.nav.ai_providers") }} />
           <Stack.Screen name="signin" options={{ headerShown: false }} />

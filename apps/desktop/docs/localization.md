@@ -21,4 +21,4 @@ puente. Rust entrega frases propias mediante `Frase`; el tipo `util::Prosa`
 conserva texto crudo durante la migración y `sin_migrar` identifica sus pendientes.
 
 La lengua pertenece al workspace. El motor de traducción vive en
-`src/lib/i18n.ts`; el instalador de paquetes es parte del motor de Terminus.
+`src/lib/i18n.ts`; el instalador de paquetes es parte del motor de Danil.

@@ -1,5 +1,5 @@
-// Entrada de alfa-app.danil.ai: sirve Terminus web (TERMINUS_WEB) en la raíz, la entrada con
-// WorkOS (session.mjs) y, en /alpha-api, una lista cerrada del BFF de appv2 (APPV2_BFF).
+// Entrada de alfa-app.danil.ai (o del host de ENTRY_HOST, como la web de staging): sirve Terminus
+// web (TERMINUS_WEB) en la raíz, la entrada con WorkOS (session.mjs) y, en /alpha-api, una lista cerrada del BFF de appv2 (APPV2_BFF).
 // Lecturas GET: /auth/profile, /auth/emails, /auth/account/support-access, /api/channels, el
 // inbox y los agentes y conexiones de atención de Configuración, con query acotada.
 // Las escrituras usan Origin exacto, Bearer personal y cuerpos JSON reconstruidos y acotados.
@@ -11,6 +11,7 @@ import { broadcastRead, broadcastWrite } from "./broadcasts.mjs";
 import { handleAuth, hasSignedOutMarker, sessionConfig } from "./session.mjs";
 
 const HOST = "alfa-app.danil.ai";
+// Pasada la puerta de `fetch`, `url.origin` es `https://<host>`: las escrituras comparan contra él.
 // La web vive en la raíz del dominio (build con `TERMINUS_WEB_BASE=/`).
 const PREFIX = "/alpha-api";
 const ENTRY_PATHS = ["/auth", "/sign-in"];
@@ -58,8 +59,8 @@ function bearerAccount(authorization) {
 }
 
 /** Toda escritura de marketing lo pasa: las reglas de la base no cubren cada ruta ni cada fallo. */
-async function requireCampaignsManage(env, headers, account) {
-  const permissionsUrl = new URL(`https://${HOST}/auth/account/my-permissions?account_id=${account}`);
+async function requireCampaignsManage(env, url, headers, account) {
+  const permissionsUrl = new URL(`/auth/account/my-permissions?account_id=${account}`, url.origin);
   const response = await forward(env, new Request(permissionsUrl, { headers, redirect: "manual" }));
   if (!response.ok) return json("permissions_unavailable", response.status === 401 ? 401 : 403);
   let permissions;
@@ -72,7 +73,7 @@ async function marketingProxy(request, env, url, path, route) {
   const write = request.method === "POST";
   if (!write && request.method !== "GET") return json("method_not_allowed", 405);
   if ((!write && !["campaigns", "templates", "contact-list", "channels", "stats"].includes(route)) || (write && !["campaigns", "pause", "cancel", "contacts", "start", "resume", "schedule"].includes(route))) return json("method_not_allowed", 405);
-  if (write && request.headers.get("Origin") !== `https://${HOST}`) return json("forbidden_origin", 403);
+  if (write && request.headers.get("Origin") !== url.origin) return json("forbidden_origin", 403);
   if (write && (request.headers.get("X-Danil-Actor") ?? "").trim().toLowerCase() === "ai") return json("identity_requires_person", 403);
   const authorization = request.headers.get("Authorization");
   if (!authorization || !/^Bearer \S+$/i.test(authorization)) return json("unauthorized", 401);
@@ -87,7 +88,7 @@ async function marketingProxy(request, env, url, path, route) {
   if (active !== account) return json("account_mismatch", 403);
   if (write && ["contacts", "start", "resume", "schedule"].includes(route)) return json("campaign_delivery_unavailable", 409);
   if (!env.APPV2_BFF) return json("bff_unavailable", 503);
-  const headers = new Headers({ Authorization: authorization, Accept: "application/json", Origin: `https://${HOST}` });
+  const headers = new Headers({ Authorization: authorization, Accept: "application/json", Origin: url.origin });
   let body;
   if (write) {
     if (route === "campaigns") {
@@ -104,7 +105,7 @@ async function marketingProxy(request, env, url, path, route) {
       const bytes = await boundedBody(request, 0);
       if (!bytes) return json("invalid_body", 400);
     }
-    const denied = await requireCampaignsManage(env, headers, account);
+    const denied = await requireCampaignsManage(env, url, headers, account);
     if (denied) return denied;
   }
   url.pathname = path;
@@ -113,7 +114,7 @@ async function marketingProxy(request, env, url, path, route) {
 }
 
 async function replyWrite(request, env, url) {
-  if (request.headers.get("Origin") !== `https://${HOST}`) return json("forbidden_origin", 403);
+  if (request.headers.get("Origin") !== url.origin) return json("forbidden_origin", 403);
   if ((request.headers.get("X-Danil-Actor") ?? "").trim().toLowerCase() === "ai") return json("identity_requires_person", 403);
   const authorization = request.headers.get("Authorization");
   if (!authorization || !/^Bearer \S+$/i.test(authorization)) return json("unauthorized", 401);
@@ -130,7 +131,7 @@ async function replyWrite(request, env, url) {
       typeof body.client_message_id !== "string" || !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(body.client_message_id)) return json("invalid_body", 400);
   if (!env.APPV2_BFF) return json("bff_unavailable", 503);
   url.pathname = "/api/messaging/reply";
-  const headers = { Authorization: authorization, Accept: "application/json", "Content-Type": "application/json", Origin: `https://${HOST}` };
+  const headers = { Authorization: authorization, Accept: "application/json", "Content-Type": "application/json", Origin: url.origin };
   return forward(env, new Request(url, { method: "POST", headers, body: JSON.stringify({ conversation_id: body.conversation_id, text: body.text.trim(), client_message_id: body.client_message_id }), redirect: "manual" }));
 }
 
@@ -245,7 +246,7 @@ async function enterWrite(request, env, url) {
 }
 
 async function emailWrite(request, env, url, path) {
-  if (request.headers.get("Origin") !== `https://${HOST}`) return json("forbidden_origin", 403);
+  if (request.headers.get("Origin") !== url.origin) return json("forbidden_origin", 403);
   // Quitar la marca convertiría en persona a un turno de IA: se rechaza aquí, como en el BFF.
   if ((request.headers.get("X-Danil-Actor") ?? "").trim().toLowerCase() === "ai") return json("identity_requires_person", 403);
   const authorization = request.headers.get("Authorization");
@@ -254,7 +255,7 @@ async function emailWrite(request, env, url, path) {
   const body = await emailBody(request, EMAIL_WRITES[path]);
   if (!body) return json("invalid_body", 400);
   if (!env.APPV2_BFF) return json("bff_unavailable", 503);
-  const headers = new Headers({ Authorization: authorization, Accept: "application/json", "Content-Type": "application/json", Origin: `https://${HOST}` });
+  const headers = new Headers({ Authorization: authorization, Accept: "application/json", "Content-Type": "application/json", Origin: url.origin });
   const referer = request.headers.get("Referer");
   if (referer !== null) headers.set("Referer", referer);
   url.pathname = path;
@@ -264,7 +265,7 @@ async function emailWrite(request, env, url, path) {
 
 /** Una escritura de Difusiones: las mismas barreras que los correos, más el interruptor. */
 async function writeBroadcast(request, env, url, path, route) {
-  if (request.headers.get("Origin") !== `https://${HOST}`) return json("forbidden_origin", 403);
+  if (request.headers.get("Origin") !== url.origin) return json("forbidden_origin", 403);
   if ((request.headers.get("X-Danil-Actor") ?? "").trim().toLowerCase() === "ai") return json("identity_requires_person", 403);
   const authorization = request.headers.get("Authorization");
   if (!authorization || !/^Bearer \S+$/i.test(authorization)) return json("unauthorized", 401);
@@ -285,9 +286,9 @@ async function writeBroadcast(request, env, url, path, route) {
   const body = route.parse === null ? undefined : await route.parse(bytes, contentType, { env, account });
   if (body === null) return json("invalid_body", 400);
   if (!env.APPV2_BFF) return json("bff_unavailable", 503);
-  const headers = new Headers({ Authorization: authorization, Accept: "application/json", Origin: `https://${HOST}` });
+  const headers = new Headers({ Authorization: authorization, Accept: "application/json", Origin: url.origin });
   if (!route.anyMember) {
-    const denied = await requireCampaignsManage(env, headers, account);
+    const denied = await requireCampaignsManage(env, url, headers, account);
     if (denied) return denied;
   }
   if (route.parse !== null && !route.multipart) headers.set("Content-Type", "application/json");
@@ -300,7 +301,7 @@ async function writeBroadcast(request, env, url, path, route) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    if (url.hostname !== HOST || url.protocol !== "https:") return json("not_found", 404);
+    if (url.hostname !== (env.ENTRY_HOST?.trim() || HOST) || url.protocol !== "https:") return json("not_found", 404);
     if (url.pathname === LEGACY || url.pathname.startsWith(`${LEGACY}/`)) {
       if (request.method !== "GET" && request.method !== "HEAD") return json("method_not_allowed", 405);
       url.pathname = url.pathname.slice(LEGACY.length) || "/";

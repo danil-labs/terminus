@@ -761,3 +761,9 @@ test("the new phone UI commands: archived_tasks and keep_awake_status are reads;
   for (const read of ["archived_tasks", "keep_awake_status", "list_ports", "list_spaces"]) assert.equal(classOf(read), "read", read);
   for (const action of ["create_space", "rename_space", "space_delete_preview", "delete_space", "set_keep_awake"]) assert.equal(classOf(action), "action", action);
 });
+
+test("delegated rows keep the panel ids, handoff parent included", () => {
+  const { fleet } = setup({ cmp_vm: {} });
+  const [encoded] = fleet.encode("cmp_vm", [{ ...row("b"), handoff_parent: "a" }], "list_delegated_sessions") as Row[];
+  assert.deepEqual([encoded.id, encoded.handoff_parent], ["cmp_vm~b", "cmp_vm~a"]);
+});
