@@ -15,6 +15,7 @@ import { t } from "../../lib/i18n";
 import { invoke } from "../../lib/invoke.ts";
 import { copyText } from "../../lib/clipboard";
 import { cn } from "../../lib/utils";
+import { HEADER_HEIGHT } from "../../lib/window";
 import type { ArbolEnTarea } from "../../lib/model";
 import type { TaskFiles } from "../../lib/taskFiles";
 import { machineOf } from "../machines/store";
@@ -53,7 +54,7 @@ export default function TaskFilesCard(props: {
   const hasTabs = () => panel().tabs.length > 0;
   const expanded = () => panel().expanded || (props.expandedOnly && hasTabs());
   // Narrow, the card shows the tree or the viewer, never both side by side.
-  let root: HTMLElement | undefined;
+  let root: HTMLDivElement | undefined;
   const [narrow, setNarrow] = createSignal(false);
   // What a narrow card shows; the wide card's tree preference stays untouched.
   const [narrowView, setNarrowView] = createSignal<"viewer" | "tree">("viewer");
@@ -129,7 +130,7 @@ export default function TaskFilesCard(props: {
   };
   const tool = "size-6 shrink-0 p-0 text-neutral-500";
   const tools = () => (
-    <div class="ml-auto flex shrink-0 items-center gap-1.5 pr-1.5">
+    <div class="relative z-10 ml-auto flex shrink-0 items-center self-center gap-1.5 pr-1.5">
       <Show when={hasTabs()}>
         <Button variant={treePressed() ? "secondary" : "ghost"} size="iconCompact" class={tool}
           title={t("code.panel.tree")} aria-label={t("code.panel.tree")} aria-pressed={treePressed()}
@@ -178,18 +179,19 @@ export default function TaskFilesCard(props: {
   );
 
   return (
-    <section ref={root} class="@container relative flex h-full min-w-0 flex-1 overflow-hidden rounded-lg border border-border bg-surface shadow-md" data-task-files>
+    <div ref={root} class="relative flex h-full min-h-0 min-w-0 flex-1 overflow-hidden">
       <Show when={hasTabs()}>
         <div class="flex min-w-0 flex-1 flex-col" classList={{ hidden: !showViewer() }}>
-          <div class="flex h-9 shrink-0 items-center gap-1 border-b border-border pl-1.5">
-            <div class="flex min-w-0 gap-0.5 overflow-x-auto [scrollbar-width:none]" role="tablist">
+          <div class={cn("relative flex shrink-0 items-end bg-surface-muted", HEADER_HEIGHT)}>
+            <span aria-hidden="true" class="pointer-events-none absolute inset-x-0 bottom-0 z-0 h-px bg-border" />
+            <div class="flex h-full min-w-0 items-end gap-0.5 overflow-x-auto overflow-y-hidden px-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="tablist">
               <For each={panel().tabs}>{(tab) => {
                 const active = () => panel().active === tab.id;
                 const dirty = () => panel().dirty.includes(tab.id);
                 return (
                   <div role="tab" aria-selected={active()} title={tab.pinned ? tab.path : t("code.panel.tab.preview")}
-                    class={cn("group flex h-7 max-w-[200px] shrink-0 cursor-default items-center gap-1.5 rounded-sm pr-1 pl-2 font-mono text-label select-none",
-                      active() ? "bg-surface-muted font-semibold text-neutral-950" : "font-medium text-neutral-500 hover:bg-neutral-950/5 hover:text-neutral-950")}
+                    class={cn("group relative z-10 flex h-full max-w-[200px] shrink-0 cursor-default items-center gap-1.5 pr-1 pl-2 font-mono text-label select-none",
+                      active() ? "tab-join font-semibold text-neutral-950" : "font-medium text-neutral-500 hover:bg-neutral-950/5 hover:text-neutral-950")}
                     onClick={() => props.files.activate(key(), tab.id)}
                     onDblClick={() => props.files.pin(key(), tab.id)}
                     onAuxClick={() => props.files.close(key(), [tab.id])}>
@@ -239,11 +241,12 @@ export default function TaskFilesCard(props: {
 
         <aside class="flex min-h-0 flex-col"
           classList={{ hidden: !showTree(), "w-56 shrink-0 border-l border-border": showViewer(), "@4xl:w-64": showViewer(), "flex-1": !showViewer() }}>
-          <div class="flex h-9 shrink-0 items-center gap-0.5 border-b border-border pl-1.5">
+          <div class={cn("relative flex shrink-0 items-end gap-0.5 bg-surface-muted pl-1.5", HEADER_HEIGHT)}>
+            <span aria-hidden="true" class="pointer-events-none absolute inset-x-0 bottom-0 z-0 h-px bg-border" />
             <For each={(props.preview ? ["files"] : ["files", "changes"]) as ("files" | "changes")[]}>{(side) => (
               <button type="button" onClick={() => props.files.setSide(key(), side)}
-                class={cn("flex h-7 items-center gap-1.5 rounded-sm px-2 text-xs",
-                  panel().side === side ? "bg-surface-muted font-semibold text-neutral-950" : "font-medium text-neutral-500 hover:bg-neutral-950/5 hover:text-neutral-950")}>
+                class={cn("relative z-10 flex h-full items-center gap-1.5 px-2 text-xs",
+                  panel().side === side ? "tab-join font-semibold text-neutral-950" : "font-medium text-neutral-500 hover:bg-neutral-950/5 hover:text-neutral-950")}>
                 {side === "files" ? t("code.panel.side.files") : t("code.panel.side.changes")}
               </button>
             )}</For>
@@ -269,7 +272,7 @@ export default function TaskFilesCard(props: {
             </Suspense>
           </Show>
         </aside>
-    </section>
+    </div>
   );
 }
 

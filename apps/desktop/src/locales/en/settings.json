@@ -572,7 +572,7 @@
   "settings.agents.move_cancel": "Cancel",
   "settings.agents.move_confirm": "Move to catalog and add",
   "settings.agents.move_working": "Moving…",
-  "settings.tools.radiant": "Danil Teams",
+  "settings.tools.harness": "Danil Teams",
   "settings.integrations.computer_use.name": "Computer use",
   "settings.integrations.computer_use.description": "Lets the agent see the screen and use the apps on your computer with mouse and keyboard, with any model. Powered by Cua Driver.",
   "settings.integrations.computer_use.scope": "Installed once for Danil. Once enabled, the agents of this workspace get it as an MCP server on their next turns. A task that runs without approvals can use any app open in your session; the others can only see the screen.",

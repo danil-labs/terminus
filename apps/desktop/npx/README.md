@@ -1,6 +1,6 @@
 # @danil-labs/terminus
 
-Instala **Danil** (la app de escritorio, distribuida como Terminus) con un solo comando:
+Instala **Danil** (la app de escritorio) con un solo comando:
 
 ```bash
 npx @danil-labs/terminus

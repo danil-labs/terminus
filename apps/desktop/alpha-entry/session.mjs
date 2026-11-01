@@ -7,7 +7,6 @@
  * stay those of app.danil.ai. Any failure denies; there is no fallback.
  */
 const WORKOS_API = "https://api.workos.com";
-const HOST_ORIGIN = "https://alfa-app.danil.ai";
 const FLOW_COOKIE = "__Host-danil_alfa_flow";
 const SESSION_COOKIE = "__Host-danil_alfa";
 const SIGNED_OUT_COOKIE = "__Host-danil_alfa_signed_out";
@@ -94,12 +93,12 @@ const setCookie = (name, value, maxAge) => `${name}=${value}; Path=/; Max-Age=${
 export const hasSignedOutMarker = request => readCookie(request, SIGNED_OUT_COOKIE) === "1";
 
 /** A return path on this site, outside the sign-in itself and the data proxy; anything else goes to the root. */
-export function safeNext(value) {
+export function safeNext(value, origin = "https://alfa-app.danil.ai") {
   if (!value || !value.startsWith("/") || value.startsWith("//") || /[\\\x00-\x1f]/.test(value)) return "/";
   try {
-    const url = new URL(value, HOST_ORIGIN);
+    const url = new URL(value, origin);
     const path = decodeURIComponent(url.pathname);
-    if (url.origin !== HOST_ORIGIN || /^\/(auth|sign-in|alpha-api)(\/|$)/.test(path) || /[\\\x00-\x1f]/.test(path)) return "/";
+    if (url.origin !== origin || /^\/(auth|sign-in|alpha-api)(\/|$)/.test(path) || /[\\\x00-\x1f]/.test(path)) return "/";
     return url.pathname + url.search + url.hash;
   } catch {
     return "/";
@@ -238,7 +237,7 @@ async function start(config, url) {
   const state = randomToken();
   const verifier = randomToken();
   const challenge = b64url(await crypto.subtle.digest("SHA-256", encoder.encode(verifier)));
-  const flow = await seal(config.env, FLOW_COOKIE, { state, verifier, next: safeNext(url.searchParams.get("next")), exp: now() + FLOW_SECONDS });
+  const flow = await seal(config.env, FLOW_COOKIE, { state, verifier, next: safeNext(url.searchParams.get("next"), url.origin), exp: now() + FLOW_SECONDS });
   const authorize = new URL(`${WORKOS_API}/user_management/authorize`);
   for (const [key, value] of Object.entries({
     client_id: config.clientId, redirect_uri: `${url.origin}/auth/workos/callback`, response_type: "code",
@@ -317,8 +316,8 @@ async function issue(config, request) {
   }
 }
 
-async function logout(config, request) {
-  let location = new URL("/auth", HOST_ORIGIN).href;
+async function logout(config, request, url) {
+  let location = new URL("/auth", url.origin).href;
   try {
     const session = await open(config.env, SESSION_COOKIE, readCookie(request, SESSION_COOKIE));
     if (ID_RE.test(session.sid ?? "")) {
@@ -351,5 +350,5 @@ export async function handleAuth(request, env, url) {
   if (route === "start") return start(config, url);
   if (route === "callback") return callback(config, request, url);
   if (route === "session") return issue(config, request);
-  return logout(config, request);
+  return logout(config, request, url);
 }

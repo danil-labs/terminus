@@ -880,7 +880,7 @@ export default function Herramientas(props: { solo?: string | string[] }) {
                     </span>
                     <Show when={p.managed}>
                       <Badge forma="dato" class="shrink-0">
-                        {t("settings.tools.radiant")}
+                        {t("settings.tools.harness")}
                       </Badge>
                     </Show>
                     <Button

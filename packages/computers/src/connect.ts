@@ -11,7 +11,7 @@
 import type { Answer, Computer } from "./api.ts";
 
 /** Donde Danil publica el instalador. */
-export const INSTALL_URL = "https://app.danil.ai/terminus/install.sh";
+export const INSTALL_URL = "https://alfa-app.danil.ai/install.sh";
 
 /** Lo que se espera a que la máquina nueva aparezca: el código vence a los 10 min. */
 export const APPEAR_WAIT = 11 * 60_000;

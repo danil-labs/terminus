@@ -1,4 +1,5 @@
 {
+  "usage.heading": "Consumo",
   "usage.bar.aria": "Lo que te queda en las cuentas activas",
   "usage.refresh": "Volver a preguntar cuánto te queda",
   "usage.tool.title": "{agent}: te queda {left}% de la ventana más justa",

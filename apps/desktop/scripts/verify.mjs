@@ -464,6 +464,12 @@ const steps = [
     root,
   ],
   [
+    "Search cards keep the match text and skip a day the message does not have",
+    process.execPath,
+    ["--test", "--experimental-strip-types", join(root, "tests/unit/search-cards.test.ts")],
+    root,
+  ],
+  [
     "The tab shortcut reads the physical key and does not clash with another",
     process.execPath,
     ["--test", "--experimental-strip-types", join(root, "tests/unit/tab-shortcuts.test.ts")],
@@ -653,6 +659,7 @@ const steps = [
   ["An approval invalidates its identity without touching other slots", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/web-session.test.ts")], root],
   ["The alpha WorkOS session asks for a short token, renews it and ends without a fallback", process.execPath, ["--test", "--test-force-exit", "--experimental-strip-types", join(root, "tests/unit/web-workos-session.test.ts")], root],
   ["Broadcasts: the full panel, the Appv2 rules and what stays behind the switch", process.execPath, ["--test", "--experimental-strip-types", join(root, "../../packages/attention/test/broadcast-panel.test.ts")], root],
+  ["app.danil.ai/terminus answers 308 to the same alfa path and never leaves that host", process.execPath, ["--test", join(root, "web-redirect/worker.test.mjs")], root],
   ["The alpha entry bounds explicit reads and writes, and leaves WorkOS sign-in in the Worker", process.execPath, ["--test", join(root, "alpha-entry/worker.test.mjs")], root],
   ["A workspace without a safe account shows data from none", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/workspace-account.test.ts")]],
   ["The attention reader does not extract variable values or API connection paths", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/attention-service.test.ts")]],

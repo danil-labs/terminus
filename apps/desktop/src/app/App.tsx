@@ -44,7 +44,7 @@ import {
   modoRecordado,
   recordarModo,
 } from "../features/chat/modes";
-import DelegatedActivity, { DelegatedLaunch, DelegatedNone, delegatedAttention, delegatedDescendants, delegatedFamilies, type DelegatedListProps } from "../features/chat/DelegatedTasks";
+import { DelegatedLaunch, DelegatedNone, DelegatedToolbar, delegatedAttention, delegatedDescendants, delegatedFamilies, type DelegatedListProps, type DelegatedPanelModel } from "../features/chat/DelegatedTasks";
 import PreviousAgentChat from "../features/chat/PreviousAgentChat";
 import type { AlmacenDePreguntas, PreguntasAMedias, Respuesta, RespuestaEnviada } from "../features/chat/Questions";
 import { contestaALaTerminal, despachable, esDeLaTerminal, guardable, inyectable, type RazonDeRetencion, retencionAlCargar, siguienteLote, sueltaElBorrador } from "../features/chat/queue";
@@ -52,7 +52,7 @@ import type { ComandoEnVivo } from "../features/chat/ShellCard";
 import { comandoDeTerminal } from "../features/chat/terminalIndent";
 import type { AlMargen } from "../features/chat/SideQuestion";
 import { comandoEscrito } from "../features/chat/slashOutput";
-import { ThreadSearch, type ThreadSearchTarget } from "../features/chat/ThreadSearch";
+import { ThreadSearch, type SearchSurface, type ThreadSearchTarget } from "../features/chat/ThreadSearch";
 import TranscriptSource from "../features/chat/TranscriptSource";
 import type { Lectura } from "../features/chat/threadWindow";
 import { lotesDeDeltas } from "../features/chat/deltaFrames";
@@ -79,10 +79,11 @@ const VisorDeArchivo = lazy(() => import("../features/code/FileViewer"));
 import { avisarDeLosArboles } from "../features/code/refresh";
 import { arbolesDe, contiene, ubicar } from "../features/code/treeKind";
 import TaskFilesRow, { taskFilesWidth } from "../features/code/TaskFilesRow";
+import { TaskSide, TaskSideShell } from "../features/code/TaskSide";
 import { moviendoHueco } from "../lib/sites";
 const DeleteTaskDialog = lazy(() => import("../features/projects/DeleteTaskDialog"));
 const TaskFilesCard = lazy(() => import("../features/code/TaskFiles"));
-import { createTaskFiles } from "../lib/taskFiles";
+import { createTaskFiles, type TaskSideMode } from "../lib/taskFiles";
 import { esDeCodigo } from "../features/code/workdirKind";
 import Observability from "../features/observability/Observability";
 import AnadirCarpeta, { type ClonEnCurso, type InicioDeCarpeta } from "../features/projects/AddWorkdir";
@@ -156,6 +157,7 @@ import { recordarCarpetas } from "../lib/folderKinds";
 import { lista } from "../lib/format";
 import ColumnaLateral from "../features/shell/SideColumn";
 import { createSpaceNavigationOrder } from "../lib/space-navigation-order";
+import GitHubStar from "../features/shell/GitHubStar";
 import TitleBar from "../features/shell/TitleBar";
 import GlobalSearch, { type SearchFilter } from "../features/shell/GlobalSearch";
 import { flattenTasks } from "../features/shell/sidebarTasks";
@@ -284,6 +286,7 @@ import {
 } from "../lib/usage";
 import { cn } from "../lib/utils";
 import {
+  BELOW_LOCATION,
   createCompactViewport,
   HEADER_HEIGHT,
   isWindows,
@@ -6703,7 +6706,8 @@ export default function App() {
    * de Solid, regla 9). Arma su propia transcripción, no lee `msgs()`.
    */
   const [threadSearchTargets, setThreadSearchTargets] = createSignal(new Map<string, ThreadSearchTarget>());
-  const [delegatedToolbarTargets, setDelegatedToolbarTargets] = createSignal(new Map<string, () => JSX.Element>());
+  const [searchSurfaces, setSearchSurfaces] = createSignal(new Map<string, SearchSurface>());
+  const [delegatedPanels, setDelegatedPanels] = createSignal(new Map<string, () => DelegatedPanelModel>());
   const consumo = createUsage({ agents, agent, busy, reload: cuentasTocadas });
   // Una sola ventana: sus pestañas van en la franja de la ventana, entre la navegación y los controles.
   const tiraDeLaVentana = () => (
@@ -6746,13 +6750,17 @@ export default function App() {
   );
   // En una tarea, el conmutador del panel derecho abre sus archivos dentro de la tarea.
   // La sesión llega como accesor: leída al llamar, cada cambio de tarea volvería a montar el botón.
+  const muestra = (id: string, mode: TaskSideMode) => {
+    const panel = archivosDeTarea.panel(id);
+    return !!id && panel.open && panel.mode === mode;
+  };
   const botonDeArchivos = (sesion: () => string) => (
     <BotonConAtajo
-      variant={archivosDeTarea.panel(sesion()).open ? "secondary" : "ghost"}
+      variant={muestra(sesion(), "files") ? "secondary" : "ghost"}
       size="icon"
-      class="relative size-7 shrink-0 text-neutral-500"
-      onClick={() => archivosDeTarea.toggle(sesion())}
-      aria-pressed={archivosDeTarea.panel(sesion()).open}
+      class="relative size-[30px] shrink-0 text-neutral-500"
+      onClick={() => archivosDeTarea.present(sesion(), "files")}
+      aria-pressed={muestra(sesion(), "files")}
       aria-label={t("code.panel.toggle")}
       accion="workTree"
       etiqueta={t("code.panel.toggle")}
@@ -6765,12 +6773,12 @@ export default function App() {
     const llave = () => (carpetaDelProyecto() ? llaveDeBorrador(project()) : "");
     return (
       <BotonConAtajo
-        variant={llave() && archivosDeTarea.panel(llave()).open ? "secondary" : "ghost"}
+        variant={muestra(llave(), "files") ? "secondary" : "ghost"}
         size="icon"
-        class="relative size-7 shrink-0 text-neutral-500"
+        class="relative size-[30px] shrink-0 text-neutral-500"
         disabled={!llave()}
-        onClick={() => archivosDeTarea.toggle(llave())}
-        aria-pressed={!!llave() && archivosDeTarea.panel(llave()).open}
+        onClick={() => archivosDeTarea.present(llave(), "files")}
+        aria-pressed={muestra(llave(), "files")}
         aria-label={t("code.panel.toggle")}
         accion="workTree"
         etiqueta={llave() ? t("code.panel.toggle") : t("shell.work_tree.no_session")}
@@ -6849,15 +6857,23 @@ export default function App() {
       onRenombrar: (id, title) => void renombrarSesion(folder, id, title),
       onPin: (id, pinned) => fijarSesion(folder, id, pinned),
     });
-    const delegatedToolbar = () => <DelegatedActivity context={`${workspaceActivo()}/${pp.sesion}`}
-      rows={delegatedRows()} list={delegatedList} live={vivas()} approvals={permissions().map(item => item.session)}
-      loading={delegation.loading} error={delegationData()?.error} onRetry={() => void refreshDelegation()} />;
+    const delegatedModel = (): DelegatedPanelModel => ({
+      context: `${workspaceActivo()}/${pp.sesion}`,
+      rows: delegatedRows(),
+      list: delegatedList,
+      live: vivas(),
+      approvals: permissions().map(item => item.session),
+      loading: delegation.loading,
+      error: delegationData()?.error,
+      onRetry: () => void refreshDelegation(),
+      onDismiss: () => { if (pp.sesion) archivosDeTarea.setOpen(pp.sesion, false); },
+    });
     createEffect(() => {
       if (!pp.sesion || !hasDelegation()) return;
       const key = `${workspaceActivo()}/${pp.sesion}`;
-      setDelegatedToolbarTargets(previous => new Map(previous).set(key, delegatedToolbar));
-      onCleanup(() => setDelegatedToolbarTargets(previous => {
-        if (previous.get(key) !== delegatedToolbar) return previous;
+      setDelegatedPanels(previous => new Map(previous).set(key, delegatedModel));
+      onCleanup(() => setDelegatedPanels(previous => {
+        if (previous.get(key) !== delegatedModel) return previous;
         const next = new Map(previous);
         next.delete(key);
         return next;
@@ -7461,7 +7477,7 @@ export default function App() {
             <For each={ventanas().filter((sitio) => sitio.fila === 0)}>
               {(sitio) => (
                 <div
-                  class="pointer-events-auto flex h-8 min-w-0 items-center px-2"
+                  class="pointer-events-auto flex h-[30px] min-w-0 items-center px-2"
                   style={{
                     "grid-column": `${sitio.col * 2 + 1}`,
                     "padding-left":
@@ -7565,14 +7581,28 @@ export default function App() {
         const agenteDeLaVentana = () => sameSite(site(), paneles.activeSite())
           ? agent()
           : (filaDe(task()?.session ?? "")?.agent ?? agent());
+        const idDePanel = () => task()?.session || (carpetaDelProyecto() ? llaveDeBorrador(project()) : "");
         const herramientas = () => <ThreadSearch conversation={task()?.session ?? ""} active={sameSite(site(), paneles.activeSite()) && settings() === null && alta() === null}
               disabled={!task()?.session}
+              open={muestra(task()?.session ?? "", "search")}
               messages={target()?.messages() ?? []} thread={() => target()?.thread()}
               onJump={block => target()?.jump(block)}
               onMove={delta => target()?.move(delta)}
+              onToggle={() => { const id = task()?.session; if (id) archivosDeTarea.present(id, "search"); }}
+              onShow={() => { const id = task()?.session; if (id && !muestra(id, "search")) archivosDeTarea.present(id, "search"); }}
+              onClose={() => { const id = task()?.session; if (id) archivosDeTarea.setOpen(id, false); }}
+              onSurface={(id, surface) => setSearchSurfaces(previous => {
+                if (surface) return new Map(previous).set(id, surface);
+                if (!previous.has(id)) return previous;
+                const next = new Map(previous);
+                next.delete(id);
+                return next;
+              })}
               tools={<>
-                <Show keyed when={delegatedToolbarTargets().get(`${workspaceActivo()}/${task()?.session ?? ""}`)} fallback={<DelegatedNone />}>{render => render()}</Show>
-                <UsageTool usage={consumo} agent={agenteDeLaVentana()} onGestionarCuentas={() => setSettings("proveedores-ia")} />
+                <Show when={delegatedPanels().get(`${workspaceActivo()}/${task()?.session ?? ""}`)} fallback={<DelegatedNone />}>
+                  {(read) => <DelegatedToolbar model={read()()} pressed={muestra(task()?.session ?? "", "delegated")} onClick={() => { const id = task()?.session; if (id) archivosDeTarea.present(id, "delegated"); }} />}
+                </Show>
+                <UsageTool usage={consumo} agent={agenteDeLaVentana()} pressed={muestra(idDePanel(), "usage")} onToggle={() => { const id = idDePanel(); if (id) archivosDeTarea.present(id, "usage"); }} />
                 <Show when={task()?.session} fallback={<Show when={!paginaDeAgente()}>{botonDelArbol()}</Show>}>
                   {botonDeArchivos(() => task()?.session ?? "")}
                 </Show>
@@ -7581,8 +7611,8 @@ export default function App() {
         // La tarea nueva (ventana sin pestaña) lleva la misma barra, con lo que aún no tiene apagado;
         // la página de un agente también es una ventana sin pestaña, y no es una tarea.
         return <Show when={(Boolean(task()) || (paneles.activeTabAt(site()) === null && !paginaDeAgente())) && !tapadoPorElProyecto(site())}>
-          <div class="z-20 min-w-0 max-w-full self-start justify-self-end pt-px pr-3" style={estiloDeLaCelda(site())}
-            classList={{ "mt-8": llevaTiraInterior(site()) }} onPointerDown={() => mandarVentana(site())}>
+          <div class="z-20 min-w-0 max-w-full self-start justify-self-end pt-2 pr-3" style={estiloDeLaCelda(site())}
+            classList={{ "mt-[30px]": llevaTiraInterior(site()) }} onPointerDown={() => mandarVentana(site())}>
             {herramientas()}
           </div>
         </Show>;
@@ -7599,7 +7629,7 @@ export default function App() {
           su ventana, como en un terminal: pertenece al panel que va a
           partir, no a una fila compartida donde un botón único no diría
           cuál. Flota sobre la esquina (`self-start justify-self-end`) en
-          vez de ocupar una fila propia de 32 px que separaría las
+          vez de ocupar una fila propia de 30 px que separaría las
           pestañas del texto. */}
 
       {/* El icono son dos columnas y no una flecha: es una forma, no un
@@ -7630,7 +7660,7 @@ export default function App() {
         <For each={ventanas().filter((sitio) => sitio.fila > 0)}>
           {(sitio) => (
             <div
-              class="tab-veil z-30 flex h-8 min-w-0 items-center self-start px-2"
+              class="tab-veil z-30 flex h-[30px] min-w-0 items-center self-start px-2"
               style={estiloDeLaCelda(sitio)}
               // Cómo la encuentra el arrastre: `ventanaBajo` pregunta al
               // documento por estos dos atributos, que es lo que hace que soltar
@@ -7783,19 +7813,29 @@ export default function App() {
           const ancho = () => (cubre() ? undefined : taskFilesWidth(panel().tabs.length > 0, anchoDeArchivos(), anchoDelArbol()));
           return (
             <Show when={usado()}>
-              {/* The top padding sits over the task's location row: only the card takes the pointer. */}
-              <div class="pointer-events-none z-10 flex min-h-0 min-w-0 justify-self-end pt-9 pr-2 pb-2 *:pointer-events-auto"
-                classList={{ hidden: !visible(), "w-full pl-2": cubre(), "mt-8": llevaTiraInterior(sitio()), "transition-[width] duration-200 ease-out": !moviendoHueco() }}
+              {/* The padding clears the location row (8 px of air plus the 30 px box)
+                  instead of covering it: only the card takes the pointer. */}
+              <div class={cn("pointer-events-none z-10 flex min-h-0 min-w-0 justify-self-end pr-2 pb-2 *:pointer-events-auto", BELOW_LOCATION)}
+                classList={{ hidden: !visible(), "w-full pl-2": cubre(), "mt-[30px]": llevaTiraInterior(sitio()), "transition-[width] duration-200 ease-out": !moviendoHueco() }}
                 style={{ ...placement(), width: ancho() }}
                 onPointerDown={() => { const d = sitio(); if (d) mandarVentana(d); }}>
-                <Suspense fallback={null}>
-                  <TaskFilesCard project={p.project} session={p.session} files={archivosDeTarea}
-                    visible={visible()} readOnly={editorDeletionLocked(p.session)}
-                    expandedOnly={paneles.isSplit() || compacta()}
-                    onSaved={() => window.dispatchEvent(new CustomEvent("harness:copia"))}
-                    onExportChat={() => exportarChat(p.session, p.project)}
-                    onMoved={archivoMovido} onRemoved={archivoBorrado} />
-                </Suspense>
+                <TaskSideShell mode={panel().mode} side={<TaskSide mode={panel().mode}
+                  search={searchSurfaces().get(p.session)}
+                  usage={{
+                    usage: consumo,
+                    agent: sameSite(paneles.siteOf(p.id) ?? null, paneles.activeSite()) ? agent() : (filaDe(p.session)?.agent ?? agent()),
+                    onManage: () => { archivosDeTarea.setOpen(p.session, false); setSettings("proveedores-ia"); },
+                  }}
+                  delegated={() => delegatedPanels().get(`${workspaceActivo()}/${p.session}`)?.()} />}>
+                  <Suspense fallback={null}>
+                    <TaskFilesCard project={p.project} session={p.session} files={archivosDeTarea}
+                      visible={visible()} readOnly={editorDeletionLocked(p.session)}
+                      expandedOnly={paneles.isSplit() || compacta()}
+                      onSaved={() => window.dispatchEvent(new CustomEvent("harness:copia"))}
+                      onExportChat={() => exportarChat(p.session, p.project)}
+                      onMoved={archivoMovido} onRemoved={archivoBorrado} />
+                  </Suspense>
+                </TaskSideShell>
               </div>
             </Show>
           );
@@ -7897,17 +7937,26 @@ export default function App() {
           return (
             <Show when={usado() && project()}>
               {(proyecto) => (
-                <div class="pointer-events-none z-10 flex min-h-0 min-w-0 justify-self-end pt-9 pr-2 pb-2 *:pointer-events-auto"
-                  classList={{ hidden: !visible(), "w-full pl-2": cubre(), "mt-8": llevaTiraInterior(sitio()), "transition-[width] duration-200 ease-out": !moviendoHueco() }}
+                <div class={cn("pointer-events-none z-10 flex min-h-0 min-w-0 justify-self-end pr-2 pb-2 *:pointer-events-auto", BELOW_LOCATION)}
+                  classList={{ hidden: !visible(), "w-full pl-2": cubre(), "mt-[30px]": llevaTiraInterior(sitio()), "transition-[width] duration-200 ease-out": !moviendoHueco() }}
                   style={{ ...estiloDeLaCelda(sitio()), width: ancho() }}
                   onPointerDown={() => mandarVentana(sitio())}>
-                  <Suspense fallback={null}>
-                    <TaskFilesCard project={proyecto()} session="" panelKey={llave()} preview={{ baseRef: draftBases()[claveAbierta()] }}
-                      files={archivosDeTarea} visible={visible()}
-                      expandedOnly={paneles.isSplit() || compacta()}
-                      onSaved={() => {}} onExportChat={async () => {}}
-                      onMoved={() => {}} onRemoved={() => {}} />
-                  </Suspense>
+                  <TaskSideShell mode={panel().mode} side={<TaskSide mode={panel().mode}
+                    search={undefined}
+                    usage={{
+                      usage: consumo,
+                      agent: agent(),
+                      onManage: () => { archivosDeTarea.setOpen(llave(), false); setSettings("proveedores-ia"); },
+                    }}
+                    delegated={() => undefined} />}>
+                    <Suspense fallback={null}>
+                      <TaskFilesCard project={proyecto()} session="" panelKey={llave()} preview={{ baseRef: draftBases()[claveAbierta()] }}
+                        files={archivosDeTarea} visible={visible()}
+                        expandedOnly={paneles.isSplit() || compacta()}
+                        onSaved={() => {}} onExportChat={async () => {}}
+                        onMoved={() => {}} onRemoved={() => {}} />
+                    </Suspense>
+                  </TaskSideShell>
                 </div>
               )}
             </Show>
@@ -8293,7 +8342,7 @@ export default function App() {
             <BotonConAtajo
               variant="ghost"
               size="icon"
-              class="size-7 shrink-0 text-neutral-500"
+              class="size-[30px] shrink-0 text-neutral-500"
               onClick={sidebar.alternar}
               aria-pressed={!sidebar.colapsado()}
               aria-label={sidebar.colapsado() ? t("shell.sidebar.show") : t("shell.sidebar.hide")}
@@ -8321,7 +8370,7 @@ export default function App() {
             <BotonConAtajo
               variant="ghost"
               size="icon"
-              class="size-7 shrink-0 text-neutral-500"
+              class="size-[30px] shrink-0 text-neutral-500"
               data-global-search-open=""
               aria-expanded={buscando() !== null}
               aria-label={t("search.open")}
@@ -8341,8 +8390,7 @@ export default function App() {
             </Show>
           </>}
           centro={tiraDeLaVentana()}
-          derecha={<>
-          </>}
+          derecha={<GitHubStar />}
         />
         <GlobalSearch
           open={buscando()}

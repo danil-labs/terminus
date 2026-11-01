@@ -1,7 +1,7 @@
-# Terminus móvil: guía del área
+# Danil móvil: guía del área
 
 Aplica [AGENTS.md](../../AGENTS.md). App de Expo (React Native, TypeScript) para
-iOS y Android: un control remoto de Terminus, no un Terminus completo. Opera
+iOS y Android: un control remoto de Danil, no Danil completo. Opera
 tareas en las máquinas de la persona a través de Danil Computers; la
 arquitectura y el estado están en [docs/mobile.md](docs/mobile.md).
 
@@ -85,7 +85,7 @@ se agregan con `npx expo install <paquete>`, que elige la versión compatible.
   recorre `computers:smoke` en Node. Mantenlo así.
 - `package.json` fija `react-dom` a la versión de `react` en `overrides`: sin
   eso npm no resuelve ninguna instalación nueva.
-- Nunca apuntes el bridge a los datos de un Terminus instalado: usa el lab. Y no
+- Nunca apuntes el bridge a los datos de un Danil instalado: usa el lab. Y no
   pruebes contra `computers.danil.ai` sin la sesión de la persona: usa el falso.
 - No agregues pruebas unitarias de pantallas. Se comprueba en el simulador o en
   un teléfono, y se dice qué se tocó y qué no.

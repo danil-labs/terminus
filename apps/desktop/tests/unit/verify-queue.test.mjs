@@ -4,13 +4,15 @@
  */
 import assert from "node:assert/strict";
 import { execFileSync, spawn } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { once } from "node:events";
+import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
 
 import { createHttpServer, createQueue } from "../../scripts/verify-queue/server.mjs";
+import { createWake } from "../../scripts/verify-remote.mjs";
 
 const verify = resolve(import.meta.dirname, "../../scripts/verify.mjs");
 const skip = process.platform === "win32" ? "la cola solo corre en Linux" : false;
@@ -53,7 +55,7 @@ async function serve(t, queue) {
 
 /** Corre `verify.mjs --remote` como lo haría `pnpm verify --remote`. */
 async function client(cwd, host, args = [], env = {}) {
-  const child = spawn(process.execPath, [verify, "--remote", ...args], { cwd, env: { ...gitEnv, VERIFY_REMOTE_HOST: host, VERIFY_REMOTE_AWS: "/nonexistent/aws", ...env } });
+  const child = spawn(process.execPath, [verify, "--remote", ...args], { cwd, env: { ...gitEnv, VERIFY_REMOTE_HOST: host, VERIFY_REMOTE_TERMINUS: "/nonexistent/terminus", VERIFY_REMOTE_AWS: "/nonexistent/aws", ...env } });
   let output = "";
   child.stdout.on("data", (chunk) => { output += chunk; });
   child.stderr.on("data", (chunk) => { output += chunk; });
@@ -322,4 +324,342 @@ test("la máquina apagada se enciende con las credenciales de quien lanza", { sk
   assert.equal(code, 0, output);
   assert.match(readFileSync(called, "utf8"), /ec2 start-instances --region us-east-1 --instance-ids i-1/);
   assert.match(output, /despierta/);
+});
+
+const started = { version: 1, result: { computer_id: "cmp_1", name: "vm-verify", power: "starting" }, error: null };
+const refused = (code) => ({ version: 1, result: null, error: { code } });
+
+/** Ejecutable falso: anota sus argumentos y responde lo siguiente de `answers`, repitiendo el último. */
+function fakeCli(dir, name, answers) {
+  const path = join(dir, name);
+  const calls = join(dir, `${name}.calls`);
+  writeFileSync(path, `#!/usr/bin/env node
+const { appendFileSync, existsSync, readFileSync } = require("node:fs");
+const calls = ${JSON.stringify(calls)};
+const answers = ${JSON.stringify(answers)};
+const count = existsSync(calls) ? readFileSync(calls, "utf8").split("\\n").length - 1 : 0;
+appendFileSync(calls, process.argv.slice(2).join(" ") + "\\n");
+const { stdout = "", stderr = "", code = 0 } = answers[Math.min(count, answers.length - 1)];
+process.stdout.write(stdout);
+process.stderr.write(stderr);
+process.exitCode = code;
+`, { mode: 0o755 });
+  return { path, calls: () => (existsSync(calls) ? readFileSync(calls, "utf8").trim().split("\n") : []) };
+}
+
+const envelope = (body, code = body.error ? 1 : 0) => ({ stdout: JSON.stringify(body), code });
+
+function wakeWith(t, answers, host = "vm-verify") {
+  const { dir } = workspace(t);
+  const terminus = fakeCli(dir, "terminus", answers);
+  const aws = fakeCli(dir, "aws", [{ code: 0 }]);
+  const wake = createWake(host, { VERIFY_REMOTE_TERMINUS: terminus.path, VERIFY_REMOTE_AWS: aws.path, VERIFY_REMOTE_INSTANCE: "i-1" });
+  return { wake, terminus, aws };
+}
+
+test("enciende con terminus y no toca aws", { skip }, (t) => {
+  const { wake, terminus, aws } = wakeWith(t, [envelope(started)]);
+  assert.equal(wake().state, "started");
+  assert.deepEqual(terminus.calls(), ["machine start vm-verify --json"]);
+  assert.deepEqual(aws.calls(), []);
+});
+
+test("con host:puerto enciende la máquina por defecto", { skip }, (t) => {
+  const { wake, terminus } = wakeWith(t, [envelope(started)], "127.0.0.1:8787");
+  wake();
+  assert.deepEqual(terminus.calls(), ["machine start vm-verify --json"]);
+});
+
+test("VERIFY_REMOTE_TERMINUS sustituye a danil y a terminus", { skip }, (t) => {
+  const { dir } = workspace(t);
+  const danil = fakeCli(dir, "danil", [envelope(started)]);
+  const cli = fakeCli(dir, "cli", [envelope(started)]);
+  const override = fakeCli(dir, "override", [envelope(started)]);
+  createWake("vm-verify", { DANIL_CLI: danil.path, TERMINUS_CLI: cli.path, VERIFY_REMOTE_TERMINUS: override.path })();
+  assert.deepEqual(override.calls(), ["machine start vm-verify --json"]);
+  assert.deepEqual([...danil.calls(), ...cli.calls()], []);
+});
+
+/** `danil` y `terminus` falsos; sin respuestas, ese ejecutable no existe. */
+function bothClis(t, danilAnswers, terminusAnswers) {
+  const { dir } = workspace(t);
+  const danil = danilAnswers ? fakeCli(dir, "danil", danilAnswers) : { path: join(dir, "no-danil"), calls: () => [] };
+  const terminus = terminusAnswers ? fakeCli(dir, "terminus", terminusAnswers) : { path: join(dir, "no-terminus"), calls: () => [] };
+  const aws = fakeCli(dir, "aws", [{ code: 0 }]);
+  const wake = createWake("vm-verify", { DANIL_CLI: danil.path, TERMINUS_CLI: terminus.path, VERIFY_REMOTE_AWS: aws.path });
+  return { wake, danil, terminus, aws };
+}
+
+test("solo terminus enciende", { skip }, (t) => {
+  const { wake, terminus, aws } = bothClis(t, null, [envelope(started)]);
+  assert.equal(wake().state, "started");
+  assert.deepEqual(terminus.calls(), ["machine start vm-verify --json"]);
+  assert.deepEqual(aws.calls(), []);
+});
+
+test("solo danil enciende", { skip }, (t) => {
+  const { wake, danil, aws } = bothClis(t, [envelope(started)], null);
+  assert.equal(wake().state, "started");
+  assert.deepEqual(danil.calls(), ["computers machine start vm-verify --json"]);
+  assert.deepEqual(aws.calls(), []);
+});
+
+test("con danil y terminus gana danil", { skip }, (t) => {
+  const { wake, danil, terminus } = bothClis(t, [envelope(started)], [envelope(started)]);
+  assert.equal(wake().state, "started");
+  assert.equal(danil.calls().length, 1);
+  assert.deepEqual(terminus.calls(), []);
+});
+
+const danilUnusable = {
+  "no conoce el comando": envelope(refused("invalid_request"), 2),
+  "no conoce el comando y no responde JSON": { stderr: "error: unrecognized subcommand 'computers'\n", code: 2 },
+  "rechaza el contexto TERMINUS_*": envelope({ version: 1, result: null, error: { code: "conflicting_selection", detail: { reason: "legacy_environment", variables: ["TERMINUS_CLI"] } } }, 2),
+};
+for (const [name, answer] of Object.entries(danilUnusable)) {
+  test(`danil que ${name} cae a terminus y no lo repite`, { skip }, (t) => {
+    const { wake, danil, terminus, aws } = bothClis(t, [answer], [envelope(started)]);
+    assert.equal(wake().state, "started");
+    wake();
+    assert.equal(danil.calls().length, 1);
+    assert.equal(terminus.calls().length, 2);
+    assert.deepEqual(aws.calls(), []);
+  });
+}
+
+test("danil sin sesión va a aws sin pasar por terminus", { skip }, (t) => {
+  const { wake, terminus, aws } = bothClis(t, [envelope(refused("machine_account"))], [envelope(started)]);
+  assert.equal(wake().state, "started");
+  assert.deepEqual(terminus.calls(), []);
+  assert.equal(aws.calls().length, 1);
+});
+
+test("danil que rechaza por permisos no cae a terminus ni a aws", { skip }, (t) => {
+  const { wake, terminus, aws } = bothClis(t, [envelope(refused("access_denied"))], [envelope(started)]);
+  assert.equal(wake().state, "failed");
+  assert.deepEqual([...terminus.calls(), ...aws.calls()], []);
+});
+
+test("sin ningún CLI cae a aws", { skip }, (t) => {
+  const { wake, aws } = bothClis(t, null, null);
+  assert.equal(wake().state, "started");
+  assert.equal(aws.calls().length, 1);
+});
+
+test("computer_stopping reintenta sin caer a aws", { skip }, (t) => {
+  const { wake, aws } = wakeWith(t, [envelope(refused("computer_stopping"))]);
+  assert.equal(wake().state, "retry");
+  assert.deepEqual(aws.calls(), []);
+});
+
+for (const code of ["machine_account", "machine_unreachable", "identity_unavailable", "invalid_request"]) {
+  test(`${code} cae a aws una sola vez`, { skip }, (t) => {
+    const { wake, terminus, aws } = wakeWith(t, [envelope(refused(code))]);
+    assert.equal(wake().state, "started");
+    wake();
+    assert.deepEqual(aws.calls(), Array(2).fill("ec2 start-instances --region us-east-1 --instance-ids i-1"));
+    assert.equal(terminus.calls().length, 1);
+  });
+}
+
+test("un CLI sin `machine` cae a aws", { skip }, (t) => {
+  const { wake, aws } = wakeWith(t, [{ stderr: "error: unrecognized subcommand 'machine'\n", code: 2 }]);
+  assert.equal(wake().state, "started");
+  assert.equal(aws.calls().length, 1);
+});
+
+test("sin terminus cae a aws", { skip }, (t) => {
+  const { dir } = workspace(t);
+  const aws = fakeCli(dir, "aws", [{ code: 0 }]);
+  assert.equal(createWake("vm-verify", { VERIFY_REMOTE_TERMINUS: join(dir, "no-existe"), VERIFY_REMOTE_AWS: aws.path })().state, "started");
+  assert.equal(aws.calls().length, 1);
+});
+
+const clearRefusals = { access_denied: /no puede encenderla/, license_required: /licencia/, not_found: /no la ve/, provider_unavailable: /respondió provider_unavailable/, machine_unknown: /respondió machine_unknown/ };
+for (const [code, words] of Object.entries(clearRefusals)) {
+  test(`${code} se explica y no cae a aws`, { skip }, (t) => {
+    const { wake, aws } = wakeWith(t, [envelope(refused(code))]);
+    const { state, message } = wake();
+    assert.equal(state, "failed");
+    assert.match(message, words);
+    assert.deepEqual(aws.calls(), []);
+  });
+}
+
+test("aws reintenta IncorrectInstanceState y falla enseguida con lo demás", { skip }, (t) => {
+  const { dir } = workspace(t);
+  const aws = fakeCli(dir, "aws", [{ stderr: "An error occurred (IncorrectInstanceState) when calling StartInstances\n", code: 254 }, { stderr: "Unable to locate credentials\n", code: 253 }]);
+  const wake = createWake("vm-verify", { VERIFY_REMOTE_TERMINUS: join(dir, "no-existe"), VERIFY_REMOTE_AWS: aws.path });
+  assert.equal(wake().state, "retry");
+  const { state, message } = wake();
+  assert.equal(state, "failed");
+  assert.match(message, /No hay acceso a la cola/);
+});
+
+/** La cola apagada en un puerto conocido; `listen` la levanta cuando el encendido llega. */
+async function offlineQueue(t, home) {
+  const server = createHttpServer(createQueue({ home, config, diskPercent: () => 10 }));
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const { port } = server.address();
+  await new Promise((done) => server.close(done));
+  t.after(() => server.close());
+  return { port, listen: () => server.listen(port, "127.0.0.1") };
+}
+
+test("--remote reintenta cada 15 s mientras la máquina se apaga y sigue al encender", { skip }, async (t) => {
+  const { dir, repo, home } = workspace(t);
+  const terminus = fakeCli(dir, "terminus", [envelope(refused("computer_stopping")), envelope(started)]);
+  const queue = await offlineQueue(t, home);
+  commit(repo, "echo tras-apagado");
+  const startedAt = Date.now();
+  const running = client(repo, `127.0.0.1:${queue.port}`, [], { VERIFY_REMOTE_TERMINUS: terminus.path });
+  while (terminus.calls().length < 2) await new Promise((done) => setTimeout(done, 50));
+  assert.ok(Date.now() - startedAt >= 15_000);
+  queue.listen();
+  const { code, output } = await running;
+  assert.equal(code, 0, output);
+  assert.match(output, /tras-apagado/);
+});
+
+test("--remote cae a aws sin sesión de Danil y corre igual", { skip }, async (t) => {
+  const { dir, repo, home } = workspace(t);
+  const terminus = fakeCli(dir, "terminus", [envelope(refused("machine_account"))]);
+  const aws = fakeCli(dir, "aws", [{ code: 0 }]);
+  const queue = await offlineQueue(t, home);
+  commit(repo, "echo por-aws");
+  const running = client(repo, `127.0.0.1:${queue.port}`, [], { VERIFY_REMOTE_TERMINUS: terminus.path, VERIFY_REMOTE_AWS: aws.path });
+  while (!aws.calls().length) await new Promise((done) => setTimeout(done, 50));
+  queue.listen();
+  const { code, output } = await running;
+  assert.equal(code, 0, output);
+  assert.match(output, /machine_account/);
+  assert.match(output, /por-aws/);
+});
+
+test("--remote termina enseguida si la cuenta no puede encender, con el motivo", { skip }, async (t) => {
+  const { dir, repo } = workspace(t);
+  const terminus = fakeCli(dir, "terminus", [envelope(refused("access_denied"))]);
+  const aws = fakeCli(dir, "aws", [{ code: 0 }]);
+  commit(repo, "true");
+  const { code, output } = await client(repo, "127.0.0.1:9", [], { VERIFY_REMOTE_TERMINUS: terminus.path, VERIFY_REMOTE_AWS: aws.path });
+  assert.equal(code, 2);
+  assert.match(output, /no puede encenderla/);
+  assert.deepEqual(aws.calls(), []);
+});
+
+test("un fallo tras aceptar el encendido no corta la espera", { skip }, async (t) => {
+  const { dir, repo, home } = workspace(t);
+  const terminus = fakeCli(dir, "terminus", [envelope(started), envelope(refused("provider_unavailable"))]);
+  const queue = await offlineQueue(t, home);
+  commit(repo, "echo aguanta");
+  const running = client(repo, `127.0.0.1:${queue.port}`, [], { VERIFY_REMOTE_TERMINUS: terminus.path });
+  while (terminus.calls().length < 2) await new Promise((done) => setTimeout(done, 50));
+  queue.listen();
+  const { code, output } = await running;
+  assert.equal(code, 0, output);
+  assert.match(output, /aguanta/);
+});
+
+test("sin credenciales de AWS el encendido no se reintenta", { skip }, async (t) => {
+  const { dir, repo } = workspace(t);
+  const aws = join(dir, "aws");
+  const calls = join(dir, "calls");
+  writeFileSync(aws, `#!/bin/sh\necho x >> ${calls}\necho 'Unable to locate credentials' >&2\nexit 253\n`, { mode: 0o755 });
+  commit(repo, "true");
+  const { code, output } = await client(repo, "127.0.0.1:9", [], { VERIFY_REMOTE_AWS: aws });
+  assert.equal(code, 2);
+  assert.match(output, /No hay acceso a la cola/);
+  assert.equal(readFileSync(calls, "utf8"), "x\n");
+});
+
+test("si la máquina cae al recibir el commit, lo manda otra vez", { skip }, async (t) => {
+  const { repo, home } = workspace(t);
+  const inner = createHttpServer(createQueue({ home, config, diskPercent: () => 10 }));
+  let dropped = false;
+  const server = createServer((request, response) => {
+    if (request.method === "POST" && request.url.startsWith("/runs?") && !dropped) {
+      dropped = true;
+      return request.socket.destroy();
+    }
+    inner.emit("request", request, response);
+  });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  t.after(() => server.close());
+  commit(repo, "echo segundo-intento");
+  const { code, output } = await client(repo, `127.0.0.1:${server.address().port}`);
+  assert.equal(code, 0, output);
+  assert.equal(dropped, true);
+  assert.match(output, /segundo-intento/);
+});
+
+const idleStop = resolve(import.meta.dirname, "../../scripts/verify-queue/verify-idle-stop");
+const idleSkip = process.platform === "linux" ? false : "el apagado solo corre en Linux";
+const MINUTE = 60;
+const HOUR = 60 * MINUTE;
+
+/** Corre el apagado con `loginctl`, `ps` y `shutdown` falsos; dice si pidió apagar. */
+function idleCheck(t, { sessions = [], processes = "", idleFor = 20 * MINUTE, files = {}, noStamp = false } = {}) {
+  const dir = mkdtempSync(join(tmpdir(), "verify-idle-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const bin = join(dir, "bin");
+  const home = join(dir, "home");
+  const stamp = join(dir, "stamp");
+  mkdirSync(bin);
+  mkdirSync(home);
+  const now = Date.now() / 1000;
+  if (!noStamp) {
+    writeFileSync(stamp, "");
+    utimesSync(stamp, now - idleFor, now - idleFor);
+  }
+  for (const [name, age] of Object.entries(files)) {
+    writeFileSync(join(home, name), "");
+    utimesSync(join(home, name), now - age, now - age);
+  }
+  const listed = sessions.map((_, index) => `  echo "s${index} 1001 verify - - active no -"`).join("\n");
+  const details = sessions.map(({ age, state = "active" }, index) => `  s${index}) if [ "$4" = State ]; then echo ${state}; else date -d @${Math.round(now - age)}; fi ;;`).join("\n");
+  writeFileSync(join(bin, "loginctl"), `#!/bin/bash
+if [ "$1" = list-sessions ]; then
+${listed || "  :"}
+  exit 0
+fi
+case "$2" in
+${details}
+esac
+`, { mode: 0o755 });
+  writeFileSync(join(bin, "ps"), `#!/bin/sh\ncat <<'END'\n${processes}\nEND\n`, { mode: 0o755 });
+  writeFileSync(join(bin, "shutdown"), `#!/bin/sh\ntouch ${join(dir, "stopped")}\n`, { mode: 0o755 });
+  try {
+    execFileSync("bash", [idleStop], { env: { PATH: `${bin}:${process.env.PATH}`, VERIFY_QUEUE_HOME: home, VERIFY_IDLE_STAMP: stamp } });
+  } catch {
+    // Sin apagar, el último `[ ... ] && ...` del script sale con 1.
+  }
+  return existsSync(join(dir, "stopped"));
+}
+
+test("la máquina se apaga a los 15 minutos sin uso, no antes", { skip: idleSkip }, (t) => {
+  assert.equal(idleCheck(t, { idleFor: 16 * MINUTE }), true);
+  assert.equal(idleCheck(t, { idleFor: 14 * MINUTE }), false);
+  assert.equal(idleCheck(t, { noStamp: true }), false, "al arrancar empieza a contar");
+});
+
+test("una corrida y una subida en curso cuentan como uso", { skip: idleSkip }, (t) => {
+  assert.equal(idleCheck(t, { files: { busy: 0 } }), false);
+  assert.equal(idleCheck(t, { files: { "incoming-a.bundle": MINUTE } }), false);
+  assert.equal(idleCheck(t, { files: { "incoming-a.bundle": 20 * MINUTE } }), true, "una subida muerta deja de contar");
+});
+
+test("una sesión cuenta hasta 2 horas y una que se cierra no cuenta", { skip: idleSkip }, (t) => {
+  assert.equal(idleCheck(t, { sessions: [{ age: HOUR }] }), false);
+  assert.equal(idleCheck(t, { sessions: [{ age: 3 * HOUR }] }), true);
+  assert.equal(idleCheck(t, { sessions: [{ age: 3 * HOUR }, { age: MINUTE }] }), false);
+  assert.equal(idleCheck(t, { sessions: [{ age: MINUTE, state: "closing" }] }), true);
+});
+
+test("una compilación cuenta hasta 2 horas", { skip: idleSkip }, (t) => {
+  assert.equal(idleCheck(t, { processes: "60 /home/verify/.cargo/bin/rustc --edition 2021" }), false);
+  assert.equal(idleCheck(t, { processes: "60 node scripts/verify.mjs" }), false);
+  assert.equal(idleCheck(t, { processes: `${3 * HOUR} node scripts/verify.mjs` }), true);
+  assert.equal(idleCheck(t, { processes: "60 node /opt/verify-queue/server.mjs" }), true);
 });

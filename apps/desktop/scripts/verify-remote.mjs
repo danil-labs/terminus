@@ -28,15 +28,23 @@ const POLL_TIMEOUT_MS = 30_000;
 const UPLOAD_TIMEOUT_MS = 10 * 60_000;
 const TUNNEL_TIMEOUT_MS = 15_000;
 const WAKE_TIMEOUT_MS = 4 * 60_000;
+const WAKE_RETRY_MS = 15_000;
 const LOST_AFTER_MS = 2 * 60_000;
 const POLL_MS = 2_000;
+
+const CLI_FALLBACK = new Set(["machine_account", "machine_unreachable", "identity_unavailable"]);
+const CLI_REFUSED = {
+  access_denied: "tu cuenta ve la máquina, pero no puede encenderla.",
+  license_required: "tu cuenta no tiene licencia de Danil.",
+  not_found: "tu cuenta no la ve; la máquina es de una organización de la que debes ser miembro.",
+};
 
 class RemoteError extends Error {}
 
 const accessHelp = (host) =>
   `No hay acceso a la cola en ${host}.\n` +
   "  La cola es para el equipo de Danil dentro de su tailnet. Sin ese acceso, verifica en local con `pnpm verify`.\n" +
-  `  Con acceso, comprueba Tailscale con \`ssh ${SSH_USER}@${host}\`. Si la máquina está apagada, encenderla pide credenciales de AWS en esta sesión.`;
+  `  Con acceso, comprueba Tailscale con \`ssh ${SSH_USER}@${host}\`. Si la máquina está apagada, encenderla pide sesión de Danil en \`danil\` o \`terminus\` o, de respaldo, credenciales de AWS en esta sesión.`;
 
 const noSshHelp =
   "No encontré ssh en el PATH.\n" +
@@ -118,7 +126,7 @@ async function openLink(host) {
     async up() {
       if (tunnel) return;
       errors = "";
-      const child = spawn(process.env.VERIFY_REMOTE_SSH ?? "ssh", ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "-o", "ExitOnForwardFailure=yes", "-o", "StrictHostKeyChecking=accept-new", "-N", "-L", local, `${SSH_USER}@${host}`], { stdio: ["ignore", "ignore", "pipe"], windowsHide: true });
+      const child = spawn(process.env.VERIFY_REMOTE_SSH ?? "ssh", ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "-o", "ExitOnForwardFailure=yes", "-o", "ServerAliveInterval=5", "-o", "ServerAliveCountMax=2", "-o", "StrictHostKeyChecking=accept-new", "-N", "-L", local, `${SSH_USER}@${host}`], { stdio: ["ignore", "ignore", "pipe"], windowsHide: true });
       tunnel = child;
       child.stderr.on("data", (chunk) => { errors += chunk; });
       child.once("error", (error) => {
@@ -135,13 +143,62 @@ async function openLink(host) {
   };
 }
 
-/** Enciende con las credenciales de quien lanza: la máquina no guarda ninguna. */
-function wake() {
-  const aws = process.env.VERIFY_REMOTE_AWS ?? "aws";
-  const instance = process.env.VERIFY_REMOTE_INSTANCE ?? DEFAULT_INSTANCE;
-  const region = process.env.VERIFY_REMOTE_REGION ?? DEFAULT_REGION;
+/** El orden de intento; un `.cmd` o `.bat` no arranca sin shell y cuenta como ausente, el `.exe` lo resuelve spawnSync. */
+function machineClis(machine, env) {
+  const start = ["machine", "start", machine, "--json"];
+  if (env.VERIFY_REMOTE_TERMINUS) return [[env.VERIFY_REMOTE_TERMINUS, start]];
+  return [[env.DANIL_CLI || "danil", ["computers", ...start]], [env.TERMINUS_CLI || "terminus", start]];
+}
+
+/** `absent` sigue con el siguiente CLI; `fallback` va directo a aws. */
+function cliStart(cli, args, machine) {
+  const result = spawnSync(cli, args, { encoding: "utf8", timeout: COMMAND_TIMEOUT_MS, killSignal: "SIGKILL", windowsHide: true });
+  let envelope = null;
+  try {
+    envelope = JSON.parse(result.stdout);
+  } catch {
+    return { state: "absent" };
+  }
+  const error = envelope?.error;
+  if (!error) return { state: envelope?.result ? "started" : "absent" };
+  if (error.code === "invalid_request" || error.detail?.reason === "legacy_environment") return { state: "absent" };
+  if (error.code === "computer_stopping") return { state: "retry" };
+  if (CLI_FALLBACK.has(error.code)) return { state: "fallback", reason: error.code };
+  const words = CLI_REFUSED[error.code] ?? `el CLI respondió ${error.code}.`;
+  return { state: "failed", message: `No puedo encender ${machine}: ${words}\n  Verifica en local con \`pnpm verify\`.` };
+}
+
+/** Con las credenciales de quien lanza: la máquina no guarda ninguna. */
+function awsStart(host, env) {
+  const aws = env.VERIFY_REMOTE_AWS ?? "aws";
+  const instance = env.VERIFY_REMOTE_INSTANCE ?? DEFAULT_INSTANCE;
+  const region = env.VERIFY_REMOTE_REGION ?? DEFAULT_REGION;
   const result = spawnSync(aws, ["ec2", "start-instances", "--region", region, "--instance-ids", instance], { encoding: "utf8", timeout: COMMAND_TIMEOUT_MS, killSignal: "SIGKILL", windowsHide: true });
-  return result.status === 0;
+  if (result.status === 0) return { state: "started" };
+  return /IncorrectInstanceState/.test(result.stderr) ? { state: "retry" } : { state: "failed", message: accessHelp(host) };
+}
+
+/** Cada llamada es un intento y sigue con el CLI que ya respondió: uno que falla puede tardar un minuto. */
+export function createWake(host, env = process.env) {
+  const machine = host.includes(":") ? DEFAULT_HOST : host;
+  const clis = machineClis(machine, env);
+  let reason = null;
+  return () => {
+    while (clis.length) {
+      const [cli, args] = clis[0];
+      const outcome = cliStart(cli, args, machine);
+      if (outcome.state === "absent") {
+        clis.shift();
+        reason = "no hay CLI con `machine`";
+      } else if (outcome.state === "fallback") {
+        clis.length = 0;
+        reason = outcome.reason;
+      } else return outcome;
+    }
+    if (reason) console.log(`  Sin encendido por sesión de Danil (${reason}); uso aws.`);
+    reason = null;
+    return awsStart(host, env);
+  };
 }
 
 async function connect(link, host) {
@@ -150,9 +207,17 @@ async function connect(link, host) {
   if (first) return first;
   if (link.problem()) throw new RemoteError(link.problem());
   console.log(`  La cola no responde en ${host}; intento encender la máquina.`);
-  if (!wake()) throw new RemoteError(accessHelp(host));
+  const wake = createWake(host);
   const deadline = Date.now() + WAKE_TIMEOUT_MS;
+  let nextWake = 0;
+  let accepted = false;
   while (Date.now() < deadline) {
+    if (Date.now() >= nextWake) {
+      nextWake = Date.now() + WAKE_RETRY_MS;
+      const { state, message } = wake();
+      accepted ||= state === "started";
+      if (state === "failed" && !accepted) throw new RemoteError(message);
+    }
     await sleep(POLL_MS * 2);
     await link.up();
     const answer = await health(link.base);
@@ -188,6 +253,17 @@ async function submit(base, commit, command) {
     return await json(base, `/runs?${query}`, init, UPLOAD_TIMEOUT_MS);
   } finally {
     bundle?.done();
+  }
+}
+
+/** La máquina pudo apagarse justo al llegar el commit: se enciende y se manda una vez más. */
+async function submitOnce(link, host, commit, command) {
+  try {
+    return await submit(link.base, commit, command);
+  } catch (error) {
+    if (error instanceof RemoteError) throw error;
+    await connect(link, host);
+    return submit(link.base, commit, command);
   }
 }
 
@@ -257,7 +333,7 @@ export async function runRemote(argv) {
     if (!options.commit && git(["status", "--porcelain"])) throw new RemoteError("Hay cambios sin commit y la corrida solo lleva commits. Haz commit, o nombra uno con --commit <sha>.");
     const commit = git(["rev-parse", "--verify", `${options.commit ?? "HEAD"}^{commit}`]);
     const command = options.noCargo ? "pnpm verify --no-cargo" : "pnpm verify";
-    const { id } = await submit(base, commit, command);
+    const { id } = await submitOnce(link, host, commit, command);
     console.log(`  Corrida ${id}: ${commit.slice(0, 10)}, «${command}», en ${host}.`);
     if (options.detach) {
       resumeHint(id);

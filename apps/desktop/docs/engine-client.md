@@ -1,6 +1,6 @@
 # The window and the engine
 
-Terminus has two processes:
+Danil has two processes:
 
 - **The window** (this repository): a Tauri app with a SolidJS front. It draws
   the interface, hosts native site views, local images, dialogs, clipboard and
@@ -34,16 +34,17 @@ el motor fijado en `seldon-runtime.lock`.
 La cuenta de Danil (Configuración → Cuenta de Danil) usa `danil_connect_start`,
 `danil_connect_status`, `danil_connect_options`, `danil_disconnect` y el evento
 `danil-connect` (seldon-host#66, [connector.md](https://github.com/danil-labs/seldon-host/blob/dev/docs/connector.md)). Iniciar sesión registra
-esta computadora en la cuenta: con un workspace de Radiant entra sin navegador;
+esta computadora en la cuenta: con un workspace de Harness entra sin navegador;
 sin él, la ventana abre `verification_uri_complete` y la persona aprueba en
-`app.danil.ai/terminus/connect`. Un motor sin estos comandos recibe `command` del
+`alfa-app.danil.ai/connect` (antes `app.danil.ai/terminus/connect`, que
+ahora redirige allí). Un motor sin estos comandos recibe `command` del
 proxy y la sección lo dice. El campo editable del alta y de la página de
 aprobación es el nombre de **esta computadora**, no el de la cuenta.
 
-La web (`app.danil.ai/terminus`) no ofrece Radiant: ni la sección de
+La web (`alfa-app.danil.ai`) no ofrece Harness: ni la sección de
 Configuración, ni su gobierno en las pantallas, ni la elección «De mi
 organización» al crear el espacio (`capabilities().radiant`, solo en el
-escritorio). Radiant se conectará con Terminus Computers, no con cada ventana;
+escritorio). Harness se conectará con Danil Computers, no con cada ventana;
 el escritorio lo conserva por ahora (2026-10-21).
 
 La persona de la cuenta (nombre, correo, foto) sale del motor:
@@ -489,7 +490,7 @@ Tinymist processes if the window dies.
 Windows does not overwrite a running `.exe`, but it renames one. The installer
 (`src-tauri/windows/hooks.nsh`) renames `terminus.exe` and `seldon-runtime.exe`
 to `old_*` and writes the new ones, so the open window and its engine keep
-working. The template's step that closes Terminus only runs on a real
+working. The template's step that closes Danil only runs on a real
 uninstall; an installer replacing the copy runs the uninstaller in place
 (`_?=$INSTDIR`), and that run also sets the files aside. The app does not use
 `downloadAndInstall`, which exits on Windows: `update_install` downloads with
@@ -498,7 +499,7 @@ the plugin's signature check and runs the installer with `/S /UPDATE`.
 `update_pending` reports when this window's image was set aside and the new
 `terminus.exe` is already in its place, whether the app or a manual installer
 did it, and the front asks for a restart. A manual installer that finds
-Terminus open shows the same notice and ends there, instead of running a second
+Danil open shows the same notice and ends there, instead of running a second
 window from its finish page. `restart_app` from a window running from `old_*`
 opens the installed `terminus.exe`, not itself.
 

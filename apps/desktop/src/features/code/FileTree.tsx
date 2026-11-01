@@ -23,6 +23,7 @@ import {
 } from "solid-js";
 import { t } from "../../lib/i18n";
 import { cn } from "../../lib/utils";
+import { HEADER_HEIGHT } from "../../lib/window";
 import { Button } from "../../ui/Button";
 import { Input } from "../../ui/Input";
 import { asFailure, type Failure, FailureNote } from "../../ui/Failure";
@@ -808,7 +809,7 @@ export default function ArbolDeArchivos(props: {
       }}
     >
       <Show when={!cargando()}>
-        <div class="sticky top-0 z-10 flex items-center gap-1 border-b border-border bg-bg px-2 py-1.5">
+        <div class={cn("sticky top-0 z-10 flex items-center gap-1 border-b border-border bg-surface px-2", HEADER_HEIGHT)}>
           <label class="flex min-w-0 flex-1 items-center gap-1.5">
             <Search size={13} class="shrink-0 text-neutral-500" aria-hidden="true" />
             <Input
