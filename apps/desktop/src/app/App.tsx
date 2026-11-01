@@ -157,6 +157,7 @@ import { recordarCarpetas } from "../lib/folderKinds";
 import { lista } from "../lib/format";
 import ColumnaLateral from "../features/shell/SideColumn";
 import { createSpaceNavigationOrder } from "../lib/space-navigation-order";
+import GitHubStar from "../features/shell/GitHubStar";
 import TitleBar from "../features/shell/TitleBar";
 import GlobalSearch, { type SearchFilter } from "../features/shell/GlobalSearch";
 import { flattenTasks } from "../features/shell/sidebarTasks";
@@ -8387,8 +8388,7 @@ export default function App() {
             </Show>
           </>}
           centro={tiraDeLaVentana()}
-          derecha={<>
-          </>}
+          derecha={<GitHubStar />}
         />
         <GlobalSearch
           open={buscando()}
