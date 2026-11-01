@@ -45,6 +45,57 @@ provider installation, account gating and retry recovery in the compiled front
 with simulated IPC. It runs manually, outside `pnpm verify`, and does not check
 the native window or a real ZCode account.
 
+## Remote verify
+
+`pnpm verify --remote` runs the Linux chain on the team machine `vm-verify`
+and needs access to Danil's tailnet (`ssh verify@vm-verify` must work). Without
+it the command says so; use `pnpm verify`. It never counts for macOS or Windows.
+
+Access: `alberto`, `alejandro`, `mauricio`, `roberto`, `cit`, and the machines
+`tag:vm-alberto`, `tag:vm-alejandro` and `tag:vm-mauricio`.
+
+The client needs only Node, git, `ssh` on the PATH and Tailscale, so it runs the
+same from PowerShell or cmd on Windows (`ssh.exe` is the OpenSSH Client optional
+feature). What runs is still Linux: a run launched from Windows verifies Linux.
+
+```sh
+pnpm verify --remote                   # HEAD; refuses uncommitted changes
+pnpm verify --remote --no-cargo        # the chain without Rust
+pnpm verify --remote --commit <sha>    # any local commit
+pnpm verify --remote --detach          # queue and return; prints the run id
+pnpm verify --remote --attach <id>     # follow a run, replaying the full log
+pnpm verify --remote --cancel <id>     # stop a queued or running run
+pnpm verify --remote --status          # what is queued and running
+```
+
+The exit code is the run's. The run lives on the machine: if the client dies,
+it goes on and `--attach` gets its log and exit code. The commit travels as a
+`git bundle`, incremental against what the machine already has, because the
+machine holds no secrets and clones nothing. Running a commit executes it, so
+an outside pull request goes there only after someone reads it.
+
+`VERIFY_REMOTE_HOST=<machine>` reaches the queue through an SSH tunnel;
+`VERIFY_REMOTE_HOST=<host>:<port>` uses a port already open, such as an SSM
+port forward to 8787. If the queue does not answer and SSH did not refuse, the
+client runs `aws ec2 start-instances` with the caller's credentials
+(`AWS_PROFILE`, `VERIFY_REMOTE_AWS` for the binary). The machine stops itself
+after 30 idle minutes.
+
+The queue is `scripts/verify-queue/server.mjs`: one per machine, one run at a
+time, first come first served, listening on loopback only. It takes repo, commit
+and a command listed in `repos.json`, and knows nothing else about a repo. Each
+repo has one fixed checkout and one fixed `CARGO_TARGET_DIR` under
+`/var/lib/verify-queue/repos/`; everything else is cleaned between runs. Above
+80 % disk it deletes the target, before a run or after a failed one, and
+rebuilds once. To install or update it, copy `scripts/verify-queue/` to the
+machine and run `install.sh` as root.
+
+## Sweeping `target/`
+
+`node scripts/sweep-targets.mjs --root <worktrees>` lists the `target/` folders
+that nothing touched in 24 hours and no `cargo` or `rustc` is using. `--apply`
+deletes them.
+
 ## The browser build
 
 The same front runs in a browser against Danil Computers instead of the Tauri

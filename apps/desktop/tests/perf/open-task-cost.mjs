@@ -231,7 +231,7 @@ async function openLong(turns, run, check) {
   const short = shown(doc, "Hola") && shown(doc, "Listo.");
   mutations = 0;
   addedNodes = 0;
-  const invokedBefore = app.comandos.length;
+  const invokedBefore = app.commands.length;
   const remoteBefore = remoteGit.calls;
   const bytesBefore = ipc.bytes;
   const nodesBefore = doc.querySelectorAll("*").length;
@@ -244,7 +244,7 @@ async function openLong(turns, run, check) {
     addedNodes,
     mutations,
     invokes:
-      app.comandos.slice(invokedBefore).filter((c) => !PERIODIC.has(c) && !c.startsWith("plugin:")).length -
+      app.commands.slice(invokedBefore).filter((c) => !PERIODIC.has(c) && !c.startsWith("plugin:")).length -
       (remoteGit.calls - remoteBefore),
     ipcBytes: ipc.bytes - bytesBefore,
   };
@@ -256,7 +256,7 @@ async function openLong(turns, run, check) {
       : null;
   if (!failure && check) failure = await behaves(app, turns, clock);
   observer.disconnect();
-  if (!failure && app.fallos.length > 0) failure = app.fallos.slice(0, 3).map((f) => String(f).split("\n").slice(0, 4).join("\n  ")).join("\n");
+  if (!failure && app.failures.length > 0) failure = app.failures.slice(0, 3).map((f) => String(f).split("\n").slice(0, 4).join("\n  ")).join("\n");
   app.w.close();
   return { ms, counters, failure };
 }

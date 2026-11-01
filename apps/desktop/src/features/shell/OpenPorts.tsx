@@ -1,4 +1,5 @@
 import type { JSX } from "solid-js";
+import { SignalDot } from "../../ui/SignalDot";
 import {
   For,
   Show,
@@ -381,7 +382,7 @@ export default function PuertosAbiertos(props: {
               when={!props.vertical}
               fallback={
                 <Show when={mios() + processes() > 0}>
-                  <span aria-hidden="true" class={cn("absolute top-1 right-1 size-1.5 rounded-full", hot() ? "bg-warning" : "bg-success")} />
+                  <SignalDot tone={hot() ? "warning" : "success"} class="absolute top-1 right-1" />
                 </Show>
               }
             >

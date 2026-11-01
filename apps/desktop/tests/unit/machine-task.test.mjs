@@ -110,7 +110,7 @@ test("una tarea de una máquina apagada abre sin fallo y mandarle algo la encien
   assert.ok(doc.querySelector('[data-task-location][data-task-location-on="true"]'), "la ventana sigue diciendo que está apagada");
   assert.ok(reads.some((r) => r.id === "r1" && r.awake), "no se volvió a leer la tarea");
   assert.ok(text(app).includes("Respuesta despierta"));
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 test("la ventana de una tarea local dice su máquina, su proyecto y su rama", async () => {
@@ -127,10 +127,10 @@ test("la ventana de una tarea local dice su máquina, su proyecto y su rama", as
   assert.match(location.querySelector("[data-task-location-machine]")?.textContent ?? "", /^Esta (Mac|computadora)$/);
   assert.equal(location.querySelector("[data-task-location-project]")?.textContent, "P1");
   assert.equal(location.querySelector("[data-task-location-branch]")?.textContent, "feat/task-location");
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
-test("la tarea nueva lleva la barra de una tarea: ubicación, herramientas apagadas con su porqué y carpeta encendida", async () => {
+test("la tarea nueva lleva la barra de una tarea: ubicación, herramientas apagadas con su porqué y carpeta apagada, sin columna derecha", async () => {
   const app = await boot("listo", "machine-task-draft-bar", responses({
     list_live_sessions: ({ project }) => (project === "p1" ? [row("t1")] : []),
     load_session: ({ id }) => session(id, [turn(0, "Hola local"), turn(1, "Respuesta local")]),
@@ -150,14 +150,21 @@ test("la tarea nueva lleva la barra de una tarea: ubicación, herramientas apaga
   const delegadas = doc.querySelector('[data-delegated-trigger="toolbar"]');
   assert.equal(delegadas?.getAttribute("aria-disabled"), "true");
   assert.equal(delegadas.title, "Aún no hay tareas delegadas");
-  boton("Cerrar el árbol de trabajo").click();
+  // La carpeta existe: su icono abre el panel con los archivos base, sin columna aparte.
+  const carpeta = boton("Archivos de la tarea");
+  assert.equal(carpeta?.disabled, false, "la carpeta existe: su icono no se apaga");
+  assert.equal(carpeta.getAttribute("aria-pressed"), "false");
+  carpeta.click();
+  await sleep(300);
+  assert.equal(boton("Archivos de la tarea")?.getAttribute("aria-pressed"), "true", "el panel de la carpeta no abrió");
+  assert.ok(doc.querySelector("[data-task-location]"), "la barra de ubicación desapareció con el panel abierto");
+  boton("Archivos de la tarea").click();
   await sleep(100);
-  assert.equal(boton("Ver el árbol de trabajo")?.disabled, false, "la carpeta existe: su icono no se apaga");
   // Una tarea real sin delegadas conserva el hueco, y su búsqueda sí funciona.
   await openTask(app, "t1");
   assert.equal(doc.querySelector('[data-delegated-trigger="toolbar"]')?.getAttribute("aria-disabled"), "true");
   assert.equal(doc.querySelector('button[aria-label="Buscar en esta tarea"][aria-keyshortcuts]')?.getAttribute("aria-disabled"), null);
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 test("el PDF que nombra el chat de una tarea de otra máquina se lee en esa máquina", async () => {
@@ -178,7 +185,7 @@ test("el PDF que nombra el chat de una tarea de otra máquina se lee en esa máq
     file_size: there("file_size", 2048),
     preview_file: there("preview_file", { kind: "pdf", text: null, data_url: null, pdf: null, bytes: 2048, truncated: false }),
   }), undefined, {}, {
-    antes: (w) => {
+    beforeImport: (w) => {
       globalThis.IntersectionObserver = w.IntersectionObserver = class {
         constructor(callback) { this.callback = callback; }
         observe(target) { setTimeout(() => this.callback([{ isIntersecting: true, target }], this), 0); }
@@ -238,7 +245,7 @@ test("el composer consulta la máquina elegida y descarta respuestas tardías", 
   finishVm([{ id: "codex", provider: "codex", label: "Codex", catalogo: "todo", usable: true, marca: null, porque: null }]);
   await sleep(150);
   assert.ok(doc.querySelector('[aria-label*="VM model"]'), "la tarea remota conserva los modelos locales");
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 test("reopening a live permission sends the observed durable id and revision", async () => {
@@ -264,7 +271,7 @@ test("reopening a live permission sends the observed durable id and revision", a
   await sleep(200);
   assert.deepEqual(decisions, [{ session: "t1", requestId: "durable-7", revision: 7, allow: true }]);
   assert.equal([...app.w.document.querySelectorAll("button")].some(button => button.textContent?.trim() === "Aprobar y ejecutar"), false);
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 for (const state of ["delivery_unknown", "owner_lost"]) test(`a missing live permission retains its durable ${state} outcome without resending`, async () => {
@@ -287,5 +294,5 @@ for (const state of ["delivery_unknown", "owner_lost"]) test(`a missing live per
   assert.ok(app.w.document.body.textContent.includes(state), "durable outcome remains in the conversation diagnostic");
   if (state === "owner_lost") assert.ok(app.w.document.body.textContent.includes("El proceso que esperaba la respuesta"));
   assert.equal([...app.w.document.querySelectorAll("button")].some(b => b.textContent?.trim() === "Aprobar y ejecutar"), false);
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });

@@ -6,13 +6,14 @@ import { useEffect, useRef, useState } from "react";
 import { Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { type ProviderUsage, providerUsage } from "../lib/accountUsage";
 import { accountWorkspace } from "../lib/engine";
+import type { Folder } from "../lib/engine";
 import type { Host } from "../lib/hosts";
 import { lang, t, w } from "../lib/i18n";
 import { BrandMark } from "./BrandMark";
 import { Icon } from "./Icon";
 import { Tap } from "./list";
 import { measure, type Rect } from "./Popover";
-import { FolderSquare } from "./TaskCard";
+import { FolderIcon } from "./FolderIcon";
 import { type Theme, useTheme } from "./theme";
 
 const windowsOf = (limits: AccountLimits | null | undefined): UsageWindow[] =>
@@ -25,7 +26,7 @@ const toneColor = (theme: Theme, left: number) => {
 
 /**
  * Bajo el título del chat: dónde corre la tarea (máquina / carpeta / rama) y
- * sus herramientas: buscar en el chat, las subtareas (con su número), y la
+ * sus herramientas: buscar en el chat, los archivos de la tarea, las subtareas (con su número, solo si hay), y la
  * barra de uso de la cuenta del proveedor, que abre su detalle. Leer el uso
  * nunca enciende la máquina.
  */
@@ -40,17 +41,19 @@ export function TaskTools({
   finding,
   onFind,
   onTools,
+  onFiles,
 }: {
   host: Host | undefined;
   workspace: string;
   machine: string;
-  folder: { key: string; name: string } | null;
+  folder: Folder | null;
   branch: string | null;
   provider: string | null;
   subtasks: number;
   finding: string | null;
   onFind: (query: string | null) => void;
   onTools: () => void;
+  onFiles: () => void;
 }) {
   const theme = useTheme();
   const [usage, setUsage] = useState<ProviderUsage | null>(null);
@@ -78,7 +81,7 @@ export function TaskTools({
           {folder ? (
             <>
               <Text style={{ color: theme.textMuted }}>/</Text>
-              <FolderSquare id={folder.key} size={8} />
+              <FolderIcon folder={folder} size={13} />
               <Text numberOfLines={1} style={[styles.placeText, { color: theme.text, maxWidth: 100, flexShrink: 0 }]}>{folder.name}</Text>
             </>
           ) : null}
@@ -93,16 +96,15 @@ export function TaskTools({
         <Tap testID="chat-find" accessibilityRole="button" accessibilityLabel={t("task.tools.find")} accessibilityState={{ selected: finding !== null }} onPress={() => onFind(finding === null ? "" : null)} style={styles.tool}>
           <Icon name="search" size={16} color={finding !== null && !theme.dark ? theme.merged : theme.text} strokeWidth={finding !== null ? 2.6 : 2} />
         </Tap>
+        <Tap testID="chat-tree" accessibilityRole="button" accessibilityLabel={t("task.tools.files")} onPress={onFiles} style={styles.tool}>
+          <Icon name="list-tree" size={16} color={theme.text} />
+        </Tap>
         {subtasks ? (
           <Tap testID="chat-subtasks" accessibilityRole="button" accessibilityLabel={t("task.tools.subtasks", { count: subtasks })} onPress={onTools} style={styles.tool}>
             <Icon name="git-fork" size={16} color={theme.text} />
             <Text style={{ color: theme.text, fontSize: TEXT.ui, fontWeight: "600" }}>{subtasks}</Text>
           </Tap>
-        ) : (
-          <Tap testID="chat-tree" accessibilityRole="button" accessibilityLabel={t("task.tools.title")} onPress={onTools} style={styles.tool}>
-            <Icon name="list-tree" size={16} color={theme.text} />
-          </Tap>
-        )}
+        ) : null}
         {tightest !== null ? (
           <View ref={bar} collapsable={false}>
             <Tap testID="chat-usage" accessibilityRole="button" accessibilityLabel={t("task.tools.usage", { left: tightest })} onPress={() => void measure(bar).then(setAnchor)} style={styles.tool}>

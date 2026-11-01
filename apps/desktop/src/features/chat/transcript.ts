@@ -522,7 +522,11 @@ const LINEAS_SIN_PROSA = new Set([
  * escribiendo, y el turno guarda un solo texto porque los deltas se concatenan—,
  * pero deja los pasos pegados a lo que explican, que es para lo que se leen.
  */
-export function transcripcion(turns: Turn[]): Msg[] {
+/**
+ * `start`: la posición del primer turno en la transcripción entera. Cada mensaje lleva
+ * `clave`, su identidad entre lecturas: sin ella, anteponer una página renumera el hilo.
+ */
+export function transcripcion(turns: Turn[], start = 0): Msg[] {
   // Todo lo ofrecido en la sesión hasta este turno. Contra el turno anterior, uno
   // guardado con la lista vacía porque no llegó a lanzarse haría anunciar otra
   // vez todo su material.
@@ -535,7 +539,7 @@ export function transcripcion(turns: Turn[]): Msg[] {
   // los toman del turno de la persona que las lanzó (`closing.rs`).
   let delLanzamiento: Pick<Turn, "reported_model" | "model_vendor"> = {};
 
-  return turns.flatMap((t) => {
+  const mensajesDe = (t: Turn): Msg[] => {
     if (t.role === "user") delLanzamiento = t;
     const cambio: Msg[] = [];
     if (t.sources) {
@@ -681,6 +685,11 @@ export function transcripcion(turns: Turn[]): Msg[] {
     const enOrden = entrelazado(t, propio, paso, visible);
     if (enOrden) return [...cambio, ...enOrden, ...entrega];
     return [...cambio, ...pasos, propio, ...entrega];
+  };
+  return turns.flatMap((t, k) => {
+    const turno = t.id ?? `#${start + k}`;
+    let pieza = 0;
+    return mensajesDe(t).map((m) => ({ ...m, clave: m.contexto ? `${turno}:contexto` : `${turno}:${pieza++}` }));
   });
 }
 

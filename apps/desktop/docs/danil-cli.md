@@ -74,7 +74,7 @@ El entorno de los procesos nuevos debe filtrar también los nombres antiguos.
 
 **La reconciliación conserva el motor de `dev`, `4e10efc24a9be6f8dbf15559f767a50fb109a0a7`.**
 El contrato, sus extensiones y el manifiesto se conservan byte por byte respecto
-de `dev` (`6352210830af16e1973b836a3cc222d90f2aed00`). Los launchers
+de `dev` (`288cdf65ba223b6cf4e5a62e53af3a8d4a7c3f56`). Los launchers
 no acreditan por sí solos la interfaz exclusiva `DANIL_*` del motor del PR
 seldon-host #276, que permanece como integración separada. Su adopción requiere
 revisión de contrato y artefactos con manifiesto y checksums para las cuatro
@@ -87,8 +87,8 @@ al pin ni habilita una publicación.
 ## Evidencia y límites
 
 Las pruebas del instalador usan directorios temporales y ejecutan su código
-real. `cli-path` pasó 6/6 y `cli-forward` 2/2 en Linux; este último comprobó
-26 órdenes raíz del motor fijado y su checksum. La resolución local de npx
+real. `cli-path` pasó 6/6 y `cli-forward` 2/2 en Linux; este último comprueba
+las órdenes raíz del motor fijado y su checksum. La resolución local de npx
 con el paquete de un solo bin mostró la ayuda del instalador sin instalar la app.
 `pnpm verify` incluye ambas pruebas; `--no-cargo` no acredita Rust.
 La evidencia del motor de compatibilidad anterior no acredita la nueva interfaz

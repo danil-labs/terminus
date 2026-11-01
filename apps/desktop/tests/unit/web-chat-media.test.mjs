@@ -37,7 +37,7 @@ async function open(name) {
   });
   const app = await boot("listo", name, {}, undefined, {}, {
     web: true,
-    antes: (w) => {
+    beforeImport: (w) => {
       globalThis.WebSocket = f.Socket;
       // Everything is on screen: the visual reads as soon as it mounts.
       globalThis.IntersectionObserver = w.IntersectionObserver = class {

@@ -279,7 +279,7 @@ caso("una función incluida que falla se nombra y «Reparar» repara todo lo inc
   await sleep(400);
   assert.deepEqual(s.llamadas.install_tool, [{ tool: "bundled-work-tools" }]);
   assert.ok(texto(app).includes("No se pudo reparar el entorno de Danil."), "el error de reparar no se ve en la pantalla");
-  assert.ok(app.comandos.filter((c) => c === "check_environment").length >= 2, "después de reparar no se vuelve a comprobar");
+  assert.ok(app.commands.filter((c) => c === "check_environment").length >= 2, "después de reparar no se vuelve a comprobar");
 });
 
 caso("lo que no contestó a tiempo se dice distinto de lo dañado", async () => {
@@ -368,7 +368,7 @@ caso("Estado del entorno lista solo los extras y lo incluido en una línea con �
   await sleep(300);
   assert.deepEqual(s.llamadas.install_tool, [{ tool: "bundled-work-tools" }]);
   assert.ok(app.w.document.body.textContent.includes("No se pudo reparar el entorno de Danil."));
-  assert.equal(app.comandos.includes("install_base_tool"), false);
+  assert.equal(app.commands.includes("install_base_tool"), false);
 });
 
 const elegido = process.env.SETUP_REPAIR_CASO;

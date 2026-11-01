@@ -34,11 +34,16 @@ import {
   Show,
   type Signal,
   Switch,
+  untrack,
+  useContext,
 } from "solid-js";
 import { Dynamic, Portal } from "solid-js/web";
 import type { ThreadSearchTarget } from "./ThreadSearch";
 import { taskChatPresentation } from "./TaskChatPresentation";
-import { CHUNK, blockOfMessage, chunkAt, chunkIds, chunkOf, chunkStart, headChunk, tailChunk, type Lectura } from "./threadWindow";
+import type { OlderState } from "./history";
+import { createBlockKeys, estimateBlock } from "./threadRows";
+import type { VirtualThreadApi } from "./VirtualThread";
+import { CHUNK, chunkAt, chunkIds, chunkOf, chunkStart, headChunk, tailChunk, type Lectura } from "./threadWindow";
 import { workLabel } from "../projects/branchLabel";
 import { sangrarTerminal } from "./terminalIndent";
 import { ponerLanzamiento } from "./launchGroups";
@@ -110,6 +115,7 @@ import { Dialog, DialogContent, DialogTitle } from "../../ui/Dialog";
 import { asFailure, type Failure, FailureNote, prosaDe } from "../../ui/Failure";
 import { MarcaAgente } from "../../ui/icons";
 import { FileMachine } from "../../ui/fileMachine";
+import { WorkFace } from "./workFace";
 import { Markdown } from "../../ui/Markdown";
 import { createVisualBudget, type VisualBudget } from "./visualBudget";
 import ChatVisual from "./ChatVisual";
@@ -222,6 +228,8 @@ export type Msg = {
    * la pregunta que la provocó sin depender de que estén una debajo de la otra.
    */
   turno?: string;
+  /** Su identidad entre lecturas: turno y pieza (`transcripcion`). Un mensaje vivo aún no la tiene. */
+  clave?: string;
   /** El turno guardado en el que el motor ya escribió este mensaje vivo (`segment_saved`). */
   tramo?: string;
   /**
@@ -438,8 +446,6 @@ export type ChatProps = {
   agentTasks?: JSX.Element;
   delegatedTask?: (reference: SenderTask) => JSX.Element;
   coordinator?: JSX.Element;
-  /** Máquina / proyecto / rama, arriba a la izquierda (`TaskLocation`). */
-  location?: JSX.Element;
   /** The task's files panel is open beside the chat: the composer loses its right margin. */
   besideFiles?: boolean;
   /** La máquina de la tarea si no es la de la ventana: los archivos del chat se leen allí. */
@@ -449,6 +455,8 @@ export type ChatProps = {
   chatName?: string | null;
   chatDescription?: string | null;
   chatBody?: string | null;
+  /** El agente de la tarea: su animación es el indicador del trabajo en curso. */
+  workAgent?: string | null;
   /** Ruta de su imagen propia. Gana al cuerpo. */
   chatAvatar?: string | null;
   /** La cara que eligió cada encargado que firma o recibe un mensaje. */
@@ -473,9 +481,13 @@ export type ChatProps = {
   /** Si hay turnos anteriores a lo cargado que el motor puede dar por páginas. */
   masAntiguos?: boolean;
   masRecientes?: boolean;
-  onRecientes?: () => void;
+  onRecientes?: () => void | Promise<void>;
   /** Pide la página anterior; resuelve con lo que la pone en el hilo, o `null`. */
   onAntiguos?: () => Promise<(() => void) | null>;
+  /** Cómo va la página anterior: un fallo se queda a la vista hasta reintentar. */
+  estadoAntiguos?: OlderState;
+  /** Si alguien lee lejos del final: una cola nueva no le quita lo que lee. */
+  onLeyendo?: (leyendo: boolean) => void;
   busy: boolean;
   stopping: boolean;
   agents: Agent[];
@@ -1181,7 +1193,14 @@ export default function Chat(props: ChatProps) {
     const lectura = retomarLectura;
     retomarLectura = null;
     const bloque = lectura && bloqueDeLectura(lectura);
-    if (lectura && bloque !== null) return hilo.retomar(bloque - chunkStart(shownFrom(), origen()), lectura.desfase);
+    if (lectura && bloque !== null) {
+      if (hiloVirtual) {
+        hilo.soltar();
+        lecturaPorSaltar = lectura;
+        return queueMicrotask(saltarALaLectura);
+      }
+      return hilo.retomar(bloque - chunkStart(shownFrom(), origen()), lectura.desfase);
+    }
     hilo.recolocar();
     hilo.bajar({ animacion: "instantanea", duracion: 300, ignorarEscapes: true });
   };
@@ -1587,7 +1606,7 @@ export default function Chat(props: ChatProps) {
         // El registro vivo y el turno cerrado son la misma fila. Conservar el
         // índice donde nació evita que su pliegue cambie de identidad justo al
         // llegar la respuesta, que es también cuando más cambia su contenido.
-        const bloque: BloqueDeTrabajo = { tipo: "trabajo", pasos, msg: m, i: ultimo?.i ?? i };
+        const bloque: BloqueDeTrabajo = { tipo: "trabajo", pasos, msg: m, i: ultimo?.tipo === "pasos" ? ultimo.i : i };
         // La respuesta de un turno cerrado se lleva su avance al pliegue.
         const avance: Avance[] = [];
         for (let previo = out.at(-1); m.turno && previo?.tipo === "trabajo" && previo.msg.avanceDe === m.turno; previo = out.at(-1)) {
@@ -1623,6 +1642,7 @@ export default function Chat(props: ChatProps) {
       if (m.meta === "cupo" && anterior?.tipo === "msg" && cupoResuelveElFallo(anterior.msg.fallo?.clase)) out.pop();
       if (
         m.role !== "system" ||
+        m.meta === "history_gap" ||
         m.meta === "fallo" ||
         m.meta === "cupo" ||
         m.meta === "engine_updated" ||
@@ -1657,10 +1677,80 @@ export default function Chat(props: ChatProps) {
   // Pasos que llegan tras la respuesta abren otro tramo, y el de la respuesta deja de correr.
   const registroCorre = (bloque: Bloque) => fromWork(bloque, (t) => esElVivo(t.msg), false) && esLaTiraViva(bloque);
 
-  const bloqueDeLectura = (lectura: Lectura) => blockOfMessage(bloques().map((b) => b.i), lectura.mensaje);
+  const clavesDeBloques = createBlockKeys();
+  const claves = createMemo(on(() => props.conversacion, (conversacion, anterior) => {
+    if (anterior !== undefined && anterior !== conversacion) clavesDeBloques.reset();
+  }));
+  const clavesDelHilo = createMemo(() => {
+    claves();
+    const lista = bloques();
+    const asignadas = clavesDeBloques.assign(lista.map((b) => props.msgs[b.i]?.clave ?? null));
+    // Por clave y no por índice: al anteponer, un índice viejo sobre los bloques nuevos es otra fila y su contenido se rehace.
+    return { lista: asignadas, deBloque: new Map(lista.map((b, k) => [b, asignadas[k]])), deClave: new Map(lista.map((b, k) => [asignadas[k], b])) };
+  });
+  createEffect(() => {
+    clavesDelHilo();
+    const renombradas = clavesDeBloques.takeRenames().filter(([vieja]) => claveDeBloque(vieja) in untrack(trabajos));
+    if (!renombradas.length) return;
+    setTrabajos({ ...untrack(trabajos), ...Object.fromEntries(renombradas.map(([vieja, nueva]) => [claveDeBloque(nueva), untrack(trabajos)[claveDeBloque(vieja)]])) });
+  });
+  const claveFila = (b: Bloque) => claveDeBloque(props.msgs[b.i]?.clave ?? clavesDelHilo().deBloque.get(b) ?? String(b.i));
+  const bloqueDeLectura = (lectura: Lectura) => {
+    const at = clavesDelHilo().lista.indexOf(lectura.clave);
+    return at < 0 ? null : at;
+  };
+  // Sin layout (jsdom) todo mide cero: el hilo se monta entero por tramos.
+  const hiloVirtual = typeof ResizeObserver !== "undefined" && document.documentElement.getBoundingClientRect().width > 0 && !localStorage.getItem(HILO_POR_TRAMOS);
+  // En su propio trozo: la carga inicial tiene techo y el hilo llega después de pintar la ventana.
+  const [hiloDeFilasListo, setHiloDeFilasListo] = createSignal<typeof import("./VirtualThread").VirtualThread>();
+  if (hiloVirtual) void import("./VirtualThread").then((module) => setHiloDeFilasListo(() => module.VirtualThread));
+  let hiloDeFilas: VirtualThreadApi | undefined;
+  let lecturaPorSaltar: Lectura | null = null;
+  const saltarALaLectura = () => {
+    const lectura = lecturaPorSaltar;
+    const bloque = lectura && bloqueDeLectura(lectura);
+    if (!lectura || bloque === null || !hiloDeFilas) return;
+    lecturaPorSaltar = null;
+    void hiloDeFilas.jump(bloque, lectura.desfase);
+  };
+  const volverAReciente = () => void Promise.resolve(props.onRecientes?.()).then(() => hilo.bajar({ animacion: "instantanea", duracion: 300, ignorarEscapes: true }));
+  const [primeraFila, setPrimeraFila] = createSignal<number | null>(null);
+  const [cajaDeFilas, setCajaDeFilas] = createSignal<HTMLElement>();
+  // Una instancia por conversación: ninguna medida ni fila pasa de una tarea a otra.
+  const cajaVirtual = createMemo<{ el: HTMLElement } | undefined>((previa) => {
+    const el = cajaDeFilas();
+    props.conversacion;
+    return el ? { el } : previa && undefined;
+  });
+  createEffect(() => {
+    if (!hiloVirtual || !props.masAntiguos || props.estadoAntiguos === "failed" || props.estadoAntiguos === "loading") return;
+    const fila = primeraFila();
+    if (fila !== null && fila <= FILAS_ANTES_DE_PEDIR) void pedirAntiguos();
+  });
+  const [retenidas, setRetenidas] = createSignal<ReadonlySet<string>>(new Set());
+  const retenerFila = (clave: string | null, motivo: string) => setRetenidas((todas) => {
+    const previa = motivos.get(motivo) ?? null;
+    if (previa === clave) return todas;
+    if (clave) motivos.set(motivo, clave);
+    else motivos.delete(motivo);
+    return new Set(motivos.values());
+  });
+  const motivos = new Map<string, string>();
+  const filasRetenidas = createMemo<ReadonlySet<string>>(() => {
+    const fija = retenidas();
+    const viva = props.busy ? clavesDelHilo().lista.at(-1) : undefined;
+    return viva ? new Set([...fija, viva]) : fija;
+  });
+  const filaDe = (nodo: Node | null | undefined) =>
+    (nodo instanceof Element ? nodo : nodo?.parentElement)?.closest<HTMLElement>("[data-thread-key]")?.dataset.threadKey ?? null;
+  const altoEstimado = (index: number) => {
+    const b = bloques()[index];
+    if (!b) return 80;
+    return estimateBlock(b.tipo, b.tipo === "pasos" ? 0 : b.msg.text.length, b.tipo === "msg" ? 0 : b.pasos.length);
+  };
   // El primer tramo montado se fija al cargar la conversación y solo retrocede:
   // si avanzara con cada mensaje nuevo, desmontaría lo que alguien lee arriba.
-  const bloqueInicial = props.lectura ? bloqueDeLectura(props.lectura) : null;
+  const bloqueInicial = props.lectura && !hiloVirtual ? bloqueDeLectura(props.lectura) : null;
   const [firstChunk, setFirstChunk] = createSignal<number | null>(
     bloqueInicial === null ? null : Math.floor(bloqueInicial / CHUNK),
   );
@@ -1676,6 +1766,7 @@ export default function Chat(props: ChatProps) {
   }, { defer: true }));
   // Plegar el avance de un turno encoge el hilo: lo montado no pasa del final.
   const shownFrom = createMemo(() => {
+    if (hiloVirtual) return headChunk(origen());
     if (typeof IntersectionObserver === "undefined") return headChunk(origen());
     const tail = tailChunk(bloques().length, origen());
     return Math.min(firstChunk() ?? tail, tail);
@@ -1689,7 +1780,7 @@ export default function Chat(props: ChatProps) {
   // esto cada tramo que alguien subió a leer queda montado hasta cerrar la pestaña.
   const sobranTramos = createMemo(() => {
     const tail = tailChunk(bloques().length, origen());
-    return hilo.alFondo() && shownFrom() < tail && cabeHasta() !== tail;
+    return !hiloVirtual && hilo.alFondo() && shownFrom() < tail && cabeHasta() !== tail;
   });
   createEffect(() => {
     if (!sobranTramos()) return;
@@ -1701,9 +1792,14 @@ export default function Chat(props: ChatProps) {
   });
   onCleanup(() => {
     const lectura = hilo.lectura();
-    const bloque = lectura && bloques()[chunkStart(shownFrom(), origen()) + lectura.hijo];
-    props.onLectura?.(lectura && bloque ? { mensaje: bloque.i, desfase: lectura.desfase } : null);
+    if (!lectura) return props.onLectura?.(null);
+    const clave = hiloVirtual
+      // Del nodo y no de su sitio: al desmontar, las filas ya salieron del hilo.
+      ? (lectura.el as HTMLElement).dataset.threadKey
+      : clavesDelHilo().lista[chunkStart(shownFrom(), origen()) + lectura.hijo];
+    props.onLectura?.(clave ? { clave, desfase: lectura.desfase } : null);
   });
+  createEffect(() => props.onLeyendo?.(!hilo.alFondo()));
   // Lo anterior entra por delante del tramo 0: lo montado conserva sus ids y no se remonta.
   let pidiendo = false;
   const pedirAntiguos = async () => {
@@ -1714,6 +1810,7 @@ export default function Chat(props: ChatProps) {
       pidiendo = false;
     });
     if (!poner || conversacion !== props.conversacion) return;
+    if (hiloVirtual) return batch(poner);
     const cabeza = bloques()[0];
     const primero = cabeza && props.msgs[cabeza.i];
     hilo.anteponer(() =>
@@ -1727,7 +1824,7 @@ export default function Chat(props: ChatProps) {
   };
   // Va con el borde y no con el componente: el hilo se desmonta mientras carga.
   const watchOlder = (edge: HTMLDivElement) => {
-    if (typeof IntersectionObserver === "undefined") return;
+    if (typeof IntersectionObserver === "undefined" || hiloVirtual) return;
     const older = new IntersectionObserver(
       (entries) => {
         // Tras volver a observar pueden llegar dos: la que vale es la última.
@@ -1795,6 +1892,14 @@ export default function Chat(props: ChatProps) {
     const hijos = elContenido?.children;
     const montadoDesde = chunkStart(shownFrom(), origen());
     const corte = elHilo.getBoundingClientRect().top + (elHilo.clientHeight - altoDeLaCaja()) / 3;
+    if (hiloVirtual) {
+      const borde = corte - elHilo.getBoundingClientRect().top;
+      for (let k = lista.length - 1; k >= 0; k--) {
+        const arriba = hiloDeFilas?.topOf(lista[k].block);
+        if (arriba !== null && arriba !== undefined && arriba <= borde) return setMensajeVisto(k);
+      }
+      return setMensajeVisto(0);
+    }
     for (let k = lista.length - 1; k >= 0; k--) {
       const el = hijos?.[lista[k].block - montadoDesde];
       if (lista[k].block < montadoDesde || (el && el.getBoundingClientRect().top <= corte)) return setMensajeVisto(k);
@@ -1805,12 +1910,42 @@ export default function Chat(props: ChatProps) {
     hilo.contenedor(el);
     elHilo = el;
     setSearchThread(el);
+    // Tras insertarla: recién clonada del `<template>` su documento no tiene ventana ni observadores.
+    createEffect(() => setCajaDeFilas(el));
     let espera: ReturnType<typeof setTimeout> | undefined;
     const alScrollear = () => {
       clearTimeout(espera);
       espera = setTimeout(medirMensajeVisto, ESPERA_DEL_RIEL_MS);
     };
     el.addEventListener("scroll", alScrollear, { passive: true });
+    const alEnfocar = (e: FocusEvent) => retenerFila(filaDe(e.target as Node), "foco");
+    const alDesenfocar = (e: FocusEvent) => { if (!el.contains(e.relatedTarget as Node | null)) retenerFila(null, "foco"); };
+    const alPulsar = (e: PointerEvent) => retenerFila(filaDe(e.target as Node), "gesto");
+    const alSoltar = () => retenerFila(null, "gesto");
+    const alSeleccionar = () => {
+      const seleccion = document.getSelection();
+      const dentroDelHilo = seleccion && !seleccion.isCollapsed && el.contains(seleccion.anchorNode);
+      retenerFila(dentroDelHilo ? filaDe(seleccion.anchorNode) : null, "seleccion");
+      retenerFila(dentroDelHilo ? filaDe(seleccion.focusNode) : null, "seleccion-fin");
+    };
+    if (hiloVirtual) {
+      el.addEventListener("focusin", alEnfocar);
+      el.addEventListener("focusout", alDesenfocar);
+      el.addEventListener("pointerdown", alPulsar);
+      window.addEventListener("pointerup", alSoltar);
+      window.addEventListener("pointercancel", alSoltar);
+      document.addEventListener("selectionchange", alSeleccionar);
+      onCleanup(() => {
+        el.removeEventListener("focusin", alEnfocar);
+        el.removeEventListener("focusout", alDesenfocar);
+        el.removeEventListener("pointerdown", alPulsar);
+        window.removeEventListener("pointerup", alSoltar);
+        window.removeEventListener("pointercancel", alSoltar);
+        document.removeEventListener("selectionchange", alSeleccionar);
+        motivos.clear();
+        setRetenidas(new Set<string>());
+      });
+    }
     // `clientWidth` y no la entrada: sin layout —jsdom— no hay ancho, y el riel no tiene dónde ir.
     const ojo = typeof ResizeObserver === "undefined"
       ? undefined
@@ -1820,19 +1955,24 @@ export default function Chat(props: ChatProps) {
       clearTimeout(espera);
       el.removeEventListener("scroll", alScrollear);
       ojo?.disconnect();
-      if (elHilo === el) { elHilo = undefined; setSearchThread(undefined); }
+      if (elHilo === el) { elHilo = undefined; setSearchThread(undefined); setCajaDeFilas(undefined); }
     });
   };
   createEffect(on([inputsDelHilo, hilo.alFondo], () => medirMensajeVisto()));
   /** Monta el tramo del mensaje si no estaba y lo deja arriba, suelto del fondo. */
   const saltarAlMensaje = (bloque: number) => {
+    if (hiloVirtual) {
+      hilo.soltar();
+      void hiloDeFilas?.jump(bloque, DESFASE_DEL_SALTO).then(medirMensajeVisto);
+      return;
+    }
     const tramo = chunkAt(bloque, origen());
     if (tramo < shownFrom()) hilo.anteponer(() => setFirstChunk(tramo));
     hilo.retomar(bloque - chunkStart(shownFrom(), origen()), DESFASE_DEL_SALTO);
     medirMensajeVisto();
   };
 
-  onMount(() => props.onSearchReady?.({ messages: searchMessages, thread: searchThread, jump: saltarAlMensaje }));
+  onMount(() => props.onSearchReady?.({ messages: searchMessages, thread: searchThread, jump: saltarAlMensaje, move: (delta) => hilo.escribir((elHilo?.scrollTop ?? 0) + delta, true) }));
   onCleanup(() => props.onSearchReady?.(null));
 
   /**
@@ -2720,178 +2860,27 @@ export default function Chat(props: ChatProps) {
     </div>
   );
 
-  return (
-    <FileMachine.Provider value={() => props.machine}>
-      <Dialog open={forkTurn() !== null} onOpenChange={(open) => { if (!open && !forkeando()) setForkTurn(null); }}>
-        <DialogContent>
-          <DialogTitle class="text-base font-semibold">{t("chat.continuation.title")}</DialogTitle>
-          <Dialog.Description class="my-3 text-sm text-neutral-500">{t("chat.continuation.description")}</Dialog.Description>
-          <Show when={(props.forkAgents ?? []).length > 0}>
-            <label class="mb-3 flex flex-col gap-1 text-xs text-neutral-500">
-              {t("chat.continuation.agent")}
-              <Select
-                value={forkAgentChoice()}
-                disabled={forkeando() !== null}
-                onChange={(e) => setForkAgentChoice(e.currentTarget.value)}
-              >
-                <option value="">{t("chat.continuation.no_agent")}</option>
-                <For each={props.forkAgents}>{(name) => <option value={name}>{name}</option>}</For>
-              </Select>
-            </label>
-          </Show>
-          <div class="flex flex-col gap-2">
-            <Button variant="outline" disabled={forkeando() !== null} onClick={() => void forkDesde("full")}>{t("chat.continuation.full")}</Button>
-            <Button variant="outline" disabled={forkeando() !== null} onClick={() => void forkDesde("focused")}>{t("chat.continuation.focused")}</Button>
-            <Button variant="ghost" disabled={forkeando() !== null} onClick={() => setForkTurn(null)}>{t("chat.continuation.cancel")}</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-      {/* Mide la caja de la conversación: el padre es su ventana del reparto. */}
-      <span ref={ancla} class="hidden" aria-hidden="true" />
-      {/* El velo cubre solo esta conversación, la que recibe al soltar. Va fijo con
-          la medida de su caja: el padre no siempre es `relative`. Sin
-          `pointer-events`: un nodo capturando el puntero estorbaría al `leave`. */}
-      <Show when={!props.soloLectura && soltando()}>
-        {(caja) => (
-        <div
-          class="pointer-events-none fixed z-50 grid place-items-center rounded-md bg-black/40 p-6"
-          style={{ left: `${caja().left}px`, top: `${caja().top}px`, width: `${caja().width}px`, height: `${caja().height}px` }}
-          aria-hidden="true"
-        >
-          <div class="flex items-center gap-2 rounded-lg border-2 border-dashed border-primary bg-surface px-4 py-3 shadow-lg">
-            <FileText size={16} class="shrink-0 text-primary" />
-            <span class="text-sm font-medium">{t("chat.drop.hint")}</span>
-          </div>
-        </div>
-        )}
-      </Show>
-
-    {/* El esqueleto se pinta contra la caja (`justify-end`), donde va a
-        estar el final del hilo: lo que se sustituye ocupa el mismo sitio.
-        Sin barra de scroll (`overflow-hidden`) y sin rótulo: el esqueleto
-        ya trae su forma y su `aria-busy` (`ui/Skeleton.tsx`). */}
-    <Show
-      when={!props.cargando}
-      fallback={
-        <>
-          <div class={cn("min-h-0 flex-1 overflow-hidden", margenDelHilo)}>
-            {/* El armazón está siempre —es lo que reserva el sitio de la caja y
-                del final del hilo—; lo que espera al umbral son las barras.
-                Ver `UMBRAL_DEL_ESQUELETO_MS`: por debajo, dibujarlas es meter
-                una forma que se va antes de que la veas. */}
-            <div
-              class={cn(
-                "mx-auto flex h-full w-full flex-col justify-end gap-6",
-                "max-w-[860px]",
-              )}
-            >
-              <Show when={esperaVisible()}>
-                <Skeleton class="ml-auto h-9 w-[40%] rounded-lg" />
-                <Skeleton filas={4} class="h-4 rounded-sm" />
-                <Skeleton class="ml-auto h-9 w-[28%] rounded-lg" />
-                <Skeleton filas={2} class="h-4 rounded-sm" />
-              </Show>
-            </div>
-          </div>
-          <div
-            class="flex shrink-0 flex-col items-center px-4 pt-1 pb-3"
-          >
-            <Show when={props.recovery} fallback={<Caja />}>{props.recovery}</Show>
-          </div>
-        </>
-      }
-    >
-      {/* El overlay de soltar solo se pinta aquí — las rutas no salen de
-          él, el `drop` de HTML5 entrega un `File` sin ruta en disco y el
-          estado lo maneja `onDragDropEvent` (arriba). Tres niveles: el de
-          fuera es el marco del botón de bajar, el de en medio es el que
-          scrollea, el de dentro es lo único medible —tiene el alto de su
-          hueco y no cambia—. `lib/paste.ts`. */}
-      <div class="relative flex min-h-0 flex-1 flex-col">
-      <Show when={props.masRecientes}><button type="button" class="shrink-0 py-2 text-xs text-primary underline" onClick={() => props.onRecientes?.()}>{t("chat.history.latest")}</button></Show>
-      {props.location}
-      {props.coordinator}
-      <Show when={!props.agentDraft ? props.chatEncargado : null}>
-        {(name) => (
-          /* La cabecera entera abre el perfil, como el contacto de un chat:
-             un botón aparte al lado sería un segundo destino para lo mismo. */
-          <header class="relative z-10 flex shrink-0 items-center gap-3 bg-transparent px-4 py-2.5">
-            <button
-              class="flex min-w-0 flex-1 items-center gap-3 rounded-sm border-0 bg-transparent p-0 text-left outline-none hover:opacity-80 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-              disabled={!props.onOpenProfile}
-              title={t("projects.agents.profile_open")}
-              onClick={() => props.onOpenProfile?.()}
-            >
-              <AstroAvatar
-                name={name()}
-                status={props.chatEstado ?? "awake"}
-                body={props.chatBody}
-                avatar={props.chatAvatar}
-                size={44}
-              />
-              {/* Solo el nombre: el estado ya lo dice la cara, y escribirlo
-                  además deja dos rótulos del mismo estado en la misma barra. */}
-              <div class="min-w-0 truncate text-[0.95rem] leading-tight font-semibold">
-                {props.chatName?.trim() || name()}
-              </div>
-            </button>
-          </header>
-        )}
-      </Show>
-      <div
-        class={cn(
-          "relative min-h-0 flex-1 overflow-auto [overflow-anchor:none]",
-          margenDelHilo,
-        )}
-        ref={tomarHilo}
-        style={props.chatEncargado ? { "clip-path": `inset(0 0 ${altoDeLaCaja()}px 0)` } : undefined}
-      >
-        <div ref={watchOlder} class="pointer-events-none absolute inset-x-0 top-0 h-px" aria-hidden="true" />
-        <Show when={rielVisible()}>
-          <YourMessages
-            messages={inputsDelHilo()}
-            active={mensajeVisto()}
-            visibleHeight={cajaDelHilo().alto - altoDeLaCaja()}
-            onJump={saltarAlMensaje}
-            bodyOf={props.bodyOf}
-            avatarOf={props.avatarOf}
-          />
-        </Show>
-        <div
-          data-chat-thread
-          class={cn(
-            "mx-auto grid w-full gap-y-4",
-            "max-w-[964px] px-[52px] grid-cols-[minmax(0,1fr)]",
-          )}
-          ref={(el) => {
-            hilo.contenido(el);
-            elContenido = el;
-          }}
-        >
-          {/* La transcripción solo añade al final; el último bloque puede pasar
-              de ejecución viva a turno cerrado. `For` identifica por el objeto
-              y `bloques()` fabrica objetos nuevos con cada delta: desmontaba
-              también las filas antiguas, perdía el ancla de lectura y hacía
-              que WebKit encogiera y recompusiera el hilo en dos movimientos.
-              `Index` conserva cada sitio del DOM y solo actualiza sus datos. */}
-          <For each={chunks()}>
-          {(chunk) => (
-          <Index each={chunkOf(bloques(), chunk, origen())}>
-            {(bloque, blockIndex) => {
+  const filaDelHilo = (bloque: () => Bloque, indice: () => number) => {
               const b = () => bloque();
               const mensaje = () => mensajeDe(b());
               const startsLaunchGroup = () => {
-                const index = chunkStart(chunk, origen()) + blockIndex;
-                if (index === chunkStart(shownFrom(), origen())) return true;
+                const index = indice();
+                if (index === (hiloVirtual ? 0 : chunkStart(shownFrom(), origen()))) return true;
                 const previous = bloques()[index - 1];
                 return previous?.tipo !== "msg" || previous.msg.meta !== "task_launched" || !previous.msg.fromTask;
               };
               return (
               <Switch>
+                <Match when={mensaje()?.msg.meta === "history_gap"}>
+                  <div class="col-start-1 min-w-0 py-1 text-center text-xs text-neutral-500" data-history-gap>
+                    {t("chat.history.gap")}{" "}
+                    <button type="button" class="text-primary underline" onClick={volverAReciente}>{t("chat.history.latest")}</button>
+                  </div>
+                </Match>
                 <Match when={trabajoDe(b())}>
                   {(trabajo) => (
                     <TrabajoDeAgente
-                      searchBlock={chunkStart(chunk, origen()) + blockIndex}
+                      searchBlock={indice()}
                       visualBudget={visualBudget}
                       visualScope={props.visualScope}
                       readVisual={props.readVisual}
@@ -2902,9 +2891,9 @@ export default function Chat(props: ChatProps) {
                       respuestas={fromWork(b(), (t) => (t.msg.turno ? respondido().get(t.msg.turno) ?? null : null), null)}
                       vivo={fromWork(b(), (t) => esElVivo(t.msg), false)}
                       corriendo={registroCorre(b())}
-                      abiertoElTrabajo={Boolean(trabajos()[claveDeBloque(b().i)])}
+                      abiertoElTrabajo={Boolean(trabajos()[claveFila(b())])}
                       onAlternarTrabajo={() => {
-                        const k = claveDeBloque(trabajo().i);
+                        const k = claveFila(trabajo());
                         setTrabajos({ ...trabajos(), [k]: !trabajos()[k] });
                       }}
                       preguntasAbiertas={!preguntasPlegadas()[claveDeTrabajo(fromWork(b(), (t) => t.msg, SIN_MENSAJE))]}
@@ -2941,9 +2930,9 @@ export default function Chat(props: ChatProps) {
                     <RegistroDeTrabajo
                       pasos={pasosDe(b())?.pasos ?? []}
                       corriendo={esLaTiraViva(b())}
-                      abierto={trabajos()[claveDeBloque(b().i)]}
+                      abierto={trabajos()[claveFila(b())]}
                       onAlternar={(abierto) => {
-                        setTrabajos({ ...trabajos(), [claveDeBloque(bp().i)]: abierto });
+                        setTrabajos({ ...trabajos(), [claveFila(bp())]: abierto });
                       }}
                     />
                     </div>
@@ -3088,7 +3077,7 @@ export default function Chat(props: ChatProps) {
                         entrante() ? presentation().incomingMessage : presentation().userMessage,
                       )}
                     >
-                      <Show when={m().historyRefs?.length}><HistoryDetails refs={m().historyRefs!} /></Show>
+                      <Show when={m().historyRefs?.length}><HistoryDetails refs={m().historyRefs!} turnId={m().turno} /></Show>
                       <Show when={entrante()}>
                         <div class="mb-1 flex justify-start gap-1 text-[0.72rem] text-neutral-500" data-sender={m().encargado ? "agent" : "task"}>
                           <Show when={m().encargado}>
@@ -3167,7 +3156,7 @@ export default function Chat(props: ChatProps) {
                             a ser texto plano, la estructura solo existiría
                             mientras se escribe. */}
                         <Show when={m().text}>
-                          <p data-thread-search-text={chunkStart(chunk, origen()) + blockIndex} class="m-0 leading-[1.5] break-words whitespace-pre-wrap">
+                          <p data-thread-search-text={indice()} class="m-0 leading-[1.5] break-words whitespace-pre-wrap">
                             {/* Index y no For: los tramos se recalculan con objetos nuevos en cada cambio del hilo, y For recrearía cada etiqueta. */}
                             <Index each={tramosDelMensaje(m().text, commandNames())}>
                               {(tramo) => (
@@ -3202,9 +3191,9 @@ export default function Chat(props: ChatProps) {
                         <HoraDelTurno at={m().at} />
                         <Show when={m().text}>
                           <BotonCopiar
-                            copiando={copiando() === claveDeBloque(b().i)}
-                            copiado={copiado() === claveDeBloque(b().i)}
-                            onCopiar={() => void copiarMensaje(claveDeBloque(b().i), m().text)}
+                            copiando={copiando() === claveFila(b())}
+                            copiado={copiado() === claveFila(b())}
+                            onCopiar={() => void copiarMensaje(claveFila(b()), m().text)}
                           />
                         </Show>
                       </div>
@@ -3231,10 +3220,196 @@ export default function Chat(props: ChatProps) {
                 </Match>
               </Switch>
               );
-            }}
-          </Index>
+  };
+
+  return (
+    <FileMachine.Provider value={() => props.machine}>
+    <WorkFace.Provider value={() => props.workAgent ? { name: props.workAgent, body: props.chatBody, avatar: props.chatAvatar } : null}>
+      <Dialog open={forkTurn() !== null} onOpenChange={(open) => { if (!open && !forkeando()) setForkTurn(null); }}>
+        <DialogContent>
+          <DialogTitle class="text-base font-semibold">{t("chat.continuation.title")}</DialogTitle>
+          <Dialog.Description class="my-3 text-sm text-neutral-500">{t("chat.continuation.description")}</Dialog.Description>
+          <Show when={(props.forkAgents ?? []).length > 0}>
+            <label class="mb-3 flex flex-col gap-1 text-xs text-neutral-500">
+              {t("chat.continuation.agent")}
+              <Select
+                value={forkAgentChoice()}
+                disabled={forkeando() !== null}
+                onChange={(e) => setForkAgentChoice(e.currentTarget.value)}
+              >
+                <option value="">{t("chat.continuation.no_agent")}</option>
+                <For each={props.forkAgents}>{(name) => <option value={name}>{name}</option>}</For>
+              </Select>
+            </label>
+          </Show>
+          <div class="flex flex-col gap-2">
+            <Button variant="outline" disabled={forkeando() !== null} onClick={() => void forkDesde("full")}>{t("chat.continuation.full")}</Button>
+            <Button variant="outline" disabled={forkeando() !== null} onClick={() => void forkDesde("focused")}>{t("chat.continuation.focused")}</Button>
+            <Button variant="ghost" disabled={forkeando() !== null} onClick={() => setForkTurn(null)}>{t("chat.continuation.cancel")}</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      {/* Mide la caja de la conversación: el padre es su ventana del reparto. */}
+      <span ref={ancla} class="hidden" aria-hidden="true" />
+      {/* El velo cubre solo esta conversación, la que recibe al soltar. Va fijo con
+          la medida de su caja: el padre no siempre es `relative`. Sin
+          `pointer-events`: un nodo capturando el puntero estorbaría al `leave`. */}
+      <Show when={!props.soloLectura && soltando()}>
+        {(caja) => (
+        <div
+          class="pointer-events-none fixed z-50 grid place-items-center rounded-md bg-black/40 p-6"
+          style={{ left: `${caja().left}px`, top: `${caja().top}px`, width: `${caja().width}px`, height: `${caja().height}px` }}
+          aria-hidden="true"
+        >
+          <div class="flex items-center gap-2 rounded-lg border-2 border-dashed border-primary bg-surface px-4 py-3 shadow-lg">
+            <FileText size={16} class="shrink-0 text-primary" />
+            <span class="text-sm font-medium">{t("chat.drop.hint")}</span>
+          </div>
+        </div>
+        )}
+      </Show>
+
+    {/* El esqueleto se pinta contra la caja (`justify-end`), donde va a
+        estar el final del hilo: lo que se sustituye ocupa el mismo sitio.
+        Sin barra de scroll (`overflow-hidden`) y sin rótulo: el esqueleto
+        ya trae su forma y su `aria-busy` (`ui/Skeleton.tsx`). */}
+    <Show
+      when={!props.cargando}
+      fallback={
+        <>
+          <div class={cn("min-h-0 flex-1 overflow-hidden", margenDelHilo)}>
+            {/* El armazón está siempre —es lo que reserva el sitio de la caja y
+                del final del hilo—; lo que espera al umbral son las barras.
+                Ver `UMBRAL_DEL_ESQUELETO_MS`: por debajo, dibujarlas es meter
+                una forma que se va antes de que la veas. */}
+            <div
+              class={cn(
+                "mx-auto flex h-full w-full flex-col justify-end gap-6",
+                "max-w-[860px]",
+              )}
+            >
+              <Show when={esperaVisible()}>
+                <Skeleton class="ml-auto h-9 w-[40%] rounded-lg" />
+                <Skeleton filas={4} class="h-4 rounded-sm" />
+                <Skeleton class="ml-auto h-9 w-[28%] rounded-lg" />
+                <Skeleton filas={2} class="h-4 rounded-sm" />
+              </Show>
+            </div>
+          </div>
+          <div
+            class="flex shrink-0 flex-col items-center px-4 pt-1 pb-3"
+          >
+            <Show when={props.recovery} fallback={<Caja />}>{props.recovery}</Show>
+          </div>
+        </>
+      }
+    >
+      {/* El overlay de soltar solo se pinta aquí — las rutas no salen de
+          él, el `drop` de HTML5 entrega un `File` sin ruta en disco y el
+          estado lo maneja `onDragDropEvent` (arriba). Tres niveles: el de
+          fuera es el marco del botón de bajar, el de en medio es el que
+          scrollea, el de dentro es lo único medible —tiene el alto de su
+          hueco y no cambia—. `lib/paste.ts`. */}
+      <div class="relative flex min-h-0 flex-1 flex-col">
+      <Show when={props.masRecientes}><button type="button" class="shrink-0 py-2 text-xs text-primary underline" onClick={volverAReciente}>{t("chat.history.latest")}</button></Show>
+      {props.coordinator}
+      <Show when={!props.agentDraft ? props.chatEncargado : null}>
+        {(name) => (
+          /* La cabecera entera abre el perfil, como el contacto de un chat:
+             un botón aparte al lado sería un segundo destino para lo mismo. */
+          <header class="relative z-10 flex shrink-0 items-center gap-3 bg-transparent px-4 py-2.5">
+            <button
+              class="flex min-w-0 flex-1 items-center gap-3 rounded-sm border-0 bg-transparent p-0 text-left outline-none hover:opacity-80 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              disabled={!props.onOpenProfile}
+              title={t("projects.agents.profile_open")}
+              onClick={() => props.onOpenProfile?.()}
+            >
+              <AstroAvatar
+                name={name()}
+                status={props.chatEstado ?? "awake"}
+                body={props.chatBody}
+                avatar={props.chatAvatar}
+                size={44}
+              />
+              {/* Solo el nombre: el estado ya lo dice la cara, y escribirlo
+                  además deja dos rótulos del mismo estado en la misma barra. */}
+              <div class="min-w-0 truncate text-[0.95rem] leading-tight font-semibold">
+                {props.chatName?.trim() || name()}
+              </div>
+            </button>
+          </header>
+        )}
+      </Show>
+      <div
+        class={cn(
+          "relative min-h-0 flex-1 overflow-auto [overflow-anchor:none]",
+          margenDelHilo,
+        )}
+        ref={tomarHilo}
+        style={props.chatEncargado ? { "clip-path": `inset(0 0 ${altoDeLaCaja()}px 0)` } : undefined}
+      >
+        <div ref={watchOlder} class="pointer-events-none absolute inset-x-0 top-0 h-px" aria-hidden="true" />
+        <Show when={rielVisible()}>
+          <YourMessages
+            messages={inputsDelHilo()}
+            active={mensajeVisto()}
+            visibleHeight={cajaDelHilo().alto - altoDeLaCaja()}
+            onJump={saltarAlMensaje}
+            bodyOf={props.bodyOf}
+            avatarOf={props.avatarOf}
+          />
+        </Show>
+        <div
+          data-chat-thread
+          class={cn(
+            "mx-auto grid w-full gap-y-4",
+            "max-w-[964px] px-[52px] grid-cols-[minmax(0,1fr)]",
           )}
-          </For>
+          ref={(el) => {
+            hilo.contenido(el);
+            elContenido = el;
+          }}
+        >
+          {/* La transcripción solo añade al final; el último bloque puede pasar
+              de ejecución viva a turno cerrado. `For` identifica por el objeto
+              y `bloques()` fabrica objetos nuevos con cada delta: desmontaba
+              también las filas antiguas, perdía el ancla de lectura y hacía
+              que WebKit encogiera y recompusiera el hilo en dos movimientos.
+              `Index` conserva cada sitio del DOM y solo actualiza sus datos. */}
+          <Show
+            when={hiloDeFilasListo() ? cajaVirtual() : undefined}
+            keyed
+            fallback={
+              <Show when={!hiloVirtual}>
+                <For each={chunks()}>
+                  {(chunk) => (
+                    <Index each={chunkOf(bloques(), chunk, origen())}>
+                      {(bloque, blockIndex) => filaDelHilo(bloque, () => chunkStart(chunk, origen()) + blockIndex)}
+                    </Index>
+                  )}
+                </For>
+              </Show>
+            }
+          >
+            {(caja) => (
+              <Dynamic
+                component={hiloDeFilasListo()!}
+                scroller={caja.el}
+                keys={() => clavesDelHilo().lista}
+                estimate={altoEstimado}
+                retained={filasRetenidas}
+                write={hilo.escribir}
+                settled={hilo.sostener}
+                onRange={setPrimeraFila}
+                ref={(api: VirtualThreadApi) => { hiloDeFilas = api; saltarALaLectura(); }}
+                row={(clave: string, indice: () => number) => {
+                  // La lista de filas puede ir un paso detrás de las claves: una que ya salió no se pinta.
+                  const inicial = clavesDelHilo().deClave.get(clave);
+                  return inicial ? filaDelHilo(createMemo<Bloque>((previo) => clavesDelHilo().deClave.get(clave) ?? previo, inicial), indice) : null;
+                }}
+              />
+            )}
+          </Show>
 
           {/* Mientras el turno viva, y sin más condiciones: con «y el
               último mensaje no es del agente» el renglón se apagaba con la
@@ -3271,6 +3446,15 @@ export default function Chat(props: ChatProps) {
           />
         </div>
       </div>
+
+      <Show when={props.estadoAntiguos === "loading" || props.estadoAntiguos === "failed"}>
+        <div class="absolute top-2 left-1/2 z-30 -translate-x-1/2 rounded-full border border-border bg-surface-raised px-3 py-1 text-xs shadow-sm" role={props.estadoAntiguos === "failed" ? "alert" : "status"}>
+          <Show when={props.estadoAntiguos === "failed"} fallback={t("chat.history.older_loading")}>
+            {t("chat.history.older_failed")}{" "}
+            <button type="button" class="text-primary underline" onClick={() => void pedirAntiguos()}>{t("chat.history.older_retry")}</button>
+          </Show>
+        </div>
+      </Show>
 
       {/* El botón solo existe mientras haga falta —si el final ya se ve,
           no hay nada que ofrecer—; `alFondo` cubre también «estás cerca»
@@ -3385,6 +3569,7 @@ export default function Chat(props: ChatProps) {
       </Show>
       </div>
     </Show>
+    </WorkFace.Provider>
     </FileMachine.Provider>
   );
 }
@@ -3429,9 +3614,12 @@ function RegistroDeTrabajo(props: {
       aria-hidden="true"
     />
   );
+  const cara = useContext(WorkFace);
   const girando = () => (
     <Show when={props.corriendo}>
-      <Spinner size={14} class="pointer-events-none text-primary" />
+      <Show when={cara()} fallback={<Spinner size={14} class="pointer-events-none animate-spin-lento text-primary" />}>
+        {(c) => <span class="pointer-events-none inline-flex shrink-0"><AstroAvatar name={c().name} status="working" body={c().body} avatar={c().avatar} size={16} /></span>}
+      </Show>
     </Show>
   );
   const tiempo = () => (
@@ -3633,7 +3821,7 @@ function TrabajoDeAgente(props: {
         )}
       </Show>
 
-      <Show when={props.msg.historyRefs?.length}><HistoryDetails refs={props.msg.historyRefs!} /></Show>
+      <Show when={props.msg.historyRefs?.length}><HistoryDetails refs={props.msg.historyRefs!} turnId={props.msg.turno} /></Show>
       <Show when={props.msg.images?.length ? props.msg.images : null}>
         {(images) => <ImagenesEntregadas items={images()} />}
       </Show>
@@ -3773,7 +3961,7 @@ function claveDeTrabajo(msg: Msg): string {
 }
 
 /** Identidad de la fila que nace con el primer paso y cierra con la respuesta. */
-function claveDeBloque(i: number): string {
+function claveDeBloque(i: string): string {
   return `bloque:${i}`;
 }
 
@@ -3989,6 +4177,10 @@ function HitoDelHilo(props: {
  * `group` sin nombre respondería a cualquier ancestro y se encenderían las de
  * todo el hilo. El sitio se reserva para que no baile el hilo.
  */
+/** Una marca de laboratorio para comparar con el hilo por tramos; no es una opción de producto. */
+const HILO_POR_TRAMOS = "terminus.chat.thread-chunks";
+const FILAS_ANTES_DE_PEDIR = 8;
+
 const FILA_DEL_MENSAJE =
   "flex items-center gap-0.5 pt-1 opacity-0 transition-opacity group-hover/mensaje:opacity-100 group-focus-within/mensaje:opacity-100";
 

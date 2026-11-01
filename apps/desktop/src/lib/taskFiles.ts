@@ -114,6 +114,7 @@ export function createTaskFiles() {
       if (p.tabs.length === 0) { p.expanded = false; p.tree = true; }
     }),
     dirtyOf: (task: string) => panel(task).dirty,
+    forget: (task: string) => setPanels(produce(all => { delete all[task]; })),
   };
 }
 

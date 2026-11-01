@@ -33,7 +33,7 @@ test("the app opens at once, never the installer nor a preparation screen", asyn
   let w;
   const app = await boot("listo", "web-setup", {}, undefined, { "sb-supabase-auth-token": session }, {
     web: true,
-    antes: (win) => {
+    beforeImport: (win) => {
       w = win;
       globalThis.WebSocket = fake.Socket;
       win.terminusWeb = { supabaseUrl: SUPABASE, supabaseKey: "public-anon-key" };
@@ -47,7 +47,7 @@ test("the app opens at once, never the installer nor a preparation screen", asyn
     assert.ok(!/Preparando tu computadora|Conectando con tu computadora|Connecting to your computer/.test(text()), "no waiting screen");
     assert.ok(!text().includes("Preparando Danil"), "never the installer");
     assert.ok(!fake.calls.some((c) => ["check_environment", "prepare_runtime", "setup_required"].includes(c.command)), "nor its checks");
-    assert.deepEqual(app.fallos, []);
+    assert.deepEqual(app.failures, []);
   } finally {
     globalThis.fetch = own;
     engine.setup_required = false;

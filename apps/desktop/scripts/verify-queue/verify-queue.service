@@ -1,0 +1,17 @@
+[Unit]
+Description=Cola de verificación
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=verify
+Environment=VERIFY_QUEUE_HOME=/var/lib/verify-queue
+Environment=VERIFY_QUEUE_CONFIG=/etc/verify-queue/repos.json
+Environment=PATH=/home/verify/.cargo/bin:/home/verify/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/env node /opt/verify-queue/server.mjs
+Restart=always
+RestartSec=2
+KillMode=process
+
+[Install]
+WantedBy=multi-user.target

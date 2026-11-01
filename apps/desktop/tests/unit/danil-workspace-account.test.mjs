@@ -119,7 +119,7 @@ test("the workspace shows its account, syncs with it, and moves to another signe
   assert.equal(select(w).value, "u_fdb");
   assert.ok(section(w).textContent.includes("Se sincroniza con alberto@dondebanco.org"), section(w).textContent);
   assert.equal(w.document.querySelector("[role=alert]"), null);
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 test("a workspace nobody chose an account for says so, and the sidebar footer shows nobody", async () => {
@@ -134,7 +134,7 @@ test("a workspace nobody chose an account for says so, and the sidebar footer sh
   await choose(w, "u_alberto");
   assert.deepEqual(e.calls.find((c) => c.command === "danil_workspace_set_account")?.args, { workspace: "w", account: "u_alberto" });
   assert.ok(section(w).textContent.includes("Se sincroniza con alberto@danil.ai"), section(w).textContent);
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 test("«Sin cuenta» asks first and then takes the workspace out of its account only", async () => {
@@ -159,7 +159,7 @@ test("«Sin cuenta» asks first and then takes the workspace out of its account 
   assert.ok(!e.calls.some((c) => c.command === "danil_disconnect"), "the account stays signed in");
   assert.equal(select(w).value, "");
   assert.ok(section(w).textContent.includes("no es de ninguna cuenta"), section(w).textContent);
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 test("«Conectar otra cuenta…» starts another sign-in and leaves the workspace where it was", async () => {
@@ -171,7 +171,7 @@ test("«Conectar otra cuenta…» starts another sign-in and leaves the workspac
   assert.equal(e.calls.find((c) => c.command === "open_external")?.args?.target, "https://app.danil.ai/terminus/connect?code=WDJB-MJHT");
   assert.equal(select(w).value, "u_alberto", "the picker stays on the current account");
   assert.ok(!e.calls.some((c) => c.command === "danil_workspace_set_account"), "nothing moves until the new account is chosen");
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 test("«Conectar otra cuenta…» on a workspace with an account does not move it when the new one signs in", async () => {
@@ -184,11 +184,11 @@ test("«Conectar otra cuenta…» on a workspace with an account does not move i
   app.emit("danil-sessions", e.state.sessions);
   await sleep(400);
   assert.ok(!e.calls.some((c) => c.command === "danil_workspace_set_account"), "it already had an account: it stays there");
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 async function openDanilAccounts(name, e, antes, panel = "cuenta-danil") {
-  const app = await boot("listo", name, { ...BASE, ...e.table }, undefined, {}, { antes });
+  const app = await boot("listo", name, { ...BASE, ...e.table }, undefined, {}, { beforeImport: antes });
   app.w.dispatchEvent(new app.w.CustomEvent("harness:open-settings", { detail: panel }));
   await sleep(1000);
   return app;
@@ -216,7 +216,7 @@ test("a workspace without an account reveals account choices only when asked", a
   );
   assert.ok(here(w).textContent.includes("Se sincroniza con alberto@danil.ai"), here(w).textContent);
   assert.equal(buttonIn(here(w), "Usar alberto@danil.ai"), undefined, "with an account, no more «Usar…»");
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 test("signing in another account from a workspace without one links that workspace, and no other", async () => {
@@ -242,7 +242,7 @@ test("signing in another account from a workspace without one links that workspa
   app.emit("danil-sessions", e.state.sessions);
   await sleep(200);
   assert.equal(e.calls.filter((c) => c.command === "danil_workspace_set_account").length, 1, "only once");
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 test("the first sign-in on this computer, from a workspace, links that workspace", async () => {
@@ -267,7 +267,7 @@ test("the first sign-in on this computer, from a workspace, links that workspace
     e.calls.filter((c) => c.command === "danil_workspace_set_account").map((c) => c.args),
     [{ workspace: "w", account: "u_alberto" }],
   );
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 test("a workspace the control plane keeps with the other account says what to do", async () => {
@@ -283,7 +283,7 @@ test("a workspace the control plane keeps with the other account says what to do
     "Este workspace sigue siendo de la otra cuenta. Inicia sesión con esa cuenta en esta computadora para moverlo.",
   );
   assert.ok(section(w).textContent.includes("Todavía no se sincroniza con alberto@dondebanco.org."), "not called synced while not joined");
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 test("an account that is no longer signed in is refused in plain words and the picker goes back", async () => {
@@ -300,7 +300,7 @@ test("an account that is no longer signed in is refused in plain words and the p
     "Esa cuenta ya no tiene sesión en esta computadora. Vuelve a iniciar sesión con ella.",
   );
   assert.equal(select(w).value, "u_alberto");
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 test("a workspace whose account signed out says it is not synced", async () => {
@@ -313,7 +313,7 @@ test("a workspace whose account signed out says it is not synced", async () => {
   assert.equal(signedOut?.textContent, "alberto@yucatantechweek.mx · sin sesión");
   assert.ok(signedOut.disabled, "it cannot be chosen until it signs in again");
   assert.equal(select(w).value, "u_ytw", "the picker still says whose it is");
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 test("with an engine without sessions per account, the workspace has no account section", async () => {
@@ -323,7 +323,7 @@ test("with an engine without sessions per account, the workspace has no account 
   });
   assert.equal(section(app.w), null);
   assert.ok(app.w.document.body.textContent.includes("Fundación Donde Banco"), "the workspaces screen is there");
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 test("the sidebar footer shows the open workspace's account and follows a switch", async () => {
@@ -344,7 +344,7 @@ test("the sidebar footer shows the open workspace's account and follows a switch
   app.emit("danil-sessions", e.state.sessions);
   await sleep(400);
   assert.equal(foot(), null, "its account signed out: nobody, and not the other account");
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 test("settings follows the workspace account and reads only its registry's machines", async () => {
@@ -383,7 +383,7 @@ test("settings follows the workspace account and reads only its registry's machi
     assert.deepEqual(rows(), ["cmp_b"]);
     assert.ok(!panel().textContent.includes(ALBERTO.email));
     assert.ok(asked.includes("u_fdb"));
-    assert.deepEqual(app.fallos, []);
+    assert.deepEqual(app.failures, []);
   } finally {
     if (app) app.w.dispatchEvent(new app.w.Event("pagehide"));
     globalThis.fetch = previous;
@@ -399,7 +399,7 @@ test("a failed account lookup does not show the default account or its computers
   assert.equal(panel.querySelector("[data-danil-session]"), null);
   assert.equal(panel.querySelector("[data-account-computers]"), null);
   assert.ok(buttonIn(panel, "Reintentar"));
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 test("switching workspace inside the same account resets «Administrar» in Perfil", async () => {
@@ -415,7 +415,7 @@ test("switching workspace inside the same account resets «Administrar» in Perf
   await sleep(700);
   assert.ok(panel().querySelector("[data-danil-manage]"), "W2 shows its own account row");
   assert.equal(panel().querySelector("[data-workspace-account-select]"), null, "manage state is new for W2");
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 test("same-account workspace switches discard old machine reads, controls and connection polling", async () => {
@@ -450,7 +450,7 @@ test("same-account workspace switches discard old machine reads, controls and co
     const { w } = app;
     const panel = () => w.document.querySelector("[data-danil-account]");
     const connect = panel().querySelector("[data-connect-machine-open]");
-    assert.ok(connect, panel().textContent + JSON.stringify(app.fallos));
+    assert.ok(connect, panel().textContent + JSON.stringify(app.failures));
     connect.click();
     await sleep(200);
     assert.ok(panel().querySelector("[data-connect-machine]"));
@@ -466,7 +466,7 @@ test("same-account workspace switches discard old machine reads, controls and co
     await sleep(2300);
     assert.equal(inventories, count, "the old connection watcher stopped polling");
     assert.deepEqual([...panel().querySelectorAll("[data-account-computer]")].map((el) => el.dataset.accountComputer), [], "late W1 authority cannot restore W1 rows");
-    assert.deepEqual(app.fallos, []);
+    assert.deepEqual(app.failures, []);
   } finally {
     releaseOld();
     globalThis.fetch = previous;
@@ -494,7 +494,7 @@ test("a delayed account change from W1 cannot overwrite W2's account", async () 
   assert.ok(panel.querySelector('[data-danil-session="u_fdb"]'));
   assert.equal(panel.querySelector('[data-danil-session="u_alberto"]'), null);
   assert.ok(here(w).textContent.includes(W2.name));
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 test("workspace-list errors offer retry and recover instead of loading forever", async () => {
@@ -513,7 +513,7 @@ test("workspace-list errors offer retry and recover instead of loading forever",
   await sleep(500);
   assert.equal(panel().dataset.danilAccount, "workspace");
   assert.ok(here(app.w).textContent.includes(W.name));
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
 
 test("a returned account-link error remains visible after the account action closes", async () => {
@@ -530,5 +530,5 @@ test("a returned account-link error remains visible after the account action clo
   const panel = app.w.document.querySelector("[data-danil-account]");
   assert.equal(panel.querySelector("[data-workspace-account-select]"), null);
   assert.ok(panel.querySelector("[role=alert]")?.textContent.includes("Este workspace sigue siendo de la otra cuenta."));
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
