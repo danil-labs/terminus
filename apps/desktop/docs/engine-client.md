@@ -36,11 +36,12 @@ La cuenta de Danil (Configuración → Cuenta de Danil) usa `danil_connect_start
 `danil-connect` (seldon-host#66, [connector.md](https://github.com/danil-labs/seldon-host/blob/dev/docs/connector.md)). Iniciar sesión registra
 esta computadora en la cuenta: con un workspace de Harness entra sin navegador;
 sin él, la ventana abre `verification_uri_complete` y la persona aprueba en
-`app.danil.ai/terminus/connect`. Un motor sin estos comandos recibe `command` del
+`alfa-app.danil.ai/connect` (antes `app.danil.ai/terminus/connect`, que
+ahora redirige allí). Un motor sin estos comandos recibe `command` del
 proxy y la sección lo dice. El campo editable del alta y de la página de
 aprobación es el nombre de **esta computadora**, no el de la cuenta.
 
-La web (`app.danil.ai/terminus`) no ofrece Harness: ni la sección de
+La web (`alfa-app.danil.ai`) no ofrece Harness: ni la sección de
 Configuración, ni su gobierno en las pantallas, ni la elección «De mi
 organización» al crear el espacio (`capabilities().radiant`, solo en el
 escritorio). Harness se conectará con Danil Computers, no con cada ventana;

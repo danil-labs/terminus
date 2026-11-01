@@ -186,11 +186,14 @@ browser equivalent. `tests/unit/web-transport.test.mjs` and
 `tests/unit/web-gate.test.mjs`, `tests/unit/web-setup.test.mjs`, `tests/unit/web-off.test.mjs`, `tests/unit/web-cached.test.mjs` and `tests/unit/web-onboarding.test.mjs` mount `dist-web/` against a relay simulated in
 Node (`tests/helpers/fake-relay.mjs`).
 
-`wrangler.web.toml` deploys `dist-web/` as the private assets Worker
-`terminus-web` (no route, no `workers.dev`); the Danil app forwards
-`/terminus/*` to it through a Service Binding. `dist-web/_headers` carries the
-policy with `frame-ancestors 'none'`, and `dist-web/index.html` is the
-single-page fallback for paths under the base.
+`dist-web/` is served at the root of alfa-app.danil.ai (`alpha-entry/`, built
+with `TERMINUS_WEB_BASE=/`). `dist-web/_headers` carries the policy with
+`frame-ancestors 'none'`, and `dist-web/index.html` is the single-page fallback
+for paths under the base. `wrangler.web.toml` no longer serves the web: it
+deploys `web-redirect/worker.mjs` as the private Worker `terminus-web`, which
+the Danil app reaches for `/terminus/*` through a Service Binding and which
+answers 308 to the same path on alfa-app.danil.ai without the prefix. It has no
+Workers Builds trigger.
 
 ## The engine pin
 
