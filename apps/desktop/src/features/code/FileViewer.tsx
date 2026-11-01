@@ -26,6 +26,7 @@ import Documento from "../artifacts/Document";
 import type { Preview } from "../artifacts/Preview";
 import { formaDe } from "../artifacts/sandbox";
 import { cn } from "../../lib/utils";
+import { HEADER_HEIGHT } from "../../lib/window";
 import { t } from "../../lib/i18n";
 import { createPref, hayPref } from "../../lib/prefs";
 import { ariaDeAtajo, textoDeAtajo } from "../../lib/shortcuts";
@@ -664,7 +665,7 @@ export default function VisorDeArchivo(props: {
       class="@container flex h-full min-h-0 flex-col"
     >
       {/* Los controles de escritura van en esta fila: es la única que está siempre. */}
-      <div class="flex h-8.5 shrink-0 items-center gap-2 border-b border-border pr-1.5 pl-2.5">
+      <div class={cn("flex shrink-0 items-center gap-2 border-b border-border pr-1.5 pl-2.5", HEADER_HEIGHT)}>
         <Migas ruta={props.ruta}>
           <Show when={sucio() || guardando()}>
             <span
