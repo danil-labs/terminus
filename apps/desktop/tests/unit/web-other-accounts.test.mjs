@@ -46,7 +46,7 @@ test("the column lists other accounts' workspaces and opens them with their acco
     ];
     const app = await boot("listo", "web-other-accounts", {}, undefined, {}, {
       web: true,
-      antes: (w) => {
+      beforeImport: (w) => {
         globalThis.WebSocket = f.Socket;
         w.terminusWeb = {
           endpoint: API,
@@ -100,7 +100,7 @@ for (const emptyAccount of [false, true]) test(`a single workspace keeps the col
     const f = fleet({ cmp_vm: { table: engine, state: "online" } });
     app = await boot("listo", `web-single-workspace-${emptyAccount}`, {}, undefined, {}, {
       web: true,
-      antes: (w) => {
+      beforeImport: (w) => {
         globalThis.WebSocket = f.Socket;
         w.terminusWeb = {
           endpoint: API,
@@ -128,7 +128,7 @@ for (const emptyAccount of [false, true]) test(`a single workspace keeps the col
     other.click();
     assert.deepEqual(added, [true]);
     assert.equal(f.relays.cmp_vm.calls.some(call => call.command === "add_workspace"), false, "choosing another account does not create in the previous account");
-    assert.deepEqual(app.fallos, []);
+    assert.deepEqual(app.failures, []);
   } finally {
     app?.w.close();
     globalThis.fetch = own;

@@ -38,7 +38,7 @@ async function open(t) {
   let w;
   const app = await boot("listo", "web-stale-chunk", {}, undefined, { "sb-supabase-auth-token": session }, {
     web: true,
-    antes: (win) => {
+    beforeImport: (win) => {
       w = win;
       globalThis.WebSocket = fake.Socket;
       win.terminusWeb = { supabaseUrl: SUPABASE, supabaseKey: "public-anon-key" };
@@ -73,7 +73,7 @@ test("a new build is offered, a gone chunk asks, and «Para después» keeps the
   assert.equal(notice(), null, "«Para después» closes it");
   await check();
   assert.equal(notice(), null, "the build already postponed does not ask again");
-  assert.ok(!app.fallos.some((f) => /navigation/i.test(f)), "nothing reloads the page");
+  assert.ok(!app.failures.some((f) => /navigation/i.test(f)), "nothing reloads the page");
 
   const event = new w.Event("vite:preloadError", { cancelable: true });
   w.dispatchEvent(event);
@@ -90,5 +90,5 @@ test("a new build is offered, a gone chunk asks, and «Para después» keeps the
 
   w.document.querySelector("[data-web-update-reload]").click();
   await sleep(50);
-  assert.ok(app.fallos.some((f) => /navigation/i.test(f)), `«Recarga ahora» reloads: ${app.fallos.join(" | ")}`);
+  assert.ok(app.failures.some((f) => /navigation/i.test(f)), `«Recarga ahora» reloads: ${app.failures.join(" | ")}`);
 });

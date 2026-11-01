@@ -44,7 +44,7 @@ test("the web shows the account's name and photo, and changes and removes the ph
     const f = fleet({ cmp_mac: { table: engine } });
     const app = await boot("listo", "web-account", {}, undefined, {}, {
       web: true,
-      antes: (w) => {
+      beforeImport: (w) => {
         globalThis.WebSocket = f.Socket;
         w.terminusWeb = { endpoint: API, computers: [MAC], getToken: async () => "tok" };
       },
@@ -86,7 +86,7 @@ test("the web shows the account's name and photo, and changes and removes the ph
     await sleep(500);
     assert.ok(requests.some((r) => r.method === "DELETE"));
     assert.equal(panel().querySelector("[data-account-avatar]")?.textContent, "AP", "back to the initials");
-    assert.deepEqual(app.fallos, []);
+    assert.deepEqual(app.failures, []);
   } finally {
     globalThis.fetch = own;
   }

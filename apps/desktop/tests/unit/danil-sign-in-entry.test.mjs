@@ -95,7 +95,7 @@ async function personalize(name, table) {
 
 test("«Personaliza» no ofrece Danil: queda en Configuración, y «Empezar» entra directo a la app", async () => {
   const engine = danil({ state: "disconnected", name: "alberto-mbp" });
-  const { w, fallos } = await personalize("danil-onboarding", engine.table);
+  const { w, failures } = await personalize("danil-onboarding", engine.table);
   assert.equal(heading(w), "Personaliza Danil.", w.document.body.textContent.slice(0, 600));
   assert.equal(w.document.querySelector("[data-danil-onboarding]"), null);
   assert.ok(!button(w, "Iniciar sesión con Danil"));
@@ -104,7 +104,7 @@ test("«Personaliza» no ofrece Danil: queda en Configuración, y «Empezar» en
   await sleep(300);
   assert.ok(!w.document.body.textContent.includes("Personaliza Danil."), "starting enters the app");
   assert.ok(!engine.calls.some((c) => c.command === "danil_connect_start"));
-  assert.deepEqual(fallos, []);
+  assert.deepEqual(failures, []);
 });
 
 test("el pie de la barra lateral solo aparece con sesión de Danil y abre su sección", async () => {
@@ -174,5 +174,5 @@ test("el pie muestra el nombre y la foto de la cuenta de Danil", async () => {
   await sleep(300);
   assert.equal(foot().querySelector("img"), null);
   assert.equal(foot().querySelector("[data-account-avatar]")?.textContent, "AC", "without a photo, the initials");
-  assert.deepEqual(app.fallos, []);
+  assert.deepEqual(app.failures, []);
 });
