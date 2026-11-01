@@ -1,4 +1,5 @@
 import { type DirectoryEntry, groupDirectory } from "@terminus/computers";
+import Link from "lucide-solid/icons/link";
 import Pin from "lucide-solid/icons/pin";
 import PinOff from "lucide-solid/icons/pin-off";
 import { createSignal, For, Show } from "solid-js";
@@ -6,12 +7,28 @@ import { t } from "../../lib/i18n";
 import { cn } from "../../lib/utils";
 import { ITEM_DE_MENU } from "../../ui/Popover";
 import { createWorkspaces } from "../settings/workspaces-store";
-import { directory, setAgentsWorkspace, togglePin } from "./workspace-directory";
+import { directory, linkableAccounts, linkActiveWorkspace, setAgentsWorkspace, togglePin } from "./workspace-directory";
 
 /** Desde aquí se entra a cualquier workspace; la barra solo muestra los fijados. */
 export default function WorkspaceDirectoryMenu(props: { onClose: () => void; onOpenAgents?: () => void }) {
   const ws = createWorkspaces();
   const [query, setQuery] = createSignal("");
+  const [linking, setLinking] = createSignal<string | null>(null);
+  const [linkError, setLinkError] = createSignal<string | null>(null);
+  const linkable = () => new Set(linkableAccounts(ws.activo()).map((e) => e.key));
+  const link = async (entry: DirectoryEntry) => {
+    const active = ws.activo();
+    if (!active || linking()) return;
+    setLinking(entry.key);
+    setLinkError(null);
+    const code = await linkActiveWorkspace(active, entry);
+    setLinking(null);
+    if (code) {
+      setLinkError(code);
+      return;
+    }
+    void ws.cargar();
+  };
   const entries = () => directory()?.workspaces ?? [];
   const visible = () => {
     const needle = query().trim().toLocaleLowerCase();
@@ -64,6 +81,19 @@ export default function WorkspaceDirectoryMenu(props: { onClose: () => void; onO
                     >
                       {entry.name || t("shell.directory.unnamed")}
                     </button>
+                    <Show when={linkable().has(entry.key)}>
+                      <button
+                        type="button"
+                        class="grid size-7 shrink-0 place-items-center rounded-sm text-neutral-500 outline-none hover:bg-neutral-200 hover:text-neutral-950 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-50"
+                        aria-label={t("shell.directory.link", { name: entry.name, workspace: ws.actual()?.name ?? "" })}
+                        title={t("shell.directory.link", { name: entry.name, workspace: ws.actual()?.name ?? "" })}
+                        disabled={linking() !== null}
+                        data-directory-link={entry.key}
+                        onClick={() => void link(entry)}
+                      >
+                        <Link size={13} aria-hidden="true" />
+                      </button>
+                    </Show>
                     <Show when={!entry.support}>
                       <button
                         type="button"
@@ -82,6 +112,15 @@ export default function WorkspaceDirectoryMenu(props: { onClose: () => void; onO
           )}
         </For>
       </div>
+      <Show when={linkError()}>
+        <p class="m-0 px-2 pt-1 text-caption text-error-strong" role="alert">
+          {linkError() === "not_account_admin"
+            ? t("shell.directory.linkNotAdmin")
+            : linkError() === "workspace_already_linked" || linkError() === "danil_workspace_taken"
+              ? t("shell.directory.linkTaken")
+              : t("shell.directory.linkFailed")}
+        </p>
+      </Show>
       <Show when={directory()?.truncated}>
         <p class="m-0 px-2 pt-1 text-caption text-neutral-500">{t("shell.directory.truncated")}</p>
       </Show>

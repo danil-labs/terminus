@@ -39,3 +39,31 @@ export async function togglePin(entry: DirectoryEntry): Promise<void> {
   await source.pin(keys).catch(() => undefined);
   reloadDirectory();
 }
+
+/**
+ * La cuenta de Danil Agents que la persona administra y que todavía no tiene un
+ * workspace de Terminus suyo. Solo la ofrece el menú si el workspace abierto es
+ * suyo y está sin enlazar: el plano de control vuelve a decidirlo al enlazar.
+ */
+export function linkableAccounts(active: string | null): DirectoryEntry[] {
+  const list = entries();
+  const open = list.find((e) => e.workspace_id === active && e.owner && !e.support);
+  if (!active || !open || open.danil_workspace_id !== null) return [];
+  return list.filter(
+    (e) => !e.support && e.workspace_id === null && e.danil_workspace_id !== null && (e.role === "owner" || e.role === "admin"),
+  );
+}
+
+/** Enlaza el workspace abierto con la cuenta; devuelve el código del error o `null`. */
+export async function linkActiveWorkspace(active: string, account: DirectoryEntry): Promise<string | null> {
+  const source = capabilities().workspaceDirectory;
+  if (!source || account.danil_workspace_id === null) return "link_failed";
+  try {
+    await source.link(active, account.danil_workspace_id);
+    return null;
+  } catch (err) {
+    return err instanceof Error ? err.message : "link_failed";
+  } finally {
+    reloadDirectory();
+  }
+}

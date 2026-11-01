@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { barWorkspaceIds, type DirectoryEntry, groupDirectory, listDirectory, setDirectoryPins } from "../../../../packages/computers/src/directory.ts";
+import { barWorkspaceIds, type DirectoryEntry, groupDirectory, linkDanilWorkspace, listDirectory, setDirectoryPins } from "../../../../packages/computers/src/directory.ts";
 
 const entry = (key: string, patch: Partial<DirectoryEntry> = {}): DirectoryEntry => ({
   key, workspace_id: null, danil_workspace_id: null, name: key, kind: "personal", organization: null, role: "owner", owner: false,
@@ -40,4 +40,20 @@ test("listing and pinning talk to the control plane", async () => {
 test("a control plane without the route says so", async () => {
   const f = (async () => new Response("", { status: 404 })) as never;
   assert.equal((await listDirectory("https://c.test", "t", f)).kind, "missing");
+});
+
+test("linking posts the account to the workspace and passes the refusal code through", async () => {
+  const calls: { url: string; init?: { method?: string; body?: string } }[] = [];
+  const ok = (async (url: string, init?: { method?: string; body?: string }) => {
+    calls.push({ url, init });
+    return Response.json({ workspace: {}, danil_workspace_id: 476 });
+  }) as never;
+  const linked = await linkDanilWorkspace("https://c.test", "t", "fq gx", 476, ok);
+  assert.equal(linked.kind === "ok" && linked.value, 476);
+  assert.equal(calls[0].url, "https://c.test/v1/workspaces/fq%20gx/danil-workspace");
+  assert.equal(calls[0].init?.method, "POST");
+  assert.equal(calls[0].init?.body, JSON.stringify({ danil_workspace_id: 476 }));
+  const taken = (async () => Response.json({ error: { code: "danil_workspace_taken" } }, { status: 409 })) as never;
+  const refused = await linkDanilWorkspace("https://c.test", "t", "w", 476, taken);
+  assert.deepEqual(refused, { kind: "error", status: 409, code: "danil_workspace_taken" });
 });

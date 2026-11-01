@@ -79,6 +79,8 @@ export type Capabilities = {
   workspaceDirectory?: {
     list: () => Promise<import("@terminus/computers").Directory>;
     pin: (keys: string[]) => Promise<void>;
+    /** Enlaza un workspace propio con una cuenta de Danil Agents; rechaza con el código del plano de control. */
+    link: (workspaceId: string, danilWorkspaceId: number) => Promise<void>;
   };
   adminPage?: { href: (workspace: string | null) => string; allowed: () => Promise<boolean> };
   /** Lo de una cuenta personal en Configuración › Cuenta. `isPersonal` decide si se ofrece; sin `usage` o `plan`, esas pestañas no salen. */

@@ -57,6 +57,32 @@ export function setDirectoryPins(endpoint: string, token: string, keys: string[]
   );
 }
 
+/**
+ * Enlaza un workspace de Terminus de la persona con su cuenta de Danil Agents
+ * (`POST /v1/workspaces/:id/danil-workspace`). Solo con el JWT de la persona, que debe
+ * ser owner o admin de la cuenta. El workspace adopta el nombre de la cuenta.
+ */
+export function linkDanilWorkspace(
+  endpoint: string,
+  token: string,
+  workspaceId: string,
+  danilWorkspaceId: number,
+  f: Fetch = globalFetch,
+): Promise<Answer<number>> {
+  return request(
+    apiUrl(endpoint, `/v1/workspaces/${encodeURIComponent(workspaceId)}/danil-workspace`),
+    token,
+    "POST",
+    (body) => {
+      const id = (body as { danil_workspace_id?: unknown } | null)?.danil_workspace_id;
+      if (typeof id !== "number") throw new Error("bad_link");
+      return id;
+    },
+    f,
+    { danil_workspace_id: danilWorkspaceId },
+  );
+}
+
 /** Personal, cada organización, sin enlazar y acceso de soporte, en ese orden. Sin grupos vacíos. */
 export function groupDirectory(entries: readonly DirectoryEntry[]): DirectoryGroup[] {
   const support = entries.filter((e) => e.support);
