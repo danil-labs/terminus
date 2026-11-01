@@ -304,7 +304,7 @@ export default function TabStrip(props: {
             props.onDrag?.(p.id, e);
           }}
           class={cn(
-            "group flex h-7 shrink-0 touch-none items-center rounded-[var(--radius-sm)] pr-1 select-none",
+            "group flex h-[30px] shrink-0 touch-none items-center rounded-[var(--radius-sm)] pr-1 select-none",
             task() ? "w-[220px] text-sm" : "w-[180px] text-[0.75rem]",
             active()
               ? "tab-active font-semibold text-neutral-950"
