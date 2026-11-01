@@ -1,11 +1,12 @@
 import { STATUS_LABELS, TEXT } from "@terminus/design";
 import { stepCounts } from "@terminus/chat/steps";
+import { commandSummary } from "@terminus/chat/command";
 import { readableToolName, toolSource, type ToolSource } from "@terminus/chat/tools";
 import { type ComponentRef, type ReactNode, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { OPENED, type Follow, type Metrics, measuredFollow, shouldStick } from "../../lib/follow";
 import { lang, t, w } from "../../lib/i18n";
-import { type Step, type StepRow, type WorkLine, type WorkRun, bareCommand, elapsed, fileName, hitOf, runningStep, workFocus } from "../../lib/steps";
+import { type Step, type StepRow, type WorkLine, type WorkRun, elapsed, fileName, hitOf, runningStep, workFocus } from "../../lib/steps";
 import type { WorkSheetState } from "../../lib/workSheet";
 import { ToolBrandMark } from "../BrandMark";
 import { Icon, type IconName } from "../Icon";
@@ -60,7 +61,7 @@ function runningLabel(step: Step): { verb: string; subject: string | null; origi
     case "edit":
       return { verb: runningEdit(step.name), subject: target && fileName(target) };
     case "run":
-      return { verb: w("common.steps.running"), subject: target && bareCommand(target).split("\n")[0] };
+      return { verb: w("common.steps.running"), subject: target && commandSummary(target) };
     case "web":
       return { verb: w("common.steps.web_searching"), subject: target };
     case "plan":
@@ -82,7 +83,7 @@ function rowLabel(row: StepRow): { verb: string; subject: string | null; origin?
   if (n === 1 && first.running) return runningLabel(first);
   switch (row.kind) {
     case "permission": {
-      const subject = target && bareCommand(target).split("\n")[0];
+      const subject = target && commandSummary(target);
       const vars = { tool: first.name, who: first.by ?? "" };
       if (first.by) return { verb: w(first.allowed ? "common.steps.permission.allowed_by" : "common.steps.permission.denied_by", vars), subject };
       return { verb: w(first.allowed ? "common.steps.permission.allowed" : "common.steps.permission.denied", vars), subject };
@@ -96,7 +97,7 @@ function rowLabel(row: StepRow): { verb: string; subject: string | null; origin?
       return n === 1 ? { verb: pastEdit(first.name), subject: target && fileName(target) } : { verb: w("common.steps.edit.many", { count: files }), subject: null };
     }
     case "run":
-      return { verb: w("common.steps.run"), subject: target && bareCommand(target).split("\n")[0] };
+      return { verb: w("common.steps.run"), subject: target && commandSummary(target) };
     case "web":
       return n === 1 ? { verb: w("common.steps.web.one"), subject: target } : { verb: w("common.steps.web.many", { count: n }), subject: null };
     case "plan":

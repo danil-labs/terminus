@@ -16,6 +16,7 @@
  * emparejamiento con lo que manda `runtime/chat/`.
  */
 import { bareCommand, classify, fileName, joinableKind, joinSteps, stepCounts, type CountedStep, type StepCount, type StepKind } from "@terminus/chat/steps";
+import { commandSummary } from "@terminus/chat/command";
 import { readableToolName, toolSource, type ToolSource } from "@terminus/chat/tools";
 import { manifiesto, t } from "./i18n.ts";
 
@@ -286,7 +287,7 @@ export function resumen(fila: Fila): Rotulo {
     case "ejecutar":
       return {
         verbo: t("common.steps.run"),
-        sujeto: objetivo && comando(objetivo).split("\n")[0],
+        sujeto: objetivo && commandSummary(objetivo),
       };
     case "web":
       return n === 1
@@ -319,7 +320,7 @@ export function resumen(fila: Fila): Rotulo {
           : uno.permitido
             ? t("common.steps.permission.allowed", { tool: uno.nombre })
             : t("common.steps.permission.denied", { tool: uno.nombre }),
-        sujeto: objetivo && comando(objetivo).split("\n")[0],
+        sujeto: objetivo && commandSummary(objetivo),
       };
     // Estos tres traen su propio texto y no se agrupan.
     default:
@@ -359,7 +360,7 @@ export function enCurso(paso: Paso): Rotulo {
     case "ejecutar":
       return {
         verbo: t("common.steps.running"),
-        sujeto: objetivo && comando(objetivo).split("\n")[0],
+        sujeto: objetivo && commandSummary(objetivo),
       };
     case "web":
       return { verbo: t("common.steps.web_searching"), sujeto: objetivo };

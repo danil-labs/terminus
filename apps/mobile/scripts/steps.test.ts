@@ -40,8 +40,8 @@ test("sin orden registrado, los pasos van delante del texto; un `!` trae su sali
   assert.deepEqual(lines.map((l) => l.kind), ["steps", "message"]);
   const shell = linesOfTurn({ role: "user", text: "ls", shell: { cwd: "/", output: "a\nb", exit_code: 0, duration_ms: 3, truncated: false } }, "s", []);
   assert.deepEqual(shell, [{ key: "s", kind: "shell", command: "ls", output: "a\nb", exitCode: 0 }]);
-  assert.equal(bareCommand('/bin/zsh -lc "cd \\"/a b\\" && git status"'), 'cd \\"/a b\\" && git status');
-  assert.equal(bareCommand("cd /repo && git status"), "git status");
+  assert.equal(bareCommand('/bin/zsh -lc "cd \\"/a b\\" && git status"'), 'cd "/a b" && git status');
+  assert.equal(bareCommand("cd /repo && git status"), "cd /repo && git status");
 });
 
 test("en vivo: los pasos corren y cierran, y el texto anterior queda como avance", () => {

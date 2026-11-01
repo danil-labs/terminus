@@ -67,6 +67,16 @@ test("un comando en curso se enseña sin su envoltorio y en una línea", () => {
   });
 });
 
+test("un comando se nombra por su programa y su primer tramo, no por el intérprete", () => {
+  const [row] = groupSteps([stepOf("Bash", "/bin/bash -lc 'cd /repo && pnpm verify'")]);
+  assert.equal(summary(row).sujeto, "pnpm verify");
+  const [wrapped] = groupSteps([stepOf("Bash", "env FOO=1 sudo -u root timeout 30 systemctl restart x")]);
+  assert.equal(summary(wrapped).sujeto, "systemctl restart x");
+  // Lo que ya era un comando no se toca, y el desplegado conserva todo.
+  const [plain] = groupSteps([stepOf("Bash", "pnpm verify 2>&1 | tail -20")]);
+  assert.equal(summary(plain).sujeto, "pnpm verify");
+});
+
 test("la cabecera de un tramo cuenta por clase, y las ediciones por archivo", () => {
   const segment = [
     stepOf("Read", "a.ts"),
