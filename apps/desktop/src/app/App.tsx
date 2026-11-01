@@ -177,6 +177,7 @@ import { pedirElCampo } from "../lib/focus";
 import { lastRoster, rememberRoster } from "../lib/handlerRoster";
 import { aplicarLenguaDeWorkspace, clavesConocidas, t } from "../lib/i18n";
 import { attachmentsOn, NotMovable } from "../lib/remoteAttachments";
+import { ATTACHMENT_DOCUMENTS_FEATURE } from "@terminus/protocol";
 import { invoke } from "../lib/invoke.ts";
 import { connected } from "../lib/engineConnection";
 import { openChatVisual, readChatVisual } from "../features/chat/readVisual";
@@ -1959,7 +1960,7 @@ export default function App() {
   // no decide con la diferencia. Lo que sí sería un fallo es tumbar la
   // transcripción por un archivo que ya no está. Resuelve contra la tarea
   // abierta: de esa son los mensajes que `Chat` está pintando.
-  async function miniaturaDeAdjunto(rel: string): Promise<string | null> {
+  async function previewDeAdjunto(rel: string): Promise<Preview | null> {
     try {
   // Un adjunto se guarda por su ruta del sistema. Los turnos anteriores a
   // v0.1.23 guardaron una relativa `entradas/…`, y esas van por
@@ -1968,17 +1969,20 @@ export default function App() {
       const esDeLaTarea = rel.startsWith("entradas/");
       const id = sessionId();
       if (esDeLaTarea && !id) return null;
-      const p = esDeLaTarea
+      return esDeLaTarea
         ? await invoke<Preview>("attachment_preview", {
             project: project(),
             id,
             rel,
           }, deLaTarea(id))
         : await previewOn(rel, id);
-      return p.data_url ?? null;
     } catch {
       return null;
     }
+  }
+
+  async function miniaturaDeAdjunto(rel: string): Promise<string | null> {
+    return (await previewDeAdjunto(rel))?.data_url ?? null;
   }
 
   // Lo que se mandó a una tarea de otra máquina vive allá; lo que todavía no
@@ -1993,6 +1997,19 @@ export default function App() {
     }
   }
 
+  /** Si la máquina de esas opciones anuncia la extensión de documentos. */
+  function documentosEn(options: { headers: Record<string, string> } | undefined): boolean {
+    const machine = options?.headers["x-terminus-machine"];
+    const fila = machines().find((m) => (machine ? m.id === machine : m.local));
+    return fila?.features?.includes(ATTACHMENT_DOCUMENTS_FEATURE) === true;
+  }
+
+  /** Las opciones de la conversación abierta o del borrador, como en `pegarImagen`. */
+  function opcionesDeAdjunto() {
+    const abierta = sessionId();
+    return abierta ? deLaTarea(abierta) : draftOptions();
+  }
+
   /**
    * Los adjuntos con las rutas de la máquina donde corre el turno. Un archivo
    * soltado o elegido se prepara en el motor de la ventana; una imagen pegada,
@@ -2003,25 +2020,32 @@ export default function App() {
     const machine = options?.headers["x-terminus-machine"];
     const local = (id: string | undefined) => !id || !!machines().find((x) => x.id === id)?.local;
     const alla = (path: string) => adjuntosEn.get(path) === machine || (local(adjuntosEn.get(path)) && local(machine));
+    const documentos = documentosEn(options);
     try {
       const listas = await attachmentsOn(paths, alla, {
+        documentos,
         read: (path) => invoke<Preview>("preview_file", { path, rel: path }, enMaquina(adjuntosEn.get(path))),
-        save: (mime, datos) => invoke<string>("guardar_imagen_pegada", { mime, datos }, options),
+        save: (mime, datos, nombre) => {
+          if (documentos) return invoke<string>("guardar_adjunto", { mime, nombre: nombre ?? null, datos }, options);
+          return invoke<string>("guardar_imagen_pegada", { mime, datos }, options);
+        },
         prepare: (saved) => invoke<string[]>("prepare_attachments", { project: proyecto, paths: saved }, options),
       });
       if (machine) for (const path of listas) adjuntosEn.set(path, machine);
       return listas;
     } catch (e) {
       if (!(e instanceof NotMovable)) throw e;
-      throw { what: t("chat.attachments.remote_images_only", { names: lista(e.names), machine: machineName(machine ?? "local") }), detail: "remote_images_only" };
+      throw { what: t("chat.attachments.remote_unsupported", { names: lista(e.names), machine: machineName(machine ?? "local") }), detail: "remote_unsupported" };
     }
   }
 
   /** Los bytes ya están en la ventana: van directo a la máquina del turno, sin pasar por la miniatura de 4 MB. */
-  async function pegarImagen(mime: string, datos: string): Promise<string> {
+  async function pegarImagen(mime: string, datos: string, nombre?: string): Promise<string> {
     const abierta = sessionId();
     const opciones = abierta ? deLaTarea(abierta) : draftOptions();
-    const ruta = await invoke<string>("guardar_imagen_pegada", { mime, datos }, opciones);
+    const ruta = documentosEn(opciones)
+      ? await invoke<string>("guardar_adjunto", { mime, nombre: nombre ?? null, datos }, opciones)
+      : await invoke<string>("guardar_imagen_pegada", { mime, datos }, opciones);
     const machine = opciones?.headers["x-terminus-machine"];
     if (machine) pegadasEn.set(ruta, machine);
     return ruta;
@@ -7339,7 +7363,9 @@ export default function App() {
         readVisual={(file) => readChatVisual({ workspace: visualWorkspace, project: pp.proyecto ?? "", session: pp.sesion ?? "" }, file)}
         openVisual={(file) => openChatVisual({ workspace: visualWorkspace, project: pp.proyecto ?? "", session: pp.sesion ?? "" }, file)}
         onMiniatura={miniaturaDeAdjunto}
+        onPreview={previewDeAdjunto}
         onPegarImagen={pegarImagen}
+        aceptaDocumentos={() => documentosEn(opcionesDeAdjunto())}
         onStop={detener}
         /* Solo el de la tarea que se está mirando: con el primero de la
            lista, dos turnos a la vez ponen la hoja de aprobar pegada a una

@@ -89,7 +89,10 @@ export const APP_ACTIONS = [
   "run_shell_command",
   "stop_shell_command",
   // Adjuntar desde el teléfono: el archivo viaja en base64 y queda en la máquina.
+  // `guardar_adjunto` acepta documentos y el nombre original (motor con
+  // `attachment_documents_v1`); el de imágenes queda para los motores anteriores.
   "guardar_imagen_pegada",
+  "guardar_adjunto",
   "prepare_attachments",
   // Iniciar sesión en una cuenta de IA en otra máquina (enlace y código) y cerrarla.
   "add_account",

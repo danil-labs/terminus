@@ -1,6 +1,15 @@
 import { RADIUS, TEXT } from "@terminus/design";
 import { SendButton } from "./SendButton";
-import type { MentionList, PermissionModeOption, ProviderInfo, ProviderModels, SlashMenu } from "@terminus/protocol";
+import {
+  ATTACHMENT_DOCUMENTS_FEATURE,
+  isImageMime,
+  mimeOfAttachment,
+  type MentionList,
+  type PermissionModeOption,
+  type ProviderInfo,
+  type ProviderModels,
+  type SlashMenu,
+} from "@terminus/protocol";
 import { modelName, previewLabel } from "@terminus/tasks";
 import * as DocumentPicker from "expo-document-picker";
 import { File } from "expo-file-system";
@@ -11,6 +20,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   ATTACHMENT_MIMES,
   type Draft,
+  IMAGE_MIMES,
   MAX_ATTACHMENT_BYTES,
   mentionsOf,
   modelsOf,
@@ -266,12 +276,20 @@ export function Composer({
     }
   }
 
+  function aceptaDocumentos() {
+    if (!host) return false;
+    const features = host.features?.();
+    if (features?.length) return features.includes(ATTACHMENT_DOCUMENTS_FEATURE);
+    return host.supports?.("guardar_adjunto") !== "no";
+  }
+
   async function addFiles(files: { name: string; mime: string; size: number | null; read: () => Promise<string> }[]) {
     if (!host || !workspace || folder === null) return;
     for (const file of files) {
       const key = `${file.name}-${Date.now()}-${Math.random()}`;
-      if (!ATTACHMENT_MIMES.has(file.mime)) {
-        setNote(t("composer.only_images"));
+      const mime = mimeOfAttachment(file.mime, file.name);
+      if (!mime || (!aceptaDocumentos() && !isImageMime(mime))) {
+        setNote(t("composer.unsupported_file"));
         continue;
       }
       if (file.size !== null && file.size > MAX_ATTACHMENT_BYTES) {
@@ -282,7 +300,7 @@ export function Composer({
       try {
         const base64 = await file.read();
         if (base64.length * 0.75 > MAX_ATTACHMENT_BYTES) throw new Error(t("composer.too_large", { name: file.name, size: ((base64.length * 0.75) / 1048576).toFixed(1) }));
-        const path = await uploadAttachment(host, workspace, folder, { mime: file.mime, base64 });
+        const path = await uploadAttachment(host, workspace, folder, { mime, base64, name: file.name });
         setAttachments((old) => old.map((a) => (a.key === key ? { ...a, path } : a)));
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error);
@@ -309,7 +327,7 @@ export function Composer({
 
   async function pickFiles() {
     setSheet(null);
-    const result = await DocumentPicker.getDocumentAsync({ type: [...ATTACHMENT_MIMES], multiple: true, copyToCacheDirectory: true });
+    const result = await DocumentPicker.getDocumentAsync({ type: [...(aceptaDocumentos() ? ATTACHMENT_MIMES : IMAGE_MIMES)], multiple: true, copyToCacheDirectory: true });
     if (result.canceled) return;
     await addFiles(
       result.assets.map((asset) => ({
@@ -494,7 +512,7 @@ export function Composer({
       <Sheet visible={sheet === "attach"} title={w("chat.attachments.add")} onClose={() => setSheet(null)}>
         <SheetOption testID="attach-photos" icon="image" label={t("composer.attach_photos")} onPress={() => void pickPhotos()} />
         <SheetOption testID="attach-files" icon="file" label={t("composer.attach_files")} onPress={() => void pickFiles()} />
-        <Text style={[styles.hint, { color: theme.textMuted, paddingHorizontal: 18, paddingTop: 8 }]}>{t("composer.only_images")}</Text>
+        <Text style={[styles.hint, { color: theme.textMuted, paddingHorizontal: 18, paddingTop: 8 }]}>{t("composer.unsupported_file")}</Text>
       </Sheet>
 
       <Sheet visible={sheet === "mode"} title={w("chat.mode.listbox")} onClose={() => setSheet(null)}>
