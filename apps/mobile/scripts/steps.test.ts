@@ -212,6 +212,20 @@ test("en curso cada tramo es un grupo y el avance sigue a la vista; al cerrar se
   assert.equal(runningStep(thread.runs[0])?.target, "dos");
 });
 
+test("un fallo sin texto sigue en el hilo; la línea del cupo retira el que ya resolvió", () => {
+  const fallo = { clase: "sin_cupo", detail: "429" };
+  const stopped = workRuns([user("u"), { id: "f", role: "system", text: "", meta: "fallo", fallo }], [], false);
+  const last = stopped.lines.at(-1);
+  assert.ok(last?.kind === "message" && last.fallo?.clase === "sin_cupo" && last.meta === "fallo");
+  const continued = workRuns(
+    [user("u"), { id: "f", role: "system", text: "", meta: "fallo", fallo }, { id: "q", role: "system", text: "", meta: "cupo", quota: { from: "a", to: "b" } }],
+    [],
+    false,
+  );
+  const messages = continued.lines.filter((line) => line.kind === "message");
+  assert.deepEqual(messages.map((line) => (line.kind === "message" ? line.meta : null)), [undefined, "cupo"]);
+});
+
 test("una respuesta intermedia queda en el chat y en la hoja; la última, solo en el chat", () => {
   const { lines, runs } = workRuns([user("u"), agent("a", ["uno"], "Primera"), agent("b", ["dos"], "Segunda")], [], false);
   assert.deepEqual(lines.map((l) => l.kind), ["message", "work", "message", "work", "message"]);

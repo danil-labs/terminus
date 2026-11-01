@@ -4,9 +4,8 @@ import { useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { AgentAvatar } from "../../ui/AgentAvatar";
-import type { BaseBranches } from "@terminus/protocol";
 import { carryForNewTask } from "../../lib/carry";
-import { baseBranchesOf, createTask, runShell, shareSpace, suggestedDefaults } from "../../lib/engine";
+import { baseBranchesOf, createTask, runShell, shareSpace, suggestedDefaults, type BranchList } from "../../lib/engine";
 import { store } from "../../lib/store";
 import { HostError } from "../../lib/hosts";
 import { t, w } from "../../lib/i18n";
@@ -39,7 +38,7 @@ export default function NewTask() {
   const [folder, setFolder] = useState<string | null>(null);
   const [agent, setAgent] = useState<string | null>(null);
   const [branch, setBranch] = useState<string | null>(null);
-  const [branches, setBranches] = useState<BaseBranches | null>(null);
+  const [branches, setBranches] = useState<BranchList | null>(null);
   const [picker, setPicker] = useState<"machine" | "folder" | "branch" | "agent" | AddFolderMode | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [waking, setWaking] = useState(false);
@@ -269,9 +268,9 @@ export default function NewTask() {
       />
       <Sheet visible={picker === "branch"} title={w("worktrees.base.from")} search={t("search.branches")} onClose={() => setPicker(null)}>
         {(query) => {
-          const shown = (branches?.branches ?? []).filter((b) => matches(query, b.name, b.remote));
+          const shown = (branches?.branches ?? []).filter((b) => matches(query, b.name, b.detail));
           return shown.length ? shown.map((b) => (
-            <SheetOption key={b.reference} icon="git-branch" label={b.name} detail={b.remote ?? null} selected={b.reference === selectedBranch} onPress={() => {
+            <SheetOption key={b.reference} icon="git-branch" label={b.name} detail={b.detail} selected={b.reference === selectedBranch} onPress={() => {
               setBranch(b.reference === branches?.selected ? null : b.reference);
               setPicker(null);
             }} />

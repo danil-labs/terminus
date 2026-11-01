@@ -219,6 +219,10 @@ export type Turn = {
   text: string;
   at?: number;
   meta?: string | null;
+  /** Por qué falló, cuando se pudo clasificar (`failures::Fallo`). Sin este campo la clase se guarda y no se ve. */
+  fallo?: { clase: string; detail?: string; vuelve_en?: number; reintentos?: number; resumes_at?: number } | null;
+  /** Con qué cuenta siguió tras quedarse sin cupo (`quota::QuotaResume`). */
+  quota?: { from?: string | null; to?: string | null; until?: number | null } | null;
   model?: string | null;
   /** Tiempo de trabajo activo del tramo del agente; falta en tareas antiguas. */
   duration_ms?: number | null;
@@ -313,8 +317,15 @@ export type PermissionModeOption = { id: string; label: Frase; falta?: Frase | n
 export type SlashMenu = { commands: { name: string; description?: string | null }[]; skills: { name: string; description?: string | null }[]; side_question?: string | null };
 /** `list_mentions`: archivos y carpetas que se pueden nombrar con `@`. */
 export type MentionList = { fuentes: { ruta: string; tipo: string; fuente?: string | null }[]; truncado?: boolean };
-/** `project_base_branches`. */
-export type BaseBranches = { branches: { reference: string; name: string; remote?: string | null }[]; selected: string | null; fetched_at?: number | null };
+/**
+ * `project_base_branches`. El motor manda `remote` como booleano. Un doble de
+ * desarrollo llegó a mandar el nombre del remoto, o `null`.
+ */
+export type BaseBranches = {
+  branches: { reference: string; name: string; remote?: boolean | string | null; commit?: string | null; ahead?: number | null; behind?: number | null }[];
+  selected: string | null;
+  fetched_at?: number | null;
+};
 /** `task_blockers`: lo que impide archivar sin preguntar. */
 export type TaskBlockers = { unsaved: { session: string; title: string; files: string[] }[]; not_finished?: boolean };
 

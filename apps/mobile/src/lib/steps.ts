@@ -5,6 +5,7 @@
  */
 import { bareCommand, classify, fileName, isQuestionFile, joinSteps, type StepKind } from "@terminus/chat/steps";
 import type { HistoryRef, Turn, TurnTool } from "@terminus/protocol";
+import { quotaResolves, type QuotaChange, type TurnFailure } from "./failureNotice.ts";
 
 export type { StepKind };
 
@@ -27,7 +28,21 @@ export function senderOf(turn: Turn): Sender | null {
 
 /** Un renglón de la conversación. */
 export type Line =
-  | { key: string; kind: "message"; role: string; text: string; images: string[]; attachments: string[]; from?: Sender | null; refs?: readonly HistoryRef[]; turnId?: string }
+  | {
+      key: string;
+      kind: "message";
+      role: string;
+      text: string;
+      images: string[];
+      attachments: string[];
+      from?: Sender | null;
+      refs?: readonly HistoryRef[];
+      turnId?: string;
+      /** `fallo` o `cupo`: la frase se arma al pintar, con la lengua de quien mira. */
+      meta?: string | null;
+      fallo?: TurnFailure | null;
+      quota?: QuotaChange | null;
+    }
   /** Lo que el agente dijo antes de su respuesta, mientras trabajaba. */
   | { key: string; kind: "progress"; text: string }
   | { key: string; kind: "steps"; rows: StepRow[] }
@@ -52,7 +67,19 @@ const toStep = (tool: TurnTool) => stepOf(tool.name ?? "", tool.target ?? null, 
 export function linesOfTurn(turn: Turn, key: string, images: string[]): Line[] {
   const from = senderOf(turn);
   const refs = turn.history_refs?.filter((ref) => ref.pointer !== "/tools");
-  const message = (text: string): Line => ({ key, kind: "message", role: turn.role, text, images, attachments: turn.attachments ?? [], from, ...(refs?.length ? { refs, turnId: turn.id } : {}) });
+  const message = (text: string): Line => ({
+    key,
+    kind: "message",
+    role: turn.role,
+    text,
+    images,
+    attachments: turn.attachments ?? [],
+    from,
+    ...(refs?.length ? { refs, turnId: turn.id } : {}),
+    ...(turn.meta ? { meta: turn.meta } : {}),
+    ...(turn.fallo ? { fallo: turn.fallo } : {}),
+    ...(turn.quota ? { quota: turn.quota } : {}),
+  });
   if (turn.shell) return [{ key, kind: "shell", command: turn.text ?? "", output: turn.shell.output ?? "", exitCode: turn.shell.exit_code ?? null }];
   const tools = turn.tools ?? [];
   const pieces = turn.pieces ?? [];
@@ -196,7 +223,8 @@ export type WorkThread = { lines: ChatLine[]; live: ChatLine[]; runs: WorkRun[] 
 
 const opensRun = (turn: Turn) => turn.role === "user" && !turn.permission && !turn.answers?.length && !turn.shell;
 const isSegment = (turn: Turn) => turn.role !== "user" && turn.role !== "system" && turn.role !== "shell";
-const isEmpty = (line: Line) => line.kind === "message" && !line.text && !line.images.length && !line.attachments.length && !line.refs?.length;
+const isEmpty = (line: Line) =>
+  line.kind === "message" && !line.text && !line.images.length && !line.attachments.length && !line.refs?.length && line.meta !== "fallo" && line.meta !== "cupo" && !line.fallo;
 
 function decisionOf(turn: Turn): Step | null {
   if (!turn.permission) return null;
@@ -294,6 +322,11 @@ function deriveRun(stretch: Stretch, pieces: readonly LivePiece[], open: boolean
     if (line.kind === "progress") return addNote(line);
     if (isEmpty(line)) return;
     seal();
+    // La línea del cupo cierra el fallo que ya resolvió: la tarea siguió.
+    if (line.kind === "message" && line.meta === "cupo") {
+      const previous = target.at(-1);
+      if (previous?.kind === "message" && quotaResolves(previous.fallo?.clase)) target.pop();
+    }
     target.push(line);
     if (segment && line.kind === "message" && line.text) answers.push(line.text);
   };

@@ -456,7 +456,7 @@ function invoke(m, command, args) {
     case "list_slash_menu":
       return { commands: [{ name: "review", description: "Revisa los cambios" }, { name: "compact", description: null }], skills: [{ name: "pdf", description: "Lee y escribe PDF" }], side_question: "btw" };
     case "list_mentions": return { fuentes: [{ ruta: "src", tipo: "carpeta" }, { ruta: "src/app.ts", tipo: "archivo" }, { ruta: "docs/guía de estilo.md", tipo: "archivo" }], truncado: false };
-    case "project_base_branches": return { branches: [{ reference: "refs/heads/main", name: "main", remote: null }, { reference: "refs/remotes/origin/dev", name: "origin/dev", remote: "origin" }], selected: "refs/heads/main", fetched_at: null };
+    case "project_base_branches": return { branches: [{ reference: "refs/heads/main", name: "main", remote: false, commit: "abc", ahead: null, behind: null }, { reference: "refs/remotes/origin/dev", name: "origin/dev", remote: true, commit: "def", ahead: 0, behind: 1 }], selected: "refs/heads/main", fetched_at: null };
     case "run_shell_command": {
       let s = args.session ? e.sessions.get(args.session) : null;
       if (!s) {
@@ -487,7 +487,9 @@ function invoke(m, command, args) {
       });
     case "list_accounts": {
       const accounts = e.accounts[args.provider] ?? [];
-      return { provider: args.provider, env_var: null, shared_credential: null, secret_note: null, active: accounts[0]?.id ?? null, accounts };
+      const chosen = e.active?.[args.provider];
+      const active = accounts.some((a) => a.id === chosen) ? chosen : (accounts[0]?.id ?? null);
+      return { provider: args.provider, env_var: null, shared_credential: null, secret_note: null, active, accounts };
     }
     case "account_status": {
       const a = (e.accounts[args.provider] ?? []).find((x) => x.id === args.id);
@@ -539,6 +541,13 @@ function invoke(m, command, args) {
       const i = list.findIndex((a) => a.id === args.id);
       if (i < 0) throw { code: "command_failed", detail: "no such account" };
       list.splice(i, 1);
+      if (e.active?.[args.provider] === args.id) delete e.active[args.provider];
+      return null;
+    }
+    case "set_active_account": {
+      const list = e.accounts[args.provider] ?? [];
+      if (!list.some((a) => a.id === args.id)) throw { code: "command_failed", detail: "no such account" };
+      (e.active ??= {})[args.provider] = args.id;
       return null;
     }
   }
@@ -585,7 +594,7 @@ function wake(m) {
  * son de un workspace y sin él en el sobre no hay activo. `list_accounts` sale
  * vacía y lo demás falla con la frase del motor (medido en vm-alberto, 1198b04).
  */
-const ACCOUNT_COMMANDS = new Set(["list_accounts", "account_status", "account_limits", "add_account", "login_account", "remove_account"]);
+const ACCOUNT_COMMANDS = new Set(["list_accounts", "account_status", "account_limits", "add_account", "login_account", "remove_account", "set_active_account"]);
 const RELAY_WITHOUT_WORKSPACE = "Por el relay, la llamada tiene que decir de qué workspace es.";
 
 function withoutWorkspace(call) {
