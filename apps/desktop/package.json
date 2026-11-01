@@ -40,6 +40,7 @@
     "@modelcontextprotocol/ext-apps": "^2.0.3",
     "@novnc/novnc": "1.7.0",
     "@supabase/supabase-js": "^2.118.0",
+    "@tanstack/solid-virtual": "3.13.51",
     "@tauri-apps/api": "^2.1.0",
     "@tauri-apps/plugin-clipboard-manager": "^2.3.3",
     "@tauri-apps/plugin-dialog": "^2.7.2",

@@ -80,6 +80,8 @@ const steps = [
   ["Chat visuals arrive in parts and fall back to tree_show on an older engine", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/chat-visual-parts.test.ts")], root],
   ["The sidebar snapshot is saved bounded and debounced", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/shell-cache.test.ts")], root],
   ["A local orchestrator config starts mcp serve with its credential", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/orchestrator-snippets.test.ts")], root],
+  ["History pages join by their turns and a failure can be retried", process.execPath, ["--test", "--experimental-strip-types", join(root, "..", "..", "packages/chat/test/history.test.ts")], root],
+  ["Thread rows keep their key when saved and when prepending", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/thread-rows.test.ts")], root],
   ["The Folder panel retries by itself, does not pile up reads and keeps the last good result", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/tree-loader.test.ts")], root],
   ["The window opens with the light list and startup confirms it without skipping a denial", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/early-startup.test.ts")], root],
   ["The release note comes in the app language", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/release-notes.test.ts")], root],

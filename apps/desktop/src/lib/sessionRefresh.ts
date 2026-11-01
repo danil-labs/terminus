@@ -68,6 +68,16 @@ export function conservarEnOrden<T>(previous: T[], incoming: T[]): T[] {
   return kept.length === previous.length && kept.every((row, i) => row === previous[i]) ? previous : kept;
 }
 
+/** Como `conservar`, por la identidad que traen las filas: la ventana pudo soltar por cualquiera de sus bordes. */
+export function conservarPorClave<T extends { clave?: string }>(previous: T[], incoming: T[]): T[] {
+  const antes = new Map(previous.flatMap((row) => (row.clave ? [[row.clave, row] as const] : [])));
+  const kept = incoming.map((row) => {
+    const anterior = row.clave ? antes.get(row.clave) : undefined;
+    return anterior !== undefined && mismoValor(anterior, row) ? anterior : row;
+  });
+  return kept.length === previous.length && kept.every((row, i) => row === previous[i]) ? previous : kept;
+}
+
 /** Como `conservarEnOrden`, alineando por el final: para cuando se antepone lo anterior. */
 export function conservarPorElFinal<T>(previous: T[], incoming: T[]): T[] {
   const offset = incoming.length - previous.length;
