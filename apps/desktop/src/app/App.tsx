@@ -471,6 +471,8 @@ export default function App() {
   // vista y no un modo. No cambia lo que la app hace, cambia lo que el
   // panel enseña. Abrir una tarea o empezar una la cierra: la
   // conversación es lo que ocupa ese sitio.
+  /** La carpeta que se abrió para ver lo que lee: su página entra una vez por Configuración. */
+  const [materialPedido, setMaterialPedido] = createSignal<string | null>(null);
   const [proyectoAbierto, setProyectoAbierto] = createSignal<string | null>(
     null,
   );
@@ -4517,6 +4519,7 @@ export default function App() {
     },
     onOpenMaterial: (id) => {
       cerrarAjustes();
+      setMaterialPedido(id);
       abrirProyecto(id);
     },
   };
@@ -7826,6 +7829,8 @@ export default function App() {
             <Suspense fallback={<div class="flex flex-1 items-center justify-center text-sm text-neutral-500" role="status">{t("projects.view.opening")}</div>}>
             <VistaDeProyecto
               proyecto={p()}
+              materialPedido={materialPedido() === p().id}
+              onMaterialVisto={() => setMaterialPedido(null)}
               workspace={workspaceActivo()}
               modelos={modelosParaAgentes()}
               sources={sources()}

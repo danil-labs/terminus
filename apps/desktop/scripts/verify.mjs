@@ -84,6 +84,7 @@ const steps = [
   ["The artifact runtime does not break silently", process.execPath, [join(root, "scripts/guards/artifact.mjs")], root],
   ["Carrying work to another machine copies in parts, resumes from the failed one and cleans up on cancel", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/carry-work.test.ts")], root],
   ["Chat visuals arrive in parts and fall back to tree_show on an older engine", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/chat-visual-parts.test.ts")], root],
+  ["An agent row names its readers only when they differ from the rest", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/agent-readers.test.ts")], root],
   ["The sidebar snapshot is saved bounded and debounced", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/shell-cache.test.ts")], root],
   ["A local orchestrator config starts mcp serve with its credential", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/orchestrator-snippets.test.ts")], root],
   ["History pages join by their turns and a failure can be retried", process.execPath, ["--test", "--experimental-strip-types", join(root, "..", "..", "packages/chat/test/history.test.ts")], root],
