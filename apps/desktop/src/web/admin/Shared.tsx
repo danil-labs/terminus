@@ -1,10 +1,9 @@
 /**
- * Lo que se comparte con el equipo de un workspace: skills, MCP y agentes. Las
- * rutas de la cuenta no existen todavía: sin `SharedSource`, /admin no las muestra.
- * Sus escrituras directas no se ofrecen aquí mientras se decide si la autoridad
- * es la cuenta o el repositorio: un cambio se propone por `PolicyFlow`.
+ * Lo que se comparte con el equipo de un workspace: skills, MCP y agentes. Se lee
+ * aquí y se cambia solo con `PolicyFlow`. Las rutas de la cuenta no existen
+ * todavía: sin `SharedSource`, /admin no las muestra.
  */
-import { createResource, createSignal, For, Show } from "solid-js";
+import { createResource, For, Show } from "solid-js";
 import { SettingsPanel, SettingsRow, SettingsSection } from "../../features/settings/layout";
 import { t } from "../../lib/i18n";
 import { Badge } from "../../ui/Badge";
@@ -19,8 +18,6 @@ export type SharedSource = {
   skills: () => Promise<{ sources: SharedSkillSource[]; skills: SharedSkill[] }>;
   servers: () => Promise<SharedServer[]>;
   agents: () => Promise<SharedAgent[]>;
-  setAudience: (kind: "skill" | "server" | "agent", id: string, audience: Audience) => Promise<void>;
-  setRequired: (id: string, required: boolean) => Promise<void>;
 };
 
 const audienceName = (value: Audience) =>
@@ -32,16 +29,8 @@ function AudienceBadge(props: { value: Audience }) {
 
 type Props = { source: SharedSource; policy?: PolicySource; canPropose: boolean };
 
-/** Abajo de cada lista: quién manda aún no se decide, y lo cambiado va por propuesta. */
 function Governed(props: { area: PolicyArea; policy?: PolicySource; canPropose: boolean }) {
-  return (
-    <>
-      <p role="status" class="m-0 rounded-md border border-border bg-surface-muted px-3 py-2 text-xs text-neutral-950" data-admin-authority="">
-        {t("web.admin.authority_open")}
-      </p>
-      <Show when={props.policy}>{(policy) => <PolicyFlow area={props.area} source={policy()} canPropose={props.canPropose} />}</Show>
-    </>
-  );
+  return <Show when={props.policy}>{(policy) => <PolicyFlow area={props.area} source={policy()} canPropose={props.canPropose} />}</Show>;
 }
 
 export function SharedSkills(props: Props) {
@@ -112,27 +101,16 @@ export function SharedAgents(props: Props) {
 
 /** `/admin?demo=1`: en memoria, sin red. */
 export function sharedDemo(): SharedSource {
-  const [skills, setSkills] = createSignal<SharedSkill[]>([
+  const skills: SharedSkill[] = [
     { id: "1", name: "revisar-pr", path: "practicas/revisar-pr", audience: "team", required: true },
     { id: "2", name: "escribir-en-espanol", path: "practicas/escribir", audience: "team", required: false },
-  ]);
-  const [servers, setServers] = createSignal<SharedServer[]>([
-    { id: "1", name: "Jira", host: "mcp.atlassian.com", credential: "personal", machines: 0, audience: "team" },
-    { id: "2", name: "Inventario", host: "mcp.ejemplo.mx", credential: "team", machines: 4, audience: "managers" },
-  ]);
-  const [agents, setAgents] = createSignal<SharedAgent[]>([
-    { id: "1", name: "QA", path: "practicas/agents/qa", audience: "team" },
-  ]);
+  ];
   return {
-    skills: async () => ({ sources: [{ id: "1", repo: "ejemplo/practicas", branch: "main", commit: "a1b2c3d", skills: skills().length, current: true }], skills: skills() }),
-    servers: async () => servers(),
-    agents: async () => agents(),
-    setAudience: async (kind, id, audience) => {
-      const change = <T extends { id: string; audience: Audience }>(rows: T[]) => rows.map((row) => (row.id === id ? { ...row, audience } : row));
-      if (kind === "skill") setSkills(change);
-      else if (kind === "server") setServers(change);
-      else setAgents(change);
-    },
-    setRequired: async (id, required) => void setSkills((rows) => rows.map((row) => (row.id === id ? { ...row, required } : row))),
+    skills: async () => ({ sources: [{ id: "1", repo: "ejemplo/practicas", branch: "main", commit: "a1b2c3d", skills: skills.length, current: true }], skills }),
+    servers: async () => [
+      { id: "1", name: "Jira", host: "mcp.atlassian.com", credential: "personal", machines: 0, audience: "team" },
+      { id: "2", name: "Inventario", host: "mcp.ejemplo.mx", credential: "team", machines: 4, audience: "managers" },
+    ],
+    agents: async () => [{ id: "1", name: "QA", path: "practicas/agents/qa", audience: "team" }],
   };
 }

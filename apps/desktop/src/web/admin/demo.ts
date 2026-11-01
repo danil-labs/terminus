@@ -66,7 +66,7 @@ const RULES: PolicyRule[] = [
   { id: "org-models", name: "Modelos en toda la organización", value: "Sin modelos gratuitos", enforcement: "advisory", scope: "organization" },
 ];
 
-function policyDemo(): PolicySource {
+function policyDemo(internal: boolean): PolicySource {
   const contents: Record<PolicyArea, string> = {
     rules: 'models:\n  allowed: ["opus-5.5", "sonnet-5.5", "gpt-6.1"]\nenforcement:\n  mode: advisory\n',
     skills: 'skills:\n  - id: revisar-pr\n    required: true\n',
@@ -82,13 +82,13 @@ function policyDemo(): PolicySource {
     mcp: [], agents: [],
   };
   return {
-    current: async (area) => ({ revision: REVISION, repo: "ejemplo/politica", path: "policy.yaml", content: contents[area] }),
+    current: async (area) => ({ revision: REVISION, repository: internal ? null : { name: "ejemplo/politica", path: "policy.yaml" }, content: contents[area] }),
     validate: async (area, candidate) => {
       if (candidate.includes("\t") || !candidate.includes(":")) return { valid: false, errors: [{ path: "/", message: "No se pudo leer como YAML." }], changed: false, added: [], modified: [], removed: [], proposedRevision: null };
       const changed = candidate !== contents[area];
       return { valid: true, errors: [], changed, added: [], modified: changed ? [area] : [], removed: [], proposedRevision: changed ? NEXT : REVISION };
     },
-    pulls: async (area) => pulls[area],
+    pulls: async (area) => (internal ? pulls[area].map((row) => ({ ...row, url: null })) : pulls[area]),
     open: async (area, _candidate, proposal) => void (pulls[area] = [{ id: String(Date.now()), number: 50, title: "Cambio propuesto", url: "https://github.com/ejemplo/politica/pull/50", author: "María", state: "checks", proposedRevision: proposal.proposedRevision ?? NEXT }, ...pulls[area]]),
   };
 }
@@ -120,7 +120,7 @@ const organizationOf = (plan: string, enterprise: boolean, workspace: string, ot
 export const personalDemo = { usage: usageDemo(true), plan: async () => ({ name: "Personal", detail: "1 workspace" }) };
 
 /** Las cuatro cuentas de la vista previa; `account` llega de `?account=`. */
-export function adminDemo(account: string | null, workspace: string, other: string): Pick<AdminSource, "memberships" | "active" | "shared" | "workspace" | "auditLog" | "usage" | "members" | "rules" | "policy" | "organization"> {
+export function adminDemo(account: string | null, workspace: string, other: string, internalPolicy: boolean): Pick<AdminSource, "memberships" | "active" | "shared" | "workspace" | "auditLog" | "usage" | "members" | "rules" | "policy" | "organization"> {
   const personal = account === "personal";
   const enterprise = account === "enterprise";
   const row: Membership = personal
@@ -135,7 +135,7 @@ export function adminDemo(account: string | null, workspace: string, other: stri
     usage: usageDemo(account === "member"),
     members: membersDemo(),
     rules: { rules: async () => RULES },
-    policy: policyDemo(),
+    policy: policyDemo(internalPolicy),
     organization: organizationOf(row.plan ?? "", enterprise, workspace, other),
   };
 }

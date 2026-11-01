@@ -271,7 +271,6 @@
   "web.admin.failed": "Your Danil workspaces could not be read.",
   "web.admin.denied_workspace": "This workspace has nothing to show you here: its owner and admins see it.",
   "web.admin.back": "Back to Danil",
-  "web.admin.group_workspace": "Workspace",
   "web.admin.group_organization": "Organization",
   "web.admin.general": "General",
   "web.admin.members": "Members",
@@ -285,7 +284,6 @@
   "web.admin.role_member": "Member",
   "web.admin.demo_other": "Sales",
   "web.admin.support": "Support access",
-  "web.admin.group_shared": "Shared with the team",
   "web.admin.skills": "Skills",
   "web.admin.mcp": "MCP",
   "web.admin.agents": "Agents",
@@ -432,7 +430,6 @@
   "web.admin.pull_state.approved": "Approved",
   "web.admin.pull_state.merged": "Merged",
   "web.admin.pull_state.closed": "Closed",
-  "web.admin.authority_open": "To be decided: whether your Danil account or a repository owns this list. Until then, nothing changes directly here.",
   "web.admin.rules_workspace": "Rules of this workspace",
   "web.admin.rules_hint": "Each rule says how it is enforced. Advisory rules block no one.",
   "web.admin.rules_organization": "Organization rules",
@@ -447,5 +444,10 @@
   "web.admin.identity_retention": "Retention",
   "web.admin.identity_roles": "Custom roles",
   "web.admin.personal": "This is a personal account: this page is for organizations. Your usage, plan and support access are in Settings.",
-  "web.admin.personal_open": "Open Settings"
+  "web.admin.personal_open": "Open Settings",
+  "web.admin.policy_by_review": "A change takes effect once someone else approves it. Danil keeps every version.",
+  "web.admin.policy_internal": "Internal Danil policy",
+  "web.admin.policy_send_review": "Send for review",
+  "web.admin.policy_proposals": "Proposals for this policy",
+  "web.admin.policy_no_proposals": "No open proposals."
 }
