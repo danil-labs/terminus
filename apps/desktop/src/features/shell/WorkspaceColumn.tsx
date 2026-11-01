@@ -328,7 +328,8 @@ function ColumnFoot(props: {
         {tools()}
         <span aria-hidden="true" class="my-1 h-px w-6 shrink-0 bg-border-strong" />
       </Show>
-      <KeepAwake />
+      {/* Sólo la computadora de esta ventana: en la web la orden iría a una máquina remota. */}
+      <Show when={import.meta.env.MODE !== "web"}><KeepAwake /></Show>
       <button type="button" class={boton} aria-label={t("settings.title")} title={t("settings.title")} onClick={() => props.onSettings()}>
         <SettingsIcon size={17} aria-hidden="true" />
       </button>
