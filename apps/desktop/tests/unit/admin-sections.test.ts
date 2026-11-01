@@ -31,10 +31,7 @@ test("real accounts today: only what has a source appears, and a member has noth
   assert.deepEqual(visibleSections("teams", false, live), []);
 });
 
-test("every order lists each section once and drops empty groups", () => {
-  for (const order of ["scope", "task", "flat"] as const) {
-    const sections = menuFor(order, [...ALL]).flatMap((entry) => entry.sections);
-    assert.deepEqual([...sections].sort(), [...ALL].sort());
-    assert.deepEqual(menuFor(order, ["general"]).map((entry) => entry.sections), [["general"]]);
-  }
+test("the menu lists each section once and drops empty groups", () => {
+  assert.deepEqual([...menuFor([...ALL]).flatMap((entry) => entry.sections)].sort(), [...ALL].sort());
+  assert.deepEqual(menuFor(["general"]).map((entry) => entry.sections), [["general"]]);
 });

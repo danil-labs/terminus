@@ -1,8 +1,7 @@
-/** Qué ve cada cuenta en `/admin`: reglas por plan y rol, y los órdenes de menú que se están comparando. */
+/** Qué ve cada cuenta en `/admin`: reglas por plan y rol, y el menú por tarea. */
 export type AccountKind = "personal" | "teams" | "enterprise";
 export type Section = "general" | "usage" | "members" | "support" | "audit" | "skills" | "mcp" | "agents" | "rules" | "workspaces" | "plan" | "identity";
-export type MenuOrder = "scope" | "task" | "flat";
-export type GroupName = "workspace" | "people" | "control" | "shared" | "organization" | "summary";
+export type GroupName = "summary" | "people" | "control" | "organization";
 
 /** Solo un plan explícito hace personal a una cuenta: si el BFF no lo manda, tratarla así dejaría sin Harness a una organización. */
 export function accountKind(account: { plan: string | null }): AccountKind {
@@ -27,27 +26,16 @@ export function visibleSections(kind: AccountKind, manager: boolean, available: 
   return BY_KIND[kind].filter((section) => available.has(section) && (manager || FOR_MEMBERS.includes(section)));
 }
 
-export const MENUS: Record<MenuOrder, { group: GroupName; sections: Section[] }[]> = {
-  scope: [
-    { group: "workspace", sections: ["general", "members", "support", "audit"] },
-    { group: "shared", sections: ["skills", "mcp", "agents"] },
-    { group: "control", sections: ["rules", "usage"] },
-    { group: "organization", sections: ["workspaces", "plan", "identity"] },
-  ],
-  task: [
-    { group: "summary", sections: ["general", "usage", "audit"] },
-    { group: "people", sections: ["members", "support"] },
-    { group: "control", sections: ["rules", "skills", "mcp", "agents"] },
-    { group: "organization", sections: ["workspaces", "plan", "identity"] },
-  ],
-  flat: [
-    { group: "summary", sections: ["general", "usage", "rules", "members", "audit", "skills", "mcp", "agents", "support", "workspaces", "plan", "identity"] },
-  ],
-};
+const MENU: { group: GroupName; sections: Section[] }[] = [
+  { group: "summary", sections: ["general", "usage", "audit"] },
+  { group: "people", sections: ["members", "support"] },
+  { group: "control", sections: ["rules", "skills", "mcp", "agents"] },
+  { group: "organization", sections: ["workspaces", "plan", "identity"] },
+];
 
 /** El menú sin lo que la cuenta no ve; un grupo vacío no sale. */
-export function menuFor(order: MenuOrder, visible: readonly Section[]) {
-  return MENUS[order].flatMap((entry) => {
+export function menuFor(visible: readonly Section[]) {
+  return MENU.flatMap((entry) => {
     const sections = entry.sections.filter((section) => visible.includes(section));
     return sections.length ? [{ group: entry.group, sections }] : [];
   });
