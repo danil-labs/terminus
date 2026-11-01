@@ -17,7 +17,8 @@ danil --version
 
 **Disponibilidad.** `dn computers` y las variables `DANIL_*` llegan con la próxima
 versión de Seldon Host y de la app. Las instalaciones actuales todavía no los
-tienen: si `dn computers` responde `unrecognized subcommand`, actualiza primero.
+tienen. Si `dn` no existe o `dn computers` responde `unrecognized subcommand`, tu
+instalación es anterior. El instalador con `computers` todavía no está publicado.
 
 ## Cómo se organiza
 
@@ -35,7 +36,8 @@ grupo. Sólo es de primer nivel si se usa en todo el trabajo diario. Un comando
 nuevo no ocupa el nombre de un grupo de dominio ni repite el nombre del comando
 (nada de `danil danil`). Todo comando funciona igual con `danil` y con `dn`.
 
-`dn agent-context --json` imprime la lista completa, con opciones y autoridad.
+`dn agent-context --json` imprime los comandos con sus opciones y autoridad, salvo
+`dn computers connect` y `dn computers status`, que describe la tabla de Autoridad.
 `dn guide` imprime la guía de tu versión.
 
 ## `dn computers`
@@ -118,8 +120,8 @@ Estos son los grupos previstos.
 | `task`, `workspace`, `folder` | Dentro de una tarea, la autoridad de esa tarea; en tu terminal, la tuya sobre el motor local |
 | `dn harness` | Se documentará cuando exista |
 
-Cada comando declara su autoridad en `dn agent-context --json`, en los campos
-`authority` y `audience`.
+El resto de los comandos declara su autoridad en `dn agent-context --json`, en los
+campos `authority` y `audience`.
 
 Dentro de una tarea la CLI usa las variables `DANIL_CONNECTION`,
 `DANIL_WORKSPACE`, `DANIL_FOLDER` y `DANIL_TASK`. Danil las pone por ti.
