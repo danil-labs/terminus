@@ -113,7 +113,8 @@ Estos son los grupos previstos.
 |---|---|
 | `dn computers connect` | Una cuenta de Danil que apruebe el código |
 | `dn computers status` | Acceso a la máquina; no necesita sesión |
-| `dn computers vm` | Tu sesión personal de AWS SSO. Sólo en tu terminal: una tarea no puede usarlo |
+| `dn computers vm setup`, `login`, `start`, `stop` | Tu sesión personal de AWS SSO. Sólo en tu terminal: una tarea no puede usarlos |
+| `dn computers vm status` | Tu sesión de AWS SSO y la configuración de la VM |
 | `task`, `workspace`, `folder` | Dentro de una tarea, la autoridad de esa tarea; en tu terminal, la tuya sobre el motor local |
 | `dn harness` | Se documentará cuando exista |
 
