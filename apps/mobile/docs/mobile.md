@@ -117,9 +117,19 @@ workspaces, que va a la raíz que fijó la compilación,
   (no se cambian: obligaría a reinstalar) y `scope: "/"`, porque el inicio de
   sesión de Danil vive en `/` y en iOS fuera del scope abriría Safari aparte.
   La app de Danil tiene su propio manifest con `id: "/"`; el `id` distinto deja
-  instalar las dos. Sin service worker: `index.html` y el manifest se revalidan
-  y solo `_expo/static/*` (con hash) se guarda largo. En iOS la app instalada no
+  instalar las dos. `index.html`, el manifest y `sw.js` se revalidan y solo
+  `_expo/static/*` (con hash) se guarda largo. En iOS la app instalada no
   comparte almacenamiento con Safari: se inicia sesión una vez dentro de ella.
+- **Avisos push:** `public/sw.js` solo muestra avisos (`push` y
+  `notificationclick`, sin `fetch` ni caché) y vive con scope `<base>m/`: en
+  app.danil.ai la raíz es del service worker de Appv2. Lo registra
+  `src/lib/push.web.ts` cuando la persona activa «Avisos de tareas» en Cuenta de
+  Danil; la suscripción se guarda en Danil Computers, cuyo relay avisa cuando una
+  tarea termina, se detiene o pide algo, también con el navegador cerrado. El
+  aviso trae solo identificadores: el worker arma la ruta (`?to=/task/…`) y no
+  muestra texto del chat. El destino del aviso de inicio de sesión lo escribe el
+  build (`phoneWorker`). En iPhone solo funciona instalada en el inicio (iOS
+  16.4 o posterior). Cerrar sesión borra la suscripción antes de soltar el token.
 - **Lo que se recuerda:** `localStorage` en lugar del llavero (`store.web.ts`).
 - **Visualizaciones y archivos HTML:** el `iframe` de la ventana (`srcdoc`,
   `allow-scripts` sin `allow-same-origin`) en lugar del WebView. Un PDF no se

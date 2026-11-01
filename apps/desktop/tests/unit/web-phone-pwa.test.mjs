@@ -4,7 +4,9 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { PHONE_ICONS, phoneHeaders, phoneManifest } from "../../scripts/web-phone-pwa.mjs";
+import { runInNewContext } from "node:vm";
+
+import { PHONE_ICONS, phoneHeaders, phoneManifest, phoneWorker } from "../../scripts/web-phone-pwa.mjs";
 
 const mobile = fileURLToPath(new URL("../../../mobile/", import.meta.url));
 const exported = fileURLToPath(new URL("../../dist-web/terminus/m/", import.meta.url));
@@ -29,7 +31,8 @@ function assertInstallableHead(html, where) {
   has(/<meta name="apple-mobile-web-app-status-bar-style" content="[\w-]+"/, "apple-mobile-web-app-status-bar-style");
   has(/<meta name="theme-color" content="#[0-9a-f]{6}"/, "theme-color");
   has(/<meta name="viewport" content="[^"]*viewport-fit=cover/, "viewport-fit=cover");
-  assert.doesNotMatch(html, /serviceWorker/, `${where}: no lleva service worker`);
+  // El service worker lo registra la app al activar los avisos, no la página.
+  assert.doesNotMatch(html, /serviceWorker/, `${where}: no registra service worker`);
 }
 
 test("el manifest del teléfono es instalable y su scope cubre el inicio de sesión de Danil", () => {
@@ -78,7 +81,7 @@ test("index.html y el manifest se revalidan, y los bundles con hash se guardan l
     if (!line.startsWith(" ")) rules.set((path = line), []);
     else rules.get(path).push(line.trim());
   }
-  for (const page of ["/terminus/m/", "/terminus/m/index.html", "/terminus/m/manifest.webmanifest"]) {
+  for (const page of ["/terminus/m/", "/terminus/m/index.html", "/terminus/m/manifest.webmanifest", "/terminus/m/sw.js"]) {
     assert.ok(rules.get(page)?.includes("Cache-Control: no-cache"), `${page} debe revalidarse`);
   }
   assert.ok(rules.get("/terminus/m/manifest.webmanifest").includes("Content-Type: application/manifest+json"));
@@ -95,10 +98,86 @@ test("lo exportado por `pnpm web:build` trae el manifest, los íconos y las etiq
   assertInstallableHead(readFileSync(join(exported, "index.html"), "utf8"), "dist-web/terminus/m/index.html");
   const manifest = JSON.parse(readFileSync(join(exported, "manifest.webmanifest"), "utf8"));
   assert.deepEqual(manifest, phoneManifest(BASE));
+  assert.doesNotMatch(readFileSync(join(exported, "sw.js"), "utf8"), /__TERMINUS_SIGN_IN__/, "sw.js exportado sin la entrada");
   for (const icon of [...PHONE_ICONS.map((each) => each.src), "icons/apple-touch-icon.png"]) {
     assert.ok(existsSync(join(exported, icon)), `falta ${icon} en la exportación`);
   }
   const headers = readFileSync(fileURLToPath(new URL("../../dist-web/_headers", import.meta.url)), "utf8");
   assert.match(headers, /^\/terminus\/\*\n {2}Content-Security-Policy: default-src 'self'/m, "la CSP permite el manifest y los íconos (default-src/img-src 'self')");
   assert.match(headers, /^\/terminus\/m\/manifest\.webmanifest\n {2}Content-Type: application\/manifest\+json/m);
+});
+
+/** Corre `sw.js` con un `self` mínimo y devuelve sus manejadores y lo que hizo. */
+function worker(source, { scope = "https://app.danil.ai/terminus/m/", windows = [] } = {}) {
+  const handlers = {};
+  const shown = [];
+  const opened = [];
+  const self = {
+    addEventListener: (name, handler) => { handlers[name] = handler; },
+    skipWaiting: () => {},
+    navigator: { language: "es-MX" },
+    location: new URL(scope),
+    registration: { scope, showNotification: async (title, options) => { shown.push({ title, ...options }); } },
+    clients: { claim: async () => {}, matchAll: async () => windows, openWindow: async (url) => { opened.push(url); } },
+  };
+  runInNewContext(source, { self, URL, JSON, encodeURIComponent });
+  const fire = async (name, event) => {
+    let done;
+    handlers[name]({ ...event, waitUntil: (promise) => { done = promise; } });
+    await done;
+  };
+  return { handlers, shown, opened, fire };
+}
+
+const built = (base = "/terminus/", login = `${base}auth`) => phoneWorker(readFileSync(join(mobile, "public/sw.js"), "utf8"), login, base);
+const pushed = (data) => ({ data: { json: () => data } });
+
+test("el service worker solo muestra avisos: sin fetch ni caché", () => {
+  const { handlers } = worker(built());
+  assert.deepEqual(Object.keys(handlers).sort(), ["activate", "install", "notificationclick", "push"]);
+});
+
+test("un aviso de tarea abre esa tarea en el teléfono; el contenido no trae dirección ni texto", async () => {
+  const sw = worker(built());
+  await sw.fire("push", pushed({ kind: "asked", computer: "cmp_1", workspace: "fqgx1w8m", folder: null, session: "t1", url: "https://evil.test/", body: "secreto" }));
+  const [notice] = sw.shown;
+  assert.equal(notice.title, "Tu tarea te preguntó algo");
+  assert.doesNotMatch(notice.body, /secreto/);
+  assert.equal(notice.tag, "task:cmp_1:t1");
+  const to = new URL(notice.data.url);
+  assert.equal(to.origin + to.pathname, "https://app.danil.ai/terminus/m/");
+  assert.equal(to.searchParams.get("to"), "/task/cmp_1/fqgx1w8m/_/t1");
+  await sw.fire("notificationclick", { notification: { data: notice.data, close() {} } });
+  assert.deepEqual(sw.opened, [notice.data.url]);
+});
+
+test("un identificador raro abre el inicio del teléfono, no otra ruta", async () => {
+  const sw = worker(built());
+  await sw.fire("push", pushed({ kind: "finished", computer: "../x", workspace: "w", session: "t" }));
+  assert.equal(sw.shown[0].data.url, "https://app.danil.ai/terminus/m/");
+});
+
+test("el aviso de inicio de sesión va a la entrada de ese build y vuelve al teléfono", async () => {
+  const app = worker(built());
+  await app.fire("push", pushed({ kind: "sign_in" }));
+  assert.equal(app.shown[0].data.url, "https://app.danil.ai/terminus/auth?next=%2Fterminus%2Fm%2F");
+  const alfa = worker(built("/", "/sign-in"), { scope: "https://alfa-app.danil.ai/m/" });
+  await alfa.fire("push", pushed({ kind: "sign_in" }));
+  assert.equal(alfa.shown[0].data.url, "https://alfa-app.danil.ai/sign-in?next=%2Fm%2F");
+  assert.throws(() => built("/", "https://evil.test/sign-in"), /mismo origen/);
+});
+
+test("con la app abierta el toque la lleva ahí; si no la controla, abre otra ventana", async () => {
+  const visited = [];
+  const open = { focus: async () => {}, navigate: async (url) => { visited.push(url); return {}; } };
+  const sw = worker(built(), { windows: [open] });
+  await sw.fire("notificationclick", { notification: { data: { url: "https://app.danil.ai/terminus/m/?to=x" }, close() {} } });
+  assert.deepEqual([visited, sw.opened], [["https://app.danil.ai/terminus/m/?to=x"], []]);
+  const outside = { focus: async () => {}, navigate: async () => { throw new TypeError("not controlled"); } };
+  const other = worker(built(), { windows: [outside] });
+  await other.fire("notificationclick", { notification: { data: { url: "https://app.danil.ai/terminus/m/" }, close() {} } });
+  assert.deepEqual(other.opened, ["https://app.danil.ai/terminus/m/"]);
+  const foreign = worker(built());
+  await foreign.fire("notificationclick", { notification: { data: { url: "https://evil.test/" }, close() {} } });
+  assert.deepEqual(foreign.opened, []);
 });
