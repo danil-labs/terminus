@@ -53,7 +53,8 @@ de descarga. Su forwarding es un mecanismo interno de distribución: no se
 instala ni anuncia ese ejecutable físico como tercer comando operativo.
 El binario físico del motor también permanece en su directorio privado.
 Los instaladores del host no deben añadir un wrapper `seldon-runtime` al PATH;
-la conexión conserva la sintaxis existente mediante `danil danil connect`.
+la conexión usa `danil computers connect` y `danil computers status`, del motor
+del PR seldon-host #276.
 Con una instalación en una ruta personalizada, pasa `--data` con la carpeta
 de datos que muestra el instalador. Este helper no selecciona perfiles de
 `engine.json`.
