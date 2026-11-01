@@ -279,6 +279,8 @@ test("return paths stay inside Terminus", () => {
   for (const value of [null, "", "inbox", "https://evil.example/", "//evil.example/", "/auth", "/auth?next=x", "/auth/workos/start", "/sign-in", "/sign-in?next=/inbox", "/x/../auth", "/x/../sign-in", "/%61uth", "/%73ign-in", "/alpha-api/auth/profile", "/\\evil", "/inbox\n"]) {
     assert.equal(safeNext(value), "/", String(value));
   }
+  assert.equal(safeNext("/inbox", "https://staging-app.danil.ai"), "/inbox");
+  assert.equal(safeNext("https://alfa-app.danil.ai/inbox", "https://staging-app.danil.ai"), "/");
 });
 
 test("callback refuses authentication and foreign return destinations without re-entering auth", async () => {

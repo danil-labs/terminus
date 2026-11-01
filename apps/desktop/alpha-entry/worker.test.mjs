@@ -112,6 +112,19 @@ test("assets preserve CSP and serve every other path from the root", async () =>
   assert.equal(h.calls.length, 0);
 });
 
+test("ENTRY_HOST moves the entry to another host; alfa then answers 404", async () => {
+  const h = harness();
+  const env = { ...h.env, ENTRY_HOST: "staging-app.danil.ai" };
+  const staging = "https://staging-app.danil.ai";
+  assert.equal(await (await worker.fetch(new Request(staging + "/inbox"), env)).text(), "assets");
+  assert.equal((await worker.fetch(new Request(origin + "/inbox"), env)).status, 404);
+  const email = { method: "POST", headers: { ...auth, "Content-Type": "application/json" }, body: JSON.stringify({ email: "a@b.co" }) };
+  assert.equal((await worker.fetch(new Request(staging + prefix + "/auth/emails", { ...email, headers: { ...email.headers, Origin: origin } }), env)).status, 403);
+  const accepted = await worker.fetch(new Request(staging + prefix + "/auth/emails", { ...email, headers: { ...email.headers, Origin: staging } }), env);
+  assert.equal(accepted.status, 200);
+  assert.equal(h.calls.at(-1).headers.get("Origin"), staging);
+});
+
 
 test("old /terminus paths redirect to the root without hitting bindings", async () => {
   const h = harness();
