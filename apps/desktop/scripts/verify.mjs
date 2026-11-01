@@ -523,6 +523,12 @@ const steps = [
     root,
   ],
   [
+    "The Harness menu follows plan, role and available sources",
+    process.execPath,
+    ["--test", "--experimental-strip-types", join(root, "tests/unit/admin-sections.test.ts")],
+    root,
+  ],
+  [
     "A site's layer shows when due",
     process.execPath,
     ["--test", "--experimental-strip-types", join(root, "tests/unit/sites.test.ts")],
