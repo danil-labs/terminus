@@ -74,20 +74,20 @@ export default function KeepAwake() {
 
   return (
     <Show when={status()?.supported}>
-      <Popover open={open()} onOpenChange={setOpen} placement="bottom-end" gutter={6}>
+      <Popover open={open()} onOpenChange={setOpen} placement="right-end" gutter={8}>
         <PopoverTrigger
           as={(p: object) => (
             <button
               {...p}
               type="button"
               class={cn(
-                "grid size-5 shrink-0 place-items-center rounded-sm outline-none hover:bg-surface-muted hover:text-neutral-950 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary data-[expanded]:bg-surface-muted",
+                "grid size-8 shrink-0 place-items-center rounded-md outline-none hover:bg-neutral-200 hover:text-neutral-950 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary data-[expanded]:bg-surface-muted",
                 status()?.active ? "text-primary" : "text-neutral-500",
               )}
               aria-label={label()}
               title={label()}
             >
-              <Coffee size={12} aria-hidden />
+              <Coffee size={17} aria-hidden />
             </button>
           )}
         />
