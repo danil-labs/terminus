@@ -75,7 +75,9 @@ an outside pull request goes there only after someone reads it.
 port forward to 8787. If the queue does not answer and SSH did not refuse, the
 client runs `aws ec2 start-instances` with the caller's credentials
 (`AWS_PROFILE`, `VERIFY_REMOTE_AWS` for the binary). The machine stops itself
-after 30 idle minutes.
+after 15 idle minutes. A run, a bundle upload, and sessions and builds younger
+than 2 hours count as use, so a forgotten shell stops counting at 2 hours and
+the machine stops 15 minutes later. If it was stopping, the client retries.
 
 The queue is `scripts/verify-queue/server.mjs`: one per machine, one run at a
 time, first come first served, listening on loopback only. It takes repo, commit
@@ -83,8 +85,10 @@ and a command listed in `repos.json`, and knows nothing else about a repo. Each
 repo has one fixed checkout and one fixed `CARGO_TARGET_DIR` under
 `/var/lib/verify-queue/repos/`; everything else is cleaned between runs. Above
 80 % disk it deletes the target, before a run or after a failed one, and
-rebuilds once. To install or update it, copy `scripts/verify-queue/` to the
-machine and run `install.sh` as root.
+rebuilds once. The user `verify` runs branch code, so `egress.nft` denies it
+IMDS, the tailnet and private networks, and the `tailscaled` socket is closed to
+it; it keeps internet access for packages. To install or update it, copy
+`scripts/verify-queue/` to the machine and run `install.sh` as root.
 
 ## Sweeping `target/`
 

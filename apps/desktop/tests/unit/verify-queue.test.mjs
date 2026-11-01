@@ -4,8 +4,9 @@
  */
 import assert from "node:assert/strict";
 import { execFileSync, spawn } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { once } from "node:events";
+import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
@@ -322,4 +323,133 @@ test("la máquina apagada se enciende con las credenciales de quien lanza", { sk
   assert.equal(code, 0, output);
   assert.match(readFileSync(called, "utf8"), /ec2 start-instances --region us-east-1 --instance-ids i-1/);
   assert.match(output, /despierta/);
+});
+
+test("una máquina que se está apagando rechaza el encendido y se reintenta", { skip }, async (t) => {
+  const { dir, repo, home } = workspace(t);
+  const aws = join(dir, "aws");
+  const calls = join(dir, "calls");
+  writeFileSync(calls, "");
+  writeFileSync(aws, `#!/bin/sh
+echo x >> ${calls}
+[ "$(wc -l < ${calls})" -ge 2 ] && exit 0
+echo 'An error occurred (IncorrectInstanceState) when calling the StartInstances operation: stopping' >&2
+exit 254
+`, { mode: 0o755 });
+  const server = createHttpServer(createQueue({ home, config, diskPercent: () => 10 }));
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const { port } = server.address();
+  await new Promise((done) => server.close(done));
+  t.after(() => server.close());
+  commit(repo, "echo despierta");
+  const running = client(repo, `127.0.0.1:${port}`, [], { VERIFY_REMOTE_AWS: aws });
+  while (readFileSync(calls, "utf8").length < 4) await new Promise((done) => setTimeout(done, 50));
+  server.listen(port, "127.0.0.1");
+  const { code, output } = await running;
+  assert.equal(code, 0, output);
+  assert.match(output, /despierta/);
+});
+
+test("sin credenciales de AWS el encendido no se reintenta", { skip }, async (t) => {
+  const { dir, repo } = workspace(t);
+  const aws = join(dir, "aws");
+  const calls = join(dir, "calls");
+  writeFileSync(aws, `#!/bin/sh\necho x >> ${calls}\necho 'Unable to locate credentials' >&2\nexit 253\n`, { mode: 0o755 });
+  commit(repo, "true");
+  const { code, output } = await client(repo, "127.0.0.1:9", [], { VERIFY_REMOTE_AWS: aws });
+  assert.equal(code, 2);
+  assert.match(output, /No hay acceso a la cola/);
+  assert.equal(readFileSync(calls, "utf8"), "x\n");
+});
+
+test("si la máquina cae al recibir el commit, lo manda otra vez", { skip }, async (t) => {
+  const { repo, home } = workspace(t);
+  const inner = createHttpServer(createQueue({ home, config, diskPercent: () => 10 }));
+  let dropped = false;
+  const server = createServer((request, response) => {
+    if (request.method === "POST" && request.url.startsWith("/runs?") && !dropped) {
+      dropped = true;
+      return request.socket.destroy();
+    }
+    inner.emit("request", request, response);
+  });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  t.after(() => server.close());
+  commit(repo, "echo segundo-intento");
+  const { code, output } = await client(repo, `127.0.0.1:${server.address().port}`);
+  assert.equal(code, 0, output);
+  assert.equal(dropped, true);
+  assert.match(output, /segundo-intento/);
+});
+
+const idleStop = resolve(import.meta.dirname, "../../scripts/verify-queue/verify-idle-stop");
+const idleSkip = process.platform === "linux" ? false : "el apagado solo corre en Linux";
+const MINUTE = 60;
+const HOUR = 60 * MINUTE;
+
+/** Corre el apagado con `loginctl`, `ps` y `shutdown` falsos; dice si pidió apagar. */
+function idleCheck(t, { sessions = [], processes = "", idleFor = 20 * MINUTE, files = {}, noStamp = false } = {}) {
+  const dir = mkdtempSync(join(tmpdir(), "verify-idle-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const bin = join(dir, "bin");
+  const home = join(dir, "home");
+  const stamp = join(dir, "stamp");
+  mkdirSync(bin);
+  mkdirSync(home);
+  const now = Date.now() / 1000;
+  if (!noStamp) {
+    writeFileSync(stamp, "");
+    utimesSync(stamp, now - idleFor, now - idleFor);
+  }
+  for (const [name, age] of Object.entries(files)) {
+    writeFileSync(join(home, name), "");
+    utimesSync(join(home, name), now - age, now - age);
+  }
+  const listed = sessions.map((_, index) => `  echo "s${index} 1001 verify - - active no -"`).join("\n");
+  const details = sessions.map(({ age, state = "active" }, index) => `  s${index}) if [ "$4" = State ]; then echo ${state}; else date -d @${Math.round(now - age)}; fi ;;`).join("\n");
+  writeFileSync(join(bin, "loginctl"), `#!/bin/bash
+if [ "$1" = list-sessions ]; then
+${listed || "  :"}
+  exit 0
+fi
+case "$2" in
+${details}
+esac
+`, { mode: 0o755 });
+  writeFileSync(join(bin, "ps"), `#!/bin/sh\ncat <<'END'\n${processes}\nEND\n`, { mode: 0o755 });
+  writeFileSync(join(bin, "shutdown"), `#!/bin/sh\ntouch ${join(dir, "stopped")}\n`, { mode: 0o755 });
+  try {
+    execFileSync("bash", [idleStop], { env: { PATH: `${bin}:${process.env.PATH}`, VERIFY_QUEUE_HOME: home, VERIFY_IDLE_STAMP: stamp } });
+  } catch {
+    // Sin apagar, el último `[ ... ] && ...` del script sale con 1.
+  }
+  return existsSync(join(dir, "stopped"));
+}
+
+test("la máquina se apaga a los 15 minutos sin uso, no antes", { skip: idleSkip }, (t) => {
+  assert.equal(idleCheck(t, { idleFor: 16 * MINUTE }), true);
+  assert.equal(idleCheck(t, { idleFor: 14 * MINUTE }), false);
+  assert.equal(idleCheck(t, { noStamp: true }), false, "al arrancar empieza a contar");
+});
+
+test("una corrida y una subida en curso cuentan como uso", { skip: idleSkip }, (t) => {
+  assert.equal(idleCheck(t, { files: { busy: 0 } }), false);
+  assert.equal(idleCheck(t, { files: { "incoming-a.bundle": MINUTE } }), false);
+  assert.equal(idleCheck(t, { files: { "incoming-a.bundle": 20 * MINUTE } }), true, "una subida muerta deja de contar");
+});
+
+test("una sesión cuenta hasta 2 horas y una que se cierra no cuenta", { skip: idleSkip }, (t) => {
+  assert.equal(idleCheck(t, { sessions: [{ age: HOUR }] }), false);
+  assert.equal(idleCheck(t, { sessions: [{ age: 3 * HOUR }] }), true);
+  assert.equal(idleCheck(t, { sessions: [{ age: 3 * HOUR }, { age: MINUTE }] }), false);
+  assert.equal(idleCheck(t, { sessions: [{ age: MINUTE, state: "closing" }] }), true);
+});
+
+test("una compilación cuenta hasta 2 horas", { skip: idleSkip }, (t) => {
+  assert.equal(idleCheck(t, { processes: "60 /home/verify/.cargo/bin/rustc --edition 2021" }), false);
+  assert.equal(idleCheck(t, { processes: "60 node scripts/verify.mjs" }), false);
+  assert.equal(idleCheck(t, { processes: `${3 * HOUR} node scripts/verify.mjs` }), true);
+  assert.equal(idleCheck(t, { processes: "60 node /opt/verify-queue/server.mjs" }), true);
 });
