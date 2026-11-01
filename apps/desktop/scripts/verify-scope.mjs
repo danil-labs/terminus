@@ -24,7 +24,7 @@ const NAMES_BUILD = /["'`/]dist(?:-web)?\b/;
 /** Los archivos que difieren de la base, con los de sin commitear y sin seguimiento; `{ reason }` si git no contesta. */
 export function changedFiles(root, base) {
   const located = locateGit(root);
-  if (!located.ok) return { reason: "git no alcanza este árbol" };
+  if (!located.ok) return { reason: "git does not reach this tree" };
   const git = (args, cwd) => execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], env: { ...process.env, ...located.entorno } });
   try {
     const top = git(["rev-parse", "--show-toplevel"], root).trim();
@@ -32,7 +32,7 @@ export function changedFiles(root, base) {
     const listed = git(["diff", "--name-only", "--no-renames", "-z", mergeBase], top) + git(["ls-files", "--others", "--exclude-standard", "-z"], top);
     return { mergeBase, files: [...new Set(listed.split("\0").filter(Boolean))].sort() };
   } catch {
-    return { reason: `git no pudo comparar contra ${base}` };
+    return { reason: `git could not compare against ${base}` };
   }
 }
 
