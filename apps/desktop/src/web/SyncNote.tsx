@@ -1,6 +1,7 @@
 import { type Accessor, createEffect, createSignal, For, on, onCleanup, Show } from "solid-js";
 import { df } from "../lib/format";
 import { t } from "../lib/i18n";
+import { SignalDot } from "../ui/SignalDot";
 import { Toast, ToastPortal } from "../ui/Toast";
 /** On, off, starting or speaking another contract: what the page says of a machine. */
 export type MachineStatus = "online" | "offline" | "starting" | "outdated";
@@ -54,10 +55,7 @@ export function SyncNote(props: { machines: Accessor<MachineRow[]> }) {
     <For each={props.machines()}>
       {(m) => (
         <li class="flex min-w-0 items-center gap-1.5" data-machine-row={marked ? m.id : undefined} data-state={marked ? m.status : undefined} title={tip(m)}>
-          <span
-            aria-hidden="true"
-            class={`size-1.5 shrink-0 rounded-full ${m.status === "online" ? "bg-success" : m.status === "starting" ? "animate-danil-pulse bg-neutral-500" : "bg-neutral-500"}`}
-          />
+          <SignalDot tone={m.status === "online" ? "success" : m.status === "outdated" ? "warning" : m.status === "starting" ? "neutral" : "off"} pulse={m.status === "starting"} />
           <span class="truncate">{m.name}</span>
           <span class="shrink-0">· {LABELS[m.status]()}</span>
         </li>

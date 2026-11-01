@@ -6494,7 +6494,7 @@ export default function App() {
    * backend lo aceptó: un mensaje que se borra de la lista sin haber entrado
    * en ningún sitio desaparece sin que nadie sepa que se perdió.
    */
-  async function mandarAhora(id: string, cortarSiNoAdmite = false) {
+  async function mandarAhora(id: string) {
     const abierta = sessionId();
     const m = cola().find((q) => q.id === id);
     if (!abierta || !m || !inyectable(m) || injecting().some((item) => item.id === id)) return;
@@ -6544,17 +6544,10 @@ export default function App() {
         if (sessionId() === abierta && project() === sourceProject) setCola((c) => c.filter((q) => q.id !== id));
         return;
       }
-      // Este agente no recibe mensajes a medias. El clic lo corta como lo haría la
-      // persona; la ventana, cuando inyecta sola, no: mataría su trabajo de fondo.
-      if (clave === "chat.steer.unsupported" && cortarSiNoAdmite && sessionId() === abierta && busy()) {
-        anexar(abierta, (ms) => [...ms, { role: "system", text: t("chat.steer.after_stop"), meta: "aviso" }]);
-        void detener();
-        return;
-      }
-      anexar(abierta, (ms) => [
-        ...ms,
-        { role: "system", ...mensajeDeFallo(e), meta: clave === "chat.steer.unsupported" ? "aviso" : "fallo" },
-      ]);
+      // Este agente no recibe mensajes a medias: sigue en la cola y sale al cerrar
+      // el turno. Cortarlo mataba turnos de Claude que solo esperaban su canal.
+      if (clave === "chat.steer.unsupported") return;
+      anexar(abierta, (ms) => [...ms, { role: "system", ...mensajeDeFallo(e), meta: "fallo" }]);
     } finally {
       setInjecting((items) => items.filter((item) => item.id !== id));
       if (workspaceActivo() === sourceWorkspace && finishedTurns.get(abierta) === true) void drainHiddenQueue(abierta);
@@ -7361,7 +7354,7 @@ export default function App() {
           // Solo con un turno vivo: sin él, lo escrito sale por el camino
           // normal y el gesto no significaría nada.
           onMandarAhora: pp.sesion && vivas().includes(pp.sesion)
-            ? (id: string) => mandarAhora(id, true)
+            ? (id: string) => mandarAhora(id)
             : null,
         }}
         />

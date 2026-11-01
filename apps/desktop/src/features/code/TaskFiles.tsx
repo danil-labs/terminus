@@ -1,4 +1,5 @@
 import { For, Show, Suspense, createResource, createSignal, onCleanup, onMount } from "solid-js";
+import { SignalDot } from "../../ui/SignalDot";
 import Ellipsis from "lucide-solid/icons/ellipsis";
 import GitCompare from "lucide-solid/icons/git-compare";
 import ListTree from "lucide-solid/icons/list-tree";
@@ -201,7 +202,7 @@ export default function TaskFilesCard(props: {
                       class={cn("grid size-5 shrink-0 place-items-center rounded-sm text-neutral-500 hover:bg-neutral-200",
                         !active() && !dirty() && "opacity-0 group-hover:opacity-100")}
                       onClick={(event) => { event.stopPropagation(); props.files.close(key(), [tab.id]); }}>
-                      <Show when={dirty()} fallback={<X size={13} />}><span class="size-2 rounded-full bg-neutral-500" /></Show>
+                      <Show when={dirty()} fallback={<X size={13} />}><SignalDot tone="neutral" /></Show>
                     </button>
                   </div>
                 );
