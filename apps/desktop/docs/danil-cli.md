@@ -97,6 +97,22 @@ usen esa VM.
 Las VMs administradas no se conectan con esta CLI. No uses `enroll.json` en una
 máquina propia.
 
+### Máquinas compartidas de tu organización
+
+`dn computers machine` lista, enciende y apaga las máquinas que tu organización
+comparte, como `vm-verify`. Dan servicios y no corren tareas. Usa la sesión de
+Danil del motor; no pide AWS.
+
+```sh
+dn computers machine list --json
+dn computers machine start vm-verify --wait --timeout 300
+dn computers machine stop vm-verify
+```
+
+`start` y `stop` tienen efecto real y quedan auditados. Son idempotentes. Con
+`--wait`, `start` espera a que la máquina corra; si se agota el plazo, responde
+`wait_timed_out` con el último estado y sale con 4.
+
 ## `dn harness`
 
 Todavía no está disponible: hoy `dn harness` responde `unrecognized subcommand`.
@@ -117,6 +133,8 @@ Estos son los grupos previstos.
 | `dn computers status` | Acceso a la máquina; no necesita sesión |
 | `dn computers vm setup`, `login`, `start`, `stop` | Tu sesión personal de AWS SSO. Sólo en tu terminal: una tarea no puede usarlos |
 | `dn computers vm status` | Tu sesión de AWS SSO y la configuración de la VM |
+| `dn computers machine list` | Lectura, con la sesión de Danil del motor |
+| `dn computers machine start`, `stop` | Autoridad de tarea: una tarea sí puede usarlos |
 | `task`, `workspace`, `folder` | Dentro de una tarea, la autoridad de esa tarea; en tu terminal, la tuya sobre el motor local |
 | `dn harness` | Se documentará cuando exista |
 
@@ -134,11 +152,11 @@ Dentro de una tarea la CLI usa las variables `DANIL_CONNECTION`,
 | `seldon-runtime danil connect` | `dn computers connect` |
 | `seldon-runtime danil status` | `dn computers status` |
 | `terminus vm <orden>` | `dn computers vm <orden>` |
+| `terminus machine <orden>` | `dn computers machine <orden>` |
 | `TERMINUS_CONNECTION`, `_WORKSPACE`, `_FOLDER`, `_TASK` | `DANIL_CONNECTION`, `_WORKSPACE`, `_FOLDER`, `_TASK` |
 | `TERMINUS_CLI`, `TERMINUS_PROFILE`, `TERMINUS_CREDENTIAL` | `DANIL_CLI`, `DANIL_PROFILE`, `DANIL_CREDENTIAL` |
 | `radiant graph`, `diff`, `assess`, `validate`, `bundle`, `run`, `connect`, `connections` | `dn harness eval …` (en desarrollo) |
 | `radiant members`, `radiant usage` | `dn harness members`, `dn harness usage` (pendientes) |
-| `radiant api` | Se retira, sin reemplazo |
 
 Las órdenes `radiant` no listadas aún no tienen lugar en Danil. Sigue usando la CLI
 de Radiant para ellas.
