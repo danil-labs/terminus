@@ -1,11 +1,174 @@
 # CLI de Danil
 
-`danil` es el comando principal. `dn` es la abreviación oficial del mismo CLI.
-Son los únicos nombres operativos instalables. Los launchers reenvían argumentos,
-entrada, salida, señales y código de salida al ejecutable seleccionado.
-No crean otro motor ni otro almacén de datos.
+Con la CLI manejas Danil desde una terminal o desde un agente: tareas, workspaces,
+carpetas y tus computadoras.
 
-## Instalación explícita desde este repositorio
+## Qué es
+
+`danil` y `dn` son el mismo comando. `dn` es la forma corta. No hay otros nombres
+operativos: `terminus`, `radiant` y `seldon-runtime` no son comandos de esta CLI y
+no tienen alias.
+
+```sh
+dn --help
+dn --version
+danil --version
+```
+
+**Disponibilidad.** `dn computers` y las variables `DANIL_*` llegan con la próxima
+versión de Seldon Host y de la app. Las instalaciones actuales todavía no los
+tienen: si `dn computers` responde `unrecognized subcommand`, actualiza primero.
+
+## Cómo se organiza
+
+Hay dos clases de comandos:
+
+| Clase | Comandos | Para qué |
+|---|---|---|
+| Por dominio | `dn computers`, `dn harness`; más adelante `dn agents` | Un área completa del producto, con sus subcomandos |
+| De trabajo | `task`, `workspace`, `folder`, `status`, `context`, `guide` y otros | Lo que usas cada día; `dn --help` los lista |
+
+El nombre `computers` todavía puede cambiar antes de la versión estable.
+
+**Regla para agregar un comando.** Si pertenece a un dominio, va dentro de su
+grupo. Sólo es de primer nivel si se usa en todo el trabajo diario. Un comando
+nuevo no ocupa el nombre de un grupo de dominio ni repite el nombre del comando
+(nada de `danil danil`). Todo comando funciona igual con `danil` y con `dn`.
+
+`dn agent-context --json` imprime la lista completa, con opciones y autoridad.
+`dn guide` imprime la guía de tu versión.
+
+## `dn computers`
+
+Tus computadoras: conectar una máquina a tu cuenta y encender tus VMs de EC2.
+
+### Conectar tu máquina, VPS o servidor
+
+1. Instala Seldon Host en esa máquina con el comando que muestra **Conectar otra
+   máquina** en la app. Deja `danil` y `dn` en `~/.local/bin`.
+2. El instalador muestra una liga y un código.
+3. Abre la liga y aprueba con tu cuenta de Danil antes de 10 minutos.
+
+Si instalaste sin conectar, o quieres reintentar:
+
+```sh
+dn computers connect
+dn computers connect --name "Mi VPS"
+```
+
+Si instalaste en una carpeta propia, agrega `--data <carpeta>/data`.
+
+Para saber cómo va:
+
+```sh
+dn computers status
+dn computers status --json
+```
+
+Sale con 0 si está conectada, con 3 si no tiene cuenta y con 1 si algo falló. Al
+fallar dice el tramo, la causa y cómo arreglarlo.
+
+### VMs de EC2 con AWS SSO
+
+`dn computers vm` enciende y apaga VMs de EC2 con **tu propia** sesión de AWS.
+Sólo necesita un archivo de configuración sin secretos.
+
+```sh
+dn computers vm setup --config-file vm.json
+dn computers vm login
+dn computers vm start --name windows --login
+dn computers vm status --name windows --json
+dn computers vm stop --name windows --confirm-shared-stop
+```
+
+`--confirm-shared-stop` es obligatorio: confirma que ya coordinaste con quienes
+usen esa VM.
+
+### Diferencia con las VMs administradas
+
+| | `dn computers connect` | `dn computers vm` | VM administrada |
+|---|---|---|---|
+| Qué es | Una máquina tuya | Una EC2 a la que tienes acceso | Una máquina que prepara Danil |
+| Cómo entra a tu cuenta | Código que apruebas | No entra: sólo la enciende o apaga | Credencial de inscripción de un solo uso (`enroll.json`) |
+| Quién actúa | Tú, con tu cuenta de Danil | Tú, con AWS SSO | El equipo de Danil |
+
+Las VMs administradas no se conectan con esta CLI. No uses `enroll.json` en una
+máquina propia.
+
+## `dn harness`
+
+Todavía no está disponible: hoy `dn harness` responde `unrecognized subcommand`.
+Estos son los grupos previstos.
+
+| Grupo | Para qué | Estado |
+|---|---|---|
+| `dn harness eval` | Evaluar tu harness en local | En desarrollo |
+| `dn harness policy` | Ver, comparar, validar y proponer políticas | En desarrollo |
+| `dn harness members` | Personas de la organización | Depende de un servicio que aún no existe |
+| `dn harness usage` | Consumo de la organización | Depende de un servicio que aún no existe |
+
+## Autoridad
+
+| Comando | Qué exige |
+|---|---|
+| `dn computers connect` | Una cuenta de Danil que apruebe el código |
+| `dn computers status` | Acceso a la máquina; no necesita sesión |
+| `dn computers vm` | Tu sesión personal de AWS SSO. Sólo en tu terminal: una tarea no puede usarlo |
+| `task`, `workspace`, `folder` | Dentro de una tarea, la autoridad de esa tarea; en tu terminal, la tuya sobre el motor local |
+| `dn harness` | Se documentará cuando exista |
+
+Cada comando declara su autoridad en `dn agent-context --json`, en los campos
+`authority` y `audience`.
+
+Dentro de una tarea la CLI usa las variables `DANIL_CONNECTION`,
+`DANIL_WORKSPACE`, `DANIL_FOLDER` y `DANIL_TASK`. Danil las pone por ti.
+
+## Migración
+
+| Antes | Ahora |
+|---|---|
+| `terminus <comando>` | `danil <comando>` o `dn <comando>` |
+| `seldon-runtime danil connect` | `dn computers connect` |
+| `seldon-runtime danil status` | `dn computers status` |
+| `terminus vm <orden>` | `dn computers vm <orden>` |
+| `TERMINUS_CONNECTION`, `_WORKSPACE`, `_FOLDER`, `_TASK` | `DANIL_CONNECTION`, `_WORKSPACE`, `_FOLDER`, `_TASK` |
+| `TERMINUS_CLI`, `TERMINUS_PROFILE`, `TERMINUS_CREDENTIAL` | `DANIL_CLI`, `DANIL_PROFILE`, `DANIL_CREDENTIAL` |
+| `radiant graph`, `diff`, `assess`, `validate`, `bundle`, `run`, `connect`, `connections` | `dn harness eval …` (en desarrollo) |
+| `radiant members`, `radiant usage` | `dn harness members`, `dn harness usage` (pendientes) |
+| `radiant api` | Se retira, sin reemplazo |
+
+Las órdenes `radiant` no listadas aún no tienen lugar en Danil. Sigue usando la CLI
+de Radiant para ellas.
+
+El contexto `TERMINUS_*` no se ignora. Si alguna de esas variables sigue en tu
+entorno, la CLI se detiene:
+
+```text
+conflicting_selection: El entorno CLI TERMINUS_* ya no se admite. Usa DANIL_*.
+```
+
+La salida es 2. Así una tarea nunca termina actuando con tu autoridad de persona.
+Quita la variable o cámbiala por su `DANIL_*`. Revisa también la configuración MCP
+de tus orquestadores externos.
+
+## Ejemplos probados
+
+Se ejecutaron con Linux x86_64. Lo no listado aquí no se ejecutó para esta guía.
+
+| Ejemplo | Resultado |
+|---|---|
+| `dn --help`, `dn --version`, `danil --version` | Probado, salida 0 |
+| `dn computers --help`, `dn computers vm login --help` | Probado, salida 0 |
+| `dn computers connect`, `--name`, `dn computers status`, `--json` | Probado con el instalador y un plano de control de prueba |
+| `dn --root <carpeta> status --json` | Probado, salida 0 |
+| `dn --root <carpeta> workspace list --json` | Probado, salida 0 |
+| `dn agent-context --json`, `dn guide` | Probado, salida 0 |
+| `TERMINUS_TASK=x danil status` | Probado, salida 2 con el mensaje de arriba |
+| `dn computers vm status --name demo --json` sin configuración | Probado: error `vm_config` |
+| `dn computers vm setup`, `login`, `start`, `stop` con AWS real | **No probado** |
+| Windows y macOS | **No probado** para esta guía |
+
+## Anexo: launchers desde este repositorio
 
 El tooling requiere Node y un ejecutable operativo existente. Desde la raíz:
 
@@ -45,56 +208,4 @@ No retira el ejecutable ni modifica datos o credenciales.
 ni instala el CLI operativo. Las versiones ya publicadas no cambian con esta
 implementación local.
 
-## Compatibilidad e integración del motor
-
-La ventana conserva `productName: Terminus`, el binario físico `terminus`,
-`ai.danil.terminus`, llavero, `engine.json`, candados, pubkey, updater y nombres
-de descarga. Su forwarding es un mecanismo interno de distribución: no se
-instala ni anuncia ese ejecutable físico como tercer comando operativo.
-El binario físico del motor también permanece en su directorio privado.
-Los instaladores del host no deben añadir un wrapper `seldon-runtime` al PATH;
-la conexión usa `danil computers connect` y `danil computers status`, del motor
-del PR seldon-host #276.
-Con una instalación en una ruta personalizada, pasa `--data` con la carpeta
-de datos que muestra el instalador. Este helper no selecciona perfiles de
-`engine.json`.
-Cambiar la marca visible no mueve datos ni instala otra app.
-Los paquetes internos `@terminus/*` también conservan sus nombres.
-
-Se conservan los enlaces `terminus://task`, el historial `::terminus-visual`,
-RPC, headers y selectores, storage móvil, esquema `terminus-mobile` y rutas
-`/terminus`. Las referencias a Terminus 0.2.74 identifican la versión anterior.
-
-La autoridad del contexto es el motor/CLI, no el launcher. El alcance autorizado
-para el motor usa exclusivamente `DANIL_CONNECTION`, `DANIL_WORKSPACE`,
-`DANIL_FOLDER`, `DANIL_TASK`, `DANIL_PROFILE`, `DANIL_CLI` y
-`DANIL_CREDENTIAL`. El contexto antiguo `TERMINUS_*` se rechaza explícitamente,
-incluso al combinarlo con banderas, para impedir que una tarea pierda su caller
-y se ejecute como persona. Una carpeta vacía es distinta de una variable ausente.
-El entorno de los procesos nuevos debe filtrar también los nombres antiguos.
-
-**La reconciliación conserva el motor de `dev`, `4e10efc24a9be6f8dbf15559f767a50fb109a0a7`.**
-El contrato, sus extensiones y el manifiesto se conservan byte por byte respecto
-de `dev` (`7702c155184674d3640032630b5a98b18b3f803f`). Los launchers
-no acreditan por sí solos la interfaz exclusiva `DANIL_*` del motor del PR
-seldon-host #276, que permanece como integración separada. Su adopción requiere
-revisión de contrato y artefactos con manifiesto y checksums para las cuatro
-plataformas. Esta reconciliación no publica artefactos ni sustituye ese pin.
-Se conserva la excepción explícita de `dev`: el cliente declara el contrato
-`5f59d603`, mientras el motor fijado declara `93b1c32f`. El guard `contract`
-registra `MOTOR_PENDIENTE`; abrir la ventana no acredita los comandos posteriores
-al pin ni habilita una publicación.
-
-## Evidencia y límites
-
-Las pruebas del instalador usan directorios temporales y ejecutan su código
-real. `cli-path` pasó 6/6 y `cli-forward` 2/2 en Linux; este último comprueba
-las órdenes raíz del motor fijado y su checksum. La resolución local de npx
-con el paquete de un solo bin mostró la ayuda del instalador sin instalar la app.
-`pnpm verify` incluye ambas pruebas; `--no-cargo` no acredita Rust.
-La evidencia del motor de compatibilidad anterior no acredita la nueva interfaz
-exclusiva. Esta fase requiere sus propias pruebas de autoridad y aislamiento.
-Los nombres Windows se comprueban también desde Linux, pero cmd, PowerShell y
-Git Bash requieren ejecución nativa. Actualización instalada, firma y reemplazo
-de ejecutables en uso requieren su propio recorrido. No se deducen de guards
-ni de pruebas de frontend con IPC simulado.
+Notas para quien mantiene la CLI: [danil-cli-internal.md](danil-cli-internal.md).
