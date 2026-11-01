@@ -31,13 +31,17 @@ import {
 } from "../../ui/sidebar";
 import type { ModelChoices } from "../projects/NewAgent";
 import AIProviders from "./AIProviders";
+import Connections from "./Connections";
 import ConnectionsOperation from "./ConnectionsOperation";
 import { CustomerAgents, CustomerConnections } from "./CustomerService";
 import Environment from "./Environment";
 import { machines } from "../machines/store";
 import { secretsRoute } from "./secrets-support";
 import General from "./General";
+import Integrations from "./Integrations";
+import { PaquetesDeLengua } from "./LanguagePacks";
 import type { ContextoDeProyectos } from "./ManageProjects";
+import ProveedorDeMemoria from "./MemoryProvider";
 import { NotifyBehavior } from "./NotifyBehavior";
 import Providers from "./Providers";
 import { SETTINGS_ENTRIES, type SettingsEntryId, type SettingsGroup, settingsTarget } from "./settings-entries";
@@ -107,6 +111,7 @@ const pestanasDe = (
     general: tab("general", () => t("settings.nav.general"), () => <General />),
     appearance: tab("appearance", () => t("settings.nav.appearance"), () => <Suspense fallback={null}><Appearance proyecto={agentes.proyecto} /></Suspense>),
     notify: tab("notify", () => t("settings.tab.notify"), () => <SettingsPanel><SettingsSection title={t("settings.tab.notify")}><NotifyBehavior /></SettingsSection></SettingsPanel>),
+    languages: tab("languages", () => t("settings.languages.title"), () => <SettingsPanel><PaquetesDeLengua /></SettingsPanel>),
     workspaces: tab("workspaces", () => t("settings.tab.workspace_bar"), () => <Workspaces />),
     "proveedores-ia": tab("proveedores-ia", () => t("settings.nav.ai_providers"), () => <AIProviders superficies={superficies()} agentesEnUso={agentes.agentesEnUso} />),
     machines: cuenta ? tab("machines", () => t("settings.tab.machines"), () => <Suspense fallback={null}><DanilAccount part="machines" /></Suspense>) : undefined,
@@ -126,7 +131,10 @@ const pestanasDe = (
       </Suspense>
     )),
     skills: tab("skills", () => t("settings.nav.skills"), () => <Skills />),
-    operation: tab("operation", () => t("settings.tab.operation"), () => <ConnectionsOperation workspace={workspace()} />),
+    operation: tab("operation", () => t("settings.skills.tab_mcp"), () => <ConnectionsOperation />),
+    plugins: tab("plugins", () => t("settings.tab.plugins"), () => <SettingsPanel><Integrations /></SettingsPanel>),
+    memory: tab("memory", () => t("settings.tab.memory"), () => <SettingsPanel><ProveedorDeMemoria /></SettingsPanel>),
+    external: cuenta ? tab("external", () => t("settings.tab.external"), () => <Suspense fallback={null}><Connections workspace={workspace()} /></Suspense>) : undefined,
     customers: tab("customers", () => t("settings.tab.customers"), () => <CustomerConnections workspace={workspaceName} />),
   };
 };
@@ -158,7 +166,7 @@ const GRUPOS: { id: SettingsGroup; nombre: () => string }[] = [
 const idTab = (id: string) => `cfg-tab-${id}`;
 const idSub = (id: string) => `cfg-sub-${id}`;
 
-/** «Administración ↗»: en la web de alfa, solo para owner y admin; el escritorio no sabe el rol y la ofrece siempre. */
+/** El enlace al Harness: en la web de alfa, solo para owner y admin; el escritorio no sabe el rol y la ofrece siempre. */
 function AdminLink(props: { workspace: string | null }) {
   const page = capabilities().adminPage;
   const [allowed] = createResource(async () => (page ? await page.allowed().catch(() => false) : capabilities().nativeWindow));
@@ -179,7 +187,7 @@ function AdminLink(props: { workspace: string | null }) {
               onClick={open}
             >
               <span class="flex size-4 items-center justify-center"><Shield size={15} /></span>
-              <span class="truncate">{t("settings.admin")}</span>
+              <span class="truncate">{t("web.admin.title")}</span>
               <ExternalLink size={13} class="text-neutral-500" />
             </SidebarMenuButton>
           </SidebarMenuItem>

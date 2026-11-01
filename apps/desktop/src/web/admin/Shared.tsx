@@ -1,14 +1,14 @@
 /**
- * Lo que se comparte con el equipo de un workspace: skills, MCP y agentes. Vive en
- * la cuenta de Danil y se administra por workspace. Las rutas de la cuenta no
- * existen todavía: sin `SharedSource`, /admin marca estas secciones como «pronto».
+ * Lo que se comparte con el equipo de un workspace: skills, MCP y agentes. Las
+ * rutas de la cuenta no existen todavía: sin `SharedSource`, /admin no las muestra.
+ * Sus escrituras directas no se ofrecen aquí mientras se decide si la autoridad
+ * es la cuenta o el repositorio: un cambio se propone por `PolicyFlow`.
  */
-import { createResource, createSignal, For } from "solid-js";
+import { createResource, createSignal, For, Show } from "solid-js";
 import { SettingsPanel, SettingsRow, SettingsSection } from "../../features/settings/layout";
 import { t } from "../../lib/i18n";
 import { Badge } from "../../ui/Badge";
-import { Select } from "../../ui/Select";
-import { Toggle } from "../../ui/Toggle";
+import { PolicyFlow, type PolicyArea, type PolicySource } from "./PolicyFlow";
 
 export type Audience = "team" | "managers" | "chosen";
 export type SharedSkillSource = { id: string; repo: string; branch: string; commit: string; skills: number; current: boolean };
@@ -23,18 +23,29 @@ export type SharedSource = {
   setRequired: (id: string, required: boolean) => Promise<void>;
 };
 
-function AudienceSelect(props: { value: Audience; onChange: (value: Audience) => void }) {
+const audienceName = (value: Audience) =>
+  value === "team" ? t("web.admin.audience_team") : value === "managers" ? t("web.admin.audience_managers") : t("web.admin.audience_chosen");
+
+function AudienceBadge(props: { value: Audience }) {
+  return <Badge title={t("web.admin.audience")}>{audienceName(props.value)}</Badge>;
+}
+
+type Props = { source: SharedSource; policy?: PolicySource; canPropose: boolean };
+
+/** Abajo de cada lista: quién manda aún no se decide, y lo cambiado va por propuesta. */
+function Governed(props: { area: PolicyArea; policy?: PolicySource; canPropose: boolean }) {
   return (
-    <Select class="w-44" aria-label={t("web.admin.audience")} value={props.value} onChange={(e) => props.onChange(e.currentTarget.value as Audience)}>
-      <option value="team">{t("web.admin.audience_team")}</option>
-      <option value="managers">{t("web.admin.audience_managers")}</option>
-      <option value="chosen">{t("web.admin.audience_chosen")}</option>
-    </Select>
+    <>
+      <p role="status" class="m-0 rounded-md border border-border bg-surface-muted px-3 py-2 text-xs text-neutral-950" data-admin-authority="">
+        {t("web.admin.authority_open")}
+      </p>
+      <Show when={props.policy}>{(policy) => <PolicyFlow area={props.area} source={policy()} canPropose={props.canPropose} />}</Show>
+    </>
   );
 }
 
-export function SharedSkills(props: { source: SharedSource }) {
-  const [data, { refetch }] = createResource(() => props.source.skills());
+export function SharedSkills(props: Props) {
+  const [data] = createResource(() => props.source.skills());
   return (
     <SettingsPanel data-admin-shared="skills">
       <SettingsSection title={t("web.admin.sources")} description={t("web.admin.sources_hint")}>
@@ -50,23 +61,19 @@ export function SharedSkills(props: { source: SharedSource }) {
         <For each={data()?.skills}>
           {(row) => (
             <SettingsRow label={row.name} description={row.path}>
-              <AudienceSelect value={row.audience} onChange={(value) => void props.source.setAudience("skill", row.id, value).then(() => refetch())} />
-              <span class="text-xs text-neutral-500">{t("web.admin.required")}</span>
-              <Toggle
-                checked={row.required}
-                label={t("web.admin.required_named", { name: row.name })}
-                onChange={(value) => void props.source.setRequired(row.id, value).then(() => refetch())}
-              />
+              <AudienceBadge value={row.audience} />
+              <Show when={row.required}><Badge tone="active">{t("web.admin.required")}</Badge></Show>
             </SettingsRow>
           )}
         </For>
       </SettingsSection>
+      <Governed area="skills" policy={props.policy} canPropose={props.canPropose} />
     </SettingsPanel>
   );
 }
 
-export function SharedMcp(props: { source: SharedSource }) {
-  const [rows, { refetch }] = createResource(() => props.source.servers());
+export function SharedMcp(props: Props) {
+  const [rows] = createResource(() => props.source.servers());
   const credential = (row: SharedServer) =>
     row.credential === "personal" ? t("web.admin.credential_personal") : t("web.admin.credential_team", { count: row.machines });
   return (
@@ -75,28 +82,30 @@ export function SharedMcp(props: { source: SharedSource }) {
         <For each={rows()}>
           {(row) => (
             <SettingsRow label={row.name} description={`${row.host} · ${credential(row)}`}>
-              <AudienceSelect value={row.audience} onChange={(value) => void props.source.setAudience("server", row.id, value).then(() => refetch())} />
+              <AudienceBadge value={row.audience} />
             </SettingsRow>
           )}
         </For>
       </SettingsSection>
+      <Governed area="mcp" policy={props.policy} canPropose={props.canPropose} />
     </SettingsPanel>
   );
 }
 
-export function SharedAgents(props: { source: SharedSource }) {
-  const [rows, { refetch }] = createResource(() => props.source.agents());
+export function SharedAgents(props: Props) {
+  const [rows] = createResource(() => props.source.agents());
   return (
     <SettingsPanel data-admin-shared="agents">
       <SettingsSection title={t("web.admin.agents")} description={t("web.admin.agents_hint")}>
         <For each={rows()}>
           {(row) => (
             <SettingsRow label={row.name} description={row.path}>
-              <AudienceSelect value={row.audience} onChange={(value) => void props.source.setAudience("agent", row.id, value).then(() => refetch())} />
+              <AudienceBadge value={row.audience} />
             </SettingsRow>
           )}
         </For>
       </SettingsSection>
+      <Governed area="agents" policy={props.policy} canPropose={props.canPropose} />
     </SettingsPanel>
   );
 }

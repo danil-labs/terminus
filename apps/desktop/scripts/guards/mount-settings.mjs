@@ -172,7 +172,7 @@ plugins.w.document.querySelector('button[aria-label="Configuración"]')?.click()
 await sleep(100);
 plugins.w.document.querySelector('#cfg-tab-connections')?.click();
 await sleep(50);
-plugins.w.document.querySelector('#cfg-sub-operation')?.click();
+plugins.w.document.querySelector('#cfg-sub-plugins')?.click();
 await sleep(100);
 const officeCard = () => [...plugins.w.document.querySelectorAll("div")].find(d => d.textContent === "LibreOffice")?.parentElement?.parentElement?.parentElement;
 const officeButton = (text) => [...officeCard().querySelectorAll("button")].find(b => b.textContent?.trim() === text);
