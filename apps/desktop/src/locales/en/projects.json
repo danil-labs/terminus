@@ -375,7 +375,7 @@
   "projects.add.on_this_machine": "On this machine · {path}",
   "projects.add.workspace_history": "Workspace history",
   "projects.error.repository_history": "Could not read this workspace’s repository history. Check the details and reopen the picker.",
-  "projects.agents.profile_prompt_radiant": "Installed by Danil Teams's governance; it is changed in its source repository.",
+  "projects.agents.profile_prompt_harness": "Installed by Danil Teams's governance; it is changed in its source repository.",
   "projects.tabs.new": "Open a tab",
   "projects.tabs.new_task_in": "New task in",
   "projects.tabs.new_browser": "Browser",
