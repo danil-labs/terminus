@@ -188,7 +188,7 @@ export function ThreadSearch(props: {
     <div class="relative flex max-w-full items-start gap-1">
       <Show when={open()}>
         <div class="flex min-w-0 flex-wrap items-center gap-1 rounded-md border border-border-strong bg-surface-raised p-1 shadow-sm" role="search" aria-label={t("chat.search.label")}>
-          <Input ref={input} class="w-44 min-w-0" value={query()} placeholder={t("chat.search.placeholder")}
+          <Input ref={input} class="w-44 min-w-0 focus-visible:border-border-strong focus-visible:outline-none" value={query()} placeholder={t("chat.search.placeholder")}
             aria-label={t("chat.search.label")} onInput={event => setQuery(event.currentTarget.value)}
             onKeyDown={event => {
               if (event.key === "Enter" && !event.isComposing) { event.preventDefault(); move(event.shiftKey ? -1 : 1); }
