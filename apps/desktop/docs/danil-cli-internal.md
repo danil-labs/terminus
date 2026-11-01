@@ -75,4 +75,4 @@ del motor. Esa rutina sigue sin comprobarse con el motor nuevo.
 
 Los ejemplos de la guía pública se ejecutaron con `seldon-runtime` SHA-256
 `22863f0d4456ed53…` de seldon-host `2d6520b`, Linux x86_64, enlazado como `danil`
-y `dn`, con `env -i`. `connect` real corre en `scripts/e2e-host-install.py`.
+y `dn`, con `env -i`. `connect` real corre en `e2e-host-install.py` de seldon-host.
