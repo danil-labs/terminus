@@ -62,6 +62,7 @@ type LocalOrchestrator = {
   created_at: number;
   active: boolean;
   credential_file: string;
+  credential_env?: string;
   cli: string | null;
 };
 
