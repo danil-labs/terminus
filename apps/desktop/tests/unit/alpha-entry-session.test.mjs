@@ -330,14 +330,14 @@ test("desktop: consent, one-time code to the loopback port, PKCE exchange, refre
   assert.equal(back.origin + back.pathname, "http://127.0.0.1:49152/callback");
   assert.equal(back.searchParams.get("state"), "s".repeat(16));
   const code = back.searchParams.get("code");
-  assert.ok(!code.includes("rt_"));
+  assert.equal(w.calls.filter(c => c.url.endsWith("/auth/v1/verify")).length, 1, "approving opens no session; only the browser's exists");
 
   assert.equal((await desktopJson(w, "/auth/desktop/exchange", { code, verifier: "w".repeat(43) })).status, 401, "a wrong verifier gets nothing");
   assert.equal((await desktopJson(w, "/auth/desktop/exchange", { code, verifier: desktopVerifier }, { Origin: origin })).status, 403, "no page may call it");
   const exchanged = await desktopJson(w, "/auth/desktop/exchange", { code, verifier: desktopVerifier });
   assert.equal(exchanged.status, 200);
   const first = await exchanged.json();
-  assert.equal(first.access_token, "sb.rt_1");
+  assert.equal(first.access_token, "sb.rt_0");
   assert.deepEqual(first.user, { user_id: uuid, email: "prueba@danil.ai", name: "Prueba Danil" });
   assert.ok(!first.session.includes("rt_"));
   assert.equal("refresh_token" in first, false);
@@ -346,7 +346,7 @@ test("desktop: consent, one-time code to the loopback port, PKCE exchange, refre
   const renewed = await desktopJson(w, "/auth/desktop/session", { session: first.session });
   assert.equal(renewed.status, 200);
   const second = await renewed.json();
-  assert.equal(second.access_token, "sb.rt_2");
+  assert.equal(second.access_token, "sb.rt_1");
   assert.notEqual(second.session, first.session);
 
   const original = w.fetch;
@@ -358,7 +358,7 @@ test("desktop: consent, one-time code to the loopback port, PKCE exchange, refre
   };
   const out = await desktopJson(w, "/auth/desktop/logout", { session: second.session });
   assert.equal(out.status, 204);
-  assert.equal(loggedOut, "Bearer sb.rt_3");
+  assert.equal(loggedOut, "Bearer sb.rt_2");
 });
 
 test("desktop: an ended WorkOS session ends the window's session too", async () => {

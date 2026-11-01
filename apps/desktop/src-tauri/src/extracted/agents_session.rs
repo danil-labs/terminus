@@ -39,6 +39,12 @@ fn refreshing() -> &'static Mutex<()> {
     R.get_or_init(Default::default)
 }
 
+/// Cuentas cuya sesión ya se comparó, en este proceso, con la persona de la cuenta del motor.
+fn verified() -> &'static Mutex<std::collections::HashSet<String>> {
+    static V: OnceLock<Mutex<std::collections::HashSet<String>>> = OnceLock::new();
+    V.get_or_init(Default::default)
+}
+
 /// Un inicio de sesión nuevo deja sin efecto al que seguía esperando.
 static CONNECT: AtomicU64 = AtomicU64::new(0);
 
@@ -62,13 +68,28 @@ fn key(account: &Option<String>) -> String {
         .to_owned()
 }
 
-/// La entrada de WorkOS; `DANIL_ENTRY_URL` la cambia en desarrollo.
+/// La entrada de WorkOS; `DANIL_ENTRY_URL` la cambia solo en builds de depuración.
 fn entry() -> String {
-    std::env::var("DANIL_ENTRY_URL")
+    #[cfg(debug_assertions)]
+    if let Some(value) = std::env::var("DANIL_ENTRY_URL")
         .ok()
         .map(|v| v.trim().trim_end_matches('/').to_owned())
         .filter(|v| v.starts_with("https://") || v.starts_with("http://127.0.0.1:"))
-        .unwrap_or_else(|| ENTRY.to_owned())
+    {
+        return value;
+    }
+    ENTRY.to_owned()
+}
+
+/// Los tokens solo viajan a un Computers conocido: el `endpoint` lo responde el motor,
+/// y un agente con el mismo usuario del sistema podría cambiar su configuración.
+fn known_computers(endpoint: &str) -> bool {
+    const KNOWN: [&str; 2] = [
+        "https://computers.danil.ai",
+        "https://computers-dev.danil.ai",
+    ];
+    KNOWN.contains(&endpoint)
+        || (cfg!(debug_assertions) && endpoint.starts_with("http://127.0.0.1:"))
 }
 
 fn keyring_service(app: &tauri::AppHandle) -> String {
@@ -83,13 +104,20 @@ fn keychain(app: &tauri::AppHandle, account: &str) -> Option<keyring::Entry> {
     keyring::Entry::new(&keyring_service(app), account).ok()
 }
 
+/// Lo guardado: `{version, user_id, session}`. Otro formato se descarta.
 fn stored(app: &tauri::AppHandle, account: &str) -> Option<String> {
-    keychain(app, account)?.get_password().ok()
+    let raw = keychain(app, account)?.get_password().ok()?;
+    let record = serde_json::from_str::<Value>(&raw).ok()?;
+    if record["version"] != 1 || !record["user_id"].is_string() {
+        return None;
+    }
+    record["session"].as_str().map(str::to_owned)
 }
 
 /// `true` si quedó en el llavero.
-fn store(app: &tauri::AppHandle, account: &str, session: &str) -> bool {
-    keychain(app, account).is_some_and(|e| e.set_password(session).is_ok())
+fn store(app: &tauri::AppHandle, account: &str, user_id: &str, session: &str) -> bool {
+    let record = json!({ "version": 1, "user_id": user_id, "session": session }).to_string();
+    keychain(app, account).is_some_and(|e| e.set_password(&record).is_ok())
 }
 
 fn forget(app: &tauri::AppHandle, account: &str) {
@@ -150,7 +178,12 @@ fn accept(app: &tauri::AppHandle, account: &str, answer: &Value) -> Result<Live,
         expires_at,
         user: answer["user"].clone(),
     };
-    store(app, account, session);
+    store(
+        app,
+        account,
+        answer["user"]["user_id"].as_str().unwrap_or_default(),
+        session,
+    );
     live()
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
@@ -220,6 +253,9 @@ fn client(app: &tauri::AppHandle, account: &Option<String>) -> Result<(String, S
         .as_str()
         .ok_or_else(|| error("client_token"))?
         .trim_end_matches('/');
+    if !known_computers(endpoint) {
+        return Err(error("unknown_endpoint"));
+    }
     Ok((secret.to_owned(), endpoint.to_owned()))
 }
 
@@ -238,6 +274,7 @@ fn grant(
     match response.status().as_u16() {
         200 | 201 => Ok(()),
         403 => Err(error("person_mismatch")),
+        409 => Err(error("no_session")),
         404 => Err(error("route_missing")),
         _ => Err(error("grant_failed")),
     }
@@ -263,12 +300,55 @@ fn active_account(token: &str) -> Option<u64> {
 }
 
 #[tauri::command(async)]
-pub(super) fn agents_session_status(app: tauri::AppHandle, account: Option<String>) -> Value {
+pub(super) fn agents_session_status(
+    app: tauri::AppHandle,
+    account: Option<String>,
+    verify: Option<bool>,
+) -> Value {
     let name = key(&account);
-    match access(&app, &name, false) {
+    if verify == Some(true) {
+        verified()
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .remove(&name);
+    }
+    match checked(&app, &account) {
         Ok(value) => status_of(&app, &name, &value),
         Err(e) if e["detail"] == "no_session" => json!({ "state": "none" }),
         Err(e) => json!({ "state": "unavailable", "detail": e["detail"] }),
+    }
+}
+
+/// La sesión, comparada una vez por proceso con la persona de la cuenta del motor:
+/// Computers rechaza la concesión si el token de cliente es de otra persona.
+fn checked(app: &tauri::AppHandle, account: &Option<String>) -> Result<Live, Value> {
+    let name = key(account);
+    let value = access(app, &name, false)?;
+    let known = verified()
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .contains(&name);
+    if !known {
+        regrant(app, account, &value.access_token)?;
+    }
+    Ok(value)
+}
+
+/// Otra persona en la cuenta o una concesión revocada terminan la sesión de la ventana.
+fn regrant(app: &tauri::AppHandle, account: &Option<String>, token: &str) -> Result<(), Value> {
+    match grant(app, account, token) {
+        Ok(()) => {
+            verified()
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .insert(key(account));
+            Ok(())
+        }
+        Err(e) if e["detail"] == "person_mismatch" || e["detail"] == "no_session" => {
+            let _ = sign_out(app, account);
+            Err(error("no_session"))
+        }
+        Err(e) => Err(e),
     }
 }
 
@@ -398,6 +478,10 @@ pub(super) fn agents_session_connect(
         let _ = sign_out(&app, &account);
         return Err(e);
     }
+    verified()
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .insert(name.clone());
     Ok(status_of(&app, &name, &value))
 }
 
@@ -424,6 +508,10 @@ fn sign_out(app: &tauri::AppHandle, account: &Option<String>) -> Result<(), Valu
         );
     }
     forget(app, &name);
+    verified()
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .remove(&name);
     Ok(())
 }
 
@@ -525,7 +613,7 @@ fn send(
         .with_config()
         .limit(MAX_BODY as u64)
         .read_to_string()
-        .unwrap_or_default();
+        .map_err(|_| error("invalid_response"))?;
     Ok(Sent {
         status,
         proxy,
@@ -584,7 +672,7 @@ pub(super) fn agents_bff_fetch(
     }
     let name = key(&account);
     let (_, endpoint) = client(&app, &account)?;
-    let mut session = access(&app, &name, false)?;
+    let mut session = checked(&app, &account)?;
     let mut sent = send(
         &endpoint,
         &session.access_token,
@@ -610,7 +698,7 @@ pub(super) fn agents_bff_fetch(
         )?;
     } else if sent.status == 403 && proxy_error(&sent).as_deref() == Some("window_session_unknown")
     {
-        grant(&app, &account, &session.access_token)?;
+        regrant(&app, &account, &session.access_token)?;
         sent = send(
             &endpoint,
             &session.access_token,
@@ -663,6 +751,14 @@ mod tests {
         let payload = URL_SAFE_NO_PAD.encode(br#"{"active_account_id":476,"sub":"x"}"#);
         assert_eq!(active_account(&format!("h.{payload}.s")), Some(476));
         assert_eq!(active_account("not-a-jwt"), None);
+    }
+
+    #[test]
+    fn tokens_only_go_to_known_computers() {
+        assert!(known_computers("https://computers.danil.ai"));
+        assert!(known_computers("https://computers-dev.danil.ai"));
+        assert!(!known_computers("https://computers.danil.ai.evil.example"));
+        assert!(!known_computers("http://computers.danil.ai"));
     }
 
     #[test]

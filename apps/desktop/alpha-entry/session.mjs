@@ -394,7 +394,15 @@ async function desktopStart(config, request, url) {
   return desktopPage(request, fields, typeof login?.email === "string" ? login.email : null);
 }
 
-/** After the click: a NEW GoTrue session for the window, handed over once to its loopback port. */
+/** The person's login, refused when banned or deleted. */
+async function loginOf(config, uuid) {
+  const login = await supabase(config, `/auth/v1/admin/users/${uuid}`);
+  if (login?.id !== uuid || typeof login.email !== "string" || !login.email) throw new Denied("no_login_yet", 403);
+  if ((login.banned_until && Date.parse(login.banned_until) > Date.now()) || login.deleted_at) throw new Denied("login_banned", 403);
+  return login;
+}
+
+/** After the click: a one-time code to the window's loopback port. It holds no token; the session opens at the exchange. */
 async function desktopApprove(config, request) {
   try {
     if (!/^application\/x-www-form-urlencoded\b/i.test(request.headers.get("Content-Type") ?? "")) throw new Denied("invalid_body", 400);
@@ -402,11 +410,8 @@ async function desktopApprove(config, request) {
     const fields = desktopRequest(new URLSearchParams(new TextDecoder().decode(bytes)));
     if (!fields) throw new Denied("invalid_body", 400);
     const session = await browserSession(config, request);
-    const login = await supabase(config, `/auth/v1/admin/users/${session.uuid}`);
-    if (login?.id !== session.uuid || typeof login.email !== "string" || !login.email) throw new Denied("no_login_yet", 403);
-    if ((login.banned_until && Date.parse(login.banned_until) > Date.now()) || login.deleted_at) throw new Denied("login_banned", 403);
-    const opened = await openSupabaseSession(config, { uuid: session.uuid, loginEmail: login.email });
-    const code = await seal(config.env, DESKTOP_CODE, { user: session.user, sid: session.sid, uuid: session.uuid, refresh: opened.refresh, challenge: fields.challenge, exp: now() + DESKTOP_CODE_SECONDS });
+    await loginOf(config, session.uuid);
+    const code = await seal(config.env, DESKTOP_CODE, { user: session.user, sid: session.sid, uuid: session.uuid, challenge: fields.challenge, exp: now() + DESKTOP_CODE_SECONDS });
     const back = new URL(`http://127.0.0.1:${fields.port}/callback`);
     back.searchParams.set("code", code);
     back.searchParams.set("state", fields.state);
@@ -459,7 +464,8 @@ async function desktopAnswer(config, value) {
   return json({ session, ...renewed.answer }, 200);
 }
 
-const validDesktop = value => ID_RE.test(value.user ?? "") && ID_RE.test(value.sid ?? "") && UUID_RE.test(value.uuid ?? "") && typeof value.refresh === "string";
+const validPerson = value => ID_RE.test(value.user ?? "") && ID_RE.test(value.sid ?? "") && UUID_RE.test(value.uuid ?? "");
+const validDesktop = value => validPerson(value) && typeof value.refresh === "string";
 
 async function desktopExchange(config, request) {
   const body = await desktopJson(request, ["code", "verifier"]);
@@ -469,11 +475,15 @@ async function desktopExchange(config, request) {
   } catch {
     throw new Denied("invalid_code");
   }
-  if (!validDesktop(code) || !CHALLENGE_RE.test(code.challenge ?? "")) throw new Denied("invalid_code");
+  if (!validPerson(code) || !CHALLENGE_RE.test(code.challenge ?? "")) throw new Denied("invalid_code");
   const challenge = b64url(await crypto.subtle.digest("SHA-256", encoder.encode(body.verifier)));
   if (!equal(challenge, code.challenge)) throw new Denied("invalid_code");
   await checkSession(config, code.user, code.sid);
-  return desktopAnswer(config, { ...code, exp: now() + SESSION_SECONDS });
+  // A NEW GoTrue session for the window, opened only by whoever holds the verifier.
+  const login = await loginOf(config, code.uuid);
+  const opened = await openSupabaseSession(config, { uuid: code.uuid, loginEmail: login.email });
+  const session = await seal(config.env, DESKTOP_SESSION, { user: code.user, sid: code.sid, uuid: code.uuid, refresh: opened.refresh, exp: now() + SESSION_SECONDS });
+  return json({ session, ...opened.answer }, 200);
 }
 
 async function desktopRefresh(config, request) {

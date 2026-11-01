@@ -32,14 +32,15 @@ La base es la del Worker de entrada (`https://alfa-app.danil.ai`; en desarrollo
    `POST /auth/desktop/approve` (mismos tres campos). No hay aprobación sin ese
    clic: un agente que abre la URL no obtiene nada sin la persona.
 3. `POST /auth/desktop/approve` exige `Origin` del Worker y rechaza
-   `X-Danil-Actor: ai`. Revisa la sesión de WorkOS, abre una sesión de GoTrue
-   NUEVA para la persona (no la del navegador) y sella un código de un solo uso
-   (nombre de sello `desktop_code`, 120 s) con `{user, sid, uuid, refresh,
-   challenge}`. Responde 303 a `http://127.0.0.1:<port>/callback?code=<código>&state=<state>`.
+   `X-Danil-Actor: ai`. Revisa la sesión de WorkOS y el login de la persona y
+   sella un código de un solo uso (nombre de sello `desktop_code`, 120 s) con
+   `{user, sid, uuid, challenge}`. El código no lleva ningún token: queda en el
+   historial del navegador, y una aprobación sin canje no deja sesiones. Responde 303 a `http://127.0.0.1:<port>/callback?code=<código>&state=<state>`.
 4. La ventana canjea: `POST /auth/desktop/exchange`, JSON `{"code","verifier"}`.
    El Worker comprueba el sello, el vencimiento y
-   `base64url(SHA-256(verifier)) == challenge`, renueva en GoTrue y responde
-   200 con la respuesta de sesión (abajo).
+   `base64url(SHA-256(verifier)) == challenge` y la sesión de WorkOS, abre una
+   sesión de GoTrue NUEVA para la persona (no la del navegador) y responde 200
+   con la respuesta de sesión (abajo).
 
 ### Respuesta de sesión
 
@@ -47,6 +48,10 @@ La base es la del Worker de entrada (`https://alfa-app.danil.ai`; en desarrollo
 { "session": "<blob sellado, opaco>", "access_token": "<JWT de Supabase>", "expires_at": 1793550000,
   "user": { "user_id": "<uuid>", "email": "a@b.c", "name": "Nombre" } }
 ```
+
+La sesión de la ventana sigue a la de WorkOS del navegador: cerrar sesión en
+el navegador la termina en la siguiente renovación (401), con un tope de 30
+días. La ventana vuelve a pedir conectar, sin mostrar error.
 
 `session` se sella con el nombre `desktop_session`, vale 30 días y lleva
 `{user, sid, uuid, refresh, exp}`. Cada renovación devuelve uno nuevo: la
@@ -77,8 +82,10 @@ El `session_id` de un JWT de GoTrue no cambia al renovar. La concesión dice
   cliente (persona `P1`, computadora `cid`) Y el JWT (persona `P2`,
   `session_id`). Exige `P1 == P2`. Inserta o reactiva
   `{session_id, user_id, computer_id, created_at, revoked_at null}`.
-  201 `{"session_id","computer_id"}`. Errores: 401 `invalid_token`,
-  403 `person_mismatch`, 400 `invalid_body`.
+  201 `{"session_id","computer_id"}`; repetirla viva desde la misma
+  computadora es idempotente. Errores: 401 `invalid_token`,
+  403 `person_mismatch`, 409 `grant_revoked` (una revocación es final),
+  400 `invalid_body`.
 - `DELETE /v1/bff/grants/self`, `Authorization: Bearer <JWT de persona>` →
   204. Marca revocada la concesión de ese `session_id`.
 - Borrar una computadora o revocar su credencial de máquina revoca sus
@@ -132,10 +139,22 @@ ventana oculta Atención y no reintenta.
   `proxy.rs`): `agents_session_status`, `agents_session_connect`,
   `agents_session_sign_out` y `agents_bff_fetch`. Todos con `account`
   opcional: la cuenta de Danil del workspace (sin ella, la principal).
-- El llavero guarda solo el blob `session`, uno por cuenta: servicio
+- El llavero guarda `{"version":1,"user_id","session"}`, uno por cuenta: servicio
   `ai.danil.terminus.agents-session`, usuario la cuenta (`default` sin ella).
   Sin llavero disponible la sesión vive solo en memoria; nunca en un archivo.
-- La base de Computers es `endpoint` de `danil_client_token {account}`.
+- La base de Computers es `endpoint` de `danil_client_token {account}`, y solo
+  si es `https://computers.danil.ai` o `https://computers-dev.danil.ai`: el
+  motor lo responde y un agente con el mismo usuario podría cambiarlo.
+  `DANIL_ENTRY_URL` y `http://127.0.0.1:*` solo valen en builds de depuración.
+- Una vez por proceso, y con cada evento `danil-connect` conectado, la ventana
+  repite la concesión: si la cuenta del motor ya es de otra persona
+  (`person_mismatch`) o la concesión fue revocada (409), borra la sesión. Un
+  `danil-connect` desconectado cierra la sesión de la ventana.
+- Las vistas eligen la cuenta por el claim `active_account_id`, que Rust
+  decodifica; no mandan `X-Danil-Workspace`, porque el Worker de entrada aún
+  no la reenvía al BFF.
+- Una respuesta que no se puede leer (más de 16 MiB o no UTF-8) es un error
+  `invalid_response`, nunca un cuerpo vacío.
 - Cerrar sesión: `DELETE /v1/bff/grants/self`, después `/auth/desktop/logout`,
   después borra el llavero. Lo mismo al cerrar la cuenta en el motor.
 

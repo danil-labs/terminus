@@ -37,5 +37,7 @@
   "attention.desktop.error.browser": "No se pudo abrir el navegador.",
   "attention.desktop.error.invalid_code": "La confirmación ya no es válida. Prueba de nuevo.",
   "attention.desktop.error.bff_timeout": "Danil tardó demasiado en responder.",
-  "attention.desktop.error.body_too_large": "El archivo es demasiado grande."
+  "attention.desktop.error.body_too_large": "El archivo es demasiado grande.",
+  "attention.desktop.error.invalid_response": "Danil respondió algo que no se puede leer. Prueba de nuevo.",
+  "attention.desktop.error.unknown_endpoint": "Esta computadora apunta a un servidor de Danil desconocido."
 }

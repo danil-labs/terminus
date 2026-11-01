@@ -86,7 +86,11 @@ const lenguasDeDisco = cargarPaquetes().then(refreshLanguage);
 // Las capacidades se leen al montar: Atención entra antes, en su trozo, solo con la bandera.
 const atencion: Promise<void> =
   import.meta.env.DANIL_DESKTOP_ATTENTION && capabilities().nativeWindow
-    ? import("../features/attention/desktop").then((m) => m.installDesktopAttention()).catch((e) => console.warn("[atencion]", e))
+    ? Promise.race([
+        import("../features/attention/desktop").then((m) => m.installDesktopAttention()),
+        // Un trozo que no llega no deja la ventana sin montar.
+        new Promise<void>((resolve) => setTimeout(resolve, 3000)),
+      ]).catch((e) => console.warn("[atencion]", e))
     : Promise.resolve();
 // No un `await` de nivel superior: el objetivo del build es `es2020`, donde no
 // existe, y subirlo por esta línea cambiaría el objetivo de la app entera.

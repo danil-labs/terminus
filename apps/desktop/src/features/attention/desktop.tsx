@@ -6,6 +6,7 @@
 import { createRoot, createSignal, Show, Suspense, lazy, type JSX } from "solid-js";
 import type { InboxSession } from "../../../../../packages/attention/src/inbox.ts";
 import { invoke } from "../../lib/invoke.ts";
+import { listen } from "../../lib/serviceEvents";
 import { t } from "../../lib/i18n";
 import { capabilities, setCapabilities, type Capabilities } from "../../lib/platform";
 import { createCustomization } from "../../lib/customization";
@@ -239,4 +240,16 @@ export function installDesktopAttention() {
   };
   setCapabilities({ ...capabilities(), inbox });
   void refreshStatus();
+  // Cerrar o cambiar la cuenta de Danil del motor termina o vuelve a comprobar la sesión de la ventana.
+  void listen<{ state?: string }>("danil-connect", (event) => {
+    if (event.payload?.state === "connected") {
+      void invoke<DesktopStatus>("agents_session_status", { verify: true })
+        .then(changed)
+        .catch(() => {});
+    } else {
+      void invoke("agents_session_sign_out", {})
+        .catch(() => {})
+        .then(() => changed({ state: "none" }));
+    }
+  });
 }
