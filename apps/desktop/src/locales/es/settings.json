@@ -773,10 +773,8 @@
   "settings.tab.machines": "Tus máquinas",
   "settings.tab.folders": "Carpetas",
   "settings.tab.secrets": "Secretos",
-  "settings.admin": "Administración",
   "settings.nav.connections": "Conexiones",
   "settings.tab.emails": "Correos",
-  "settings.tab.operation": "Operación y código",
   "settings.tab.customers": "Atención a clientes",
   "settings.customers.title": "Atención a clientes",
   "settings.customers.unavailable": "Esta sección todavía no se ve en la app de escritorio. Ábrela en la web con tu cuenta de Danil.",
@@ -794,5 +792,10 @@
   "settings.connections.one_workspace": "Elige sólo un workspace por máquina antes de activar.",
   "settings.connections.access_saved": "Selección guardada. El acceso se comprueba cuando el orquestador usa cada destino.",
   "settings.connections.retry": "Reintentar",
-  "settings.connections.approval_fixed": "El modo de aprobación de una conexión existente se conserva. El servicio todavía no permite cambiarlo."
+  "settings.connections.approval_fixed": "El modo de aprobación de una conexión existente se conserva. El servicio todavía no permite cambiarlo.",
+  "settings.tab.plugins": "Plugins",
+  "settings.tab.memory": "Memoria",
+  "settings.tab.external": "Acceso externo",
+  "settings.tab.usage": "Consumo",
+  "settings.tab.plan": "Plan"
 }

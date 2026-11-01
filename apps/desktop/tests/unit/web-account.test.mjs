@@ -56,7 +56,7 @@ test("the web shows the account's name and photo, and changes and removes the ph
 
     assert.equal(foot()?.getAttribute("aria-label"), "Ana Pérez", foot()?.outerHTML ?? "no footer entry");
     assert.equal(foot().querySelector("img")?.getAttribute("src"), b64(PNG), "the photo as a data: URI, no remote image");
-    assert.equal(foot().querySelector(".bg-success, .bg-neutral-300"), null, "no machine dot on the web");
+    assert.equal(foot().querySelector(".signal-dot"), null, "no machine dot on the web");
     assert.ok(requests.every((r) => r.token === "Bearer tok"), "every call carries the person's session");
 
     foot().click();
