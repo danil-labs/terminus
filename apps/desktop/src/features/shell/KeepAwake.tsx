@@ -4,6 +4,7 @@ import { createSignal, For, onCleanup, Show } from "solid-js";
 import { invoke } from "../../lib/invoke.ts";
 import { t } from "../../lib/i18n";
 import { cn } from "../../lib/utils";
+import type { SignalTone } from "../../ui/SignalDot";
 import { Popover, PopoverContent, PopoverTrigger } from "../../ui/Popover";
 
 export type Mode = "on" | "agent" | "off";
@@ -66,6 +67,8 @@ export default function KeepAwake() {
     set(mode);
   };
 
+  // Siempre es verde; con agentes, amarillo; apagado no dice nada.
+  const tone = (): SignalTone => (status()?.mode === "on" ? "success" : status()?.mode === "agent" ? "warning" : "neutral");
   const state = () => (status()?.active ? t("shell.keep_awake.active") : t("shell.keep_awake.inactive"));
   const label = () => {
     const s = status();
@@ -82,8 +85,9 @@ export default function KeepAwake() {
               type="button"
               class={cn(
                 "grid size-8 shrink-0 place-items-center rounded-md outline-none hover:bg-neutral-200 hover:text-neutral-950 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary data-[expanded]:bg-surface-muted",
-                status()?.active ? "text-primary" : "text-neutral-500",
+                "signal-icon",
               )}
+              data-tone={tone()}
               aria-label={label()}
               title={label()}
             >
