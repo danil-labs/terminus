@@ -658,6 +658,7 @@ const steps = [
   ["An approval invalidates its identity without touching other slots", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/web-session.test.ts")], root],
   ["The alpha WorkOS session asks for a short token, renews it and ends without a fallback", process.execPath, ["--test", "--test-force-exit", "--experimental-strip-types", join(root, "tests/unit/web-workos-session.test.ts")], root],
   ["Broadcasts: the full panel, the Appv2 rules and what stays behind the switch", process.execPath, ["--test", "--experimental-strip-types", join(root, "../../packages/attention/test/broadcast-panel.test.ts")], root],
+  ["app.danil.ai/terminus answers 308 to the same alfa path and never leaves that host", process.execPath, ["--test", join(root, "web-redirect/worker.test.mjs")], root],
   ["The alpha entry bounds explicit reads and writes, and leaves WorkOS sign-in in the Worker", process.execPath, ["--test", join(root, "alpha-entry/worker.test.mjs")], root],
   ["A workspace without a safe account shows data from none", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/workspace-account.test.ts")]],
   ["The directory groups what can be entered and the bar shows the pinned ones", process.execPath, ["--test", "--experimental-strip-types", join(root, "tests/unit/workspace-directory.test.ts")]],
