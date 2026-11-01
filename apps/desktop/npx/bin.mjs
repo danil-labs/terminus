@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// npx @danil-labs/terminus — instala Terminus (app de escritorio Danil) con un
+// npx @danil-labs/terminus — instala Danil (app de escritorio) con un
 // comando. Canal para desarrolladores (que ya tienen Node), adicional al
 // instalador que se descarga a mano.
 //
@@ -25,7 +25,7 @@ import { downloadToFile, fetchText } from './lib/download.mjs';
 import { verifyFile } from './lib/minisign.mjs';
 import { t } from './lib/i18n.mjs';
 
-// Clave pública minisign de Terminus. Idéntica a la embebida en la app
+// Clave pública minisign de Danil. Idéntica a la embebida en la app
 // (harness-app/terminus-app -> src-tauri/tauri.conf.json -> plugins.updater.pubkey).
 // Es pública por diseño; sella que el instalador salió de Danil.
 const PUBKEY_B64 =
@@ -52,7 +52,7 @@ function parseArgs(argv) {
 }
 
 function printHelp() {
-  log(`${paint(C.bold, 'Terminus')} — ${t('help', { manualUrl: MANUAL_DOWNLOAD_URL })}`);
+  log(`${paint(C.bold, 'Danil')} — ${t('help', { manualUrl: MANUAL_DOWNLOAD_URL })}`);
 }
 
 async function sha256File(filePath) {
@@ -196,7 +196,7 @@ async function main() {
     process.exit(1);
   }
 
-  log(paint(C.bold, 'Terminus') + paint(C.dim, ` · ${t('title')}`));
+  log(paint(C.bold, 'Danil') + paint(C.dim, ` · ${t('title')}`));
 
   const plat = detectPlatform();
   log(`  ${t('system')}${plat.label}  ${paint(C.dim, `(${plat.platform}/${plat.arch})`)}`);

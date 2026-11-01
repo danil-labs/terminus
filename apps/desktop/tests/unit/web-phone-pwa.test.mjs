@@ -27,7 +27,7 @@ function assertInstallableHead(html, where) {
   has(/<link rel="apple-touch-icon" sizes="180x180" href="icons\/apple-touch-icon\.png"/, "apple-touch-icon");
   has(/<meta name="apple-mobile-web-app-capable" content="yes"/, "apple-mobile-web-app-capable");
   has(/<meta name="mobile-web-app-capable" content="yes"/, "mobile-web-app-capable");
-  has(/<meta name="apple-mobile-web-app-title" content="Terminus"/, "apple-mobile-web-app-title");
+  has(/<meta name="apple-mobile-web-app-title" content="Danil"/, "apple-mobile-web-app-title");
   has(/<meta name="apple-mobile-web-app-status-bar-style" content="[\w-]+"/, "apple-mobile-web-app-status-bar-style");
   has(/<meta name="theme-color" content="#[0-9a-f]{6}"/, "theme-color");
   has(/<meta name="viewport" content="[^"]*viewport-fit=cover/, "viewport-fit=cover");
@@ -43,8 +43,8 @@ test("el manifest del teléfono es instalable y su scope cubre el inicio de sesi
   assert.equal(manifest.scope, "/");
   assert.notEqual(manifest.id, "/", "la app de Danil ya usa id \"/\" en el mismo origen");
   assert.equal(manifest.display, "standalone");
-  assert.equal(manifest.name, "Terminus");
-  assert.equal(manifest.short_name, "Terminus");
+  assert.equal(manifest.name, "Danil");
+  assert.equal(manifest.short_name, "Danil");
   assert.equal(manifest.lang, "es");
   assert.match(manifest.theme_color, /^#[0-9a-f]{6}$/);
   assert.match(manifest.background_color, /^#[0-9a-f]{6}$/);

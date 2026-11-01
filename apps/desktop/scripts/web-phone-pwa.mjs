@@ -23,9 +23,9 @@ export function phoneManifest(base) {
   const phone = `${base}${PHONE_DIR}/`;
   return {
     id: phone,
-    name: "Terminus",
-    short_name: "Terminus",
-    description: "Tus tareas de Terminus desde el teléfono.",
+    name: "Danil",
+    short_name: "Danil",
+    description: "Tus tareas de Danil desde el teléfono.",
     lang: "es",
     dir: "ltr",
     start_url: phone,
