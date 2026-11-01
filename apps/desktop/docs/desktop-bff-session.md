@@ -149,7 +149,9 @@ ventana oculta Atención y no reintenta.
 - Una vez por proceso, y con cada evento `danil-connect` conectado, la ventana
   repite la concesión: si la cuenta del motor ya es de otra persona
   (`person_mismatch`) o la concesión fue revocada (409), borra la sesión. Un
-  `danil-connect` desconectado cierra la sesión de la ventana.
+  `danil-connect` `disconnected` cierra la sesión de la ventana solo si la cuenta
+  principal (`danil_connect_status`) quedó desconectada; `pending`, `error` o una
+  cuenta secundaria no la tocan: la siguiente llamada vuelve a comprobar.
 - Las vistas eligen la cuenta por el claim `active_account_id`, que Rust
   decodifica; no mandan `X-Danil-Workspace`, porque el Worker de entrada aún
   no la reenvía al BFF.

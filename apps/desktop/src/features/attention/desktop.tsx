@@ -188,6 +188,19 @@ let live: Promise<Live> | null = null;
 const loadLive = () =>
   (live ??= import("../../web/attention/capability").then((m) => m.attentionCapability(false, false, session)));
 
+/** Pinta `part` de la capacidad web sin pedir sesión: lo que es local, como el catálogo de «Personalizar». */
+function loaded(part: (cap: Live) => JSX.Element): JSX.Element {
+  const View = lazy(async () => {
+    const cap = await loadLive();
+    return { default: () => part(cap) };
+  });
+  return (
+    <Suspense fallback={null}>
+      <View />
+    </Suspense>
+  );
+}
+
 /** Pinta `part` de la capacidad web con sesión; sin ella, el panel para conectar. */
 function gated(part: (cap: Live) => JSX.Element, connect = true): JSX.Element {
   const View = lazy(async () => {
@@ -224,7 +237,7 @@ export function installDesktopAttention() {
     subscribe: session.subscribe,
     sidebarMenu: AttentionMenu,
     personalizeMenu: PersonalizeMenu,
-    catalog: (props) => gated((cap) => cap.catalog(props), false),
+    catalog: (props) => loaded((cap) => cap.catalog(props)),
     broadcasts: (workspace) => gated((cap) => cap.broadcasts(workspace)),
     initial: false,
     render: (workspace) => gated((cap) => cap.render(workspace)),
@@ -240,16 +253,21 @@ export function installDesktopAttention() {
   };
   setCapabilities({ ...capabilities(), inbox });
   void refreshStatus();
-  // Cerrar o cambiar la cuenta de Danil del motor termina o vuelve a comprobar la sesión de la ventana.
+  // La sesión de la ventana es de la cuenta principal. Conectada: se vuelve a comprobar la persona.
+  // Solo la principal desconectada la cierra; `pending`, `error` o una secundaria no la tocan.
   void listen<{ state?: string }>("danil-connect", (event) => {
-    if (event.payload?.state === "connected") {
+    const state = event.payload?.state;
+    if (state === "connected") {
       void invoke<DesktopStatus>("agents_session_status", { verify: true })
         .then(changed)
         .catch(() => {});
-    } else {
-      void invoke("agents_session_sign_out", {})
-        .catch(() => {})
-        .then(() => changed({ state: "none" }));
+    } else if (state === "disconnected") {
+      void invoke<{ state?: string }>("danil_connect_status", {})
+        .then((principal) => {
+          if (principal?.state !== "disconnected") return;
+          return invoke("agents_session_sign_out", {}).then(() => changed({ state: "none" }));
+        })
+        .catch(() => {});
     }
   });
 }
