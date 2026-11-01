@@ -27,3 +27,10 @@ the catalog); the rest are development tools run by hand (`engine.mjs`,
   runtime: `pnpm.cmd` is not a native binary.
 - `engine.mjs` downloads and runs the engine lab
   ([development](../docs/development.md)).
+- `verify --remote` (`verify-remote.mjs`) sends one commit to the queue in
+  `verify-queue/`, which knows no repo: what it may run comes from
+  `verify-queue/repos.json`. Use and setup are in
+  [development](../docs/development.md#remote-verify). After changing that
+  folder, run its `install.sh` on the machine.
+- `sweep-targets.mjs` lists the `target/` folders of unused worktrees; it
+  deletes only with `--apply`.

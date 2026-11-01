@@ -1,0 +1,5 @@
+#!/bin/bash
+# Apaga la VM tras 30 minutos sin corrida ni sesión.
+f=/run/verify-last-active
+if [ -e /var/lib/verify-queue/busy ] || pgrep -f 'verify.mjs|cargo|rustc' >/dev/null || [ -n "$(who)" ] || [ ! -e "$f" ]; then touch "$f"; exit 0; fi
+[ $(( $(date +%s) - $(stat -c %Y "$f") )) -gt 1800 ] && /sbin/shutdown -h now
