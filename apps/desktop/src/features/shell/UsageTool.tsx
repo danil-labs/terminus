@@ -83,7 +83,7 @@ export default function UsageTool(props: {
               {...p}
               variant="chrome"
               size="iconCompact"
-              class="size-auto h-7 shrink-0 gap-1.5 px-1.5 text-neutral-500 focus-visible:outline-none"
+              class="size-auto h-[30px] shrink-0 gap-1.5 px-2 text-neutral-500 focus-visible:outline-none"
               aria-label={title()}
               onPointerEnter={entrar}
               onPointerLeave={salir}

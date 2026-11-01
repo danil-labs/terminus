@@ -6750,7 +6750,7 @@ export default function App() {
     <BotonConAtajo
       variant={archivosDeTarea.panel(sesion()).open ? "secondary" : "ghost"}
       size="icon"
-      class="relative size-7 shrink-0 text-neutral-500"
+      class="relative size-[30px] shrink-0 text-neutral-500"
       onClick={() => archivosDeTarea.toggle(sesion())}
       aria-pressed={archivosDeTarea.panel(sesion()).open}
       aria-label={t("code.panel.toggle")}
@@ -6767,7 +6767,7 @@ export default function App() {
       <BotonConAtajo
         variant={llave() && archivosDeTarea.panel(llave()).open ? "secondary" : "ghost"}
         size="icon"
-        class="relative size-7 shrink-0 text-neutral-500"
+        class="relative size-[30px] shrink-0 text-neutral-500"
         disabled={!llave()}
         onClick={() => archivosDeTarea.toggle(llave())}
         aria-pressed={!!llave() && archivosDeTarea.panel(llave()).open}
@@ -7461,7 +7461,7 @@ export default function App() {
             <For each={ventanas().filter((sitio) => sitio.fila === 0)}>
               {(sitio) => (
                 <div
-                  class="pointer-events-auto flex h-8 min-w-0 items-center px-2"
+                  class="pointer-events-auto flex h-[30px] min-w-0 items-center px-2"
                   style={{
                     "grid-column": `${sitio.col * 2 + 1}`,
                     "padding-left":
@@ -7581,8 +7581,8 @@ export default function App() {
         // La tarea nueva (ventana sin pestaña) lleva la misma barra, con lo que aún no tiene apagado;
         // la página de un agente también es una ventana sin pestaña, y no es una tarea.
         return <Show when={(Boolean(task()) || (paneles.activeTabAt(site()) === null && !paginaDeAgente())) && !tapadoPorElProyecto(site())}>
-          <div class="z-20 min-w-0 max-w-full self-start justify-self-end pt-px pr-3" style={estiloDeLaCelda(site())}
-            classList={{ "mt-8": llevaTiraInterior(site()) }} onPointerDown={() => mandarVentana(site())}>
+          <div class="z-20 min-w-0 max-w-full self-start justify-self-end pt-2 pr-3" style={estiloDeLaCelda(site())}
+            classList={{ "mt-[30px]": llevaTiraInterior(site()) }} onPointerDown={() => mandarVentana(site())}>
             {herramientas()}
           </div>
         </Show>;
@@ -7599,7 +7599,7 @@ export default function App() {
           su ventana, como en un terminal: pertenece al panel que va a
           partir, no a una fila compartida donde un botón único no diría
           cuál. Flota sobre la esquina (`self-start justify-self-end`) en
-          vez de ocupar una fila propia de 32 px que separaría las
+          vez de ocupar una fila propia de 30 px que separaría las
           pestañas del texto. */}
 
       {/* El icono son dos columnas y no una flecha: es una forma, no un
@@ -7630,7 +7630,7 @@ export default function App() {
         <For each={ventanas().filter((sitio) => sitio.fila > 0)}>
           {(sitio) => (
             <div
-              class="tab-veil z-30 flex h-8 min-w-0 items-center self-start px-2"
+              class="tab-veil z-30 flex h-[30px] min-w-0 items-center self-start px-2"
               style={estiloDeLaCelda(sitio)}
               // Cómo la encuentra el arrastre: `ventanaBajo` pregunta al
               // documento por estos dos atributos, que es lo que hace que soltar
@@ -7785,7 +7785,7 @@ export default function App() {
             <Show when={usado()}>
               {/* The top padding sits over the task's location row: only the card takes the pointer. */}
               <div class="pointer-events-none z-10 flex min-h-0 min-w-0 justify-self-end pt-9 pr-2 pb-2 *:pointer-events-auto"
-                classList={{ hidden: !visible(), "w-full pl-2": cubre(), "mt-8": llevaTiraInterior(sitio()), "transition-[width] duration-200 ease-out": !moviendoHueco() }}
+                classList={{ hidden: !visible(), "w-full pl-2": cubre(), "mt-[30px]": llevaTiraInterior(sitio()), "transition-[width] duration-200 ease-out": !moviendoHueco() }}
                 style={{ ...placement(), width: ancho() }}
                 onPointerDown={() => { const d = sitio(); if (d) mandarVentana(d); }}>
                 <Suspense fallback={null}>
@@ -7898,7 +7898,7 @@ export default function App() {
             <Show when={usado() && project()}>
               {(proyecto) => (
                 <div class="pointer-events-none z-10 flex min-h-0 min-w-0 justify-self-end pt-9 pr-2 pb-2 *:pointer-events-auto"
-                  classList={{ hidden: !visible(), "w-full pl-2": cubre(), "mt-8": llevaTiraInterior(sitio()), "transition-[width] duration-200 ease-out": !moviendoHueco() }}
+                  classList={{ hidden: !visible(), "w-full pl-2": cubre(), "mt-[30px]": llevaTiraInterior(sitio()), "transition-[width] duration-200 ease-out": !moviendoHueco() }}
                   style={{ ...estiloDeLaCelda(sitio()), width: ancho() }}
                   onPointerDown={() => mandarVentana(sitio())}>
                   <Suspense fallback={null}>
@@ -8293,7 +8293,7 @@ export default function App() {
             <BotonConAtajo
               variant="ghost"
               size="icon"
-              class="size-7 shrink-0 text-neutral-500"
+              class="size-[30px] shrink-0 text-neutral-500"
               onClick={sidebar.alternar}
               aria-pressed={!sidebar.colapsado()}
               aria-label={sidebar.colapsado() ? t("shell.sidebar.show") : t("shell.sidebar.hide")}
@@ -8321,7 +8321,7 @@ export default function App() {
             <BotonConAtajo
               variant="ghost"
               size="icon"
-              class="size-7 shrink-0 text-neutral-500"
+              class="size-[30px] shrink-0 text-neutral-500"
               data-global-search-open=""
               aria-expanded={buscando() !== null}
               aria-label={t("search.open")}
