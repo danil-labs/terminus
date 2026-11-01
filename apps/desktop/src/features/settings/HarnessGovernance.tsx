@@ -31,19 +31,19 @@ type UsageReport = {
 function usageState(state: UsageReport["state"]): string {
   switch (state) {
     case "active":
-      return t("radiant.usage.state.active");
+      return t("harness.usage.state.active");
     case "pending":
-      return t("radiant.usage.state.pending");
+      return t("harness.usage.state.pending");
     case "off":
-      return t("radiant.usage.state.off");
+      return t("harness.usage.state.off");
     case "not_chosen":
-      return t("radiant.usage.state.not_chosen");
+      return t("harness.usage.state.not_chosen");
     default:
-      return t("radiant.usage.state.unsupported");
+      return t("harness.usage.state.unsupported");
   }
 }
 
-/** El reporte de consumo de IA a Radiant de este workspace (`radiant/usage_report.rs`). */
+/** El reporte de consumo de IA a Harness de este workspace (`radiant/usage_report.rs`). */
 function UsageReporting(props: { workspace: string }) {
   const [report, setReport] = createSignal<UsageReport | null>(null);
   const [failure, setFailure] = createSignal<Failure | null>(null);
@@ -79,29 +79,29 @@ function UsageReporting(props: { workspace: string }) {
       {(r) => (
         <div class="grid gap-1">
           <div class="flex items-center justify-between gap-2">
-            <span class="text-sm text-neutral-500">{t("radiant.usage.title")}</span>
+            <span class="text-sm text-neutral-500">{t("harness.usage.title")}</span>
             <Show
               when={r().policy === "optional"}
               fallback={
                 <Show when={r().policy === "required"}>
-                  <Badge forma="dato">{t("radiant.usage.required")}</Badge>
+                  <Badge forma="dato">{t("harness.usage.required")}</Badge>
                 </Show>
               }
             >
-              <Toggle checked={r().opted_in} label={t("radiant.usage.toggle")} onChange={(on) => void choose(on)} />
+              <Toggle checked={r().opted_in} label={t("harness.usage.toggle")} onChange={(on) => void choose(on)} />
             </Show>
           </div>
           <span class="text-sm text-neutral-950">{usageState(r().state)}</span>
-          <span class="text-xs text-neutral-500">{t("radiant.usage.what")}</span>
+          <span class="text-xs text-neutral-500">{t("harness.usage.what")}</span>
           <Show when={r().queued > 0}>
             <div class={ROW}>
-              <span class="text-neutral-500">{t("radiant.usage.queued")}</span>
+              <span class="text-neutral-500">{t("harness.usage.queued")}</span>
               <span class="text-neutral-950">{r().queued}</span>
             </div>
           </Show>
           <Show when={r().quarantined > 0}>
             <div class={ROW}>
-              <span class="text-neutral-500">{t("radiant.usage.quarantined")}</span>
+              <span class="text-neutral-500">{t("harness.usage.quarantined")}</span>
               <span class="text-warning-strong">{r().quarantined}</span>
             </div>
           </Show>
@@ -120,26 +120,26 @@ type McpAgent = { id: string; label: string; recibe: boolean; login: boolean; si
 function connectionStatus(status: string): string {
   switch (status) {
     case "connected":
-      return t("radiant.governance.connection.connected");
+      return t("harness.governance.connection.connected");
     case "not_connected":
-      return t("radiant.governance.connection.not_connected");
+      return t("harness.governance.connection.not_connected");
     case "needs_reauthorization":
-      return t("radiant.governance.connection.needs_reauthorization");
+      return t("harness.governance.connection.needs_reauthorization");
     default:
-      return t("radiant.governance.connection.unknown");
+      return t("harness.governance.connection.unknown");
   }
 }
 
 function tailscaleState(state: Tailscale, tailnet: string): string {
   switch (state.kind) {
     case "missing":
-      return t("radiant.governance.tailscale.state_missing");
+      return t("harness.governance.tailscale.state_missing");
     case "stopped":
-      return t("radiant.governance.tailscale.state_stopped");
+      return t("harness.governance.tailscale.state_stopped");
     default:
       return state.tailnet === tailnet || state.suffix.replace(/\.$/, "") === tailnet
-        ? t("radiant.governance.tailscale.state_on", { tailnet })
-        : t("radiant.governance.tailscale.state_other", { tailnet: state.tailnet || state.suffix });
+        ? t("harness.governance.tailscale.state_on", { tailnet })
+        : t("harness.governance.tailscale.state_other", { tailnet: state.tailnet || state.suffix });
   }
 }
 
@@ -147,7 +147,7 @@ function tailscaleState(state: Tailscale, tailnet: string): string {
  * Gobernar este workspace con el workspace de Radiant elegido, y lo que eso
  * instaló. La desactivación retira lo gestionado (`governed::retire`).
  */
-export default function RadiantGovernance(props: { remote: { id: string; name: string } | null }) {
+export default function HarnessGovernance(props: { remote: { id: string; name: string } | null }) {
   const [busy, setBusy] = createSignal(false);
   const [failure, setFailure] = createSignal<Failure | null>(null);
   const [connections, setConnections] = createSignal<RemoteConnection[] | null>(null);
@@ -257,11 +257,11 @@ export default function RadiantGovernance(props: { remote: { id: string; name: s
   return (
     <div class="grid gap-3 rounded-lg border border-border bg-surface-raised p-4">
       <div class="flex items-center justify-between gap-2">
-        <h3 class="m-0 text-sm font-semibold text-neutral-950">{t("radiant.governance.title")}</h3>
+        <h3 class="m-0 text-sm font-semibold text-neutral-950">{t("harness.governance.title")}</h3>
         <Toggle
           checked={governed() !== null}
           disabled={busy() || (governed() === null && !props.remote)}
-          label={t("radiant.governance.toggle")}
+          label={t("harness.governance.toggle")}
           onChange={toggle}
         />
       </div>
@@ -270,11 +270,11 @@ export default function RadiantGovernance(props: { remote: { id: string; name: s
           when={governed()}
           fallback={
             props.remote
-              ? t("radiant.governance.off", { workspace: props.remote.name })
-              : t("radiant.governance.choose_workspace")
+              ? t("harness.governance.off", { workspace: props.remote.name })
+              : t("harness.governance.choose_workspace")
           }
         >
-          {(g) => t("radiant.governance.on", { workspace: g().workspace_name })}
+          {(g) => t("harness.governance.on", { workspace: g().workspace_name })}
         </Show>
       </span>
 
@@ -288,10 +288,10 @@ export default function RadiantGovernance(props: { remote: { id: string; name: s
         {(g) => (
           <>
             <div class={ROW}>
-              <span class="text-neutral-500">{t("radiant.governance.validity")}</span>
+              <span class="text-neutral-500">{t("harness.governance.validity")}</span>
               <span class="flex items-center gap-2">
                 <Show when={state()?.stale}>
-                  <Badge tone="warning">{t("radiant.governance.stale")}</Badge>
+                  <Badge tone="warning">{t("harness.governance.stale")}</Badge>
                 </Show>
                 <span class="text-neutral-950">{until()}</span>
                 <Button
@@ -300,15 +300,15 @@ export default function RadiantGovernance(props: { remote: { id: string; name: s
                   disabled={busy()}
                   onClick={() => void act(() => invoke<GovernanceStatus>("radiant_govern_refresh"))}
                 >
-                  {t("radiant.governance.refresh")}
+                  {t("harness.governance.refresh")}
                 </Button>
               </span>
             </div>
             <Show when={g().last_error}>
-              <p class="m-0 text-xs text-neutral-500">{t("radiant.governance.kept")}</p>
+              <p class="m-0 text-xs text-neutral-500">{t("harness.governance.kept")}</p>
             </Show>
             <Show when={g().mode === "managed" && g().locked.length > 0}>
-              <p class="m-0 text-xs text-neutral-500">{t("radiant.governance.locked_note")}</p>
+              <p class="m-0 text-xs text-neutral-500">{t("harness.governance.locked_note")}</p>
             </Show>
           </>
         )}
@@ -318,38 +318,38 @@ export default function RadiantGovernance(props: { remote: { id: string; name: s
         {(s) => (
           <div class="grid gap-2">
             <div class={ROW}>
-              <span class="text-neutral-500">{t("radiant.governance.sources")}</span>
+              <span class="text-neutral-500">{t("harness.governance.sources")}</span>
               <span class="text-right text-neutral-950">
                 {s()
                   .sources.map((source) =>
                     source.role === "governance_root"
-                      ? t("radiant.governance.root_source", { name: source.name })
+                      ? t("harness.governance.root_source", { name: source.name })
                       : source.name,
                   )
-                  .join(" · ") || t("radiant.governance.none")}
+                  .join(" · ") || t("harness.governance.none")}
               </span>
             </div>
             <div class={ROW}>
-              <span class="text-neutral-500">{t("radiant.governance.skills")}</span>
-              <span class="text-right text-neutral-950">{s().skills.join(" · ") || t("radiant.governance.none")}</span>
+              <span class="text-neutral-500">{t("harness.governance.skills")}</span>
+              <span class="text-right text-neutral-950">{s().skills.join(" · ") || t("harness.governance.none")}</span>
             </div>
             <div class={ROW}>
-              <span class="text-neutral-500">{t("radiant.governance.agents")}</span>
-              <span class="text-right text-neutral-950">{s().agents.join(" · ") || t("radiant.governance.none")}</span>
+              <span class="text-neutral-500">{t("harness.governance.agents")}</span>
+              <span class="text-right text-neutral-950">{s().agents.join(" · ") || t("harness.governance.none")}</span>
             </div>
             <div class={ROW}>
-              <span class="text-neutral-500">{t("radiant.governance.models")}</span>
+              <span class="text-neutral-500">{t("harness.governance.models")}</span>
               <span class="text-right text-neutral-950">
                 {(s().models.allowed.length > 0 ? s().models.allowed : s().models.providers).join(" · ") ||
-                  t("radiant.governance.none")}
+                  t("harness.governance.none")}
                 <Show when={s().models.default}>
-                  {(d) => <> · {t("radiant.governance.default_model", { model: d() })}</>}
+                  {(d) => <> · {t("harness.governance.default_model", { model: d() })}</>}
                 </Show>
               </span>
             </div>
             <div class="grid gap-1">
-              <span class="text-sm text-neutral-500">{t("radiant.governance.mcp")}</span>
-              <Show when={s().mcp.length > 0} fallback={<span class="text-sm text-neutral-950">{t("radiant.governance.none")}</span>}>
+              <span class="text-sm text-neutral-500">{t("harness.governance.mcp")}</span>
+              <Show when={s().mcp.length > 0} fallback={<span class="text-sm text-neutral-950">{t("harness.governance.none")}</span>}>
                 <ul class="m-0 grid list-none gap-1 p-0">
                   <For each={s().mcp}>
                     {(server) => (
@@ -359,11 +359,11 @@ export default function RadiantGovernance(props: { remote: { id: string; name: s
                           when={server.active}
                           fallback={
                             <span class="text-xs text-warning-strong">
-                              {server.reason ? t(server.reason) : t("radiant.governance.mcp_inactive")}
+                              {server.reason ? t(server.reason) : t("harness.governance.mcp_inactive")}
                             </span>
                           }
                         >
-                          <Badge forma="dato">{t("radiant.governance.mcp_active")}</Badge>
+                          <Badge forma="dato">{t("harness.governance.mcp_active")}</Badge>
                         </Show>
                       </li>
                     )}
@@ -374,7 +374,7 @@ export default function RadiantGovernance(props: { remote: { id: string; name: s
             <Show when={s().tailnet}>
               {(net) => (
                 <div class={ROW}>
-                  <span class="text-neutral-500">{t("radiant.governance.tailscale.title")}</span>
+                  <span class="text-neutral-500">{t("harness.governance.tailscale.title")}</span>
                   <span class="text-right text-neutral-950">{tailscaleState(net().state, net().tailnet)}</span>
                 </div>
               )}
@@ -387,7 +387,7 @@ export default function RadiantGovernance(props: { remote: { id: string; name: s
 
       <Show when={governed() && logins().length > 0}>
         <div class="grid gap-1">
-          <span class="text-sm text-neutral-500">{t("radiant.governance.login.title")}</span>
+          <span class="text-sm text-neutral-500">{t("harness.governance.login.title")}</span>
           <ul class="m-0 grid list-none gap-2 p-0">
             <For each={logins()}>
               {(server) => (
@@ -395,7 +395,7 @@ export default function RadiantGovernance(props: { remote: { id: string; name: s
                   <span class="text-neutral-950">{server.name}</span>
                   <Show
                     when={agents().length > 0}
-                    fallback={<span class="text-xs text-neutral-500">{t("radiant.governance.login.no_agents")}</span>}
+                    fallback={<span class="text-xs text-neutral-500">{t("harness.governance.login.no_agents")}</span>}
                   >
                     <For each={agents()}>
                       {(agent) => (
@@ -403,19 +403,19 @@ export default function RadiantGovernance(props: { remote: { id: string; name: s
                           <span class="text-xs text-neutral-700">{agent.label}</span>
                           <Show
                             when={!server.sesiones.includes(agent.id)}
-                            fallback={<Badge forma="dato">{t("radiant.governance.login.signed_in")}</Badge>}
+                            fallback={<Badge forma="dato">{t("harness.governance.login.signed_in")}</Badge>}
                           >
                             <Show
                               when={agent.login}
                               fallback={
                                 <span class="text-xs text-warning-strong">
-                                  {t("radiant.governance.login.unsupported")}
+                                  {t("harness.governance.login.unsupported")}
                                   <Show when={agent.sin_login}>{(why) => <> · {prosa(why())}</>}</Show>
                                 </span>
                               }
                             >
                               <Button size="compact" variant="secondary" onClick={() => void signIn(agent.id, server.id)}>
-                                {t("radiant.governance.login.sign_in", { agent: agent.label })}
+                                {t("harness.governance.login.sign_in", { agent: agent.label })}
                               </Button>
                             </Show>
                           </Show>
@@ -439,7 +439,7 @@ export default function RadiantGovernance(props: { remote: { id: string; name: s
 
       <Show when={governed() && shownConnections().length > 0}>
         <div class="grid gap-1">
-          <span class="text-sm text-neutral-500">{t("radiant.governance.connections")}</span>
+          <span class="text-sm text-neutral-500">{t("harness.governance.connections")}</span>
           <ul class="m-0 grid list-none gap-1 p-0">
             <For each={shownConnections()}>
               {(c) => (
@@ -449,7 +449,7 @@ export default function RadiantGovernance(props: { remote: { id: string; name: s
                     <span class="text-xs text-neutral-500">{connectionStatus(c.status)}</span>
                     <Show when={c.status !== "connected"}>
                       <Button size="compact" variant="secondary" onClick={() => void connect(c.id)}>
-                        {t("radiant.governance.connect")}
+                        {t("harness.governance.connect")}
                       </Button>
                     </Show>
                   </span>
