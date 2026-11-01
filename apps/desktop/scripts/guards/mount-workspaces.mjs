@@ -94,11 +94,13 @@ assert.deepEqual(columnApp.failures, []);
 const MAC = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)";
 const LONG_NAME = "Software y Servicios Danil, Consultoría de Gobierno de Agentes";
 const singleWorkspace = { workspaces: [{ id: "w", name: LONG_NAME, context_root: null }], active: "w" };
+const estrellas = [];
 const soloApp = await boot("listo", "title-bar-one", { ...TASK_AFTER_QUEUE,
   list_workspaces: () => structuredClone(singleWorkspace),
   workspaces_startup: () => structuredClone(singleWorkspace),
   list_workspace_attention: () => [{ workspace: "w", tasks: [{ session: "s1", project: "", state: "asked" }] }],
   "plugin:window|title": "Terminus · una-rama",
+  site_open_external: (args) => { estrellas.push(args.url); return null; },
 }, MAC);
 await sleep(300);
 const d1 = soloApp.w.document;
@@ -107,6 +109,13 @@ assert.ok(d1.querySelector("[data-workspace-column]"), "con un solo workspace la
 assert.ok(titleBar.classList.contains("pl-[84px]"), "en macOS la franja se aparta del semáforo");
 assert.equal(d1.querySelectorAll(".pl-\\[84px\\]").length, 1, "y ninguna otra cabecera reserva su hueco");
 assert.equal(d1.querySelector("[data-window-branch]"), null, "la franja no nombra la build");
+const estrella = () => titleBar.querySelector("[data-github-star]");
+assert.equal(titleBar.lastElementChild.lastElementChild, estrella(), "la invitación a la estrella cierra la franja por la derecha");
+assert.equal(estrella().querySelector("button").textContent.trim(), "Star en GitHub");
+estrella().querySelector("button").click();
+await sleep(50);
+assert.deepEqual(estrellas, ["https://github.com/danil-labs/terminus"]);
+assert.equal(estrella(), null, "abrir el repositorio retira la invitación");
 assert.ok(d1.querySelector('[data-workspace-column-foot] button[aria-label="Configuración"]'), "Configuración vive al pie de la columna");
 const setupRequests = [];
 soloApp.w.addEventListener("harness:new-workspace", () => setupRequests.push(1));
@@ -142,6 +151,12 @@ await sleep(100);
 assert.equal(d2.querySelector("[data-global-search]"), null, "Escape lo cierra");
 assert.ok(d2.querySelector('[data-title-bar] button[aria-label="Mostrar el historial"]'), "con el riel oculto, el mismo botón de la franja lo trae de vuelta");
 assert.equal(d2.querySelector("[data-window-branch]"), null, "sin título de ventana no se nombra ninguna build");
+const ocultarEstrella = d2.querySelector('[data-title-bar] [data-github-star] button[aria-label="Ocultar invitación"]');
+assert.ok(ocultarEstrella, "la invitación se puede ocultar sin abrir GitHub");
+ocultarEstrella.click();
+await sleep(20);
+assert.equal(d2.querySelector("[data-github-star]"), null, "la X la retira en esta máquina");
+assert.ok(!collapsedApp.commands.includes("site_open_external"));
 d2.querySelector('button[aria-label="Mostrar el historial"]').click();
 await sleep(100);
 assert.ok(d2.querySelector('button[aria-label="Ocultar el historial"]'));
