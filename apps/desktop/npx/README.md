@@ -10,6 +10,11 @@ Es un canal de distribución para desarrolladores —que ya tienen Node— adici
 a los instaladores que se bajan a mano desde [terminus.danil.ai](https://terminus.danil.ai).
 Funciona en Windows, macOS (Apple Silicon e Intel) y Linux x86_64.
 
+Este paquete instala la app; su único bin `danil-terminus` es el
+instalador de escritorio. `danil` y `dn` se configuran por separado; consulta la
+[guía del CLI](../docs/danil-cli.md). El nombre del paquete y las rutas de
+descarga conservan compatibilidad con las instalaciones existentes.
+
 ## Qué hace
 
 1. Detecta tu sistema operativo y arquitectura (`process.platform` / `process.arch`).

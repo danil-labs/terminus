@@ -48,6 +48,15 @@ While the certificate builds reputation, SmartScreen may warn the first time:
 company's Developer ID. The `npx` path also verifies the minisign signature the
 app uses to update itself. Its code is in [`apps/desktop/npx/`](apps/desktop/npx).
 
+## Operational CLI
+
+`danil` is the primary command; `dn` is its official abbreviation. These are
+the only operational command names. The physical desktop executable keeps its
+distribution identity and forwards CLI calls internally. The npm command above
+installs the desktop app; it is not the operational CLI.
+See [CLI installation and compatibility](apps/desktop/docs/danil-cli.md)
+for explicit launcher installation, collision checks and engine dependencies.
+
 ## Build from source
 
 ### Requirements

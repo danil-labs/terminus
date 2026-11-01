@@ -46,6 +46,7 @@ sends).
 | `design-tokens` | `scripts/guards/design-tokens.mjs`, `tests/unit/cn-text-scale.test.ts` | Un tamaño de letra con escalón en `packages/design/src/scale.ts` usa el token, y `cn` lo reconoce como tamaño. Los valores sueltos tienen un techo que solo baja. |
 | `doc-paths` | `scripts/guards/doc-paths.mjs` | Code paths and local links in the documentation exist. Generated files are excluded. |
 | `missing-classes` | `scripts/guards/missing-classes.mjs` | Finds written classes that Tailwind does not generate. |
+| `cli-path` | `tests/unit/cli-path.test.mjs` | Runs the production launcher installer against temporary directories: arguments, pipes, exit code, idempotence, owned removal and PATH collisions (including Windows name variants). Native Windows shell execution requires Windows. |
 | `triggers` | `tests/unit/triggers.test.mjs` | A trigger keeps the handler that opens its panel. |
 | `mount-frontend` | `scripts/guards/mount-frontend.mjs` | Runs `dist/` in jsdom with a simulated IPC and checks that it mounts, with the window's first gestures, panels and tabs. It does not open a native window. |
 | `mount-task-notices` | `scripts/guards/mount-task-notices.mjs` | Same harness: a task's notices and when they repeat. |

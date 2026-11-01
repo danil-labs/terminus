@@ -2,7 +2,8 @@ use std::ffi::OsStr;
 #[cfg(unix)]
 use std::os::unix::process::CommandExt;
 
-// Catálogo de args.rs del motor, más help y kn.
+// Catálogo de args.rs del motor, más help y kn. `computers` y `harness` llegan
+// con el motor de #276; hasta entonces el error es del motor, no abrir la ventana.
 const COMMANDS: &[&str] = &[
     "account",
     "activity",
@@ -10,6 +11,7 @@ const COMMANDS: &[&str] = &[
     "agent-context",
     "auth",
     "chat",
+    "computers",
     "config",
     "context",
     "engine",
@@ -17,6 +19,7 @@ const COMMANDS: &[&str] = &[
     "github",
     "guide",
     "handler",
+    "harness",
     "help",
     "instances",
     "keep-awake",
@@ -37,6 +40,9 @@ const COMMANDS: &[&str] = &[
     "workspace",
 ];
 const GLOBAL_FLAGS: &[&str] = &[
+    "--root",
+    "--engine",
+    "--profile",
     "--workspace",
     "--machine",
     "--folder",
