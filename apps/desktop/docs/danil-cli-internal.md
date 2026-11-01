@@ -35,7 +35,7 @@ El entorno de los procesos nuevos debe filtrar también los nombres antiguos.
 
 **La reconciliación conserva el motor de `dev`, `4e10efc24a9be6f8dbf15559f767a50fb109a0a7`.**
 El contrato, sus extensiones y el manifiesto se conservan byte por byte respecto
-de `dev` (`0ae017913a309de857c40ea5ff6b24aa2a2b4487`). Los launchers
+de `dev` (`35847bb732bcf9c3b74430e0143fbc1d4d33c32c`). Los launchers
 no acreditan por sí solos la interfaz exclusiva `DANIL_*` del motor del PR
 seldon-host #276, que permanece como integración separada. Su adopción requiere
 revisión de contrato y artefactos con manifiesto y checksums para las cuatro
