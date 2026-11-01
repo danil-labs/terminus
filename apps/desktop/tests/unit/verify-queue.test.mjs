@@ -4,7 +4,7 @@
  */
 import assert from "node:assert/strict";
 import { execFileSync, spawn } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { once } from "node:events";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -159,6 +159,7 @@ test("--remote devuelve el exit real y el log entero, y dice qué plataforma no 
   assert.equal(failed.code, 7, failed.output);
   assert.match(failed.output, /paso-visible/);
   assert.match(failed.output, /falló \(exit 7\)/);
+  assert.match(failed.output, /Linux en 127/);
   assert.match(failed.output, /NO se comprobó: una corrida --remote nunca cuenta por ellos/);
 
   commit(repo, "echo segundo");
@@ -250,6 +251,42 @@ test("un host sin puerto llega a la cola por túnel SSH", { skip }, async (t) =>
   const { code, output } = await client(repo, "vm-verify", [], { VERIFY_REMOTE_SSH: fakeSsh(dir, host.split(":")[1]) });
   assert.equal(code, 0, output);
   assert.match(output, /por-tunel/);
+});
+
+test("sin ssh en el PATH lo dice y no intenta encender", { skip }, async (t) => {
+  const { dir, repo } = workspace(t);
+  const aws = join(dir, "aws");
+  writeFileSync(aws, `#!/bin/sh\ntouch ${join(dir, "called")}\n`, { mode: 0o755 });
+  commit(repo, "true");
+  const { code, output } = await client(repo, "vm-verify", [], { VERIFY_REMOTE_SSH: join(dir, "no-existe"), VERIFY_REMOTE_AWS: aws });
+  assert.equal(code, 2);
+  assert.match(output, /No encontré ssh en el PATH/);
+  assert.match(output, /`pnpm verify`/);
+  assert.equal(existsSync(join(dir, "called")), false);
+});
+
+test("sin Tailscale lo dice y no intenta encender", { skip }, async (t) => {
+  const { dir, repo } = workspace(t);
+  const ssh = join(dir, "ssh");
+  const aws = join(dir, "aws");
+  writeFileSync(ssh, "#!/bin/sh\necho 'ssh: Could not resolve hostname vm-verify: No such host is known.' >&2\nexit 255\n", { mode: 0o755 });
+  writeFileSync(aws, `#!/bin/sh\ntouch ${join(dir, "called")}\n`, { mode: 0o755 });
+  commit(repo, "true");
+  const { code, output } = await client(repo, "vm-verify", [], { VERIFY_REMOTE_SSH: ssh, VERIFY_REMOTE_AWS: aws });
+  assert.equal(code, 2);
+  assert.match(output, /Tailscale no está conectado aquí, o esta máquina no tiene acceso/);
+  assert.equal(existsSync(join(dir, "called")), false);
+});
+
+test("el bundle temporal se borra al terminar", { skip }, async (t) => {
+  const { dir, repo, home } = workspace(t);
+  const host = await serve(t, createQueue({ home, config, diskPercent: () => 10 }));
+  commit(repo, "true");
+  const temporary = join(dir, "tmp");
+  mkdirSync(temporary);
+  const { code, output } = await client(repo, host, [], { TMPDIR: temporary });
+  assert.equal(code, 0, output);
+  assert.deepEqual(readdirSync(temporary), []);
 });
 
 test("sin permiso de SSH no intenta encender la máquina", { skip }, async (t) => {

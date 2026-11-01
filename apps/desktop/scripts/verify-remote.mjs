@@ -5,6 +5,8 @@
  * de trabajo, y la corrida sigue en la máquina aunque este proceso muera.
  * La cola escucha en loopback: `VERIFY_REMOTE_HOST=máquina` llega por túnel SSH y
  * `VERIFY_REMOTE_HOST=host:puerto` usa un puerto ya abierto, como un túnel de SSM.
+ * Corre igual en Windows: sin shell, y el commit viaja por HTTP desde un archivo
+ * porque un pipe de PowerShell 5.1 corrompe binarios.
  */
 import { spawn, spawnSync } from "node:child_process";
 import { mkdtempSync, openAsBlob, rmSync } from "node:fs";
@@ -35,6 +37,15 @@ const accessHelp = (host) =>
   `No hay acceso a la cola en ${host}.\n` +
   "  La cola es para el equipo de Danil dentro de su tailnet. Sin ese acceso, verifica en local con `pnpm verify`.\n" +
   `  Con acceso, comprueba Tailscale con \`ssh ${SSH_USER}@${host}\`. Si la máquina está apagada, encenderla pide credenciales de AWS en esta sesión.`;
+
+const noSshHelp =
+  "No encontré ssh en el PATH.\n" +
+  "  En Windows es el cliente de OpenSSH: Configuración > Aplicaciones > Características opcionales.\n" +
+  "  Sin él, verifica en local con `pnpm verify`.";
+
+const noTailnetHelp = (host) =>
+  `No resuelvo ${host}: Tailscale no está conectado aquí, o esta máquina no tiene acceso a la cola.\n` +
+  "  Sin acceso al tailnet del equipo, verifica en local con `pnpm verify`.";
 
 function parse(argv) {
   const options = { noCargo: false, commit: null, attach: null, cancel: null, status: false, detach: false };
@@ -90,22 +101,30 @@ const freePort = () =>
 
 /** Un puerto ya abierto, o un túnel SSH que se reabre si cae: la corrida no depende de él. */
 async function openLink(host) {
-  if (host.includes(":")) return { base: `http://${host}`, up: async () => {}, denied: () => false };
+  if (host.includes(":")) return { base: `http://${host}`, up: async () => {}, problem: () => null };
   const port = await freePort();
   const local = `127.0.0.1:${port}:127.0.0.1:${QUEUE_PORT}`;
   let tunnel = null;
   let errors = "";
+  let missing = false;
   process.once("exit", () => tunnel?.kill());
   return {
     base: `http://127.0.0.1:${port}`,
-    denied: () => /permission denied|not allowed|tailnet policy/i.test(errors),
+    problem() {
+      if (missing) return noSshHelp;
+      if (/could not resolve hostname/i.test(errors)) return noTailnetHelp(host);
+      return /permission denied|not allowed|tailnet policy/i.test(errors) ? accessHelp(host) : null;
+    },
     async up() {
       if (tunnel) return;
       errors = "";
       const child = spawn(process.env.VERIFY_REMOTE_SSH ?? "ssh", ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "-o", "ExitOnForwardFailure=yes", "-o", "StrictHostKeyChecking=accept-new", "-N", "-L", local, `${SSH_USER}@${host}`], { stdio: ["ignore", "ignore", "pipe"], windowsHide: true });
       tunnel = child;
       child.stderr.on("data", (chunk) => { errors += chunk; });
-      child.once("error", () => { tunnel = null; });
+      child.once("error", (error) => {
+        missing = error.code === "ENOENT";
+        tunnel = null;
+      });
       child.once("close", () => { tunnel = null; });
       const deadline = Date.now() + TUNNEL_TIMEOUT_MS;
       while (tunnel === child && Date.now() < deadline) {
@@ -129,7 +148,7 @@ async function connect(link, host) {
   await link.up();
   const first = await health(link.base);
   if (first) return first;
-  if (link.denied()) throw new RemoteError(accessHelp(host));
+  if (link.problem()) throw new RemoteError(link.problem());
   console.log(`  La cola no responde en ${host}; intento encender la máquina.`);
   if (!wake()) throw new RemoteError(accessHelp(host));
   const deadline = Date.now() + WAKE_TIMEOUT_MS;
@@ -142,16 +161,21 @@ async function connect(link, host) {
   throw new RemoteError(accessHelp(host));
 }
 
+const removeBundle = (dir) => rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
+
 async function bundleFor(commit, known) {
   const dir = mkdtempSync(join(tmpdir(), "verify-remote-"));
   const file = join(dir, "commit.bundle");
   const ref = `refs/verify-remote/${commit}-${process.pid}`;
-  git(["update-ref", ref, commit]);
   try {
+    git(["update-ref", ref, commit]);
     git(["bundle", "create", "-q", file, ref, ...known.filter(hasCommit).map((sha) => `^${sha}`)]);
-    return { body: await openAsBlob(file), done: () => rmSync(dir, { recursive: true, force: true }) };
+    return { body: await openAsBlob(file), done: () => removeBundle(dir) };
+  } catch (error) {
+    removeBundle(dir);
+    throw error;
   } finally {
-    git(["update-ref", "-d", ref]);
+    spawnSync("git", ["update-ref", "-d", ref], { timeout: COMMAND_TIMEOUT_MS, windowsHide: true });
   }
 }
 

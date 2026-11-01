@@ -47,6 +47,13 @@ the native window or a real ZCode account.
 and needs access to Danil's tailnet (`ssh verify@vm-verify` must work). Without
 it the command says so; use `pnpm verify`. It never counts for macOS or Windows.
 
+Access: `alberto`, `alejandro`, `mauricio`, `roberto`, `cit`, and the machines
+`tag:vm-alberto`, `tag:vm-alejandro` and `tag:vm-mauricio`.
+
+The client needs only Node, git, `ssh` on the PATH and Tailscale, so it runs the
+same from PowerShell or cmd on Windows (`ssh.exe` is the OpenSSH Client optional
+feature). What runs is still Linux: a run launched from Windows verifies Linux.
+
 ```sh
 pnpm verify --remote                   # HEAD; refuses uncommitted changes
 pnpm verify --remote --no-cargo        # the chain without Rust
