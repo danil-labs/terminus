@@ -53,7 +53,8 @@ a 0.47 px o menos con prepend y append concurrentes, sin remontar el nodo.
 Ventana WebKitGTK en Linux, QA con motor `58a9f7d`: primer mensaje en 31-34 s en
 tarea activa, la base no llega en 120 s; selección, foco, contenido largo, visual
 expandido y lectura guardada pasan sobre `08f2732e`. Un motor congelado se
-comporta igual que la base. Sin comprobar: Expo nativo, lector de pantalla,
+comporta igual que la base. Web de escritorio con relay simulado y web de teléfono
+en Chromium móvil pasan, hasta 1,500 turnos y más de 2 MiB en el teléfono. Sin comprobar: Expo nativo, lector de pantalla,
 Windows y macOS, y cambio de pestaña o panel con carga en vuelo.
 
 ## Límites conocidos
