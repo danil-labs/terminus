@@ -1082,9 +1082,12 @@
 
 /* Secciones de la tarjeta: el contenido se recorta dentro de su sección;
    omitir una sección por agrupación elimina también su ancho. */
-.task-card-lines { container-type: inline-size; width: 100%; min-width: 0; --task-card-surface: var(--color-rail); }
+.task-card-lines { container-type: inline-size; width: 100%; min-width: 0; --task-card-surface: var(--color-rail); --task-card-fade: var(--color-neutral-100); }
 .task-card-lines[data-outside] { --task-card-surface: var(--color-surface); }
-.task-card-selected .task-card-lines { --task-card-surface: var(--color-neutral-200); }
+.task-card-selected .task-card-lines { --task-card-surface: var(--color-neutral-200); --task-card-fade: var(--color-neutral-200); }
+/* Con el menú a la vista, la derecha de la tarjeta se funde con su fondo. */
+.task-card-with-menu::after { content: ""; position: absolute; top: -7px; right: -8px; bottom: -7px; z-index: 1; width: 120px; border-radius: 0 9px 9px 0; background: linear-gradient(to right, transparent, var(--task-card-fade) 50%); opacity: 0; pointer-events: none; }
+.group\/session:hover .task-card-with-menu::after, .group\/session:focus-within .task-card-with-menu::after, .task-card-with-menu[data-menu-open]::after { opacity: 1; }
 .task-card-metadata { display: grid; grid-template-columns: 16px minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.3fr) 36px; min-width: 0; align-items: center; gap: 6px; height: 16px; }
 .task-card-metadata[data-no-folder], .task-card-metadata[data-no-machine] { grid-template-columns: 16px minmax(0, 1fr) minmax(0, 1.3fr) 36px; }
 .task-card-metadata[data-no-folder][data-no-machine] { grid-template-columns: 16px minmax(0, 1fr) 36px; }

@@ -682,12 +682,12 @@ export default function Sessions(props: {
       const appearance = gitAppearance(git());
       return git().stale ? { ...appearance, color: "text-neutral-500" } : appearance;
     };
-    return <div class="task-card-lines" data-outside={!tarjetaDelRiel() || undefined}>
+    return <div class={cn("task-card-lines", r.conMenu && "task-card-with-menu")} data-menu-open={abierto() ? "" : undefined} data-outside={!tarjetaDelRiel() || undefined}>
       <div class="relative flex h-[22px] min-w-0 items-center gap-1.5">
         <div class="min-w-0 flex-1">{r.titulo}</div>
         <Show when={!tarjetaDelRiel()}><EtapaDeTarea etapa={r.s.stage} /></Show>
         <Show when={r.conMenu}><span data-session-actions class={cn("absolute top-1/2 right-0 z-10 hidden -translate-y-1/2 group-hover/session:inline-flex group-focus-within/session:inline-flex", abierto() && "inline-flex")} data-abierto={abierto() ? "true" : undefined}>{r.menu()}</span></Show>
-        <span data-session-status class={cn("inline-flex size-6 shrink-0 items-center justify-center transition-opacity", r.conMenu && "group-hover/session:opacity-30 group-focus-within/session:opacity-30", abierto() && "opacity-30")}>
+        <span data-session-status class="inline-flex size-6 shrink-0 items-center justify-center">
           <EstadoDeTarea {...r.actividad}
             identity={() => <Show when={activeAgent()}>{agent => <span data-session-agent><AstroAvatar name={agent()} status={working() ? "working" : "awake"} body={profiles()[agent()]?.body} avatar={profiles()[agent()]?.avatar} size={18} /></span>}</Show>}
             identityLabel={activeAgent() ? nombre(activeAgent()!) : undefined}
@@ -717,7 +717,7 @@ export default function Sessions(props: {
             <span class="task-card-rocket">{r.cohete()}</span>
           </span>
         </span>
-        <span data-session-time class={cn("task-card-time text-[0.71875rem] tabular-nums transition-opacity", r.conMenu && "group-hover/session:opacity-30 group-focus-within/session:opacity-30", abierto() && "opacity-30")}>{shortTaskTime(cuando())}</span>
+        <span data-session-time class="task-card-time text-[0.71875rem] tabular-nums">{shortTaskTime(cuando())}</span>
       </div>
     </div>;
   };
