@@ -71,14 +71,24 @@ export async function pushState(): Promise<PushState> {
   return { supported: true, needsInstall: needsInstall(), blocked: Notification.permission === "denied", on: Boolean(await current().catch(() => null)) };
 }
 
+/** El paso que falló y lo que dijo el navegador, p. ej. `subscribe: AbortError: …`; staging lo muestra en la fila. */
+async function step<T>(name: string, action: () => Promise<T>): Promise<T> {
+  try {
+    return await action();
+  } catch (err) {
+    const detail = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+    throw new Error(`${name}: ${detail}`.slice(0, 200));
+  }
+}
+
 /** Pide permiso con el toque de la persona; iOS lo exige. */
 export async function enablePush(getToken: () => Promise<string>): Promise<void> {
   if ((await Notification.requestPermission()) !== "granted") throw new Error("push_denied");
   const key = await pushPublicKey(COMPUTERS);
   if (!key) throw new Error("push_disabled");
-  const found = await registration();
-  const subscription = (await found.pushManager.getSubscription()) ?? (await found.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(key) }));
-  await save(getToken, subscription);
+  const found = await step("register", registration);
+  const subscription = await step("subscribe", async () => (await found.pushManager.getSubscription()) ?? (await found.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(key) })));
+  await step("save", () => save(getToken, subscription));
 }
 
 /** Antes de cerrar sesión: después ya no hay token para borrar la fila. */
