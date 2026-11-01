@@ -23,8 +23,9 @@ export function toggleMaximizeFromHeader(event: MouseEvent) {
 // Su posición no se puede consultar; hay que volver a medir si macOS la cambia.
 export const TRAFFIC_LIGHT_PADDING = "pl-[84px]";
 
-// Una fila de 32 px alinea sus controles con el centro del semáforo, y=15,75 pt.
-export const HEADER_HEIGHT = "h-8";
+// La caja de «Nueva tarea» mide 30 px. La franja usa la misma: el semáforo
+// queda a 1 px de su centro (y=15,75 pt) y los controles llenan la fila.
+export const HEADER_HEIGHT = "h-[30px]";
 
 export const needsTrafficLightPadding = (
   ownsCorner: () => boolean,

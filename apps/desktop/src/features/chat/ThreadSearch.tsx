@@ -214,10 +214,10 @@ export function ThreadSearch(props: {
       <div class="flex shrink-0 items-center gap-1.5">
         {props.leadingTools}
         {/* `aria-disabled` y no `disabled`: el botón apagado no recibe el puntero y perdería el porqué. */}
-        <Button variant="chrome" size="iconCompact" class="size-6 text-neutral-500 aria-disabled:cursor-default aria-disabled:opacity-60 aria-disabled:hover:bg-transparent"
+        <Button variant="chrome" size="iconCompact" class="size-[30px] text-neutral-500 aria-disabled:cursor-default aria-disabled:opacity-60 aria-disabled:hover:bg-transparent"
           onClick={() => { if (!props.disabled) show(); }} aria-disabled={props.disabled || undefined}
           title={props.disabled ? t("chat.search.unavailable") : t("chat.search.open", { key: textoDeAtajo("findInTask") })} aria-label={t("chat.search.label")}
-          aria-keyshortcuts={ariaDeAtajo("findInTask")} aria-expanded={open()}><Search size={13} /></Button>
+          aria-keyshortcuts={ariaDeAtajo("findInTask")} aria-expanded={open()}><Search size={14} /></Button>
         {props.tools}
       </div>
     </div>
