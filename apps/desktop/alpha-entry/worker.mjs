@@ -1,6 +1,7 @@
 // Entrada de alfa-app.danil.ai (o del host de ENTRY_HOST, como la web de staging): sirve Terminus
 // web (TERMINUS_WEB) en la raíz, la entrada con WorkOS (session.mjs) y, en /alpha-api, una lista cerrada del BFF de appv2 (APPV2_BFF).
-// Lecturas GET: /auth/profile, /auth/emails, /auth/account/support-access, /api/channels, el
+// Lecturas GET: /auth/profile, /auth/emails, /auth/account/support-access,
+// /auth/organization/workspaces, /api/channels, el
 // inbox y los agentes y conexiones de atención de Configuración, con query acotada.
 // Las escrituras usan Origin exacto, Bearer personal y cuerpos JSON reconstruidos y acotados.
 // La autorización de respuestas se revalida en el BFF sobre la cuenta y canal de la conversación.
@@ -299,6 +300,7 @@ export default {
         path === "/api/inbox/conversations" ? "list" :
         path === "/api/channels" ? "channels" :
         path === "/auth/account/support-access" ? "support" :
+        path === "/auth/organization/workspaces" ? "support" :
         SERVICE_READS.includes(path) || SERVICE_AGENT.test(path) ? "service" :
         path === "/auth/account/my-permissions" ? "support" :
         /^\/api\/inbox\/conversations\/[1-9]\d*\/messages$/.test(path) ? "messages" : null;

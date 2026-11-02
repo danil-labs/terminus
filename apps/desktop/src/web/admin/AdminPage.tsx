@@ -129,7 +129,9 @@ export function AdminPage(props: { source: AdminSource }) {
       ...(s.members ? (["members"] as const) : []),
       ...(s.shared ? (["skills", "mcp", "agents"] as const) : []),
       ...(s.rules && s.policy ? (["rules"] as const) : []),
-      ...(s.organization?.workspaces ? (["workspaces"] as const) : []),
+      // Sin organización conocida (BFF sin el dato, o workspace personal) no hay lista que pedir.
+      // Decide el id, no el nombre: una organización sin nombre sigue existiendo.
+      ...(s.organization?.workspaces && current()?.organizationId ? (["workspaces"] as const) : []),
       ...(s.organization?.plan ? (["plan"] as const) : []),
       ...(s.organization?.identity?.length ? (["identity"] as const) : []),
     ]);
@@ -310,7 +312,9 @@ function Body(props: { section: Section | undefined; workspace: Membership; sour
             )}
           </Show>
         </Match>
-        <Match when={props.section === "workspaces" && props.source.organization?.workspaces}>{(rows) => <OrganizationWorkspaces source={rows()} />}</Match>
+        <Match when={props.section === "workspaces" && props.source.organization?.workspaces}>
+          {(rows) => <OrganizationWorkspaces source={rows()} account={props.workspace.id} organization={props.workspace.organization} />}
+        </Match>
         <Match when={props.section === "plan" && props.source.organization?.plan}>{(plan) => <Plan source={plan()} />}</Match>
         <Match when={props.section === "identity" && props.source.organization?.identity}>{(rows) => <Identity rows={rows()} />}</Match>
       </Switch>

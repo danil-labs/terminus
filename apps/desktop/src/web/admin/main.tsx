@@ -28,6 +28,8 @@ export async function startAdmin(settings: { login: string; supabaseUrl: string;
     active: async () => activeAccountOf(await session.getToken()),
     support: { demo: false, workspaces: api.workspaces, list: api.list },
     auditLog: webAuditLog(settings.supabaseUrl, settings.supabaseKey, () => session.getToken(), () => void session.unauthorized()),
+    // La organización y sus workspaces salen del BFF; si no manda la organización, la sección no aparece.
+    organization: { workspaces: api.organizationWorkspaces },
     workspace: new URLSearchParams(window.location.search).get("workspace"),
     home: home(),
     settings: `${home()}?settings=usage`,
