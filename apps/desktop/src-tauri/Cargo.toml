@@ -60,6 +60,10 @@ tauri-plugin-process = "2.3.1"
 tauri-plugin-notification = "2"
 tauri-plugin-clipboard-manager = "2.3.3"
 ureq = { version = "3.2", features = ["json"] }
+# La sesión de persona de Atención vive en el llavero del sistema (docs/desktop-bff-session.md).
+keyring = { version = "3.6", features = ["apple-native", "windows-native", "sync-secret-service", "crypto-rust"] }
+base64 = "0.22"
+getrandom = "0.3"
 # La vista en vivo de Typst arranca Tinymist en una carpeta de trabajo vacía.
 tempfile = "3"
 terminus-engine-client = { path = "crates/engine-client" }

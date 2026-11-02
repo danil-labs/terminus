@@ -9,7 +9,7 @@ import { SettingsPanel, SettingsRow, SettingsSection } from '../../features/sett
 import { t } from '../../lib/i18n';
 import { Badge } from '../../ui/Badge';
 import { Button } from '../../ui/Button';
-import { activeAccountOf } from '../audit-log';
+import { bffTransport } from './transport';
 
 const Channels = lazy(() => import('./Channels').then(module => ({ default: module.Channels })));
 
@@ -21,11 +21,11 @@ type Session = InboxSession & { subscribe?: (clear: () => void) => () => void };
 export type CustomerProps = { demo: boolean; session?: Session; load: () => Promise<ServiceSource | null>; workspace: () => string | null };
 
 export function liveService(session: InboxSession): ServiceSource {
-  const prefix = `${import.meta.env.BASE_URL}alpha-api`;
-  const support = createSupportAccess(session, fetch, prefix);
+  const bff = bffTransport();
+  const support = createSupportAccess(session, bff.request, bff.prefix);
   return {
-    ...createService(session, fetch, prefix),
-    resolves: async workspace => !!await resolveWorkspaceAccount(workspace, { accounts: support.memberships, active: async () => activeAccountOf(await session.getToken()) }),
+    ...createService(session, bff.request, bff.prefix),
+    resolves: async workspace => !!await resolveWorkspaceAccount(workspace, { accounts: support.memberships, active: () => bff.active(session) }),
   };
 }
 
