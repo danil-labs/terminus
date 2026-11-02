@@ -12,8 +12,9 @@ export type SupportWorkspace = { id: number; name: string };
 /**
  * Un workspace de Danil al que la persona entra como miembro, con su rol; organización y plan solo si el BFF los manda.
  * `personal` es `true` solo cuando el BFF dice que no tiene organización (`organization: null`); si no manda el campo, no se sabe.
+ * `organizationId` existe cuando el BFF manda la organización: decide por él, no por el nombre, que puede venir vacío.
  */
-export type Membership = SupportWorkspace & { role: string; organization: string | null; plan: string | null; personal?: boolean };
+export type Membership = SupportWorkspace & { role: string; organization: string | null; plan: string | null; personal?: boolean; organizationId?: number };
 /** Un workspace de la organización, visto desde el Harness: nombre y número de miembros, nunca la entrada. */
 export type OrganizationWorkspace = { id: number; name: string; members: number };
 
@@ -31,6 +32,11 @@ const text = (value: unknown): string => {
 };
 const nullable = (value: unknown): string | null => value === null || value === undefined ? null : text(value);
 const STATUSES: readonly string[] = ['active', 'expired', 'revoked'];
+/** El id de la organización que manda el BFF, si es un entero positivo. */
+const organizationIdOf = (value: unknown): number | undefined => {
+  const raw = value && typeof value === 'object' ? (value as Record<string, unknown>).id : undefined;
+  return typeof raw === 'number' && Number.isSafeInteger(raw) && raw > 0 ? raw : undefined;
+};
 /** Quién puede ver y revocar lo decide el BFF (`members.manage`); aquí solo se listan los workspaces donde la persona es owner o admin. */
 const MANAGERS: readonly string[] = ['owner', 'admin'];
 export const isManager = (role: string) => MANAGERS.includes(role);
@@ -70,6 +76,7 @@ export function createSupportAccess(session: InboxSession, request: typeof fetch
         organization: typeof organization === 'string' && organization ? organization : null,
         plan: typeof row.plan === 'string' && row.plan ? row.plan : null,
         ...(Object.hasOwn(row, 'organization') && row.organization === null ? { personal: true } : {}),
+        ...(organizationIdOf(row.organization) ? { organizationId: organizationIdOf(row.organization) } : {}),
       }];
     });
   }

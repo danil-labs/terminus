@@ -130,7 +130,8 @@ export function AdminPage(props: { source: AdminSource }) {
       ...(s.shared ? (["skills", "mcp", "agents"] as const) : []),
       ...(s.rules && s.policy ? (["rules"] as const) : []),
       // Sin organización conocida (BFF sin el dato, o workspace personal) no hay lista que pedir.
-      ...(s.organization?.workspaces && current()?.organization ? (["workspaces"] as const) : []),
+      // Decide el id, no el nombre: una organización sin nombre sigue existiendo.
+      ...(s.organization?.workspaces && current()?.organizationId ? (["workspaces"] as const) : []),
       ...(s.organization?.plan ? (["plan"] as const) : []),
       ...(s.organization?.identity?.length ? (["identity"] as const) : []),
     ]);

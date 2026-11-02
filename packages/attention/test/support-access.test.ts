@@ -87,7 +87,7 @@ test('only an explicit organization: null marks a workspace personal; a missing 
     { id: 45, name: 'Antiguo', role: 'owner' },
   ] } }));
   assert.deepEqual(await api.memberships(), [
-    { id: 476, name: 'Danil Workspace', role: 'owner', organization: 'Danil', plan: null },
+    { id: 476, name: 'Danil Workspace', role: 'owner', organization: 'Danil', plan: null, organizationId: 189 },
     { id: 600, name: 'Mío', role: 'owner', organization: null, plan: null, personal: true },
     { id: 45, name: 'Antiguo', role: 'owner', organization: null, plan: null },
   ]);
@@ -106,4 +106,13 @@ test('organization workspaces is one read scoped to the workspace, with names an
   const broken = createSupportAccess(session(), async () => Response.json({ organization: { id: 1, name: 'X' }, workspaces: [{ id: 1, name: 'A', members: -1 }] }));
   await assert.rejects(broken.organizationWorkspaces(1), /invalid_response/);
   await assert.rejects(api.organizationWorkspaces(0), /invalid_response/);
+});
+
+test('an organization without a name still counts as an organization', async () => {
+  const api = createSupportAccess(session(), async () => Response.json({ user: { accounts: [
+    { id: 476, name: 'Danil Workspace', role: 'owner', organization: { id: 189, name: '' } },
+  ] } }));
+  assert.deepEqual(await api.memberships(), [
+    { id: 476, name: 'Danil Workspace', role: 'owner', organization: null, plan: null, organizationId: 189 },
+  ]);
 });
