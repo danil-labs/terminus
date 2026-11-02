@@ -102,6 +102,14 @@ const MODELS = {
   ],
 };
 const IMAGE_MIMES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
+const DOCUMENT_MIMES = new Set([
+  "application/pdf", "text/plain", "text/markdown", "text/csv", "application/json",
+  "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-powerpoint", "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "application/vnd.oasis.opendocument.text", "application/vnd.oasis.opendocument.spreadsheet",
+  "application/vnd.oasis.opendocument.presentation", "application/rtf",
+]);
 const IMAGE_CAP = 25 * 1024 * 1024;
 
 /** El inicio de sesión por tubería: Codex da enlace y código a comparar y termina solo; Claude pide pegar el código. */
@@ -477,6 +485,16 @@ function invoke(m, command, args) {
       if (!bytes.length) throw { code: "command_failed", detail: "chat.attachments.paste_empty" };
       if (bytes.length > IMAGE_CAP) throw { code: "command_failed", detail: "chat.attachments.paste_too_large" };
       const path = `/tmp/captura-${randomUUID().slice(0, 6)}.${args.mime.split("/")[1]}`;
+      e.files.add(path);
+      return path;
+    }
+    case "guardar_adjunto": {
+      if (!IMAGE_MIMES.has(args.mime) && !DOCUMENT_MIMES.has(args.mime)) throw { code: "command_failed", detail: "chat.attachments.paste_unsupported_format" };
+      const bytes = Buffer.from(String(args.datos ?? ""), "base64");
+      if (!bytes.length) throw { code: "command_failed", detail: "chat.attachments.paste_empty" };
+      if (bytes.length > IMAGE_CAP) throw { code: "command_failed", detail: "chat.attachments.paste_too_large" };
+      const name = String(args.nombre ?? "").replace(/[^\p{L}\p{N}._-]+/gu, "-").replace(/^[._-]+|[._-]+$/g, "") || "adjunto";
+      const path = `/tmp/adjunto-${randomUUID().slice(0, 6)}-${name.includes(".") ? name : `${name}.${args.mime.split("/")[1]}`}`;
       e.files.add(path);
       return path;
     }

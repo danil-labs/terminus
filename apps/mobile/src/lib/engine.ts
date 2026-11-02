@@ -44,7 +44,18 @@ import { type HistoryRead } from "@terminus/chat/history";
 import { readDetailText } from "@terminus/chat/historyDetail";
 import { readVisualHtml, type VisualPart, type VisualWhole, VISUAL_FILE, VISUAL_TREE } from "@terminus/chat/visual";
 import { arrangeSpaces, spaceOrder, type AccountWorkspace, groupWorkspaces, linkedAttention, onlyLinked, registryProjects, withRegistry } from "@terminus/computers";
-import { type ChatBackgroundView, chatBackgroundImageUrl, chatBackgroundView, isSingleAttention } from "@terminus/protocol";
+import {
+  ATTACHMENT_MIMES,
+  COMMAND_UNSUPPORTED,
+  IMAGE_MIMES,
+  MAX_UPLOAD_BYTES,
+  type ChatBackgroundView,
+  chatBackgroundImageUrl,
+  chatBackgroundView,
+  isImageMime,
+  isSingleAttention,
+  isUnknownCommand,
+} from "@terminus/protocol";
 import type { TaskActivity } from "@terminus/design";
 import { type FlatRow, flattenTasks, launcherOf, REMOTE_CHILD_FEATURE, type RemoteScope, remoteLauncherOf } from "@terminus/tasks";
 import { AUTO_MODE } from "./composer.ts";
@@ -778,19 +789,35 @@ export function stopShell(host: Host, workspace: string, session: string) {
 }
 
 /**
- * Una imagen del teléfono a la máquina, por el camino de pegar una imagen en
- * la ventana: viaja en base64 (`guardar_imagen_pegada`) y queda como adjunto
- * del workspace (`prepare_attachments`). Devuelve la ruta para `attachments`.
- * El motor solo guarda así PNG, JPEG, WebP y GIF de hasta 25 MiB, y el socket
- * corta en 16 MiB por mensaje: el teléfono no sube otros archivos ni imágenes
- * de más de `MAX_ATTACHMENT_BYTES`.
+ * Un archivo del teléfono a la máquina: viaja en base64 (`guardar_adjunto`) y
+ * queda como adjunto del workspace (`prepare_attachments`). Devuelve la ruta
+ * para `attachments`. Con un motor anterior, el documento no cabe: las
+ * imágenes siguen por `guardar_imagen_pegada`, y el resto se rechaza. El
+ * socket corta en 16 MiB por mensaje: `MAX_ATTACHMENT_BYTES` deja margen.
  */
-export const ATTACHMENT_MIMES: ReadonlySet<string> = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
-/** 16 MiB de mensaje en base64 son unos 12 MB de imagen. */
-export const MAX_ATTACHMENT_BYTES = 11 * 1024 * 1024;
+export { ATTACHMENT_MIMES, IMAGE_MIMES };
+/** 16 MiB de mensaje en base64 son unos 11 MB de archivo. */
+export const MAX_ATTACHMENT_BYTES = MAX_UPLOAD_BYTES;
 
-export async function uploadAttachment(host: Host, workspace: string, folder: string, file: { mime: string; base64: string }): Promise<string> {
-  const saved = await host.call<string>("guardar_imagen_pegada", workspace, { mime: file.mime, datos: file.base64 });
+export async function uploadAttachment(
+  host: Host,
+  workspace: string,
+  folder: string,
+  file: { mime: string; base64: string; name?: string },
+): Promise<string> {
+  const saved = await (async () => {
+    try {
+      return await host.call<string>("guardar_adjunto", workspace, {
+        mime: file.mime,
+        nombre: file.name ?? null,
+        datos: file.base64,
+      });
+    } catch (error) {
+      if (!isUnknownCommand(error)) throw error;
+      if (!isImageMime(file.mime)) throw new HostError(COMMAND_UNSUPPORTED, "guardar_adjunto");
+      return host.call<string>("guardar_imagen_pegada", workspace, { mime: file.mime, datos: file.base64 });
+    }
+  })();
   if (typeof saved.value !== "string" || !saved.value) throw new HostError("operation_failed");
   const prepared = await host.call<string[]>("prepare_attachments", workspace, { project: folder, paths: [saved.value] });
   const path = Array.isArray(prepared.value) ? prepared.value[0] : null;

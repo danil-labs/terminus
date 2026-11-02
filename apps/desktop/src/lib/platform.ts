@@ -92,7 +92,7 @@ export type Capabilities = {
   machineOnCreate?: (workspace: string | null) => JSX.Element;
   /** La máquina donde se crea ahora un proyecto nuevo, si no es la de la ventana; `lead`, si sus spaces son los del panel. */
   remoteCreate?: (workspace: string | null) => { machine: string; lead: boolean } | null;
-  /** Los adjuntos salen del navegador como bytes: el motor solo guarda imágenes (`guardar_imagen_pegada`). */
+  /** Los adjuntos salen del navegador como bytes: los guarda el motor (`guardar_adjunto`). */
   browserFiles?: boolean;
   /** Transporte para intentar ver la pantalla; `null` si la máquina no pertenece a esta cuenta. La captura la decide el motor. */
   machineScreen?: (machine: string) => (() => Promise<WebSocket>) | null;

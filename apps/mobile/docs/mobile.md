@@ -222,7 +222,7 @@ lleva su comentario allí:
 | Para qué | Lecturas | Acciones |
 |---|---|---|
 | Vista previa y finalizar | `task_blockers` | `set_session_pinned`, `rename_session`, `set_task_archived`, `finish_task`, `delete_session` |
-| Cuadro de escribir | `list_models`, `list_permission_modes`, `list_slash_menu`, `list_mentions`, `project_base_branches` | `run_shell_command`, `stop_shell_command`, `guardar_imagen_pegada`, `prepare_attachments`, `set_permission_mode` (cambiar el modo del turno en marcha; a automático aprueba lo pendiente) |
+| Cuadro de escribir | `list_models`, `list_permission_modes`, `list_slash_menu`, `list_mentions`, `project_base_branches` | `run_shell_command`, `stop_shell_command`, `guardar_adjunto`, `guardar_imagen_pegada` (motores anteriores), `prepare_attachments`, `set_permission_mode` (cambiar el modo del turno en marcha; a automático aprueba lo pendiente) |
 | Almacenamiento por máquina (en Consumos) | `list_workspaces` sin workspace para capacidad; `list_storage` al abrir el detalle del workspace | — |
 | Reloj del turno en curso | `list_live_turns` | — |
 | Identidad de agentes | `list_agent_profiles`, `preview_file` | — |
@@ -291,11 +291,12 @@ en otra máquina lleva su trabajo sin subir con `@terminus/carry`
 trabajo de vuelta. `work_import` y `work_cancel` son intenciones del relay; las
 partes no. Sin comprobar en el simulador.
 
-**Adjuntos.** El único camino del motor para un archivo que viene de otro
-cliente es el de pegar una imagen (`guardar_imagen_pegada`, en base64): solo
-PNG, JPEG, WebP y GIF, hasta 25 MiB, y el socket corta en 16 MiB por mensaje.
-El teléfono adjunta fotos y archivos de imagen de hasta 11 MB; un PDF u otro
-archivo no viaja por el relay (haría falta un comando del motor para eso).
+**Adjuntos.** El camino del motor para un archivo que viene de otro cliente es
+`guardar_adjunto` (en base64): imágenes PNG, JPEG, WebP y GIF y documentos PDF,
+texto, Office y OpenDocument, con el nombre original y un tope de 25 MiB. El
+socket corta en 16 MiB por mensaje, así que el teléfono se queda en 11 MB. Un
+motor anterior no anuncia `attachment_documents_v1` y el teléfono solo le manda
+imágenes por `guardar_imagen_pegada`.
 
 **Inicio de sesión sin pantalla** (#67 del motor): `add_account` deja la
 cuenta vacía y `login_account` con modo `tuberia` arranca el CLI; los eventos

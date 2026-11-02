@@ -1,4 +1,5 @@
 import type { HistoryRef } from "@terminus/protocol";
+import type { Preview } from "../artifacts/Preview";
 import { HistoryDetails } from "./HistoryDetails";
 import type { InvokeOptions } from "@tauri-apps/api/core";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
@@ -654,7 +655,11 @@ export type ChatProps = {
    * solo necesita una imagen. `null` si no es imagen o no cabe (`preview::MINIATURA_MAX`).
    */
   onMiniatura: (rel: string) => Promise<string | null>;
-  onPegarImagen: (mime: string, datos: string) => Promise<string>;
+  /** El archivo entero, para abrir un PDF o un texto sin salir de la ventana. */
+  onPreview: (rel: string) => Promise<Preview | null>;
+  onPegarImagen: (mime: string, datos: string, nombre?: string) => Promise<string>;
+  /** La máquina del turno acepta documentos además de imágenes. */
+  aceptaDocumentos: () => boolean;
   /**
    * Hay una pregunta del agente sin contestar. Cierra la caja a propósito:
    * el agente se quedó esperando en vez de elegir por su cuenta, y seguir
@@ -1470,6 +1475,7 @@ export default function Chat(props: ChatProps) {
   /** En la web: el archivo viaja como bytes y el motor lo guarda en su máquina (`browserFiles.ts`). */
   const enNavegador = (m: typeof import("./browserFiles")) => m.adjuntador({
     puede: () => !props.soloLectura && puedeAdjuntar(),
+    documentos: props.aceptaDocumentos,
     marcar: setSoltando,
     conversacion: () => props.conversacion,
     pegar: props.onPegarImagen,
@@ -2408,7 +2414,7 @@ export default function Chat(props: ChatProps) {
             <For each={props.adjuntos}>
               {(p) => (
                 <div class="group relative shrink-0">
-                  <Adjunto rel={p} miniatura={props.onMiniatura} />
+                  <Adjunto rel={p} miniatura={props.onMiniatura} preview={props.onPreview} />
                   {/* Dentro de la esquina: fuera de ella, el scroll horizontal la recorta. */}
                   <button
                     type="button"
@@ -3160,6 +3166,7 @@ export default function Chat(props: ChatProps) {
                           <Adjuntos
                             rels={m().attachments!}
                             miniatura={props.onMiniatura}
+                            preview={props.onPreview}
                           />
                         </Show>
                         {/* Lo que se mencionó se sigue viendo como referencia
