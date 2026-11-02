@@ -19,6 +19,18 @@ test("cada nombre conocido tiene su clave de alias", () => {
   for (const id of Object.keys(TOOL_LABELS)) assert.equal(toolMarkId(id), id, `${id} no se resuelve a sí mismo`);
 });
 
+test("la marca con variante oscura trae los mismos trazos y tintas propias", () => {
+  const danil = TOOL_MARKS.danil;
+  assert.ok(danil.dark, "Danil no tiene variante oscura");
+  assert.equal(danil.dark!.length, danil.paths.length);
+  // La tinta de la marca es suya en los dos temas; no hereda el color del texto.
+  for (const trazo of [...danil.paths, ...danil.dark!]) assert.match(trazo.fill ?? "", /^#[0-9a-f]{6}$/i);
+  assert.deepEqual(
+    danil.paths.map((trazo) => trazo.d),
+    danil.dark!.map((trazo) => trazo.d),
+  );
+});
+
 test("la marca sale del nombre del servidor, con sufijos y alias", () => {
   assert.equal(toolMarkId("github"), "github");
   assert.equal(toolMarkId("GitHub"), "github");

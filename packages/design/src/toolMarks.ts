@@ -20,6 +20,11 @@ export type ToolMarkPath = { d: string; fill: string | null };
 export type ToolMark = {
   viewBox: string;
   paths: ToolMarkPath[];
+  /**
+   * Los trazos del tema oscuro, si cambian: la marca de Danil va en tinta
+   * `#0a0a0a` en claro y `#ececef` en oscuro, como su favicon.
+   */
+  dark?: ToolMarkPath[];
 };
 
 /**

@@ -55,6 +55,7 @@ export function BrandMark({ id, size = 14, color }: { id: string | null | undefi
  * afirma un dueño que no sabemos, y el renglón escribe el nombre igual.
  */
 export function ToolBrandMark({ server, size = 14, color }: { server: string; size?: number; color: string }) {
+  const dark = useTheme().dark;
   const which = toolMarkId(server);
   if (!which) {
     return (
@@ -67,9 +68,10 @@ export function ToolBrandMark({ server, size = 14, color }: { server: string; si
     );
   }
   const mark = TOOL_MARKS[which];
+  const paths = dark && mark.dark ? mark.dark : mark.paths;
   return (
     <Svg width={size} height={size} viewBox={mark.viewBox}>
-      {mark.paths.map((p, i) => (
+      {paths.map((p, i) => (
         <Path key={i} d={p.d} fill={p.fill ?? color} />
       ))}
     </Svg>
