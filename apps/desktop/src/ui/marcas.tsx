@@ -26,24 +26,37 @@ function pedir() {
 export function MarcaServicio(props: { id: ToolMarkId; size?: number; class?: string; fallback?: JSX.Element }) {
   pedir();
   const lado = () => props.size ?? 14;
+  const caja = (marca: ToolMark, paths: ToolMark["paths"], clase: string) => (
+    <svg
+      class={clase}
+      width={lado()}
+      height={lado()}
+      viewBox={marca.viewBox}
+      fill="currentColor"
+      aria-hidden="true"
+    >
+      {paths.map((trazo) => (
+        <path d={trazo.d} fill={trazo.fill ?? undefined} />
+      ))}
+    </svg>
+  );
   return (
     <Show
       when={marcas()?.[props.id]}
       fallback={props.fallback ?? <span class="block shrink-0" style={{ width: `${lado()}px`, height: `${lado()}px` }} />}
     >
       {(marca) => (
-        <svg
-          class={props.class ?? "block shrink-0"}
-          width={lado()}
-          height={lado()}
-          viewBox={marca().viewBox}
-          fill="currentColor"
-          aria-hidden="true"
+        <Show
+          when={marca().dark}
+          fallback={caja(marca(), marca().paths, props.class ?? "block shrink-0")}
         >
-          {marca().paths.map((trazo) => (
-            <path d={trazo.d} fill={trazo.fill ?? undefined} />
-          ))}
-        </svg>
+          {(dark) => (
+            <>
+              {caja(marca(), marca().paths, `${props.class ?? "block shrink-0"} dark:hidden`)}
+              {caja(marca(), dark(), `hidden shrink-0 dark:block`)}
+            </>
+          )}
+        </Show>
       )}
     </Show>
   );
