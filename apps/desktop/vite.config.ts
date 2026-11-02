@@ -126,7 +126,11 @@ const desktop: UserConfig = {
   // Tailwind v4 es CSS-first: no hay `tailwind.config.js`, los tokens viven en
   // el `@theme` de `src/styles/global.css` y este plugin es todo el cableado.
   plugins: [solid(), tailwindcss(), excalidrawFonts()],
-  define: { __TERMINUS_CONTRACT__: CONTRACT },
+  define: {
+    __TERMINUS_CONTRACT__: CONTRACT,
+    // Atención en la ventana (docs/desktop-bff-session.md): apagada hasta desplegar la entrada y Computers.
+    "import.meta.env.DANIL_DESKTOP_ATTENTION": JSON.stringify(process.env.DANIL_DESKTOP_ATTENTION === "1"),
+  },
   // noVNC (la pantalla de una VM) usa `await` de nivel superior. Solo lo carga
   // su trozo perezoso: un webview sin soporte falla al abrir esa pestaña, no la app.
   esbuild: { supported: { "top-level-await": true } },

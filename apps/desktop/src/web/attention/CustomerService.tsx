@@ -8,6 +8,7 @@ import { SettingsPanel, SettingsRow, SettingsSection } from '../../features/sett
 import { t } from '../../lib/i18n';
 import { Badge } from '../../ui/Badge';
 import { Button } from '../../ui/Button';
+import { bffTransport } from './transport';
 import { accountSources, type AgentsSession } from './workspace-sources';
 
 const Channels = lazy(() => import('./Channels').then(module => ({ default: module.Channels })));
@@ -20,9 +21,9 @@ type Session = InboxSession & { subscribe?: (clear: () => void) => () => void };
 export type CustomerProps = { demo: boolean; session?: Session; load: () => Promise<ServiceSource | null>; workspace: () => string | null };
 
 export function liveService(session: AgentsSession): ServiceSource {
-  const prefix = `${import.meta.env.BASE_URL}alpha-api`;
+  const bff = bffTransport();
   return {
-    ...createService(session, fetch, prefix),
+    ...createService(session, bff.request, bff.prefix),
     resolves: async workspace => !!await resolveWorkspaceAccount(workspace, accountSources(session)),
   };
 }

@@ -233,7 +233,7 @@ function addresses() {
 }
 
 server.listen(PORT, "0.0.0.0", () => {
-  console.log(`Terminus mobile bridge on port ${PORT}, engine data ${DATA}`);
+  console.log(`Danil mobile bridge on port ${PORT}, engine data ${DATA}`);
   for (const address of addresses()) {
     const url = `http://${address}:${PORT}`;
     console.log(`  ${url}\n  terminus-mobile://pair?url=${encodeURIComponent(url)}&token=${TOKEN}`);

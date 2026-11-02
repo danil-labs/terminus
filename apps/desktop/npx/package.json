@@ -4,7 +4,6 @@
   "description": "Instala Danil (app de escritorio) con un solo comando: npx @danil-labs/terminus",
   "type": "module",
   "bin": {
-    "terminus": "bin.mjs",
     "danil-terminus": "bin.mjs"
   },
   "files": [

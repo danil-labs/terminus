@@ -1,6 +1,7 @@
 import { createEffect, createSignal, For, on, onCleanup, onMount, Show } from 'solid-js';
 import { createInbox, matchesFilter, type Conversation, type ConversationCounts, type InboxFilter, type Message } from '../../../../../packages/attention/src/inbox.ts';
 import { resolveWorkspaceAccount } from '../../../../../packages/attention/src/workspace-account.ts';
+import { bffTransport } from './transport';
 import { accountSources, type AgentsSession } from './workspace-sources';
 import { t } from '../../lib/i18n';
 import { inboxDraft } from './inbox-drafts';
@@ -27,9 +28,10 @@ export function Attention(props: { demo: boolean; session?: AgentsSession & { su
   const [channel, setChannel] = createSignal<string | null>(null);
   const [filter, setFilter] = createSignal<InboxFilter>('all');
   const [counts, setCounts] = createSignal<ConversationCounts>({ assistance: null, aiDisabled: null });
-  const api = props.session ? createInbox(props.session, fetch, `${import.meta.env.BASE_URL}alpha-api`) : null;
+  const bff = bffTransport();
+  const api = props.session ? createInbox(props.session, bff.request, bff.prefix) : null;
   const draftSession = props.session ?? { getToken: async () => '', unauthorized: async () => false };
-  const messaging = props.session ? createMessaging(props.session, fetch, `${import.meta.env.BASE_URL}alpha-api`) : null;
+  const messaging = props.session ? createMessaging(props.session, bff.request, bff.prefix) : null;
   let epoch = 0;
   let thread = 0;
   const clear = () => { epoch++; thread++; setCanReply(false); setRows([]); setSelected(undefined); setMessages([]); setMore(false); setOlder(false); setError(''); setDetail(false); setLoadingThread(false); setQuery(''); setChannel(null); setFilter('all'); setCounts({ assistance: null, aiDisabled: null }); };

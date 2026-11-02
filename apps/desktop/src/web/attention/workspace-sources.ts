@@ -1,15 +1,13 @@
 import { type DirectoryEntry, listDirectory } from '@terminus/computers';
 import type { InboxSession } from '../../../../../packages/attention/src/inbox.ts';
 import { type AccountSources, enterWorkspace } from '../../../../../packages/attention/src/workspace-account.ts';
-import { activeAccountOf } from '../audit-log';
+import { bffTransport } from './transport';
 
 /** La sesión de las pantallas de agentes: quién es, qué puede entrar y el workspace con que habla al BFF. */
 export type AgentsSession = InboxSession & {
   directory: () => Promise<DirectoryEntry[]>;
   rememberWorkspace: (key: string | null) => void;
 };
-
-const prefix = () => `${import.meta.env.BASE_URL}alpha-api`;
 
 export function agentsSession(endpoint: string, session: InboxSession): AgentsSession {
   let key: string | null = null;
@@ -19,7 +17,8 @@ export function agentsSession(endpoint: string, session: InboxSession): AgentsSe
     rememberWorkspace: value => { key = value; },
     reenter: async () => {
       if (!key) return false;
-      return enterWorkspace(session, fetch, prefix(), key).then(() => true, () => false);
+      const bff = bffTransport();
+      return enterWorkspace(session, bff.request, bff.prefix, key).then(() => true, () => false);
     },
     directory: async () => {
       const answer = await listDirectory(endpoint, await session.getToken());
@@ -31,7 +30,10 @@ export function agentsSession(endpoint: string, session: InboxSession): AgentsSe
 
 export const accountSources = (session: AgentsSession): AccountSources => ({
   directory: session.directory,
-  active: async () => activeAccountOf(await session.getToken()),
-  enter: key => enterWorkspace(session, fetch, prefix(), key),
+  active: () => bffTransport().active(session),
+  enter: key => {
+    const bff = bffTransport();
+    return enterWorkspace(session, bff.request, bff.prefix, key);
+  },
   remember: session.rememberWorkspace,
 });

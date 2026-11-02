@@ -83,12 +83,23 @@ const montar = () =>
   );
 
 const lenguasDeDisco = cargarPaquetes().then(refreshLanguage);
+// Las capacidades se leen al montar: Atención entra antes, en su trozo, solo con la bandera.
+const atencion: Promise<void> =
+  import.meta.env.DANIL_DESKTOP_ATTENTION && capabilities().nativeWindow
+    ? Promise.race([
+        import("../features/attention/desktop").then((m) => m.installDesktopAttention()),
+        // Un trozo que no llega no deja la ventana sin montar.
+        new Promise<void>((resolve) => setTimeout(resolve, 3000)),
+      ]).catch((e) => console.warn("[atencion]", e))
+    : Promise.resolve();
 // No un `await` de nivel superior: el objetivo del build es `es2020`, donde no
 // existe, y subirlo por esta línea cambiaría el objetivo de la app entera.
-if (laQueTocaYaEstaDentro()) montar();
-// Si la lectura falla o no acaba, se monta en el respaldo: el lanzador tiene que
-// poder conectar el motor que desbloquea las lecturas pendientes.
-else void mountAfterLanguagePacks(lenguasDeDisco, montar);
+void atencion.then(() => {
+  if (laQueTocaYaEstaDentro()) montar();
+  // Si la lectura falla o no acaba, se monta en el respaldo: el lanzador tiene que
+  // poder conectar el motor que desbloquea las lecturas pendientes.
+  else void mountAfterLanguagePacks(lenguasDeDisco, montar);
+});
 
 // Las otras computadoras de la cuenta de Danil, en un trozo aparte: sin sesión no instala nada.
 // La web trae su propio transporte (`web/main.tsx`).

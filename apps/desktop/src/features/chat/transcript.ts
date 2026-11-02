@@ -6,6 +6,7 @@
  */
 
 import { isQuestionFile } from "@terminus/chat/steps";
+import { mcpCallFromName } from "@terminus/chat/tools";
 import type { HistoryRef } from "@terminus/protocol";
 import type { CodeRange } from "../../lib/model.ts";
 import type { Recipient, ReplyTo, SenderTask } from "../../lib/recipients.ts";
@@ -121,18 +122,11 @@ export type McpAppCall = {
   result?: Record<string, unknown> | null;
 };
 
-export function mcpCallFromName(name: string): McpAppCall | undefined {
-  if (name.startsWith("mcp__")) {
-    const split = name.slice(5).indexOf("__");
-    if (split > 0) return {
-      server: name.slice(5, 5 + split),
-      tool: name.slice(7 + split),
-    };
-  }
-  const split = name.indexOf("·");
-  if (split > 0) return { server: name.slice(0, split), tool: name.slice(split + 1) };
-  return undefined;
-}
+/**
+ * Partir `mcp__servidor__tool` es cosa de todos los clientes, no de esta
+ * pantalla: vive en `@terminus/chat/tools`, junto con la marca del servicio.
+ */
+export { mcpCallFromName };
 
 /**
  * Mete un fragmento de respuesta en el hilo vivo.

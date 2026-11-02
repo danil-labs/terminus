@@ -89,7 +89,10 @@ export const APP_ACTIONS = [
   "run_shell_command",
   "stop_shell_command",
   // Adjuntar desde el teléfono: el archivo viaja en base64 y queda en la máquina.
+  // `guardar_adjunto` acepta documentos y el nombre original (motor con
+  // `attachment_documents_v1`); el de imágenes queda para los motores anteriores.
   "guardar_imagen_pegada",
+  "guardar_adjunto",
   "prepare_attachments",
   // Iniciar sesión en una cuenta de IA en otra máquina (enlace y código) y cerrarla.
   "add_account",
@@ -98,6 +101,8 @@ export const APP_ACTIONS = [
   "cancel_login",
   "discard_account",
   "remove_account",
+  // El próximo turno corre con esta cuenta. No enciende la máquina: el uso solo se muestra si ya está encendida.
+  "set_active_account",
   // «Nueva carpeta» y «Clonar repo» desde la tarea nueva: el clon corre en segundo
   // plano y avisa con el evento `project_clone`.
   "create_project",
