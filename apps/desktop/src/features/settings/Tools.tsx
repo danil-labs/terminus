@@ -7,6 +7,8 @@ import { Textarea } from "../../ui/Textarea";
 import { FailureNote, asFailure, type Failure } from "../../ui/Failure";
 import { cn } from "../../lib/utils";
 import { MarcaProveedor, McpMark } from "../../ui/icons";
+import { MarcaServicio } from "../../ui/marcas";
+import { toolMarkId } from "@terminus/design";
 import { t } from "../../lib/i18n";
 import { prosa, type Frase } from "../../lib/prose";
 import { ITEM_DE_MENU, Popover, PopoverContent, PopoverTrigger } from "../../ui/Popover";
@@ -995,12 +997,15 @@ export function ConexionesMenu(props: {
    * entero es el botón que la inicia; el punto rojo solo lo señala.
    */
   const Renglon = (p: { name: string; label: string; marca?: string; detalle?: string; muerto?: boolean }) => {
+    // Sin grupo (el CLI de Danil, uno pegado a mano) el nombre del servidor
+    // sigue diciendo de qué servicio es; sin esto la fila queda sin marca.
+    const marca = () => toolMarkId(p.marca ?? p.name);
     const pide = () => pendientes().has(p.name);
     const estado = () => mcpSignInState(p.name);
     const aviso = () => (estado() === "retry" ? t("mcp.task.sign_in_again") : t("mcp.task.sign_in"));
     const contenido = () => (
       <>
-        <Show when={p.marca}>{(g) => <MarcaProveedor id={g()} size={14} />}</Show>
+        <Show when={marca()}>{(id) => <MarcaServicio id={id()} size={14} />}</Show>
         <span class="min-w-0 flex-1 truncate">{p.label}</span>
       </>
     );
