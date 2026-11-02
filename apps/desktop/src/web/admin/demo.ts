@@ -125,9 +125,9 @@ export function adminDemo(account: string | null, workspace: string, other: stri
   const enterprise = account === "enterprise";
   const row: Membership = personal
     ? { id: 1, name: workspace, role: "owner", organization: null, plan: "Personal" }
-    : { id: 1, name: workspace, role: account === "member" ? "member" : "owner", organization: "Danil", plan: enterprise ? "Enterprise" : "Teams" };
+    : { id: 1, name: workspace, role: account === "member" ? "member" : "owner", organization: "Danil", organizationId: 1, plan: enterprise ? "Enterprise" : "Teams" };
   return {
-    memberships: async () => [row, { id: 2, name: other, role: "member", organization: row.organization, plan: row.plan }],
+    memberships: async () => [row, { id: 2, name: other, role: "member", organization: row.organization, organizationId: row.organizationId, plan: row.plan }],
     active: async () => 1,
     workspace: null,
     shared: sharedDemo(),
