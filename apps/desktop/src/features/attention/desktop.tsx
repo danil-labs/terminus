@@ -4,7 +4,8 @@
  * El token nunca llega aquí: `agents_bff_fetch` lo pone en Rust.
  */
 import { createRoot, createSignal, Show, Suspense, lazy, type JSX } from "solid-js";
-import type { InboxSession } from "../../../../../packages/attention/src/inbox.ts";
+import type { DirectoryEntry } from "@terminus/computers";
+import { enterWorkspace } from "../../../../../packages/attention/src/workspace-account.ts";
 import { invoke } from "../../lib/invoke.ts";
 import { listen } from "../../lib/serviceEvents";
 import { t } from "../../lib/i18n";
@@ -13,7 +14,8 @@ import { createCustomization } from "../../lib/customization";
 import { featureEntries } from "../../lib/attention-labels";
 import { AttentionMenu, PersonalizeMenu } from "../../web/attention/SidebarEntries";
 import { loadedConversations, requestConversation } from "../../web/attention/loaded";
-import { setBffTransport, type BffTransport } from "../../web/attention/transport";
+import { bffTransport, setBffTransport, type BffTransport } from "../../web/attention/transport";
+import type { AgentsSession } from "../../web/attention/workspace-sources";
 import { Button } from "../../ui/Button";
 import "../../web/phrases";
 
@@ -99,10 +101,34 @@ async function windowFetch(input: RequestInfo | URL, init: RequestInit = {}): Pr
   return new Response(empty ? null : reply.body, { status: reply.status, headers: reply.content_type ? { "Content-Type": reply.content_type } : {} });
 }
 
-const session: InboxSession & { subscribe: (clear: () => void) => () => void } = {
+let workspaceKey: string | null = null;
+const session: AgentsSession & { subscribe: (clear: () => void) => () => void } = {
   // Lo lee `sessionFetch` para la cabecera, que `windowFetch` descarta.
   getToken: async () => "window",
   unauthorized: async () => false,
+  workspaceKey: () => workspaceKey,
+  rememberWorkspace(value) { workspaceKey = value; },
+  async reenter() {
+    if (!workspaceKey) return false;
+    const bff = bffTransport();
+    try {
+      await enterWorkspace(
+        { getToken: async () => "window", unauthorized: async () => false },
+        bff.request,
+        bff.prefix,
+        workspaceKey,
+      );
+      return true;
+    } catch {
+      return false;
+    }
+  },
+  // El directorio es de Computers y el token se queda en Rust.
+  async directory() {
+    const rows = await invoke<DirectoryEntry[]>("agents_session_directory", {});
+    if (!Array.isArray(rows)) throw new Error("directory_unavailable");
+    return rows;
+  },
   subscribe(clear) {
     clears.add(clear);
     return () => clears.delete(clear);

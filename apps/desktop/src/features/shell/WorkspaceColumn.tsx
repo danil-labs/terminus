@@ -15,6 +15,7 @@ import { cerrarConEscape, createWorkspaces, type Workspace } from "../settings/w
 import { topState, type AttentionState, type WorkspaceAttention } from "./attention";
 import KeepAwake from "./KeepAwake";
 import ProfileMenu from "./ProfileMenu";
+import { workspaceBar } from "./workspace-directory";
 
 /** Las iniciales de las dos primeras palabras; una sola palabra da una letra. */
 export function monogram(name: string) {
@@ -74,6 +75,8 @@ export function AttentionBadge(props: { state: AttentionState; class?: string })
 export default function WorkspaceColumn(props: {
   attention: WorkspaceAttention[];
   onManage: () => void;
+  /** Abrió desde el menú un workspace que solo tiene agentes. */
+  onOpenAgents?: () => void;
   /** Ajustes, en su sección si se da. */
   onSettings: (panel?: string) => void;
   onReportarBug: () => void;
@@ -81,14 +84,20 @@ export default function WorkspaceColumn(props: {
   tools?: JSX.Element;
 }) {
   const ws = createWorkspaces();
+  // Con fijados, la barra muestra esos y el abierto; la persona cambia a cualquier otro desde el menú.
+  const visibles = () => {
+    const bar = workspaceBar(ws.activo() ?? null);
+    return (ws.lista() ?? []).filter(w => !bar || bar.has(w.id));
+  };
   let list: HTMLDivElement | undefined;
   const reorder = createNavigationReorder({
     scope: () => ws.activo() ?? "",
     list: () => list,
     attribute: "data-workspace-tile",
     axis: "y",
-    ids: () => (ws.lista() ?? []).map(w => w.id),
-    save: ws.reorder,
+    ids: () => visibles().map(w => w.id),
+    // Los que la barra no muestra conservan su lugar relativo, al final.
+    save: (ids) => ws.reorder([...ids, ...(ws.lista() ?? []).map(w => w.id).filter(id => !ids.includes(id))]),
   });
   const [menuOf, setMenuOf] = createSignal<string | null>(null);
   cerrarConEscape(() => menuOf() !== null, () => setMenuOf(null));
@@ -289,7 +298,7 @@ export default function WorkspaceColumn(props: {
         <Show when={accounts && others().length > 0}>
           <AccountHeader id={accounts!.current.user_id} email={accounts!.current.email} extra={accounts!.current.extra} signedIn />
         </Show>
-        <KeyedList each={ws.lista() ?? []} by={w => w.id}>{w => <Tile w={w()} />}</KeyedList>
+        <KeyedList each={visibles()} by={w => w.id}>{w => <Tile w={w()} />}</KeyedList>
         <button
           type="button"
           class="mt-1 grid size-8 shrink-0 place-items-center rounded-md border border-dashed border-neutral-500 text-neutral-500 outline-none hover:bg-neutral-200 hover:text-neutral-950 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
@@ -308,13 +317,14 @@ export default function WorkspaceColumn(props: {
           )}
         </For>
       </div>
-      <ColumnFoot tools={props.tools} onSettings={props.onSettings} onReportarBug={props.onReportarBug} />
+      <ColumnFoot onOpenAgents={props.onOpenAgents} tools={props.tools} onSettings={props.onSettings} onReportarBug={props.onReportarBug} />
     </nav>
   );
 }
 
 /** Lo que avisa de algo, Configuración y el perfil, al pie de la columna. */
 function ColumnFoot(props: {
+  onOpenAgents?: () => void;
   tools?: JSX.Element;
   onSettings: (panel?: string) => void;
   onReportarBug: () => void;
@@ -333,7 +343,7 @@ function ColumnFoot(props: {
       <button type="button" class={boton} aria-label={t("settings.title")} title={t("settings.title")} onClick={() => props.onSettings()}>
         <SettingsIcon size={17} aria-hidden="true" />
       </button>
-      <ProfileMenu onAccount={() => props.onSettings("cuenta-danil")} onReportarBug={props.onReportarBug} />
+      <ProfileMenu onOpenAgents={props.onOpenAgents} onAccount={() => props.onSettings("cuenta-danil")} onReportarBug={props.onReportarBug} />
     </div>
   );
 }

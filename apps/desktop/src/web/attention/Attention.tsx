@@ -1,7 +1,8 @@
 import { createEffect, createSignal, For, on, onCleanup, onMount, Show } from 'solid-js';
-import { createInbox, matchesFilter, type Conversation, type ConversationCounts, type InboxFilter, type InboxSession, type Message } from '../../../../../packages/attention/src/inbox.ts';
+import { createInbox, matchesFilter, type Conversation, type ConversationCounts, type InboxFilter, type Message } from '../../../../../packages/attention/src/inbox.ts';
 import { resolveWorkspaceAccount } from '../../../../../packages/attention/src/workspace-account.ts';
 import { bffTransport } from './transport';
+import { accountSources, type AgentsSession } from './workspace-sources';
 import { t } from '../../lib/i18n';
 import { inboxDraft } from './inbox-drafts';
 import { createMessaging } from '../../../../../packages/attention/src/messaging.ts';
@@ -10,7 +11,7 @@ import { Button } from '../../ui/Button';
 import { Skeleton } from '../../ui/Skeleton';
 import { ChannelFilter, ContactDetails, ConversationHeader, ConversationRow, ConversationSearch, FilterChips, InboxComposer, MessageBubble, senderLabel, SelectConversation } from './inbox-view';
 
-export function Attention(props: { demo: boolean; session?: InboxSession & { subscribe?: (clear: () => void) => () => void }; workspace: () => string | null }) {
+export function Attention(props: { demo: boolean; session?: AgentsSession & { subscribe?: (clear: () => void) => () => void }; workspace: () => string | null }) {
   const [resolved, setResolved] = createSignal(false);
   const [account, setAccount] = createSignal<number>();
   const [rows, setRows] = createSignal<Conversation[]>([]);
@@ -45,8 +46,8 @@ export function Attention(props: { demo: boolean; session?: InboxSession & { sub
   });
   async function connect() {
     clear(); setResolved(false); setAccount(undefined); const request = epoch; setBusy(true);
-    try { if (!api) throw new Error(t("web.alpha.session_required")); const value = await resolveWorkspaceAccount(props.workspace(), { accounts: api.accounts, active: () => bff.active(props.session!) }); if (request === epoch) { setResolved(true); if (value) void load(value.id); } }
-    catch (cause) { if (request === epoch) setError(cause instanceof Error ? cause.message : t("web.alpha.error")); }
+    try { if (!api) throw new Error(t("web.alpha.session_required")); const value = await resolveWorkspaceAccount(props.workspace(), accountSources(props.session!)); if (request === epoch) { setResolved(true); if (value) void load(value.id); } }
+    catch (cause) { if (request === epoch) setError(cause instanceof Error && cause.message === 'workspace_not_entered' ? t("web.service.not_entered") : cause instanceof Error ? cause.message : t("web.alpha.error")); }
     finally { if (request === epoch) setBusy(false); }
   }
   async function load(id: number, append = false) {

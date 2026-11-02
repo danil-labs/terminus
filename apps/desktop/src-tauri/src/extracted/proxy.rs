@@ -271,6 +271,7 @@ pub(super) fn desktop_command(name: &str) -> bool {
                 | "agents_session_status"
                 | "agents_session_connect"
                 | "agents_session_sign_out"
+                | "agents_session_directory"
                 | "agents_bff_fetch"
                 | "service_filter"
                 | "load_history"

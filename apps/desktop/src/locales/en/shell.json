@@ -397,5 +397,18 @@
   "shell.sidebar.view.status_review": "Review",
   "shell.sidebar.view.status_ready": "Ready",
   "shell.sidebar.view.status_closed": "Closed",
-  "shell.sidebar.view.status_unknown": "Unknown"
+  "shell.sidebar.view.status_unknown": "Unknown",
+  "shell.directory.title": "Workspaces",
+  "shell.directory.search": "Search workspaces",
+  "shell.directory.personal": "Personal",
+  "shell.directory.unlinked": "Not linked",
+  "shell.directory.support": "Support access",
+  "shell.directory.unnamed": "Unnamed",
+  "shell.directory.pin": "Pin {name} to the bar",
+  "shell.directory.unpin": "Remove {name} from the bar",
+  "shell.directory.link": "Link {name} to {workspace}",
+  "shell.directory.linkNotAdmin": "Only an owner or admin of the account can link it.",
+  "shell.directory.linkTaken": "That account or this workspace is already linked.",
+  "shell.directory.linkFailed": "Could not link. Try again.",
+  "shell.directory.truncated": "There are more workspaces. Use search."
 }

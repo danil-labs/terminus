@@ -262,6 +262,7 @@ fn start(client: Option<Arc<Client>>, autostart: bool, launcher: launcher::Launc
             agents_session::agents_session_status,
             agents_session::agents_session_connect,
             agents_session::agents_session_sign_out,
+            agents_session::agents_session_directory,
             agents_session::agents_bff_fetch,
             proxy::service_filter,
             proxy::load_history,

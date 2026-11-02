@@ -137,8 +137,10 @@ ventana oculta Atención y no reintenta.
 
 - Comandos propios de la ventana (no del motor; `desktop_command` en
   `proxy.rs`): `agents_session_status`, `agents_session_connect`,
-  `agents_session_sign_out` y `agents_bff_fetch`. Todos con `account`
-  opcional: la cuenta de Danil del workspace (sin ella, la principal).
+  `agents_session_sign_out`, `agents_session_directory` y `agents_bff_fetch`.
+  Todos con `account` opcional: la cuenta de Danil del workspace (sin ella, la principal).
+  `agents_session_directory` llama `GET /v1/me/workspaces` con el JWT de la persona
+  y devuelve solo el arreglo `workspaces`. El token no sale de Rust.
 - El llavero guarda `{"version":1,"user_id","session"}`, uno por cuenta: servicio
   `ai.danil.terminus.agents-session`, usuario la cuenta (`default` sin ella).
   Sin llavero disponible la sesión vive solo en memoria; nunca en un archivo.

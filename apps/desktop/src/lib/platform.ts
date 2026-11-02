@@ -75,6 +75,13 @@ export type Capabilities = {
   /** La bitácora de cambios de la cuenta de Danil activa, con la sesión (la web en alfa); la muestra `/admin`. */
   accountAuditLog?: AuditLogSource;
   /** `/admin` dentro de esta web (alfa); `allowed` dice si la persona es owner o admin de algún workspace de Danil. Sin esto, el escritorio la abre en el navegador. */
+  /** Los workspaces que la persona puede entrar (la web). Sin esto, el menú y la barra siguen como en el motor. */
+  workspaceDirectory?: {
+    list: () => Promise<import("@terminus/computers").Directory>;
+    pin: (keys: string[]) => Promise<void>;
+    /** Enlaza un workspace propio con una cuenta de Danil Agents; rechaza con el código del plano de control. */
+    link: (workspaceId: string, danilWorkspaceId: number) => Promise<void>;
+  };
   adminPage?: { href: (workspace: string | null) => string; allowed: () => Promise<boolean> };
   /** Lo de una cuenta personal en Configuración › Cuenta. `isPersonal` decide si se ofrece; sin `usage` o `plan`, esas pestañas no salen. */
   personalAccount?: { isPersonal: () => Promise<boolean>; usage?: () => JSX.Element; plan?: () => JSX.Element };

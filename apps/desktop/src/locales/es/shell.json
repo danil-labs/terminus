@@ -397,5 +397,18 @@
   "shell.sidebar.view.status_review": "Revisión",
   "shell.sidebar.view.status_ready": "Listo",
   "shell.sidebar.view.status_closed": "Cerrado",
-  "shell.sidebar.view.status_unknown": "Desconocido"
+  "shell.sidebar.view.status_unknown": "Desconocido",
+  "shell.directory.title": "Workspaces",
+  "shell.directory.search": "Buscar workspace",
+  "shell.directory.personal": "Personal",
+  "shell.directory.unlinked": "Sin enlazar",
+  "shell.directory.support": "Acceso de soporte",
+  "shell.directory.unnamed": "Sin nombre",
+  "shell.directory.pin": "Fijar {name} en la barra",
+  "shell.directory.unpin": "Quitar {name} de la barra",
+  "shell.directory.link": "Enlazar {name} con {workspace}",
+  "shell.directory.linkNotAdmin": "Solo un owner o admin de la cuenta puede enlazarla.",
+  "shell.directory.linkTaken": "Esa cuenta o este workspace ya tienen un enlace.",
+  "shell.directory.linkFailed": "No se pudo enlazar. Inténtalo de nuevo.",
+  "shell.directory.truncated": "Hay más workspaces. Usa la búsqueda."
 }

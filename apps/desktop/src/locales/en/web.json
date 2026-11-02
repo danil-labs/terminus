@@ -449,5 +449,6 @@
   "web.admin.policy_internal": "Internal Danil policy",
   "web.admin.policy_send_review": "Send for review",
   "web.admin.policy_proposals": "Proposals for this policy",
-  "web.admin.policy_no_proposals": "No open proposals."
+  "web.admin.policy_no_proposals": "No open proposals.",
+  "web.service.not_entered": "Could not enter this workspace. Try again."
 }

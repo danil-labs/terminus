@@ -633,6 +633,55 @@ fn proxy_error(sent: &Sent) -> Option<String> {
         .map(str::to_owned)
 }
 
+fn directory_rows(body: &str) -> Result<Value, Value> {
+    let value: Value = serde_json::from_str(body).map_err(|_| error("invalid_response"))?;
+    match value.get("workspaces") {
+        Some(rows) if rows.is_array() => Ok(rows.clone()),
+        _ => Err(error("invalid_response")),
+    }
+}
+
+/// `GET /v1/me/workspaces` con el JWT de la persona. El directorio no pasa por `/v1/bff`.
+fn directory_get(endpoint: &str, token: &str) -> Result<(u16, String), Value> {
+    let mut response = agent()
+        .get(&format!("{endpoint}/v1/me/workspaces"))
+        .header("Authorization", &format!("Bearer {token}"))
+        .header("Accept", "application/json")
+        .call()
+        .map_err(|e| match e {
+            ureq::Error::Timeout(_) => error("bff_timeout"),
+            _ => error("unavailable"),
+        })?;
+    let status = response.status().as_u16();
+    let body = response
+        .body_mut()
+        .with_config()
+        .limit(MAX_BODY as u64)
+        .read_to_string()
+        .map_err(|_| error("invalid_response"))?;
+    Ok((status, body))
+}
+
+/// El directorio de la persona, sin el token: la ventana elige la cuenta por id de workspace.
+#[tauri::command(async)]
+pub(super) fn agents_session_directory(
+    app: tauri::AppHandle,
+    account: Option<String>,
+) -> Result<Value, Value> {
+    let (_, endpoint) = client(&app, &account)?;
+    let name = key(&account);
+    let mut session = checked(&app, &account)?;
+    let mut got = directory_get(&endpoint, &session.access_token)?;
+    if got.0 == 401 {
+        session = access(&app, &name, true)?;
+        got = directory_get(&endpoint, &session.access_token)?;
+    }
+    if got.0 != 200 {
+        return Err(error("directory_unavailable"));
+    }
+    directory_rows(&got.1)
+}
+
 /// Una llamada al BFF por Computers con la sesión de la persona; el JavaScript nunca ve el token.
 #[tauri::command(async)]
 #[allow(clippy::too_many_arguments)]
@@ -759,6 +808,13 @@ mod tests {
         assert!(known_computers("https://computers-dev.danil.ai"));
         assert!(!known_computers("https://computers.danil.ai.evil.example"));
         assert!(!known_computers("http://computers.danil.ai"));
+    }
+
+    #[test]
+    fn directory_keeps_only_an_array() {
+        assert!(directory_rows(r#"{"workspaces":[{"key":"a:476"}]}"#).is_ok());
+        assert!(directory_rows(r#"{"workspaces":"no"}"#).is_err());
+        assert!(directory_rows("[]").is_err());
     }
 
     #[test]

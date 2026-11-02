@@ -11,6 +11,7 @@ import { cn } from "../../lib/utils";
 import { ITEM_DE_MENU, Popover, PopoverAnchor, PopoverContent } from "../../ui/Popover";
 
 const DanilFooterEntry = lazy(() => import("./DanilFooterEntry"));
+const WorkspaceDirectoryMenu = lazy(() => import("./WorkspaceDirectoryMenu"));
 
 const BUG_REPORT_URL = "https://github.com/danil-labs/terminus/issues/new?template=bug_report.yml";
 
@@ -34,6 +35,7 @@ const ELEGIDA = "bg-surface-raised font-semibold text-neutral-950 shadow-sm";
 export default function ProfileMenu(props: {
   onAccount: () => void;
   onReportarBug: () => void;
+  onOpenAgents?: () => void;
 }) {
   const [open, setOpen] = createSignal(false);
   const [tema, setTema] = createSignal<Apariencia>(apariencia());
@@ -68,6 +70,12 @@ export default function ProfileMenu(props: {
             <span class="min-w-0 flex-1 truncate">{t("settings.nav.danil_account")}</span>
             <ChevronRight size={14} aria-hidden="true" class="shrink-0 text-neutral-500" />
           </button>
+          <div class="my-1 h-px bg-border" />
+        </Show>
+        <Show when={capabilities().workspaceDirectory}>
+          <Suspense fallback={null}>
+            <WorkspaceDirectoryMenu onClose={() => setOpen(false)} onOpenAgents={props.onOpenAgents} />
+          </Suspense>
           <div class="my-1 h-px bg-border" />
         </Show>
         <p class="m-0 px-2 pt-1 pb-1 text-caption font-medium text-neutral-500">{t("shell.profile.theme")}</p>

@@ -18,7 +18,7 @@ import Sparkles from "lucide-solid/icons/sparkles";
 import Users from "lucide-solid/icons/users";
 import { createMemo, createResource, createSignal, For, type JSX, lazy, Match, Show, Suspense, Switch } from "solid-js";
 import { isManager, type Membership } from "../../../../../packages/attention/src/support-access.ts";
-import { resolveWorkspaceAccount } from "../../../../../packages/attention/src/workspace-account.ts";
+import { type AccountSources, resolveWorkspaceAccount } from "../../../../../packages/attention/src/workspace-account.ts";
 import { t } from "../../lib/i18n";
 import { Button } from "../../ui/Button";
 import { Select } from "../../ui/Select";
@@ -44,6 +44,8 @@ export type AdminSource = {
   memberships: () => Promise<Membership[]>;
   /** El workspace activo de la sesión: la bitácora solo lee ese. */
   active: () => Promise<number | null>;
+  /** De dónde sale la cuenta de `workspace` (`resolveWorkspaceAccount`). */
+  accounts: AccountSources;
   support: SupportAccessSource;
   auditLog?: AuditLogSource;
   /** Lo que se comparte con el equipo de este workspace. */
@@ -117,7 +119,7 @@ export function AdminPage(props: { source: AdminSource }) {
     const [rows, active] = await Promise.all([props.source.memberships(), props.source.active().catch(() => null)]);
     const account = props.source.workspace === null
       ? rows.find((m) => m.id === active)
-      : await resolveWorkspaceAccount(props.source.workspace, { accounts: async () => rows, active: async () => active });
+      : await resolveWorkspaceAccount(props.source.workspace, props.source.accounts);
     return { rows, active, current: rows.find((m) => m.id === account?.id) ?? null };
   });
   const current = () => data()?.current ?? null;

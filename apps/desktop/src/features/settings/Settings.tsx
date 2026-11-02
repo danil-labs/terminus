@@ -101,7 +101,7 @@ const pestanasDe = (
   proyectos: ContextoDeProyectos | undefined,
   workspace: () => string | null,
   activityMachine: () => string | null,
-  workspaceName: () => string | null,
+  agentsWorkspace: () => string | null,
 ): Record<string, Pestana | undefined> => {
   const cuenta = capabilities().danilAccount || capabilities().accountProfile;
   const tab = (id: string, name: () => string, panel: Pestana["panel"]): Pestana => ({ id, get name() { return name(); }, panel });
@@ -130,7 +130,7 @@ const pestanasDe = (
           modelos={agentes.modelos}
           proyecto={agentes.proyecto}
           onAgentProfile={agentes.onAgentProfile}
-          after={<CustomerAgents workspace={workspaceName} />}
+          after={<CustomerAgents workspace={agentsWorkspace} />}
         />
       </Suspense>
     )),
@@ -139,7 +139,7 @@ const pestanasDe = (
     plugins: tab("plugins", () => t("settings.tab.plugins"), () => <SettingsPanel><Integrations /></SettingsPanel>),
     memory: tab("memory", () => t("settings.tab.memory"), () => <SettingsPanel><ProveedorDeMemoria /></SettingsPanel>),
     external: cuenta ? tab("external", () => t("settings.tab.external"), () => <Suspense fallback={null}><Connections workspace={workspace()} /></Suspense>) : undefined,
-    customers: tab("customers", () => t("settings.tab.customers"), () => <CustomerConnections workspace={workspaceName} />),
+    customers: tab("customers", () => t("settings.tab.customers"), () => <CustomerConnections workspace={agentsWorkspace} />),
   };
 };
 
@@ -208,6 +208,8 @@ export default function Settings(props: {
   workspace?: string | null;
   /** Su nombre: con él se avisa si la atención que se ve es de otra cuenta. */
   workspaceName?: string | null;
+  /** Id del workspace abierto, o la clave de uno que solo tiene agentes. */
+  agentsWorkspace?: string | null;
   activityMachine?: string | null;
   onClose: () => void;
   /** Con qué entrada o pestaña abrir: un id de `settings-entries.ts`, viejo o nuevo. */
@@ -301,7 +303,7 @@ export default function Settings(props: {
       return props.agentesEnUso ?? [];
     },
     onAgentProfile: (project, name) => props.onAgentProfile?.(project, name),
-  }, props.proyectos, () => props.workspace ?? null, () => props.activityMachine ?? null, () => props.workspaceName ?? null);
+  }, props.proyectos, () => props.workspace ?? null, () => props.activityMachine ?? null, () => props.agentsWorkspace ?? null);
   const ENTRADAS = entradasDe(pestanas);
 
   // Sin soporte del motor activo, Secretos no se ofrece; su enlace directo sí abre el aviso.
@@ -469,7 +471,7 @@ export default function Settings(props: {
                   </optgroup>
                 )}</For>
               </Select>
-              <AdminLink workspace={props.workspaceName ?? null} />
+              <AdminLink workspace={props.agentsWorkspace ?? null} />
             </header>
             <Sidebar
               role="tablist"
@@ -499,7 +501,7 @@ export default function Settings(props: {
                   )}
                 </For>
               </SidebarContent>
-              <AdminLink workspace={props.workspaceName ?? null} />
+              <AdminLink workspace={props.agentsWorkspace ?? null} />
             </Sidebar>
 
             <div class="relative min-h-0 min-w-0 bg-surface">
