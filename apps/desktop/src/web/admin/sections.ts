@@ -3,11 +3,14 @@ export type AccountKind = "personal" | "teams" | "enterprise";
 export type Section = "general" | "usage" | "members" | "support" | "audit" | "skills" | "mcp" | "agents" | "rules" | "workspaces" | "plan" | "identity";
 export type GroupName = "summary" | "people" | "control" | "organization";
 
-/** Solo un plan explícito hace personal a una cuenta: si el BFF no lo manda, tratarla así dejaría sin Harness a una organización. */
-export function accountKind(account: { plan: string | null }): AccountKind {
+/**
+ * Solo un dato explícito hace personal a una cuenta: el plan Personal o `personal` (el BFF dijo que no tiene organización).
+ * Si el BFF no manda ninguno, tratarla así dejaría sin Harness a una organización.
+ */
+export function accountKind(account: { plan: string | null; personal?: boolean }): AccountKind {
   const plan = account.plan?.toLowerCase() ?? "";
   if (plan.includes("enterprise")) return "enterprise";
-  if (plan.includes("personal")) return "personal";
+  if (plan.includes("personal") || account.personal === true) return "personal";
   return "teams";
 }
 

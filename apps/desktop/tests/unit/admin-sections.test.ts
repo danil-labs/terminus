@@ -11,6 +11,12 @@ test("only an explicit plan makes an account personal, so a missing plan never l
   assert.equal(accountKind({ plan: null }), "teams");
 });
 
+test("the BFF saying a workspace has no organization makes it personal; a missing field does not", () => {
+  assert.equal(accountKind({ plan: null, personal: true }), "personal");
+  assert.equal(accountKind({ plan: null, personal: undefined }), "teams");
+  assert.equal(accountKind({ plan: "Enterprise", personal: true }), "enterprise");
+});
+
 test("a personal account has no Harness", () => {
   assert.deepEqual(visibleSections("personal", true, ALL), []);
 });

@@ -111,7 +111,7 @@ const auditDemo: AuditEntry[] = [
 ];
 
 const organizationOf = (plan: string, enterprise: boolean, workspace: string, other: string): OrganizationSource => ({
-  workspaces: async () => [{ id: 1, name: workspace, members: 4 }, { id: 2, name: other, members: 7 }],
+  workspaces: async (_account: number) => [{ id: 1, name: workspace, members: 4 }, { id: 2, name: other, members: 7 }],
   plan: async () => ({ name: plan, detail: "2 workspaces · 11 personas" }),
   identity: enterprise ? [{ id: "sso", value: "Activo con Okta" }, { id: "domains", value: "ejemplo.mx" }, { id: "retention", value: "365 días" }] : undefined,
 });
